@@ -32914,13 +32914,13 @@ function gearEscapeAdvice(data, loop, species, z, cap, rig) {
   const subject = lineMode
     ? "Your line"
     : item && item !== "bare"
-      ? label(item)
+      ? "The " + label(item)
       : rig.lure || rig.bait
         ? "This hook setup"
         : "Your bare hook";
   const opening = lineMode
-    ? "It took the hook, but your line only holds up to " + limit + "."
-    : "The fish took it. " + subject + " can only hold up to " + limit + " for this fish.";
+    ? "It took the hook, but your line only lands fish up to " + limit + "."
+    : "It took the hook. " + subject + " can only land this kind of fish up to " + limit + ".";
   const hooks = [{ lure: rig.lure, bait: rig.bait, change: null }];
   for (const [id, lure] of Object.entries(local))
     if (lure.water === water && (!lure.found || loop?.lures?.includes(id)))
@@ -44545,11 +44545,11 @@ var pP = {
       size: "{a} {class}, near {size}.",
       stillOut: "It's still out there, {place}.",
       stillOutWater: "It's still out there, in that deep water.",
-      oddsLink: "Odds in your log",
+      oddsLink: "Odds in your Journal",
       toast: "{a} {species} {cause}.",
       cause: {
-        snapped: "It parted the line.",
-        snappedLong: "It parted the line on its last run.",
+        snapped: "It broke the line.",
+        snappedLong: "It broke the line on its last run.",
         thrown: "It threw the hook.",
         thrownLeap: "It threw the hook mid-leap.",
         spat: "It spat the hook at the raft.",
@@ -44558,12 +44558,12 @@ var pP = {
         staggered: "The line parted when you staggered.",
       },
       toastCause: {
-        snapped: "parted the line",
+        snapped: "broke the line",
         thrown: "threw the hook",
         spat: "spat the hook",
         spooled: "stripped the reel",
         fouled: "fouled the line",
-        staggered: "parted the line",
+        staggered: "broke the line",
       },
       hint: {
         line: "Heavier line holds the long runs.",
@@ -44583,8 +44583,8 @@ var pP = {
         marked: "{name}, {class}, near {size}",
       },
       gear: {
-        tackle: "+{hold} Hold on every fish \xB7 counts \xD71.6 against {styles}.",
-        item: "+{hold} Hold against {targets}.",
+        tackle: "Adds {hold} Grip on every fish, and more on {styles}.",
+        item: "Adds {hold} Grip on {targets}.",
         none: "Helps nothing you have met yet.",
         compare: "{name} ({class}): {from} \u2192 {to} with this.",
         lastAway: "The {name} that {cause} ({class})",
@@ -44726,14 +44726,14 @@ var pP = {
       ],
       murkWake: "Awake, little Wick? You're guttering. Fish make oil; oil makes light.",
       murkWakeP3: "Water's that way.",
-      murkSpooked: "Too keen. It felt you. Again.",
+      murkSpooked: "Too soon. Wait till it goes right under.",
       murkPassed: "It let go. Bait's still on. Again.",
       murkLost: [
         "Happens to all of us. Again.",
         "Twice. The water keeps score. Once more.",
         "Some nights. Come on, the chart won't read itself.",
       ],
-      murkOdds: "Your odds are in the log. Better tackle, better odds. Never certain.",
+      murkOdds: "Your odds are in the Journal. Better tackle, better odds. Never certain.",
       murkGate: "The real water's through the gate. Chart's on the table.",
       murkFirstOil: "First oil's on me. The rest you fish for.",
       murkReplay: "Same as it ever was. The gate's where you left it.",
@@ -44748,13 +44748,13 @@ var pP = {
       skip: "Skip",
       skipConfirm: "Skip the first evening?",
       replay: "Replay the first evening",
-      logGlyph: "Odds are in the log",
+      logGlyph: "Odds are in the Journal",
     },
     tips: {
       fe_walk: "Walk with WASD or the left stick. Tap a glow to walk there.",
-      fe_cast: "Hold on the water. Let go to cast.",
+      fe_cast: "Press on the water. Let go to cast.",
       fe_wait: "Wait for it to go under.",
-      fe_strike: { touch: "Now. Tap.", desktop: "Now. Click." },
+      fe_strike: { touch: "It's under. Press now.", desktop: "It's under. Press now." },
       fe_play: "The line does the rest. You'll know what it is when it's in.",
       fe_sail: { desktop: "Sail with WASD or the left stick.", touch: "Sail with the left stick." },
     },
@@ -46661,7 +46661,7 @@ var pP = {
       id: "af_changed",
       phase: 1,
       trigger: "tip:show:af_changed",
-      text: "Tap when it goes under. The line does the rest now; your odds are in the log.",
+      text: "Press when it goes under. The line does the rest now, and your odds are in the Journal.",
     },
     {
       id: "af_letpass",
@@ -46673,7 +46673,7 @@ var pP = {
       id: "af_strikeReminder",
       phase: 1,
       trigger: "tip:show:af_strikeReminder",
-      text: "Tap when it goes under.",
+      text: "Press when it goes under.",
     },
     {
       id: "af_hurry",
@@ -47012,8 +47012,8 @@ var pP = {
     tabs: { tackle: "Tackle", raft: "Raft", bait: "Bait", maps: "Maps", home: "Home", giants: "Giants" },
     jetty: { murk: "Murk", chart: "Chart", journal: "Journal", wall: "The Long Wall" },
     shelf: {
-      hold: "One more slot.",
-      rod: "Holds every fish better. Casts farther.",
+      hold: "Room for one more fish.",
+      rod: "Grips every fish better. Casts farther.",
       line: "Lands bigger fish.",
       reel: "More line for the big ones.",
       heartmoss: "Ten Heartmoss Balls. Fish the Bell Pool by day or dusk. Other fish take them too.",
@@ -47025,13 +47025,13 @@ var pP = {
       bell_pool: "The moon looks in on the old bell.",
     },
     murk: {
-      empty: "Nothing? The water keeps its own counsel. Go again.",
+      empty: "Nothing? It happens. Go again.",
       wake: "Awake, little Wick? Good. Fish sell. Clams buy. That's the whole of it.",
       firstChart: "Three slots in that hold. Fill them and come home.",
       firstChartBy: { tallow: "Four slots in that hold. Fill them and come home." },
       firstSale: "Clams. Spend them here. I'm the only shop left.",
       firstQuiet: "Quiet water. Move on, or go home.",
-      firstLetGo: "Let one go and the water remembers.",
+      firstLetGo: "Let one go. That spot gets a bite back.",
       firstTrophy: "Now that's a fish.",
       sailOut: [
         "Bring me something with a story.",
@@ -47148,16 +47148,16 @@ wo.orders = {
   heavyZ: 0.35,
 };
 Object.assign(Ca.shelf, {
-  feather_fly: "+5 Hold against insect eaters.",
-  glimmer_spoon: "+6 Hold against predators.",
-  bone_jig: "+6 Hold against bottom feeders.",
+  feather_fly: "Adds 5 Grip on insect eaters.",
+  glimmer_spoon: "Adds 6 Grip on predators.",
+  bone_jig: "Adds 6 Grip on bottom feeders.",
   bell_spinner: "For the Thousandcast Pike.",
   mireworm: "For the Mossmere.",
   lumen_moss: "The Gloam Eel bites on nothing else.",
-  cut_strip: "Holds predators better.",
-  oars: "Faster.",
-  keel: "Bigger fish.",
-  lantern: "Bigger fish at night.",
+  cut_strip: "Grips predators better.",
+  oars: "Your raft sails faster.",
+  keel: "Brings bigger fish.",
+  lantern: "Brings bigger fish at night.",
   orders: "Orders pay double.",
 });
 Ca.gearNames = {
@@ -47217,7 +47217,7 @@ Ca.log = Object.assign(Ca.log || {}, {
   bare: "Bare hook",
   under: "<1%",
   unmet: "and {n} you have not met",
-  gear: "+{n} Hold on the fish it suits ({m} you have met).",
+  gear: "Adds {n} Grip on the fish it suits ({m} you have met).",
 });
 wo.start = { lures: ["bent_spoon"], bait: { mireworm: 10 }, fit: "mireworm" };
 wo.bare = { waitMult: 2.5, favour: -0.5 };
@@ -47853,21 +47853,22 @@ Ca.lookNames = {
   amber_glass: "Amber Lantern Glass",
 };
 Ca.tabs.prints = "Prints";
-Ca.murk.shelfBare = "Shelf's bare. Keep the rest; the road goes on.";
+Ca.murk.shelfBare = "Shelf's bare. Save your clams for new water.";
 Ca.goods = { name: "Murk's Goods", buy: "Buy \xB7 {price}" };
 Ca.sheet = {
   title: "{name}'s Sheet",
   buffs: "Buffs",
   odds: "Odds",
   exact: {
-    wick: "Each sells \xD7{mult}, at least {floor} more. Never a giant.",
-    taper: "First bite never a common fish. Giants \xD7{share} as often, to {cap}.",
-    stub: "Bites sooner \xD7{sooner}. Quiet water costs \xD7{quiet} as much, and never slows them.",
-    tallow: "+{good} good bite at every water and place, too.",
-    ashwick: "Once, tired: +{hold} Hold when it bites again. Never a giant.",
+    wick: "Each one sells for {mult} times as much, and at least {floor} clams more. Giants do not count.",
+    taper:
+      "Your first bite each evening is never a common fish. Giants bite {share} times as often, up to {cap} of bites.",
+    stub: "Fish bite {sooner} times as fast. Quiet water hurts only {quiet} times as much, and never slows your bites.",
+    tallow: "You also get {good} more good bite in every water and place.",
+    ashwick: "It returns once, tired, and you get {hold} more Grip on it. Giants never return.",
   },
   cast: "Casts {m} m \xB7 {n} longer to strike",
-  hookSet: "Hook set: Hold +{hold}",
+  hookSet: "Hook set: {hold} more Grip",
   bigger: { predator: "Bigger predators.", bottom: "Bigger bottom feeders." },
   giants: "Giants \xD7{k}.",
   rarer: "Rarer fish.",
@@ -48669,7 +48670,7 @@ wo.ambient.sporewood = {
     ],
   },
 };
-Ca.tackle.screen = { rod: "Rod", line: "Line", reel: "Reel", done: "Done", hold: "+{n} Hold." };
+Ca.tackle.screen = { rod: "Rod", line: "Line", reel: "Reel", done: "Done", hold: "Adds {n} Grip." };
 var Jr = ds.size;
 function ak(e, t = null) {
   let n = e.size.L50;
@@ -107590,8 +107591,8 @@ function HF(e) {
         giants: Array.isArray(tt.species),
         equipped: e.af?.equippedItem?.(Ve) === tt.id,
         depth: tt.depth || null,
-        holdText: e.af?.holdText?.(tt.id) || `+${wt} Hold`,
-        effectText: e.af?.holdText?.(tt.id) || `+${wt} Hold`,
+        holdText: e.af?.holdText?.(tt.id) || `+${wt} Grip`,
+        effectText: e.af?.holdText?.(tt.id) || `+${wt} Grip`,
       }
     );
   }
@@ -108516,14 +108517,14 @@ function FF(e) {
       q = k.holdPerLevel ? `${k.holdPerLevel} per level` : k.hold;
     if (k.all)
       return (
-        (F.tackle || "+{hold} Hold on every fish")
-          .split(" \xB7 ")[0]
+        (F.tackle || "Adds {hold} Grip on every fish")
+          .split(", and ")[0]
           .replace("{hold}", q)
           .replace(/\.$/, "") + "."
       );
     let $ = J(ge);
     if ($ && $.suits === !0)
-      return String(n().TEXT_LOOP?.log?.gear || "+{n} Hold on the fish it suits ({m} you have met).")
+      return String(n().TEXT_LOOP?.log?.gear || "Adds {n} Grip on the fish it suits ({m} you have met).")
         .replace("{n}", q)
         .replace("{m}", $.met.length);
     let de;
@@ -108537,7 +108538,7 @@ function FF(e) {
               .filter(Boolean)
               .join(", ")),
       de
-        ? (F.item || "+{hold} Hold against {targets}.").replace("{hold}", q).replace("{targets}", de)
+        ? (F.item || "Adds {hold} Grip on {targets}.").replace("{hold}", q).replace("{targets}", de)
         : F.none || "Helps nothing you have met yet."
     );
   }
@@ -148467,7 +148468,7 @@ function pU(e, t = {}, { speciesName: n = "", placeName: o = "", species: a = nu
       cause: g,
       still: v,
       hint: L,
-      link: s.oddsLink || "Odds in your log",
+      link: s.oddsLink || "Odds in your Journal",
       cls: c,
     };
   return (
@@ -148619,16 +148620,16 @@ function cU(e, t, { names: n = {} } = {}) {
     let f = Array.isArray(t.emphasis) ? t.emphasis : Ju(t.emphasis?.styles),
       u = (f.length ? f : Aue(e, t.kind)).map((h) => kue[h] || h);
     return u.length
-      ? Rc(o.tackle || "+{hold} Hold on every fish \xB7 counts \xD71.6 against {styles}.", {
+      ? Rc(o.tackle || "Adds {hold} Grip on every fish, and more on {styles}.", {
           hold: a,
           styles: Wz(u),
         })
-      : `+${a} Hold on every fish.`;
+      : `Adds ${a} Grip on every fish.`;
   }
   let i = t.targets,
     c = (f) => (Array.isArray(f?.met) ? f.met.length : xr(f?.met, -1));
   if (i && typeof i == "object" && i.suits === !0)
-    return Rc(e?.TEXT_LOOP?.log?.gear || "+{n} Hold on the fish it suits ({m} you have met).", {
+    return Rc(e?.TEXT_LOOP?.log?.gear || "Adds {n} Grip on the fish it suits ({m} you have met).", {
       n: a,
       m: Math.max(0, c(i)),
     });
@@ -148654,8 +148655,8 @@ function cU(e, t, { names: n = {} } = {}) {
     }
   else return o.none || "Helps nothing you have met yet.";
   return d === "every fish"
-    ? `+${a} Hold on every fish.`
-    : Rc(o.item || "+{hold} Hold against {targets}.", { hold: a, targets: d });
+    ? `Adds ${a} Grip on every fish.`
+    : Rc(o.item || "Adds {hold} Grip on {targets}.", { hold: a, targets: d });
 }
 function vb(e, t, n, o, { speciesName: a = "" } = {}) {
   if (!t || n === null || n === void 0 || o === null || o === void 0) return "";
@@ -149049,7 +149050,7 @@ function yU(e, t, n, o) {
     p(E, "wf", "gw-fed", ue), h(E.querySelector(".gw-wf-t"), "wfT", ue ? "Well-fed" : "Hungry");
     let Oe = r(Ce.BALANCE?.wellFed?.effects?.hold, r(Ce.CATCH_V3?.buffs?.wellFed, 2)),
       ut = ue
-        ? `Well-fed: a steadier hand on the line (+${Oe} Hold). Hunger never hurts.`
+        ? `Well-fed: a steadier hand on the line (+${Oe} Grip). Hunger never hurts.`
         : "Eat a fish to be Well-fed again. Hunger never hurts.";
     E.title !== ut && (E.title = ut);
     let Ot = Math.max(
@@ -158571,7 +158572,7 @@ function pC(e) {
     bait: t.bait || "Bait",
     bare: t.bare || "Bare hook",
     done: n.done || "Done",
-    hold: n.hold || "+{n} Hold.",
+    hold: n.hold || "Adds {n} Grip.",
     after: t.after || "After this fish.",
     cast: o.cast || "Casts {m} m.",
     play: o.play || "Plays {x}\xD7 as long.",
@@ -163624,7 +163625,7 @@ function GV(e, t, { names: n = {}, phone: o = !1 } = {}) {
           notchLabel: y(C.notches),
           lines: Y,
           fresh: !!C.fresh,
-          figure: C.slot === "rod" ? `${C.values.castMax} m` : `+${C.values.hold} Hold`,
+          figure: C.slot === "rod" ? `${C.values.castMax} m` : `+${C.values.hold} Grip`,
           next: C.next ? { id: C.next.id, text: w(C.next), compare: p(C.next.compare) } : null,
           art: C.found
             ? null
@@ -163649,7 +163650,7 @@ function GV(e, t, { names: n = {}, phone: o = !1 } = {}) {
           le.push(xb(t, { kind: C, hold: Te.hold, targets: { suits: !0, met: As(Te.suits?.met) } })),
         C === "bait")
       ) {
-        t?.BALANCE?.favour?.tackle?.bait?.[Y] && le.push(a.shelf?.keel || "Bigger fish."),
+        t?.BALANCE?.favour?.tackle?.bait?.[Y] && le.push(a.shelf?.keel || "Brings bigger fish."),
           Y === "cut_strip" && le.push(s.bigger?.predator || "");
         let Ye = Ui(t?.BAITS).find((ee) => ee?.id === Y)?.bonus || {};
         As(Ye.biteSpeed) > 0 && le.push(s0(s.sooner, { k: Math.round((1 + As(Ye.biteSpeed)) * 100) / 100 })),
@@ -163676,7 +163677,7 @@ function GV(e, t, { names: n = {}, phone: o = !1 } = {}) {
         count: C === "bait" && Y ? le.count : null,
         lines: O(C, Y),
         fresh: !!le.fresh,
-        figure: Y ? (C === "lure" ? (le.hold ? `+${le.hold} Hold` : "") : String(As(le.count))) : "",
+        figure: Y ? (C === "lure" ? (le.hold ? `+${le.hold} Grip` : "") : String(As(le.count))) : "",
         art: Y
           ? { slot: C === "lure" ? "lure" : Y === t?.LOOP?.legendBait?.[r.water]?.id ? "bait" : "tin", id: Y }
           : { slot: "hook", id: "bare" },
@@ -163840,7 +163841,7 @@ function GV(e, t, { names: n = {}, phone: o = !1 } = {}) {
               (ie.name = c(le.id)),
               (ie.effect = [
                 Y.kind === "bigger"
-                  ? a.shelf?.keel || "Bigger fish."
+                  ? a.shelf?.keel || "Brings bigger fish."
                   : Y.kind === "sooner"
                     ? s0(s.sooner, { k: Y.value })
                     : Y.kind === "rarer"
@@ -164356,17 +164357,17 @@ function currentKitRows(model, view, data, firstOpen) {
     data.LURES?.find((x) => x.id === id)?.name ||
     id;
   const signed = (n) => (n >= 0 ? "+" : "") + num(n);
-  const hold = (n) => signed(n) + " Hold";
+  const hold = (n) => signed(n) + " Grip";
   const exact = model.wick?.exact;
   if (exact?.id === "taper") {
     add(
       view.head.passive,
-      "The first fish bite of the outing skips common fish.",
+      "Your first bite each evening is never a common fish.",
       model.trip ? (firstOpen ? "Ready this outing" : "Used this outing") : "First bite each outing",
     );
     add(
       view.head.passive,
-      "Giant bite weight ×" + exact.values.share + ", up to " + exact.values.cap + "% share.",
+      "Giants bite " + exact.values.share + " times as often, up to " + exact.values.cap + "% of bites.",
       "In giant water",
     );
   } else add(view.head.passive, [view.head.line, view.head.exact].filter(Boolean).join(" "), "Wick passive");
@@ -165177,7 +165178,7 @@ function VV(e) {
     lt.appendChild(context);
     const definition = document.createElement("p");
     definition.className = "gw-kit-guide";
-    definition.textContent = "Hold helps you land a fish once it is hooked.";
+    definition.textContent = "Grip helps you land a fish once it is hooked.";
     lt.appendChild(definition);
     for (const row of currentKitRows(overview, summary, n(), a()?.taperFirstOpen?.())) {
       const wrap = document.createElement("div");
