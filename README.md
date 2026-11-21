@@ -17,7 +17,7 @@ in `src/`; any hand edit to it is overwritten by the next build. Commit the rebu
 | `src/shell.html`                               | The page around the scripts: head, styles, the two small inline scripts, the loader. It holds three placeholders, `@@GW_INCLUDE:game.js@@`, `@@GW_INCLUDE:field-guide.html@@` and `@@GW_INCLUDE:spore-guide.html@@`. |
 | `src/game.js`                                  | The `<script type="module">` body: three.js plus all game code, as one file. It comes from a minified bundle, so identifiers are short; it has been formatted with Prettier, nothing else.                           |
 | `src/field-guide.html`, `src/spore-guide.html` | Two standalone documents the game opens. The page stores each as a JSON string inside a `<script type="application/json">` element; the build encodes them.                                                          |
-| `tools/build.mjs`                              | Assembles `src/` into `Gloomwater-Mossmere.html`. Plain Node, no dependencies, no minification, deterministic. Prints the size and SHA-256.                                                                          |
+| `tools/build.mjs`                              | Assembles `src/` into `Gloomwater-Mossmere.html`, squeezing the spacing and comments out of the game code on the way (whitespace only, via esbuild). Deterministic. Prints the size and SHA-256. `--readable` builds an unsqueezed copy for debugging.                                                                          |
 | `tools/verify-equivalence.mjs`                 | Proves the built page is the same program as a committed one (see below).                                                                                                                                            |
 | `tools/smoke.mjs`                              | Plays the opening of a new game in headless Chromium and fails on any console or page error.                                                                                                                         |
 | `tools/scenarios.mjs`                          | Scenario tests: loads each save fixture, boots the built game in headless Chromium and drives it through `window.__gw`.                                                                                              |
@@ -44,6 +44,17 @@ SwiftShader (software WebGL2), opens the page from a `file://` URL, starts a new
 the intro, taps through the opening tow, sails onto the Mossmere and makes one cast. It takes about a
 minute. Google Fonts requests are answered with an empty stylesheet so the test never depends on the
 network.
+
+### Why the built page is squeezed
+
+`src/game.js` is formatted so people can read and edit it, which costs about 1.8 MB of spacing. The build
+prints it back without spacing or comments before it goes into the page (esbuild, whitespace only: no
+syntax or name changes), so players get the smaller file and the source stays readable. The tests always
+run against the squeezed page, the one people play.
+
+To debug with readable code and line numbers, run `node tools/build.mjs --readable`. It writes
+`Gloomwater-Mossmere.readable.html`, which is ignored by git. Never commit a readable build as
+`Gloomwater-Mossmere.html`.
 
 ### Rules the build enforces
 

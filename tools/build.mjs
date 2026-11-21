@@ -6,18 +6,26 @@
 //   src/field-guide.html  standalone document, stored in the page as a JSON string
 //   src/spore-guide.html  standalone document, stored in the page as a JSON string
 //
-// Plain Node, no dependencies, no minification. The output is a pure function of the four inputs, so two
-// builds from the same sources are byte-identical. Any problem fails the build with a message.
+// The game code is squeezed on the way in: esbuild prints src/game.js back without its spacing and comments
+// (whitespace only: no syntax or name minification), which takes about 1.8 MB off the page and changes
+// nothing in how it runs. "npm run verify" proves that against any earlier build. With --readable the
+// code goes in exactly as written, for debugging; that needs no dependency.
 //
-// Usage: node tools/build.mjs [--out <path>]   (default: <repo>/Gloomwater-Mossmere.html)
+// The output is a pure function of the four inputs (and the pinned esbuild version), so two builds from the
+// same sources are byte-identical. Any problem fails the build with a message.
+//
+// Usage: node tools/build.mjs [--readable] [--out <path>]
+//   default output: <repo>/Gloomwater-Mossmere.html, or Gloomwater-Mossmere.readable.html with --readable
 
 import { createHash } from "node:crypto";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const OUTPUT = join(ROOT, "Gloomwater-Mossmere.html");
+export const READABLE_OUTPUT = join(ROOT, "Gloomwater-Mossmere.readable.html");
 
 // Placeholder token in src/shell.html  ->  source file and how it is embedded.
 export const REGIONS = [
@@ -92,7 +100,27 @@ export function encodeDocument(text) {
   return json;
 }
 
-export function build() {
+// Prints the module body back without spacing or comments. Whitespace only: names and syntax stay as
+// written, so the result is the same program statement for statement (esbuild may add a number to a local
+// name where two scopes share one; that never changes what runs).
+export function squeezeModule(code, rel = "src/game.js") {
+  let transformSync;
+  try {
+    ({ transformSync } = createRequire(import.meta.url)("esbuild"));
+  } catch {
+    fail("esbuild is not installed: run npm install, or build with --readable");
+  }
+  let result;
+  try {
+    result = transformSync(code, { loader: "js", charset: "utf8", minifyWhitespace: true, sourcefile: rel });
+  } catch (e) {
+    fail(`cannot squeeze ${rel}: ${e.message}`);
+  }
+  if (result.warnings.length) fail(`esbuild warned about ${rel}: ${result.warnings[0].text}`);
+  return result.code;
+}
+
+export function build({ readable = false } = {}) {
   const shell = readText("src/shell.html");
   for (const { token } of REGIONS) {
     const n = shell.split(token).length - 1;
@@ -107,7 +135,9 @@ export function build() {
     let body;
     if (kind === "module") {
       checkModule(src, file);
-      body = src;
+      body = readable ? src : squeezeModule(src, file);
+      // The printed code must be as safe to embed as the source was.
+      if (!readable) checkModule(body, `${file} (squeezed)`);
     } else {
       body = encodeDocument(src);
     }
@@ -121,9 +151,11 @@ export function build() {
 export const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
 
 function main(argv) {
+  const readable = argv.includes("--readable");
   const i = argv.indexOf("--out");
-  const out = i >= 0 ? resolve(argv[i + 1] ?? fail("--out needs a path")) : OUTPUT;
-  const bytes = build();
+  const out =
+    i >= 0 ? resolve(argv[i + 1] ?? fail("--out needs a path")) : readable ? READABLE_OUTPUT : OUTPUT;
+  const bytes = build({ readable });
   const tmp = `${out}.tmp-${process.pid}`;
   writeFileSync(tmp, bytes);
   renameSync(tmp, out);
