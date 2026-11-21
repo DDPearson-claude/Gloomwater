@@ -48,9 +48,19 @@ The designer's direction for her story and her hiding place. The details are in 
 - **Bite marks.** Fish the player catches sometimes carry a mark from whatever hunts them. The marks point to the kind of predator out there and help rule suspects out.
 - **Clue ideas to draw on.** The designer's list of River Monsters clue types (wounds and scars, signs in the field, what witnesses say, local tales and history, red herrings) is the pool for this and later lakes. Not all of it is for Mossmere.
 
+## Mossmere hunt, second version, approved 21 November 2026
+
+The full design is `mossmere-hunt-2.md` once it is added to this folder. It replaces the clue design of `mossmere-hunt.md` (the Case page, the bell at night). The designer's answers to its four questions:
+
+- **She steals a fish off your line, float and all.** Once a night, just after the midnight bell, inside Hob's part of the lake, and only until her water is found. The float is replaced free. That theft is how her water is found, and it is what sketch 2 draws. (A narrow exception to rule 9.)
+- **One part per loss.** A wrong rig can lose her up to three times, in fight order: hook, then leader, then line. Each loss teaches one part only. Sketch 5 is still one sketch and grows by one part with each loss. (The designer turned down "one loss shows every wrong part".)
+- **The unique item is Hob's Lamp.** Hob gives it when she is landed. It hangs on the raft in every lake. Its one bonus: kinds of fish the player has never caught bite more often. It never helps against a lake's monster.
+- **Going back.** An earlier lake's gear and clams wait as the player left them. Only the unique item travels.
+
+Gaps filled by the team, as reported to the designer: the midnight bell hangs in the leaning toll-tower at the north end and strikes about two minutes after setting out; her feeding time lasts about three minutes from its first stroke; none of her signs appear before Hob has drawn his map; she is called "the thief" and "it" until she is landed; the notepad draws a new sketch as soon as it is gained; the five line-up fish are drawn from the start and the sixth frame stays a question mark.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.
-- The unique item for Mossmere: what it is and which stat it gives.
 - The designer's approval of the Mossbell Isle rock artwork.
 - Hunt length and earnings have not been measured in play; the estimates in the proposals are untested.
