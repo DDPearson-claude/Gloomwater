@@ -9,6 +9,7 @@
     "lint": "eslint --no-warn-ignored src/game.js",
     "test": "npm run -s lint && node tools/build.mjs && node tools/smoke.mjs",
     "verify": "node tools/verify-equivalence.mjs",
+    "scenarios": "node tools/scenarios.mjs",
     "format": "prettier --write src/game.js tools/*.mjs"
   },
   "devDependencies": {

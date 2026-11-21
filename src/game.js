@@ -33498,7 +33498,7 @@ var Y5 = {
       },
       unlock: {
         shells: 180,
-        requires: [{ type: "legendary", id: "belled_matriarch", label: "Land the Belled Matriarch" }],
+        requires: [{ type: "legendary", id: "belled_matriarch", label: "Land the Bellhead Catfish" }],
       },
       drain: { oil: 1.2, satiety: 1.15 },
       gloom: 1.13,
@@ -33958,12 +33958,11 @@ var Ms = [
     },
     {
       id: "belled_matriarch",
-      name: "The Belled Matriarch",
+      name: "Bellhead Catfish",
       legendSale: 900,
       zone: "mossmere",
       rarity: "legendary",
       tier: 3,
-      epithet: "She Who Tolls for the Drowned",
       weight: [12, 30],
       value: 140,
       food: 60,
@@ -33993,7 +33992,7 @@ var Ms = [
         scale: 2,
       },
       hint: "Listen for a bell beneath the calm, far out in deep water. She takes only Heartmoss.",
-      lore: "A temple bell sank into her when she was young. She has tolled for the drowned ever since.",
+      lore: "A great catfish, older than the harbour. A bell grew into her broad head when she was young, and her skin has gone the colour of tarnished bronze.",
     },
     {
       id: "sporebelly_puffer",
@@ -41421,7 +41420,7 @@ var Nf = [
       { size: U5(260, 120), family: "bottom", phase: 1, src: "v1", legendPlace: "bell_pool" },
       {
         model: { body: 6969924, glow: 14209279, fin: 9075292 },
-        lore: "A harbour bell grew into her skull when she was young. Her scales have gone the colour of tarnished bronze, and she has tolled for the drowned ever since.",
+        lore: "A great catfish, older than the harbour. A bell grew into her broad head when she was young, and her skin has gone the colour of tarnished bronze.",
       },
     ),
     mi("sporebelly_puffer", {

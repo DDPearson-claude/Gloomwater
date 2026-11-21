@@ -20,6 +20,9 @@ in `src/`; any hand edit to it is overwritten by the next build. Commit the rebu
 | `tools/build.mjs`                              | Assembles `src/` into `Gloomwater-Mossmere.html`. Plain Node, no dependencies, no minification, deterministic. Prints the size and SHA-256.                                                                          |
 | `tools/verify-equivalence.mjs`                 | Proves the built page is the same program as a committed one (see below).                                                                                                                                            |
 | `tools/smoke.mjs`                              | Plays the opening of a new game in headless Chromium and fails on any console or page error.                                                                                                                         |
+| `tools/scenarios.mjs`                          | Scenario tests: loads each save fixture, boots the built game in headless Chromium and drives it through `window.__gw`.                                                                                              |
+| `tools/game-driver.mjs`                        | The browser driver the scenario tests and the fixture maker share.                                                                                                                                                   |
+| `tools/fixtures/`                              | Real saves made by the game (`tools/make-fixtures.mjs`); its README says how each was made.                                                                                                                          |
 | `docs/`                                        | Design notes.                                                                                                                                                                                                        |
 
 ## Build and test
@@ -31,6 +34,7 @@ npm run build    # src/ -> Gloomwater-Mossmere.html
 npm test         # lint, build, then the smoke test: run this before every commit
 npm run lint     # every identifier the game reads must be declared (catches patch typos in seconds)
 npm run verify   # same program as another commit? See below
+npm run scenarios # load each save fixture, play from it, check the scenarios (under three minutes)
 npm run format   # Prettier on src/game.js and tools/
 ```
 
