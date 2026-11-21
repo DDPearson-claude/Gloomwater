@@ -35,6 +35,15 @@ The designer's direction for her story and her hiding place. The details are in 
 - **Challenging but still fun.**
 - **The fisherman's notepad.** When the player gains a clue, a picture of it is drawn in a notepad. The player studies the pictures to work out what they are hunting and where. The notepad takes the place of the approved Case page (H10) as the record of the hunt. See `mossmere-notepad.md` once written and approved.
 - **Five sketches in total.** The notepad holds five sketches for the whole hunt, not one per small clue. Each is a picture worth studying.
+- **Three questions.** The hunt is about three things: **where she is**, **which fish it isn't**, and **what gear will catch her**. The five sketches, approved in outline:
+  1. *Hob's map* (where). Talk to Hob. He draws the lake and shades the part where he lost her.
+  2. *The bell* (where). Stay out after dark in that part of the lake. A bell rings under the water and the player draws where the ripples start. That marks her spot.
+  3. *The line-up* (which fish it isn't). The lake's big fish, drawn side by side. Each one caught is crossed out, with the reason it could not be her.
+  4. *The swirl* (gear). Fishing her spot with worms under a float, something big turns below and leaves them. She wants a live fish, on the bottom.
+  5. *What came back* (gear). Hook her and lose her. The broken end is drawn beside Hob's old one. It shows the hook, leader and line that will hold her.
+- **She stays unknown.** While the player rules fish out one by one, nothing shows or says what she is. Her kind, name and picture stay hidden until she is caught.
+- **Bite marks.** Fish the player catches sometimes carry a mark from whatever hunts them. The marks point to the kind of predator out there and help rule suspects out.
+- **Clue ideas to draw on.** The designer's list of River Monsters clue types (wounds and scars, signs in the field, what witnesses say, local tales and history, red herrings) is the pool for this and later lakes. Not all of it is for Mossmere.
 
 ## Still open
 
