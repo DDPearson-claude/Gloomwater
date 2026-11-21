@@ -14,6 +14,7 @@ The designer has the final say on every gameplay decision. This file is the reco
 8. **Ordinary fish forgive on the rest of the rig; the monster does not.** Common fish bite on any sensible rig provided the bait or lure is one they would take.
 9. **No boat hazards**, and none of the by-catch or environmental hazards from the tackle database.
 10. **The designer decides; the build follows.** Gameplay ideas go to the designer first. When time is short, questions are put as quick yes or no choices and the remaining gaps are filled with the recommended option and reported.
+11. **One voice.** All copy in the game follows the tone and style of the 10-step first-play guide: clear, very readable and nice to read. Short plain sentences, spoken to the player. See `voice.md` once written.
 
 ## Mossmere, approved 21 November 2026
 
@@ -23,6 +24,15 @@ The proposals in this folder (`mossmere-hunt.md`, `mossmere-gear.md`) are approv
 - **Her reward (changes H8).** She is measured and released for the 900-clam bounty, and the player also gains a **completely unique item**. It gives **one unique bonus stat**, and it is **the only thing carried from lake to lake**.
 - **Between lakes (changes G9).** Following from that: nothing else carries over. Rod, line and reel tiers, rig parts and clams all start fresh in a new lake; only the monster's unique item travels.
 - Everything else stands as recommended: H1 Live Minnow at 1 in 3 and Worm Bunch at 1 in 6; H2 Waxed Silk holds her, advanced by Murk after the first loss; H3 she feeds any time after dark; H4 bait on the bottom; H5 three tries and one hook-up a night; H6 landing at best three in four, and a loss to a wrong part gives no advantage; H7 landing her opens Sporewood; H9 the Bell Pool is found through the case; H10 a self-filling Case page opened by the bell on the second evening; H11 nudges, never the answer; H12 the Mossbell Isle angler is named Hob and gives one line a night; H13 top weight trimmed to about 150 kg; G2 the rig as one picture; G3 the lead shifts who bites and never stops a fish; G4 a free tin of three live minnows that empties each evening; G5 a bell on the rod tip; G6 the first lead is Murk's gift; G7 three saved rigs; G8 a swirl every time and words once a night per part; G10 Thousandcast Pike takes a live minnow.
+
+## Mossmere story direction, 21 November 2026
+
+The designer's direction for her story and her hiding place. The details are in `mossmere-story.md` once written and approved.
+
+- **She has a story.** The fish the player hunts has a story of her own, told in the game's one voice.
+- **Hob half remembers.** The angler on Mossbell Isle once hooked something huge and lost it. He cannot quite remember what it was. Talking to him gives the **first clue: an area of the lake**, not the exact spot.
+- **Her water is nearly unmarked.** The place she lives has few discernible markings. The player finds it by putting together all the clues gathered. This changes how the Bell Pool is revealed (H9, and the mist and reveal in the approved hunt).
+- **Challenging but still fun.**
 
 ## Still open
 
