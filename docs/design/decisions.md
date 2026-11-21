@@ -14,7 +14,7 @@ The designer has the final say on every gameplay decision. This file is the reco
 8. **Ordinary fish forgive on the rest of the rig; the monster does not.** Common fish bite on any sensible rig provided the bait or lure is one they would take.
 9. **No boat hazards**, and none of the by-catch or environmental hazards from the tackle database.
 10. **The designer decides; the build follows.** Gameplay ideas go to the designer first. When time is short, questions are put as quick yes or no choices and the remaining gaps are filled with the recommended option and reported.
-11. **One voice.** All copy in the game follows the tone and style of the 10-step first-play guide: clear, very readable and nice to read. Short plain sentences, spoken to the player. See `voice.md` once written.
+11. **One voice.** All copy in the game follows the tone and style of the 10-step first-play guide: clear, very readable and nice to read. Short plain sentences, spoken to the player. The rules are in `voice.md`. Approved with it: fish lore describes the real animal in plain words; the tackle stat is called Grip, so "hold" only means the fish store; "Journal", never "log"; the old survival words (descent, trials, Shrine, Waystone) leave the screens.
 
 ## Mossmere, approved 21 November 2026
 
@@ -36,6 +36,7 @@ The designer's direction for her story and her hiding place. The details are in 
 - **Her water is nearly unmarked.** The place she lives has few discernible markings. The player finds it by putting together all the clues gathered. This changes how the Bell Pool is revealed (H9, and the mist and reveal in the approved hunt).
 - **Challenging but still fun.**
 - **The fisherman's notepad.** When the player gains a clue, a picture of it is drawn in a notepad. The player studies the pictures to work out what they are hunting and where. The notepad takes the place of the approved Case page (H10) as the record of the hunt. See `mossmere-notepad.md` once written and approved.
+- **The notepad's look is approved:** a worn spiral pad, pencil sketches, a few handwritten words.
 - **Five sketches in total.** The notepad holds five sketches for the whole hunt, not one per small clue. Each is a picture worth studying.
 - **Three questions.** The hunt is about three things: **where she is**, **which fish it isn't**, and **what gear will catch her**. The five sketches, approved in outline:
   1. *Hob's map* (where). Talk to Hob. He draws the lake and shades the part where he lost her.
