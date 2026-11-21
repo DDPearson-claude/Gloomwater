@@ -1,5 +1,8 @@
 # Mossmere hunt: the Bellhead Catfish
 
+> **Read this first.** The clue design in this document (the Case page, the suspects' cards, Hob's lines, the bell at night and how the Bell Pool is revealed) is replaced by `mossmere-hunt-2.md`. What stands from here: her needs, her odds and tries, the landing rules, measure and release, the bounty and the gate to Sporewood. `decisions.md` has the rulings.
+
+
 **The proposal.** Mossmere's legend becomes a wels catfish, the **Bellhead Catfish**, and landing her opens Sporewood. From the second evening the drowned bell tolls after dark and a Case page opens in the journal. Ordinary fishing fills it in: catching suspects rules them out, the Mossbell Isle angler tells one thing a night, and the Bell Pool shows which part of your rig is wrong. She takes only after dark, in the Bell Pool, on a live bait on the bottom, and she breaks any line lighter than Waxed Silk. It needs a new journal page, a voice for the angler, the bell reworked for night, and the gear proposal's Sounding Lead and Live Minnow.
 
 ## How it plays

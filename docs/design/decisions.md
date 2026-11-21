@@ -20,7 +20,7 @@ The designer has the final say on every gameplay decision. This file is the reco
 
 The proposals in this folder (`mossmere-hunt.md`, `mossmere-gear.md`) are approved with their recommended options, except where changed below.
 
-- **Gear starts deeper than proposed (changes G1).** Mossmere gets a **leader** choice and a **hook** choice from the start, in addition to bait depth and live bait. See `mossmere-gear-deeper.md` once written.
+- **Gear starts deeper than proposed (changes G1).** Mossmere gets a **leader** choice and a **hook** choice from the start, in addition to bait depth and live bait. See `mossmere-gear-deeper.md`.
 - **Her reward (changes H8).** She is measured and released for the 900-clam bounty, and the player also gains a **completely unique item**. It gives **one unique bonus stat**, and it is **the only thing carried from lake to lake**.
 - **Between lakes (changes G9).** Following from that: nothing else carries over. Rod, line and reel tiers, rig parts and clams all start fresh in a new lake; only the monster's unique item travels.
 - Everything else stands as recommended: H1 Live Minnow at 1 in 3 and Worm Bunch at 1 in 6; H2 Waxed Silk holds her, advanced by Murk after the first loss; H3 she feeds any time after dark; H4 bait on the bottom; H5 three tries and one hook-up a night; H6 landing at best three in four, and a loss to a wrong part gives no advantage; H7 landing her opens Sporewood; H9 the Bell Pool is found through the case; H10 a self-filling Case page opened by the bell on the second evening; H11 nudges, never the answer; H12 the Mossbell Isle angler is named Hob and gives one line a night; H13 top weight trimmed to about 150 kg; G2 the rig as one picture; G3 the lead shifts who bites and never stops a fish; G4 a free tin of three live minnows that empties each evening; G5 a bell on the rod tip; G6 the first lead is Murk's gift; G7 three saved rigs; G8 a swirl every time and words once a night per part; G10 Thousandcast Pike takes a live minnow.
@@ -50,7 +50,7 @@ The designer's direction for her story and her hiding place. The details are in 
 
 ## Mossmere hunt, second version, approved 21 November 2026
 
-The full design is `mossmere-hunt-2.md` once it is added to this folder. It replaces the clue design of `mossmere-hunt.md` (the Case page, the bell at night). The designer's answers to its four questions:
+The full design is `mossmere-hunt-2.md`. The notepad's look and how its sketches are made are in `mossmere-notepad.md`, with a tappable mock-up in `notepad-mockup.html`. It replaces the clue design of `mossmere-hunt.md` (the Case page, the bell at night). The designer's answers to its four questions:
 
 - **She steals a fish off your line, float and all.** Once a night, just after the midnight bell, inside Hob's part of the lake, and only until her water is found. The float is replaced free. That theft is how her water is found, and it is what sketch 2 draws. (A narrow exception to rule 9.)
 - **One part per loss.** A wrong rig can lose her up to three times, in fight order: hook, then leader, then line. Each loss teaches one part only. Sketch 5 is still one sketch and grows by one part with each loss. (The designer turned down "one loss shows every wrong part".)
