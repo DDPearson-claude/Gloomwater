@@ -47,7 +47,7 @@
 | 3 | You sail past Mossbell Isle. Hob draws his map (sketch 1) and gives you his old line end. At the tally Murk names five big fish (sketch 3). |
 | 4 to 5 | After midnight in Hob's part: boils and scraped fish. Then a fish is taken off your line (sketch 2). At the next midnight the cutscene shows a bird taken. |
 | 5 to 6 | Fishing the spot after the bell, something turns under your rig (sketch 4). Line-up fish are crossed out as you catch them. |
-| 6 to 9 | A live minnow on the lead. She takes, and you lose her once for each wrong part, one a night: hook, then leader, then line (sketch 5). After the line loss, Murk puts Waxed Silk on the slate. |
+| 6 to 9 | A live minnow on the lead. She takes, and you lose her once for each wrong part, one a night: hook, then leader, then line (sketch 5). Waxed Silk is bought with saved clams. Murk gives no credit. |
 | 7 to 12 | Landed, measured, the bell seen, released. Hob's Lamp. Hob's rod comes up from her hole. |
 
 ## 2. The notepad and the five sketches

@@ -72,6 +72,14 @@ The designer showed the game's outline to an outside reviewer and passed these o
 - **Murk's Order Board teaches the new rig.** Once a part is owned, the board sometimes posts a double-pay order that uses it on an ordinary fish.
 - **Bad luck never walls a player.** Losing her on a fully right rig still makes her a little easier next time. Losing her to a wrong part gives nothing, so the puzzle still has to be solved.
 
+## More rulings on the outside review, 21 November 2026
+
+Details are in `mossmere-review-addendum.md`.
+
+- **No credit for the silk (changes H2).** "You need to save up to buy the right rig." Murk never puts Waxed Silk on his slate, neither when her water is found nor after a line loss. The player saves clams and buys it from the line shelf. Any mention of the slate, credit or an advance for the silk in the design documents is withdrawn.
+- **Earnings must be measured.** Because the silk has to be saved for, how many evenings it takes to earn its price is now part of the hunt's length. It is to be measured in play, and the price brought to the designer if it makes the hunt drag.
+- **The relic test.** A later monster's item passes only if it changes what the player finds, sees or carries or how they handle the rig; never adds Grip, landing odds or clams; never touches a lake's monster; stays small and does not stack; is felt on the first evening in a new lake; and can be said in one plain line. (The outside review's "wider strike notch" idea fails as worded, because a clean strike adds Grip.)
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.
