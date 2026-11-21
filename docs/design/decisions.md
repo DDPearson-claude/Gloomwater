@@ -60,6 +60,17 @@ The full design is `mossmere-hunt-2.md`. The notepad's look and how its sketches
 
 Gaps filled by the team, as reported to the designer: the midnight bell hangs in the leaning toll-tower at the north end and strikes about two minutes after setting out; her feeding time lasts about three minutes from its first stroke; none of her signs appear before Hob has drawn his map; she is called "the thief" and "it" until she is landed; the notepad draws a new sketch as soon as it is gained; the five line-up fish are drawn from the start and the sixth frame stays a question mark.
 
+## Adopted from an outside review, 21 November 2026
+
+The designer showed the game's outline to an outside reviewer and passed these on as direction. How each is built is in `mossmere-review-addendum.md` once written.
+
+- **Every rig condition can be worked out.** One part per loss stays as the fallback teacher. A sharp player who reads the clues (Hob's worn line end, Murk's shelf lines) can get the rig right in one or two attempts and is never forced through three losses.
+- **Relics are for utility and discovery.** Every later monster's unique item helps the player find, see or handle things. None gives raw Grip or more clams. (Ideas only, for later lakes: signs seen from further away; one more live bait in the tin; a slightly wider clean cast or strike notch.)
+- **Tackle arrives with the story.** One new thing an evening, strictly. New tackle is brought by story beats and sketches earned, not by fixed evening numbers, so the player always knows why an item appeared. Chafe Gut does not reach Murk's shelf before the player has seen Hob's worn line end.
+- **Local fish variants.** A few more kinds of fish, each tied to one clear home in the lake, reusing existing models with their own colours and markings. Every minnow variant counts as a live minnow. Variants are extra Journal entries and do not lengthen the lake's main list. When this is built is the designer's call.
+- **Murk's Order Board teaches the new rig.** Once a part is owned, the board sometimes posts a double-pay order that uses it on an ordinary fish.
+- **Bad luck never walls a player.** Losing her on a fully right rig still makes her a little easier next time. Losing her to a wrong part gives nothing, so the puzzle still has to be solved.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.
