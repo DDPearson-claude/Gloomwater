@@ -31,6 +31,7 @@ The designer's direction for her story and her hiding place. The details are in 
 
 - **She has a story.** The fish the player hunts has a story of her own, told in the game's one voice.
 - **Her story is "The thief of the mere".** Things vanish off the water after dark: ducks, floats, Hob's whole rod. People blame the gloom. It is her, hunting at the top. The drowned harbour bell is only scenery. (Chosen over "the bell she wears" and "the bell she lives in". Sketch 2 below was approved as "the bell" before this choice, so it is reworked to mark her water out of the thief story.)
+- **The midnight bell tells the time.** An old bell up in the city still rings at the stroke of midnight, and the strange disappearances happen at about then. The bell tells the player **when** to fish for her. It never tells them where. (This changes H3, which let her feed at any time after dark.)
 - **Hob half remembers.** The angler on Mossbell Isle once hooked something huge and lost it. He cannot quite remember what it was. Talking to him gives the **first clue: an area of the lake**, not the exact spot.
 - **Her water is nearly unmarked.** The place she lives has few discernible markings. The player finds it by putting together all the clues gathered. This changes how the Bell Pool is revealed (H9, and the mist and reveal in the approved hunt).
 - **Challenging but still fun.**
