@@ -14,6 +14,6 @@ Reference maps of how the game works today, written by reading the bundled build
 ## Reading them
 
 - Findings are cited by search anchor: a function name, property name or string that can be searched for in the game script.
-- Line numbers such as `L32480` refer to the game script formatted with prettier 3.3.3 (`--parser babel --print-width 110`), as of the build these maps were made from. They drift as the code changes; the anchors do not.
+- Line numbers such as `L32480` refer to `src/game.js`. They were taken from a single-pass formatting of the build these maps were made from: exact up to about line 58200, up to 4 lines out after that, and they drift as the code changes. The anchors do not.
 - Each map ends with a "Checked" section. A second agent tried to refute its key claims against the code: 33 of 40 held, and the 7 that did not were corrected in place.
 - The maps describe the build as it stood on 21 November 2026. Treat anything in them as a starting point to confirm, not as a guarantee.

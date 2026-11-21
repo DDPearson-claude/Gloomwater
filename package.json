@@ -1,0 +1,21 @@
+{
+  "name": "gloomwater",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Gloomwater: editable sources for the single-file game Gloomwater-Mossmere.html",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "lint": "eslint --no-warn-ignored src/game.js",
+    "test": "npm run -s lint && node tools/build.mjs && node tools/smoke.mjs",
+    "verify": "node tools/verify-equivalence.mjs",
+    "format": "prettier --write src/game.js tools/*.mjs"
+  },
+  "devDependencies": {
+    "acorn": "8.14.0",
+    "esbuild": "0.25.12",
+    "eslint": "9.15.0",
+    "globals": "15.12.0",
+    "prettier": "3.3.3"
+  }
+}
