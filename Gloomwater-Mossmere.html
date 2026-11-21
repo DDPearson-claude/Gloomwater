@@ -43771,6 +43771,10 @@ var pP = {
         glass_sovereign: "leaper",
         lantern_swallower: "sinker",
       },
+      // Per-legend landing cap; a legend not listed here uses cap.legend.
+      cap: { belled_matriarch: 0.75 },
+      // The weakest line Hold that can land the legend; on a weaker line she is always lost.
+      minLineHold: { belled_matriarch: 5 },
       woundPerEscape: 6,
       woundCap: 18,
       woundScope: { expedition: "meta.legendWounds", run: "meta.legendWounds", descent: "run.legendWounds" },
@@ -47284,6 +47288,14 @@ Ca.gate = {
     bait: "It wants a better bait.",
   },
 };
+// Why a legend got away, shown where the gear-limit escape line appears: "line" when her line was too
+// weak to land her, "fight" for a lost fight on the right line. Legends not listed here say nothing.
+Ca.legendAway = {
+  belled_matriarch: {
+    line: "She ran for the bell and rasped the {line} through. Only Waxed Silk will hold her.",
+    fight: "The hook pulled at the bell. She'll remember it.",
+  },
+};
 Ca.murk.firstAway = "Lost a big one? Better gear holds them.";
 function $ee(e, t, { zone: n = e?.zone, tier: o = wo.waters[n]?.tier } = {}) {
   if (!e || e.rarity === "legendary") return null;
@@ -49119,8 +49131,10 @@ function GP(e, t, n = {}, o = {}) {
         (a.fouledSpecies.includes(s.id) ? a.fouled : 0) +
         a.class[t] +
         (lakeFightProfiles.get(s.id)?.pressure ?? 0));
-  let L = a.cap[t];
+  let L = r && Number.isFinite(a.legend.cap?.[s.id]) ? a.legend.cap[s.id] : a.cap[t];
   let landingChance = Math.max(a.floor, L / (1 + Math.exp(-a.scale * (y - b))));
+  const landingBlockedBy = r && c("line") < (a.legend.minLineHold?.[s.id] ?? 0) ? "line" : null;
+  if (landingBlockedBy) landingChance = 0;
   // The journal evaluates hypothetical tackle. Use the same size limits as the live cast.
   if (o.previewGearLimits && !r && bs[v]?.hook) {
     const items = [n.item, n.upgrade?.id];
@@ -49143,6 +49157,7 @@ function GP(e, t, n = {}, o = {}) {
     lake: v,
     style: l,
     terms: { wick: a.wick, tackle: d, item: h, strike: m, buffs: g, marked: p, wounds: w },
+    landingBlockedBy,
   };
 }
 function q2(e, t, n = {}, o = {}) {
@@ -104938,7 +104953,13 @@ function yF(e) {
     gearWater: il(e),
     fit: { rod: null, line: null, reel: null },
     eveningsAt: { [il(e)]: 0 },
+    hunt: { mossmere: freshHuntRecord() },
   };
+}
+// One lake's monster hunt in the save. Only the part built so far: lineLesson is set by the first loss to a
+// line too weak for her.
+function freshHuntRecord() {
+  return { lineLesson: false };
 }
 function a8(e, t, { hasTrip: n = !1 } = {}) {
   if (!Ln(e)) return e;
@@ -105047,6 +105068,11 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
     p != null && typeof p != "string" && (c.fit[g] = null), c.fit[g] === void 0 && (c.fit[g] = null);
   }
   m && (c.eveningsAt = { [i]: c.evenings });
+  for (let [lake, record] of Object.entries(o.hunt)) {
+    let saved = Ln(c.hunt[lake]) ? c.hunt[lake] : (c.hunt[lake] = record);
+    for (let [key, value] of Object.entries(record))
+      typeof saved[key] != typeof value && (saved[key] = value);
+  }
   for (let [g, p] of Object.entries(c.eveningsAt)) c.eveningsAt[g] = Math.max(0, ha(p));
   for (let [g, p] of Object.entries(t?.LOOP?.lostTackle || {}))
     p?.slot === "lure" && Zl(c, g) && !c.lures.includes(g) && c.lures.push(g);
@@ -108378,6 +108404,14 @@ function FF(e) {
     let k = Se(!0);
     return (k[ge] = Math.min(be(), (k[ge] | 0) + 1)), k[ge];
   }
+  // A legend's escape: a lost fight wounds her; a loss to a line too weak for her adds no wound and
+  // records the lesson in the lake's hunt record.
+  function noteLegendEscape(loss, speciesId) {
+    if (loss.legendLossReason !== "line") return ne(speciesId);
+    const hunt = u()?.hunt?.[loss.zone];
+    hunt && typeof hunt == "object" && !e.isReplay() && (hunt.lineLesson = true);
+    return 0;
+  }
   function he(ge) {
     if (!l() || e.isReplay()) return;
     let k = Se();
@@ -108917,7 +108951,7 @@ function FF(e) {
       V = ge.name || null;
     if (f(q)) {
       let cn = q?.zone || e.hubZone() || F.zone || null;
-      if (de) ne(F.id);
+      if (de) noteLegendEscape(ge, F.id);
       else if (ge.markedFishId && tt().some((Nt) => Nt?.id === ge.markedFishId)) {
         let Nt = tt().find((Gt) => Gt.id === ge.markedFishId);
         Nt.rehooked = !0;
@@ -108968,7 +109002,7 @@ function FF(e) {
         $.elderLog.length > 400 && $.elderLog.splice(0, $.elderLog.length - 400)),
       de)
     )
-      ne(F.id);
+      noteLegendEscape(ge, F.id);
     else if (ge.markedFishId && tt().some((cn) => cn?.id === ge.markedFishId)) {
       let cn = tt().find((Nt) => Nt.id === ge.markedFishId);
       cn.rehooked = !0;
@@ -130257,6 +130291,15 @@ function Y0e(e) {
       }
     (i.p = Number.isFinite(Fn) ? Fn : Bt(Pe.CATCH_V3?.floor, 0.01)),
       i.find ? (i.p = 1) : i.overCap && (i.p = 0);
+    // A legend hooked on a line too weak for her cannot be landed (the line check at the strike).
+    i.legendLineLoss = !1;
+    if (At && !i.find)
+      try {
+        i.legendLineLoss = Pe.catchParts?.(vn ? Q : Q.id, Dt, tn, Qn)?.landingBlockedBy === "line";
+      } catch (Oi) {
+        y(Oi);
+      }
+    i.legendLineLoss && (i.p = 0);
     let _o = zB(lt);
     i.draws = _o;
     let va = i.forceOutcome === "land" ? 0 : i.forceOutcome === "lose" ? 1 : _o.u;
@@ -130279,7 +130322,14 @@ function Y0e(e) {
           });
     if (((i.plan0 = Ii), (i.loss = null), i.outcome === "lose")) {
       let Oi = !!i.cast?.place?.foul || !!i.cast?.place?.rule?.foul,
-        Aa = i.overCap && !i.find ? (i.overCap.by === "line" ? "snapped" : "thrown") : null;
+        Aa =
+          i.overCap && !i.find
+            ? i.overCap.by === "line"
+              ? "snapped"
+              : "thrown"
+            : i.legendLineLoss
+              ? "snapped"
+              : null;
       (i.loss = CB(Ii, {
         style: xo,
         grade: R,
@@ -130846,6 +130896,25 @@ function Y0e(e) {
     } else O(!1), E(!1);
     At >= 1 && ((gi.bobberPos = null), O(!1), E(!1), T("setAim", null), (i.lostInfo = null), at("idle"));
   }
+  // Why a legend got away ("line" or "fight") and, for a legend that has words for it, the line telling the
+  // player why.
+  function legendLossDetails(species) {
+    const legendLossReason = i.legendLineLoss ? "line" : "fight",
+      template = t().TEXT_LOOP?.legendAway?.[species.id]?.[legendLossReason];
+    return {
+      legendLossReason,
+      ...(template ? { legendLossText: Rc(template, { line: castLineName() || "line" }) } : {}),
+    };
+  }
+  // The display name of the line on this cast: a found line, or the bought line fitted.
+  function castLineName() {
+    const data = t(),
+      loadout = i.castLoadout || nn() || {},
+      foundLine = loadout.found?.line;
+    if (typeof foundLine == "string") return data.TEXT_LOOP?.finds?.items?.[foundLine]?.name || "";
+    const lineId = jr(data, al(data, e.state?.meta?.loop), "line")[loadout.line | 0]?.id;
+    return data.TEXT_LOOP?.gearItems?.[lineId] || data.TACKLE?.line?.find((x) => x.id === lineId)?.name || "";
+  }
   function pi() {
     let R = i.species,
       I = i.lostInfo,
@@ -130881,6 +130950,7 @@ function Y0e(e) {
       grade: i.grade,
       legendary: Pe,
       zone: Yt(),
+      ...(Pe ? legendLossDetails(R) : {}),
       ...(i.overCap && !Pe
         ? {
             overCap: {
@@ -148969,7 +149039,7 @@ function yU(e, t, n, o) {
       (V = !1), (Je = !1), Ee();
     }),
     Pt("fish:escaped", (te) => {
-      b() ? te.overCap && kt(te) : $.push({ p: te, at: performance.now() });
+      b() ? (te.overCap || te.legendLossText) && kt(te) : $.push({ p: te, at: performance.now() });
     }),
     _t("player:scorched", () => je());
   function ht(te, ke) {
@@ -149406,7 +149476,7 @@ function yU(e, t, n, o) {
   }
   function kt(te) {
     let ke = s().TEXT_LOOP?.gate?.away || {},
-      Ce = te.overCap?.advice || ke[te.overCap?.key] || ke[te.overCap?.by] || "";
+      Ce = te.overCap?.advice || ke[te.overCap?.key] || ke[te.overCap?.by] || te.legendLossText || "";
     if (!Ce) return;
     let qe = e.vw,
       st = e.vh,

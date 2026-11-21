@@ -34,7 +34,7 @@ npm run build    # src/ -> Gloomwater-Mossmere.html
 npm test         # lint, build, then the smoke test: run this before every commit
 npm run lint     # every identifier the game reads must be declared (catches patch typos in seconds)
 npm run verify   # same program as another commit? See below
-npm run scenarios # load each save fixture, play from it, check the scenarios (under three minutes)
+npm run scenarios # load each save fixture, play from it, check the scenarios (about five minutes)
 npm run format   # Prettier on src/game.js and tools/
 ```
 
