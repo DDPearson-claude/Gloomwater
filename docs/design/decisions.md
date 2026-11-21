@@ -37,6 +37,7 @@ The designer's direction for her story and her hiding place. The details are in 
 - **Challenging but still fun.**
 - **The fisherman's notepad.** When the player gains a clue, a picture of it is drawn in a notepad. The player studies the pictures to work out what they are hunting and where. The notepad takes the place of the approved Case page (H10) as the record of the hunt. See `mossmere-notepad.md` once written and approved.
 - **The notepad's look is approved:** a worn spiral pad, pencil sketches, a few handwritten words.
+- **The notepad's three headings are Where, Suspects and Gear.** ("Suspects" replaces "Which fish it isn't", by the designer's ruling.)
 - **Five sketches in total.** The notepad holds five sketches for the whole hunt, not one per small clue. Each is a picture worth studying.
 - **Three questions.** The hunt is about three things: **where she is**, **which fish it isn't**, and **what gear will catch her**. The five sketches, approved in outline:
   1. *Hob's map* (where). Talk to Hob. He draws the lake and shades the part where he lost her.

@@ -5,7 +5,7 @@ Mock-up: `notepad-mockup.html` (open it on a phone and press **Gain a clue**, th
 ## The short version
 
 - A pocket notepad, spiral at the top, in Murk's shelf-book paper and ink. Pencil for drawing, red crayon only for crossing out.
-- Exactly five sketches on three pages, under the hunt's three headings: **Where** (1 Hob's map, 2 Taken at midnight), **Which fish it isn't** (3 The line-up), **Gear** (4 The swirl, 5 What came back).
+- Exactly five sketches on three pages, under the hunt's three headings: **Where** (1 Hob's map, 2 Taken at midnight), **Suspects** (3 The line-up), **Gear** (4 The swirl, 5 What came back).
 - Each sketch has a title, a pencil drawing and one or two handwritten sentences from the design (hunt part 2). Sketch 1 has a second drawing, Hob's taped line end, with its own sentence. Sketch 5 grows: each loss adds one small drawing and one sentence. Nothing else is written on the pad.
 - When you gain a clue, the pad turns to the right page and a pencil draws the sketch in, stroke by stroke. Then the words write themselves.
 - The line-up crosses off one fish per first catch, with a drawing of why. Bite marks collect at its foot. Nothing on the pad or in the page source shows or names what the thief is, and the words call it "it".

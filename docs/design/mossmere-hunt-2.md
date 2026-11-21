@@ -4,7 +4,7 @@
 
 - **The tale.** Things go missing on Mossmere at night: birds, floats, once Hob's whole rod. People say the gloom takes them. It is a fish. She rises at midnight to snatch what moves on top, then takes it down to eat on the bottom.
 - **When.** The old bell on the toll-tower, up on the old city wall at the north end, strikes midnight two minutes after you set out. Things go missing just after it. She hunts for about three minutes, and never at any other time. The bell tells you when, never where.
-- **Five sketches in a notepad.** Where: (1) *Hob's map*, (2) *Taken at midnight*, the spot where she took a fish off your line. Which fish it isn't: (3) *The line-up*, five big fish crossed out one by one, with the bite marks you find. Gear: (4) *The swirl*, (5) *What came back*.
+- **Five sketches in a notepad.** Where: (1) *Hob's map*, (2) *Taken at midnight*, the spot where she took a fish off your line. Suspects: (3) *The line-up*, five big fish crossed out one by one, with the bite marks you find. Gear: (4) *The swirl*, (5) *What came back*.
 - **Her water is plain water.** Before midnight, and before you have Hob's map, nothing there is different. After the bell, boils and scraped fish lead you in. No mist, frame, glow, toll, dark patch or shop chart.
 - **She stays unknown.** No name, picture, outline or card anywhere until she is landed. Everyone calls her "the thief".
 - **Her bell** is Hob's old rod bell, caught in his line the night she stole his rod. You see it only when you measure her.
@@ -52,7 +52,7 @@
 
 ## 2. The notepad and the five sketches
 
-The notepad is a Journal tab with five pages, one per sketch, under three headings: **Where**, **Which fish it isn't**, **Gear**. Each page shows a pencil drawing and a few handwritten words, always in whole sentences. A page not yet earned is blank. At the foot is one narrator line, **What to try next**, which always points to a place, a time or a person, never the answer. It replaces the approved Case page. Nothing on it needs operating.
+The notepad is a Journal tab with five pages, one per sketch, under three headings: **Where**, **Suspects**, **Gear**. Each page shows a pencil drawing and a few handwritten words, always in whole sentences. A page not yet earned is blank. At the foot is one narrator line, **What to try next**, which always points to a place, a time or a person, never the answer. It replaces the approved Case page. Nothing on it needs operating.
 
 **Nobody has to find it.** When a sketch is drawn, the line "You draw it in your notepad." shows on the water. At the next tally the notepad opens by itself at that page, and closes with one press. So a player who never opens the Journal still sees every sketch once.
 
@@ -70,7 +70,7 @@ The notepad is a Journal tab with five pages, one per sketch, under three headin
 - *Words:* "Something took a fish off the line, right here. It happened just after the bell struck midnight."
 - *If missed:* see the nudges in section 4.
 
-**3. The line-up** (which fish it isn't). See section 3.
+**3. The line-up** (suspects). See section 3.
 
 **4. The swirl** (gear: bait and depth)
 - *Drawn:* a slice through the water at the spot. Your rig is drawn as it was, from the rig picture's own icons. A huge dark swirl turns under it with no shape inside. An arrow curls from the swirl down to a small fish lying on the bottom.
