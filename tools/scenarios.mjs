@@ -17,15 +17,16 @@
 //   editSave (save) => { ... }: changes the parsed fixture before it is loaded, for a kind of save no
 //            fixture holds
 //   timeoutMs a longer time limit than SCENARIO_TIMEOUT_MS, for a scenario that opens many screens
-//   run      async (session, { fixture, page }) => { ... }: throw an Error to fail. `session` is a
-//            GameSession (tools/game-driver.mjs) that has booted to the title; `fixture` is the parsed save.
+//   run      async (session, { fixture, page, browser }) => { ... }: throw an Error to fail. `session` is a
+//            GameSession (tools/game-driver.mjs) that has booted to the title; `fixture` is the parsed save;
+//            `browser` opens a second session (a reload of a saved string).
 
 import { readFileSync } from "node:fs";
 import * as acorn from "acorn";
 import { join } from "node:path";
 import { DEFAULT_PAGE, GameSession, ROOT, launchBrowser } from "./game-driver.mjs";
 
-const BUDGET_MS = 1_500_000; // every scenario, launch to exit
+const BUDGET_MS = 2_400_000; // every scenario, launch to exit
 const SCENARIO_TIMEOUT_MS = 240_000;
 // Smaller than the smoke test's 480 x 270: SwiftShader draws every frame on the CPU, and several
 // scenarios share it. The game's layout still fits (its phone layout).
@@ -496,11 +497,539 @@ const heardOnWater = (session) =>
     return { lines, models, landedAt };
   });
 
+// ---- the Sounding Lead (Mossmere gear, first step) -------------------------------------------------------
+
+const LEAD = "sounding_lead";
+const GIFT_LINE = "Not every fish looks up. A lead takes your worm down to the ones that don't.";
+const BOTTOM = ["gutter_crayfish", "rustfin_sucker", "weeping_carp", "milkeye_perch", "bridgechain_sturgeon"];
+const HIGH = ["dusk_minnow", "lampsipper", "reedjaw_pike"];
+const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol;
+
+// Gives a save the lead (as the gift would) and, with fit, fits it: for scenarios about what it does.
+const withLead =
+  (fit = true) =>
+  (save) => {
+    const loop = save.meta.loop;
+    loop.parts = ["cork_float", LEAD];
+    loop.fitted = { ...loop.fitted, depth: fit ? "lead" : "float" };
+  };
+
+const leadRecord = (session) =>
+  session.eval(() => {
+    const s = window.__gw.progression.loop.state();
+    return { parts: [...(s.parts ?? [])], depth: s.fitted?.depth ?? null, gift: s.lastTrip?.gift ?? null };
+  });
+
+// Goes home and reads Murk's tally once it has counted (the gift block's text, if any), then closes it.
+async function tallyAndGift(session) {
+  const homeBy = Date.now() + 60_000;
+  while (!(await session.eval(() => window.__gw.game.goHome()))) {
+    if (Date.now() > homeBy)
+      throw new Error(`the game will not go home; ${JSON.stringify(await session.state())}`);
+    await session.closeGuides(3000);
+    await session.pause(1000);
+  }
+  const soldVisible = () =>
+    [...document.querySelectorAll("button")].some(
+      (b) => b.textContent.trim() === "Sold" && b.getBoundingClientRect().width > 0,
+    );
+  await session.waitFor("Murk's tally", 90_000, soldVisible);
+  await session.clickButton(/^Sold$/); // finishes the count
+  await session.pause(2500);
+  const gift = await session.eval(() => {
+    const el = document.querySelector(".gw-tally-gift");
+    return el
+      ? { text: el.textContent.replace(/\s+/g, " ").trim(), shown: el.classList.contains("gw-in") }
+      : null;
+  });
+  const end = Date.now() + 60_000;
+  while (Date.now() < end && (await session.eval(soldVisible))) {
+    await session.clickButton(/^Sold$/);
+    await session.pause(1500);
+  }
+  await session.closeGuides();
+  return gift;
+}
+
+// Murk's shelf: the rod, line and reel cards ("line:2:Waxed Silk").
+const tackleShelf = (session) =>
+  session.eval(() =>
+    (window.__gw.progression.loop.shelf().tabs.find((t) => t.id === "tackle")?.items || [])
+      .filter((c) => /^(rod|line|reel):/.test(c.id))
+      .map((c) => `${c.id}:${c.name}`),
+  );
+
+// The Depth row of the tackle screen: { chips: [{ key, on }], note, lines } or null when there is none.
+async function depthRow(session) {
+  await session.eval(() => window.__gw.ui.loop.tackle.openScreen({ from: "rack" }));
+  await session.pause(800);
+  const row = await session.eval(() => {
+    const el = document.querySelector('.gw-ts-row[data-row="depth"]');
+    return el
+      ? {
+          chips: [...el.querySelectorAll(".gw-ts-chip")].map((c) => ({
+            key: c.dataset.key,
+            on: c.getAttribute("aria-pressed") === "true",
+          })),
+          lines: [...el.querySelectorAll(".gw-ts-note")].map((n) => n.textContent.trim()),
+        }
+      : null;
+  });
+  return row;
+}
+const closeTackle = (session) => session.eval(() => window.__gw.ui.loop.tackle.closeScreen());
+
+// The foot lines of the Odds page (the Wick's sheet, opened as Murk's "Odds" button does).
+async function oddsFoot(session) {
+  await session.eval(() => window.__gw.ui.openTackle());
+  await session.pause(1500);
+  const lines = await session.eval(() =>
+    [...document.querySelectorAll(".gw-sh-foot")].map((e) => e.textContent.trim()),
+  );
+  await backToJetty(session);
+  return lines;
+}
+const LEAD_ODDS = "On the Sounding Lead: bottom feeders \u00d72, higher feeders \u00d70.5.";
+
+// One Mire Worm bait roll at the raft (or a place), float or lead, through the game's own odds (fishPoolRoll).
+const rollBoth = (session, opts) =>
+  session.eval((o) => {
+    const loop = window.__gw.progression.loop,
+      d = window.__gw.debug;
+    o.light && d.setPhase(o.light);
+    const roll = (depth) => (loop.fitDepth(depth), d.fishPoolRoll(1, { bait: "mireworm", ...o.roll }));
+    const float = roll("float"),
+      lead = roll("lead");
+    loop.fitDepth("float");
+    return { float, lead };
+  }, opts);
+
 // ---- the scenarios --------------------------------------------------------------------------------------
 
 const FIXTURE_NAMES = ["fresh-first-evening", "mid-mossmere", "legend-sold", "sporewood-crossed"];
 
 const SCENARIOS = [
+  {
+    name: "gear: on the water with the lead: no float, the line slants in, the Tip Bell on every rod, the depth word, the tip answers, a real press strikes and lands",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 600_000,
+    editSave: withLead(false),
+    async run(session) {
+      await session.toHome();
+      check(
+        !(await oddsFoot(session)).includes(LEAD_ODDS),
+        "the Odds page gives the lead's numbers on the float",
+      );
+      // Fitted the way a player does it: the Sounding Lead's chip in the tackle screen's Depth row.
+      await depthRow(session);
+      await session.eval(() => document.querySelector('.gw-ts-chip[data-key="sounding_lead"]').click());
+      await session.pause(800);
+      const row = await session.eval(() =>
+        [...document.querySelectorAll('.gw-ts-row[data-row="depth"] .gw-ts-note')].map((n) =>
+          n.textContent.trim(),
+        ),
+      );
+      await closeTackle(session);
+      check((await leadRecord(session)).depth === "lead", "the Depth chip did not fit the lead");
+      check(
+        row.join(" ") ===
+          "Fish that feed on the bottom bite more often. Fish that feed higher bite less often, and there is no float to watch.",
+        `the lead's lines: ${row}`,
+      );
+      // Its numbers are on the Odds page only.
+      const odds = await oddsFoot(session);
+      check(odds.includes(LEAD_ODDS), `the Odds page does not give the lead's numbers: ${odds}`);
+      await buyAtHome(session, ["rod:1", "rod:2"]);
+      await session.sail();
+      // The Tip Bell sits on the tip of each of the three rods.
+      const rods = [];
+      for (const pick of ["willow_switch", "ashwood_rod", null]) {
+        await session.eval((id) => window.__gw.progression.loop.fitTackle("rod", id), pick);
+        await session.pause(1500);
+        const r = await session.eval(() => {
+          const a = window.__gw.actors.leadDebug();
+          let model = null;
+          window.__gw.render.scene.traverse((o) => {
+            o.name === "rod-blank" && o.parent?.name === "rod" && (model = o.userData.tackleId);
+          });
+          return { model, bell: a.bell.visible, off: Math.hypot(...a.bell.at.map((v, i) => v - a.tip[i])) };
+        });
+        check(r.bell && r.off < 0.02, `the Tip Bell on ${r.model}: ${JSON.stringify(r)}`);
+        rods.push(r.model);
+      }
+      check(new Set(rods).size === 3, `three rod models: ${rods}`);
+      // A cast on the lead, watched to the bite; every line shown is recorded.
+      await listenOnWater(session);
+      await session.eval(() => {
+        const g = window.__gw;
+        window.__leadWatch = {
+          events: [],
+          maxNibbleLoad: 0,
+          maxSwing: 0,
+          float: false,
+          ring: false,
+          biteLoad: 0,
+        };
+        for (const n of ["fishing:nibble", "fishing:tell", "fishing:bite"])
+          g.bus.on(n, (e) => window.__leadWatch.events.push(`${n}${e?.onLead ? ":lead" : ""}`));
+        const p = g.player.position,
+          yaw = g.render.getYaw();
+        g.debug.castAt(p.x - Math.sin(yaw) * 9, p.z - Math.cos(yaw) * 9, 0.6);
+        window.__leadTimer = setInterval(() => {
+          const a = g.actors.leadDebug(),
+            w = window.__leadWatch;
+          if (g.fishing.state === "waiting" || g.fishing.state === "bite") {
+            w.float ||= a.floatShown;
+            w.ring ||= a.ringShown;
+            w.sink = a.sink;
+            w.lineDrop = a.lineDrop;
+            w.events.length && (w.maxNibbleLoad = Math.max(w.maxNibbleLoad, a.tipLoad));
+            w.maxSwing = Math.max(w.maxSwing, a.bell.swing);
+          }
+          g.fishing.state === "bite" && (w.biteLoad = Math.max(w.biteLoad, a.tipLoad));
+        }, 50);
+      });
+      let state = "casting";
+      for (const end = Date.now() + 240_000; Date.now() < end; ) {
+        state = await session.eval(() => window.__gw.fishing.state);
+        if (state === "bite" || state === "reeling" || state === "idle") break;
+        await session.clickButton(/^Got it$/);
+        await session.pause(120);
+      }
+      check(state === "bite", `no bite on the lead (state ${state})`);
+      // The real strike input: a press on the water.
+      const box = await session.page.locator("canvas").first().boundingBox();
+      await session.page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.6);
+      await session.pause(1500);
+      const watch = await session.eval(() => (clearInterval(window.__leadTimer), window.__leadWatch));
+      const hooked = await session.eval(() => window.__gw.fishing.state);
+      check(hooked === "reeling" || hooked === "landing", `the press did not strike: ${hooked}`);
+      check(!watch.float && !watch.ring, `a float or its ring showed: ${JSON.stringify(watch)}`);
+      check(
+        watch.sink > 0.99 && watch.lineDrop > 0.3,
+        `the lead did not settle, the line slanting in: ${JSON.stringify(watch)}`,
+      );
+      check(
+        watch.events.includes("fishing:nibble:lead") &&
+          watch.events.includes("fishing:tell:lead") &&
+          watch.events.includes("fishing:bite:lead"),
+        `the tells were not on the lead: ${watch.events}`,
+      );
+      check(
+        watch.maxNibbleLoad > 0.2 && watch.maxSwing > 0.02,
+        `the tip and bell did not answer: ${JSON.stringify(watch)}`,
+      );
+      check(watch.biteLoad > 0.5, `the tip did not pull round at the bite: ${watch.biteLoad}`);
+      // Landed: the catch card. A fish can still get away (the landing roll is the game's); then cast again.
+      const castAndStrike = async () => {
+        await session.eval(() => {
+          const g = window.__gw,
+            p = g.player.position,
+            yaw = g.render.getYaw();
+          g.debug.castAt(p.x - Math.sin(yaw) * 9, p.z - Math.cos(yaw) * 9, 0.6);
+        });
+        for (const end = Date.now() + 240_000; Date.now() < end; ) {
+          const st = await session.eval(() => window.__gw.fishing.state);
+          if (st === "bite") break;
+          await session.clickButton(/^Got it$/);
+          await session.pause(120);
+        }
+        await session.page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.6);
+      };
+      await session.eval(() => {
+        window.__landed = { landed: 0, escaped: 0 };
+        window.__gw.bus.on("fish:landed", () => window.__landed.landed++);
+        window.__gw.bus.on("fish:escaped", () => window.__landed.escaped++);
+      });
+      let card = false,
+        tries = 1;
+      for (const end = Date.now() + 400_000; Date.now() < end && !card; ) {
+        await session.clickButton(/^Got it$/);
+        card = await session.eval(() =>
+          [...document.querySelectorAll("button")].some(
+            (b) => /Keep/.test(b.textContent) && b.getBoundingClientRect().width > 0,
+          ),
+        );
+        const now = await session.eval(() => ({ ...window.__landed, state: window.__gw.fishing.state }));
+        if (!card && now.escaped >= tries && now.state === "idle" && tries < 3) {
+          tries++;
+          await castAndStrike();
+        }
+        await session.pause(400);
+      }
+      check(card, `the fish was not landed in ${tries} tries`);
+      await session.clickButton(/^\d?Keep\b/);
+      const heard = await heardOnWater(session);
+      const word = heard.lines.find((l) => /^(Shallow|Middling|Deep)$/.test(l));
+      check(word, `no depth word after the cast: ${heard.lines.slice(0, 20).join(" | ")}`);
+      // The guide's boxes are the first-play guide's own words and are not changed here; a save that never saw
+      // its bite box (made before the guide) sees it at its first bite, on the lead too.
+      const floaty = heard.lines.find(
+        (l) => !/^Guide\b/.test(l) && /\bfloat|\bcork|\bunder\b|bobber/i.test(l),
+      );
+      check(!floaty, `a line on the lead speaks of a float: "${floaty}"`);
+      // A hard take slams the tip and rings the bell hardest.
+      const slam = await session.eval(async () => {
+        const g = window.__gw;
+        const p = g.player.position,
+          yaw = g.render.getYaw();
+        g.debug.castAt(p.x - Math.sin(yaw) * 9, p.z - Math.cos(yaw) * 9, 0.6);
+        for (let k = 0; k < 400 && g.fishing.state !== "waiting"; k++)
+          await new Promise((r) => setTimeout(r, 100));
+        g.actors.takeLoad("hard");
+        await new Promise((r) => setTimeout(r, 60));
+        return g.actors.leadDebug().bell.speed;
+      });
+      check(slam > 3, `the bell did not ring at a hard take: ${slam}`);
+      return `rods ${rods.join(", ")}; word "${word}"; tip ${watch.maxNibbleLoad.toFixed(2)} at a nibble, ${watch.biteLoad.toFixed(2)} at the bite; struck by a press and landed (${tries} ${tries > 1 ? "casts" : "cast"})`;
+    },
+  },
+  {
+    name: "gear: with the Cork Float fitted, a seeded run of bait casts bites exactly as before the Sounding Lead",
+    fixture: "legend-sold",
+    debug: true,
+    timeoutMs: 360_000,
+    async run(session, { fixture }) {
+      const want = JSON.parse(readFileSync(join(FIXTURES_DIR, "bite-sequence-float.json"), "utf8"));
+      check(fixture.meta.loop.fitted.depth === undefined, "the fixture already knows the Depth part");
+      await session.sail();
+      const loaded = await leadRecord(session);
+      check(
+        loaded.depth === "float" && JSON.stringify(loaded.parts) === '["cork_float"]',
+        `the old save does not load with the Cork Float: ${JSON.stringify(loaded)}`,
+      );
+      let rolls = 0;
+      for (const [key, sequence] of Object.entries(want.sequences)) {
+        const [light, place] = key.split("|");
+        const got = await session.eval(
+          ([light, place, n, seed, bait]) => {
+            const d = window.__gw.debug;
+            d.setPhase(light);
+            d.fishSeed(seed);
+            const seq = [];
+            for (let k = 0; k < n; k++) {
+              const r = d.fishPoolRoll(1, { place, bait });
+              seq.push(r?.mist ? `mist:${r.mist}` : Object.keys(r?.counts ?? {})[0]);
+            }
+            return seq;
+          },
+          [light, place === "open" ? null : place, sequence.length, want.seed, want.bait],
+        );
+        const at = got.findIndex((id, i) => id !== sequence[i]);
+        check(at < 0, `${key}: roll ${at} drew ${got[at]}, the recorded build drew ${sequence[at]}`);
+        rolls += got.length;
+      }
+      return `${rolls} rolls at 3 places and 2 lights match the recorded sequence`;
+    },
+  },
+
+  {
+    name: "gear: the Sounding Lead doubles bottom feeders and halves higher feeders in all three bite paths, and stops none",
+    fixture: "legend-sold",
+    debug: true,
+    editSave: withLead(false),
+    async run(session) {
+      await session.sail();
+      // 1. Pool rows (l1), open water by day: each kind's share against an any-depth fish (Mossback Perch).
+      const day = await rollBoth(session, { light: "calm", roll: {} });
+      check(
+        !day.float.onLead && day.lead.onLead,
+        `the lead did not fish: ${JSON.stringify([day.float.onLead, day.lead.onLead])}`,
+      );
+      const f = day.float.shares,
+        l = day.lead.shares,
+        base = l.mossback_perch / f.mossback_perch,
+        ratio = (id) => l[id] / f[id] / base;
+      const kinds = Object.keys(f).filter((id) => f[id] > 0);
+      for (const id of kinds) {
+        check(l[id] > 0, `${id} bites on the float but not on the lead`);
+        const want = BOTTOM.includes(id) ? 2 : HIGH.includes(id) ? 0.5 : 1;
+        check(near(ratio(id), want, 1e-6), `${id}: ${ratio(id).toFixed(4)} times as often, expected ${want}`);
+      }
+      check(
+        kinds.some((id) => BOTTOM.includes(id)) && kinds.some((id) => HIGH.includes(id)),
+        "no mix of kinds here",
+      );
+      const sum = (s, ids) => ids.reduce((t, id) => t + (s[id] || 0), 0);
+      check(sum(l, BOTTOM) > sum(f, BOTTOM) && sum(l, HIGH) < sum(f, HIGH), "the shares did not move");
+      // 2. Guests (P7): the Lily Gardener's Notebook brings Nightbloom Carp (a bottom feeder) to the pads at night.
+      await session.eval(() => {
+        window.__gw.progression.loop.state().finds.got.lily_notebook = 1;
+        window.__gw.player.teleport({ x: 40, z: 28 }, 0);
+      });
+      await session.pause(1500);
+      const pads = await rollBoth(session, { light: "gloomtide", roll: {} });
+      check(pads.float.area === "pads", `not on the pads: ${pads.float.area}`);
+      const p = pads.float.shares.nightbloom_carp,
+        guestWant = (2 * p) / (1 - p) / (1 + (2 * p) / (1 - p));
+      check(p > 0, "no Nightbloom Carp on the float");
+      check(
+        near(pads.lead.shares.nightbloom_carp, guestWant, 1e-9),
+        `Nightbloom Carp share ${pads.lead.shares.nightbloom_carp} on the lead, expected ${guestWant} (float ${p})`,
+      );
+      // 3. Sign and sight takes (_7): a prerolled sucker takes more surely, a minnow less.
+      const sucker = await rollBoth(session, {
+        light: "calm",
+        roll: { preroll: { speciesId: "rustfin_sucker", base: 0.2 } },
+      });
+      const minnow = await rollBoth(session, {
+        light: "calm",
+        roll: { preroll: { speciesId: "dusk_minnow", base: 0.45 } },
+      });
+      check(
+        near(sucker.lead.preroll, Math.min(0.9, 2 * sucker.float.preroll), 1e-9) &&
+          sucker.lead.preroll > sucker.float.preroll,
+        `sucker take ${sucker.float.preroll} -> ${sucker.lead.preroll}`,
+      );
+      check(
+        near(minnow.lead.preroll, minnow.float.preroll / 2, 1e-9),
+        `minnow take ${minnow.float.preroll} -> ${minnow.lead.preroll}`,
+      );
+      // Lure casts are untouched: with a lure fitted the lead does not fish.
+      const lure = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          d = window.__gw.debug;
+        loop.fitDepth("lead");
+        loop.state().lures.includes("feather_fly") || loop.state().lures.push("feather_fly");
+        loop.changeHook({ lure: "feather_fly" });
+        const r = d.fishPoolRoll(1, {}),
+          leadFishes = loop.leadFishes();
+        loop.changeHook({ lure: null, bait: "mireworm" });
+        return { onLead: r.onLead, leadFishes };
+      });
+      check(!lure.onLead && !lure.leadFishes, `the lead fished under a lure: ${JSON.stringify(lure)}`);
+      return `pool: bottom x2, high x0.5 across ${kinds.length} kinds; guest ${p.toFixed(3)} -> ${pads.lead.shares.nightbloom_carp.toFixed(3)}; takes ${sucker.float.preroll} -> ${sucker.lead.preroll}, ${minnow.float.preroll} -> ${minnow.lead.preroll}`;
+    },
+  },
+
+  {
+    name: "gear: Murk gives the Sounding Lead at the next tally with his line, once, and an old save loads with the float",
+    fixture: "fresh-first-evening",
+    debug: true,
+    timeoutMs: 720_000,
+    async run(session, { fixture, page, browser }) {
+      check(fixture.meta.loop.said.firstSale === true, "the fixture has not sold yet");
+      await session.toHome();
+      const loaded = await leadRecord(session);
+      check(
+        loaded.depth === "float" && JSON.stringify(loaded.parts) === '["cork_float"]',
+        `the old save does not load with the Cork Float alone: ${JSON.stringify(loaded)}`,
+      );
+      check(
+        (await depthRow(session)) === null,
+        "the tackle screen offers a Depth choice before the lead is owned",
+      );
+      await closeTackle(session);
+      await session.sail();
+      await session.catchFish("dusk_minnow");
+      const gift = await tallyAndGift(session);
+      check(
+        gift?.shown && gift.text.includes(GIFT_LINE),
+        `the tally does not show Murk's gift: ${JSON.stringify(gift)}`,
+      );
+      check(gift.text.includes("Sounding Lead"), `the gift is not named: ${gift.text}`);
+      const after = await leadRecord(session);
+      check(
+        after.gift === LEAD &&
+          after.parts.filter((id) => id === LEAD).length === 1 &&
+          after.depth === "float",
+        `after the tally: ${JSON.stringify(after)}`,
+      );
+      // The tackle screen now offers Depth, the float fitted.
+      const row = await depthRow(session);
+      check(
+        JSON.stringify(row?.chips) === '[{"key":"cork_float","on":true},{"key":"sounding_lead","on":false}]',
+        `the Depth row: ${JSON.stringify(row)}`,
+      );
+      await closeTackle(session);
+      // Reloaded, it is not given again.
+      const saved = await session.saved();
+      const again = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await again.boot();
+        await again.sail();
+        await again.catchFish("mossback_perch");
+        const second = await tallyAndGift(again);
+        const record = await leadRecord(again);
+        check(second === null, `a second gift: ${JSON.stringify(second)}`);
+        check(
+          record.gift === null && record.parts.filter((id) => id === LEAD).length === 1,
+          `after reloading and another tally: ${JSON.stringify(record)}`,
+        );
+        await again.collectGameErrors();
+        check(!again.errors.length, `errors after reloading: ${again.errors.join("; ")}`);
+      } finally {
+        await again.close();
+      }
+      return `"${gift.text.slice(0, 60)}..." at the next tally; once only after a reload`;
+    },
+  },
+
+  {
+    name: "gear: the gift waits for the first tally with a sale",
+    fixture: "fresh-first-evening",
+    debug: true,
+    timeoutMs: 420_000,
+    // A save that has never sold (its first tally had nothing to sell).
+    editSave: (save) => delete save.meta.loop.said.firstSale,
+    async run(session) {
+      await session.sail();
+      const empty = await tallyAndGift(session);
+      const before = await leadRecord(session);
+      check(
+        empty === null && !before.parts.includes(LEAD),
+        `the lead came at a tally with no sale: ${JSON.stringify(before)}`,
+      );
+      await session.sail();
+      await session.catchFish("dusk_minnow");
+      const gift = await tallyAndGift(session);
+      const after = await leadRecord(session);
+      check(
+        gift?.text.includes(GIFT_LINE) && after.parts.includes(LEAD),
+        `no gift at the first sale: ${JSON.stringify(after)}`,
+      );
+      return "nothing at an empty tally, the lead at the first sale";
+    },
+  },
+
+  {
+    name: "gear: mid-mossmere gets the lead at its next tally",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session) {
+      await session.sail();
+      await session.catchFish("dusk_minnow");
+      const gift = await tallyAndGift(session);
+      const after = await leadRecord(session);
+      check(
+        gift?.text.includes(GIFT_LINE) && after.gift === LEAD && after.depth === "float",
+        `${JSON.stringify(after)}`,
+      );
+      return "given at the next tally";
+    },
+  },
+
+  {
+    name: "gear: Sporewood ignores depth and does not offer it",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withLead(true),
+    async run(session) {
+      await session.toHome();
+      check((await depthRow(session)) === null, "Sporewood's tackle screen offers Depth");
+      await closeTackle(session);
+      await session.sail({ water: "sporewood" });
+      const r = await rollBoth(session, { light: "calm", roll: { bait: "spore_cake" } });
+      check(
+        !r.lead.onLead && JSON.stringify(r.lead.shares) === JSON.stringify(r.float.shares),
+        `Sporewood odds moved: ${JSON.stringify(r)}`,
+      );
+      const leadFishes = await session.eval(() => window.__gw.progression.loop.leadFishes());
+      check(leadFishes === false, "the lead fishes in Sporewood");
+      return "no Depth row, odds unchanged";
+    },
+  },
   ...FIXTURE_NAMES.map((name) => ({
     name: `${name} loads and reaches play without errors`,
     fixture: name,
@@ -989,7 +1518,7 @@ async function runScenario(browser, scenario) {
       scenario.editSave(save);
       fixture = JSON.stringify(save);
     }
-    const context = { fixture: fixture ? JSON.parse(fixture) : null, page: PAGE };
+    const context = { fixture: fixture ? JSON.parse(fixture) : null, page: PAGE, browser };
     const work = async () => {
       if (scenario.browser === false) return scenario.run(null, context);
       session = await GameSession.open(browser, {

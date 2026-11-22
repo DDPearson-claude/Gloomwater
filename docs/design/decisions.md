@@ -85,3 +85,5 @@ Details are in `mossmere-review-addendum.md`.
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.
 - The designer's approval of the Mossbell Isle rock artwork.
 - Hunt length and earnings have not been measured in play; the estimates in the proposals are untested.
+- Murk's shelf after a Sporewood visit still offers Sporewood's rods, lines and reels back in Mossmere. The simple fix (the shelf follows the barge) was built and withdrawn: tackle tiers are one shared ladder and Mossmere's stats are carried over at the first tow, so it double-counted gear and made Sporewood tiers cheap. It is to be fixed with per-lake kits ("Between lakes" above).
+- Known fault, to fix in a small step: a chart opened in the first moment of the home screen can come up without its tap areas until it is closed and opened again. Sail still works.

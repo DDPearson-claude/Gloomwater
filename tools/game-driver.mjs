@@ -177,6 +177,7 @@ export class GameSession {
     const end = Date.now() + timeoutMs;
     const seen = [];
     let picked = !water;
+    let chartWaits = 0;
     while (Date.now() < end) {
       const act = await this.eval(
         ([wickLabel, waterId]) => {
@@ -211,7 +212,7 @@ export class GameSession {
             waterId && document.querySelector(`.gw-chart-hit[data-id="${kind}:${waterId}"]`);
           if (hit("water")) return hit("water").click(), `pick ${waterId} on the chart`;
           if (hit("sheet")) return hit("sheet").click(), `turn to ${waterId} on the chart`;
-          if (waterId && document.querySelector(".gw-m-chart")) return "wait"; // until the chart is drawn
+          if (waterId && document.querySelector(".gw-m-chart")) return "wait for the chart"; // until it is drawn
           if (button("Sail")) return button("Sail").click(), "sail";
           if (g.flow === "home" && !g.game?.towing?.() && !g.ui?.isBlocking?.() && button("Chart"))
             return button("Chart").click(), "open chart";
@@ -221,7 +222,15 @@ export class GameSession {
       );
       if (act.startsWith("pick ")) picked = true;
       if (act === "key:Enter") await this.page.keyboard.press("Enter");
-      if (act !== "wait" && seen[seen.length - 1] !== act) seen.push(act);
+      // A chart opened in the first moment of the home screen is sometimes drawn without its tap areas and
+      // stays that way (a known timing fault in the game). After three seconds, close it; it is opened again.
+      chartWaits = act === "wait for the chart" ? chartWaits + 1 : 0;
+      if (chartWaits >= 8) {
+        await this.page.keyboard.press("Escape");
+        chartWaits = 0;
+        if (seen[seen.length - 1] !== "reopen chart") seen.push("reopen chart");
+      }
+      if (!act.startsWith("wait") && seen[seen.length - 1] !== act) seen.push(act);
       if (act === "playing") {
         await this.closeGuides();
         await this.waitUntilFree();

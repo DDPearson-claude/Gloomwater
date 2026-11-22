@@ -32064,6 +32064,38 @@ var Ih = (e) => (e && bs[e]?.hook ? bs[e] : y0),
     return n.table[e] || n.guests?.[e];
   },
   SS = (e) => (e && bs[e]?.geometry ? bs[e] : y0);
+// Mossmere's Depth part (mossmere-gear.md B2, B3): where each fish feeds. With the Sounding Lead on a bait cast,
+// "bottom" fish bite more often and "high" fish less often (wo.depthMult); a fish missing here feeds at any depth.
+// Sporewood has no table, so it ignores depth until it is reworked.
+bs.mossmere.depth = {
+  gutter_crayfish: "bottom",
+  rustfin_sucker: "bottom",
+  weeping_carp: "bottom",
+  milkeye_perch: "bottom",
+  bridgechain_sturgeon: "bottom",
+  gloam_eel: "bottom",
+  rainglass_darter: "bottom",
+  nightbloom_carp: "bottom",
+  dusk_minnow: "high",
+  lampsipper: "high",
+  reedjaw_pike: "high",
+  thousandcast_pike: "high",
+  rosefleck_trout: "high",
+};
+// How much more or less often a species bites at the depth a bait cast fishes: depth "lead" (the Sounding Lead)
+// or null (the Cork Float, today's rig, which changes nothing). It never falls below the floor, so the lead
+// stops no fish that could bite on the float.
+function depthBiteMult(speciesId, depth, water) {
+  if (depth !== "lead") return 1;
+  // A null water is the home lake, as in Ih().
+  let feeds = (water == null ? y0 : bs[water])?.depth?.[speciesId] || "any",
+    rule = wo?.depthMult || {};
+  return Math.max(ka(rule.floor, 0.5), ka(rule.lead?.[feeds], 1));
+}
+// A sign or sight take chance on the lead: raised (to at most 0.9, never below what it was) or lowered.
+function depthTakeChance(p, mult) {
+  return mult > 1 ? Math.max(p, Math.min(0.9, p * mult)) : p * mult;
+}
 bs.sporewood.geometry = {
   inflow: { x: 74.5, z: -24, r: 8 },
   outflow: { x: -66, z: 37, r0: 0, r1: 8 },
@@ -32507,6 +32539,7 @@ function l1(
     hook: r = !0,
     boost: l = null,
     water: i = null,
+    depth = null,
   } = {},
 ) {
   let c = Ih(i).hook.mult;
@@ -32517,7 +32550,9 @@ function l1(
       m = ka(u);
     (m *= !n && t ? ES(h, t, o, i) : C7(h, o, i)), l && h && l[h] > 0 && (m *= l[h]);
     let g = r ? Rl(h, { lure: a, bait: s, water: i }) : void 0;
-    return r && g != null && (m *= c[g]), { sp: f, w: m, g };
+    r && g != null && (m *= c[g]);
+    depth && (m *= depthBiteMult(h, depth, i));
+    return { sp: f, w: m, g };
   });
 }
 function L7(e) {
@@ -32534,6 +32569,7 @@ function P7(
     D: r = null,
     guests: l = null,
     water: i = null,
+    depth = null,
   } = {},
 ) {
   let c = Sr(e).map((m) => ({ ...m })),
@@ -32551,14 +32587,23 @@ function P7(
     } else y = Math.min(0.99, ka(t.share, 0) * p);
     let v = Rl(t.sp.id, { lure: n, bait: o, water: i }),
       b = y > 0 && y < 1 ? (f * y) / (1 - y) : 0;
-    v <= 1 && (b *= d.mult[v]), c.push({ sp: t.sp, w: b, g: v, giant: !0 });
+    v <= 1 && (b *= d.mult[v]), depth && (b *= depthBiteMult(t.sp.id, depth, i));
+    c.push({ sp: t.sp, w: b, g: v, giant: !0 });
   }
   for (let m of Sr(l)) {
     if (!m?.sp || c.some((y) => y.sp?.id === m.sp.id)) continue;
     let g = Rl(m.sp.id, { lure: n, bait: o, water: i }),
       p = ka(m.share, 0) * (tee[g] ?? 0),
       w = c.reduce((y, v) => y + ka(v.w), 0);
-    p > 0 && p < 1 && w > 0 && c.push({ sp: m.sp, w: (w * p) / (1 - p), g, guest: !0 });
+    p > 0 &&
+      p < 1 &&
+      w > 0 &&
+      c.push({
+        sp: m.sp,
+        w: ((w * p) / (1 - p)) * (depth ? depthBiteMult(m.sp.id, depth, i) : 1),
+        g,
+        guest: !0,
+      });
   }
   let u = L7(c),
     h = d.cap * u;
@@ -32615,12 +32660,13 @@ function G5(
     comeback: f = null,
     notes: u = null,
     water: h = null,
+    depth = null,
   } = {},
 ) {
   let m = t?.place ?? null,
     g = e?.AUTOFISH?.signRule || { minSpecies: 2, maxShare: 0.8 },
     p = u ? I7(e, u, { area: n, place: m, phase: o }) : null,
-    w = l1(t?.list, { area: n, place: m, phase: o, lure: a, bait: s, boost: p?.boost, water: h }),
+    w = l1(t?.list, { area: n, place: m, phase: o, lure: a, bait: s, boost: p?.boost, water: h, depth }),
     y = ka(l, 0);
   if (y)
     for (let S of w)
@@ -32660,6 +32706,7 @@ function G5(
     D: e,
     guests: p?.guests,
     water: h,
+    depth,
   });
   let b = L7(w),
     L = !1;
@@ -32675,7 +32722,9 @@ function G5(
     let S = d.sp;
     if ((!S.bait || S.bait === s) && !(v && S.rarity === "common")) {
       let P = Rl(S.id, { lure: a, bait: s, water: h });
-      E = { sp: S, p: _7(ka(d.base, 1), P, h), from: "preroll", z: d.z, g: P };
+      let take = _7(ka(d.base, 1), P, h);
+      depth && (take = depthTakeChance(take, depthBiteMult(S.id, depth, h)));
+      E = { sp: S, p: take, from: "preroll", z: d.z, g: P };
     }
   }
   let O = E && E.g === 0 ? E.sp.id : null,
@@ -32717,6 +32766,7 @@ function zS(
     rb: s = 0,
     notes: r = null,
     water: l = null,
+    depth = null,
   } = {},
 ) {
   let i = id(t),
@@ -32731,11 +32781,11 @@ function zS(
     let y = ka(d.shares?.[i]?.[w], 0);
     if (!(y > 0)) continue;
     let v = r ? I7(e, r, { area: w, place: null, phase: i }) : null,
-      b = l1(p.list, { area: w, place: null, phase: i, lure: n, bait: h, boost: v?.boost, water: f });
+      b = l1(p.list, { area: w, place: null, phase: i, lure: n, bait: h, boost: v?.boost, water: f, depth });
     if (c)
       for (let O of b)
         O.sp?.rarity === "uncommon" ? (O.w *= 1 + 2 * c) : O.sp?.rarity === "rare" && (O.w *= 1 + 4 * c);
-    let L = P7(b, { lure: n, bait: h, phase: i, wickId: a, D: e, guests: v?.guests, water: f }),
+    let L = P7(b, { lure: n, bait: h, phase: i, wickId: a, D: e, guests: v?.guests, water: f, depth }),
       E = L.reduce((O, T) => O + T.w, 0);
     if (E > 0) {
       for (let O of L) m[O.sp.id] = (m[O.sp.id] || 0) + (y * O.w) / E;
@@ -47207,6 +47257,33 @@ Ca.tackle = {
   none: "No lure",
   after: "After this fish.",
 };
+// Rig parts beyond rod, reel and line (mossmere-gear.md B2). The Depth part: the Cork Float is everyone's rig and
+// changes nothing; the Sounding Lead is Murk's gift at the first tally with a sale (its price is for later).
+wo.rig = {
+  parts: {
+    cork_float: { slot: "depth", fit: "float", start: !0, water: null },
+    sounding_lead: { slot: "depth", fit: "lead", depth: "bottom", gift: "firstSale", price: 30, water: null },
+  },
+};
+wo.depthMult = { lead: { bottom: 2, high: 0.5, any: 1 }, float: 1, floor: 0.5 };
+Ca.depth = {
+  head: "Depth",
+  names: { cork_float: "Cork Float", sounding_lead: "Sounding Lead" },
+  good: {
+    cork_float: "Every fish bites, and you see each nibble on the float.",
+    sounding_lead: "Fish that feed on the bottom bite more often.",
+  },
+  cost: {
+    cork_float: "It costs you nothing.",
+    sounding_lead: "Fish that feed higher bite less often, and there is no float to watch.",
+  },
+  lure: "Lures swim at their own depth.",
+  fit: "Fit it on the Tackle screen, under Depth.",
+  words: { shallow: "Shallow", mid: "Middling", deep: "Deep" },
+  gift: "Not every fish looks up. A lead takes your worm down to the ones that don't.",
+  strike: "The rod tip pulls round. Press now.",
+  odds: "On the Sounding Lead: bottom feeders \xD72, higher feeders \xD70.5.",
+};
 var VS = 2;
 function SP(e = globalThis) {
   let t = Number(e?.GW_LOOP_COST);
@@ -54318,6 +54395,40 @@ var kc = {
             d: 0.2,
             peak: 0.1 + s * 0.05,
           });
+      },
+    },
+    // The Tip Bell on the rod while the Sounding Lead fishes: a light tinkle for a knock, a hard ring for a bite.
+    tip_tinkle: {
+      gain: 0.45,
+      gap: 0.12,
+      max: 2,
+      pri: 2,
+      wet: 0.35,
+      pj: 0.04,
+      fn(e, t, n, o) {
+        Cu(e, t, n, 2350 * o, 0.16, [1, 2.32, 2.98, 4.15], [0.5, 0.3, 0.2, 0.12]);
+        Cu(e, t, n + 0.07, 2500 * o, 0.09, [1, 2.32, 2.98, 4.15], [0.4, 0.25, 0.16, 0.1]);
+      },
+    },
+    tip_ring: {
+      gain: 0.7,
+      gap: 0.3,
+      max: 2,
+      pri: 3,
+      wet: 0.4,
+      pj: 0.02,
+      fn(e, t, n, o) {
+        e.burst(t, { t: n, a: 0.001, d: 0.02, peak: 0.3, ft: "highpass", f: 3200 * o, q: 0.9 });
+        for (let k = 0; k < 4; k++)
+          Cu(
+            e,
+            t,
+            n + k * 0.09,
+            2050 * o,
+            0.32 * (1 - k * 0.2),
+            [1, 2.32, 2.98, 4.15],
+            [1.2, 0.7, 0.45, 0.28],
+          );
       },
     },
     dusk_toll: {
@@ -90680,6 +90791,69 @@ function makeWaterLures(tilt) {
     },
   };
 }
+// The Tip Bell (mossmere-gear.md B5, B8): a small brass bell clipped to the rod tip while the Sounding Lead
+// fishes. It is a world-space group set on the tip each frame, so it sits on every rod model, and it swings on a
+// spring: a knock makes it tinkle, a bite rings it hard.
+function makeTipBell() {
+  let group = new fo();
+  // Drawn about twice life size, like the cork float, so it reads on a phone from the raft's camera.
+  (group.name = "tipBell"), (group.visible = !1), group.scale.setScalar(2.2);
+  let hang = new fo();
+  group.add(hang);
+  // Warm, a little self-lit: it catches the lantern after dark.
+  let brass = sa({ color: 0xf0c060, rim: 0.8, emissive: 0x9a6c20 }),
+    dark = sa({ color: 0x3a2c22, rim: 0.3 }),
+    clip = new An(new Xn(0.007, 0.007, 0.05, 5), dark);
+  (clip.position.y = -0.025), hang.add(clip);
+  let bellGeo = new Li(
+      [
+        [0, 0],
+        [0.016, -0.003],
+        [0.026, -0.016],
+        [0.032, -0.04],
+        [0.046, -0.072],
+        [0.052, -0.08],
+        [0.044, -0.082],
+      ].map((p) => new Rn(p[0], p[1])),
+      12,
+    ),
+    bell = new An(bellGeo, brass);
+  (bell.position.y = -0.05), hang.add(bell), Gr(bell, { thickness: 0.008 });
+  let clapper = new An(new Ao(0.013, 8, 6), dark);
+  (clapper.position.y = -0.125), hang.add(clapper);
+  let glint = Js({ color: 0xffe2a0, size: 0.22, opacity: 0.2 });
+  (glint.position.y = -0.08), hang.add(glint);
+  let swing = { x: 0, z: 0, vx: 0, vz: 0, flare: 0 };
+  return {
+    group,
+    mats: [brass, dark, glint.material],
+    geos: [clip.geometry, bellGeo, clapper.geometry],
+    // A push: strength 0.5 is a knock's tinkle, 1.6 a bite's hard ring.
+    ring(strength = 1) {
+      let a = Math.random() * Math.PI * 2;
+      (swing.vx += Math.cos(a) * 3.2 * strength), (swing.vz += Math.sin(a) * 3.2 * strength);
+      swing.flare = Math.min(1, swing.flare + 0.35 * strength);
+    },
+    debug: () => ({
+      visible: group.visible,
+      swing: Math.hypot(swing.x, swing.z),
+      speed: Math.hypot(swing.vx, swing.vz),
+      flare: swing.flare,
+      at: group.position.toArray(),
+    }),
+    update(dt, tip, show) {
+      if (((group.visible = !!show && !!tip), !group.visible)) return;
+      group.position.copy(tip);
+      (swing.vx += (-60 * swing.x - 3.2 * swing.vx) * dt), (swing.x += swing.vx * dt);
+      swing.x = Math.max(-0.9, Math.min(0.9, swing.x));
+      (swing.vz += (-60 * swing.z - 3.2 * swing.vz) * dt), (swing.z += swing.vz * dt);
+      swing.z = Math.max(-0.9, Math.min(0.9, swing.z));
+      hang.rotation.set(swing.z, 0, -swing.x);
+      swing.flare = Math.max(0, swing.flare - dt * 1.6);
+      glint.material.opacity = 0.2 + 0.7 * swing.flare;
+    },
+  };
+}
 function GN() {
   let e = new fo();
   (e.name = "bobber"), (e.visible = !1);
@@ -100635,6 +100809,22 @@ function qre(e) {
   t.add(r.mesh);
   let l = GN();
   t.add(l.group);
+  let tipBell = makeTipBell(),
+    tipPos = new He(),
+    leadCheck = { t: -1, on: !1 };
+  t.add(tipBell.group);
+  // Whether the Sounding Lead fishes this trip, read a few times a second: the Tip Bell shows before a cast too.
+  function leadFitted() {
+    if (Math.abs(b.t - leadCheck.t) > 0.25) {
+      leadCheck.t = b.t;
+      try {
+        leadCheck.on = e.progression?.loop?.leadFishes?.() === !0;
+      } catch {
+        leadCheck.on = !1;
+      }
+    }
+    return leadCheck.on;
+  }
   let i = new ua({
       color: 15390376,
       transparent: !0,
@@ -100677,7 +100867,22 @@ function qre(e) {
       raftLevelExplicit: !1,
       characterExplicit: !1,
       line: { visible: !1, end: new He(), hasEnd: !1, tension: 0, slack: 0 },
-      bob: { visible: !1, pos: new He(), state: "floating", prev: "", stateT: 0, dipT: 0, spin: 0 },
+      bob: {
+        visible: !1,
+        pos: new He(),
+        state: "floating",
+        prev: "",
+        stateT: 0,
+        dipT: 0,
+        spin: 0,
+        // The Sounding Lead: no float; the line slants down to the lead; the tip and its bell give the tells.
+        lead: !1,
+        depth: 0,
+        dip: 0,
+        sink: 0,
+        tipLoad: 0,
+        nibbleRung: 0,
+      },
       catchFish: null,
       catchBig: !1,
       eatFish: null,
@@ -101337,13 +101542,16 @@ function qre(e) {
         ((Ht.stateT += Me),
         Ht.state !== Ht.prev && (J(Ht.state, Ht.prev), (Ht.prev = Ht.state), (Ht.stateT = 0)),
         Ne(Me, ve)),
-        (l.group.visible = Ht.visible),
+        (l.group.visible = Ht.visible && !Ht.lead),
         Ht.visible || (c.visible = !1),
         ht.visible &&
           (ht.hasEnd || Ht.visible) &&
-          (Ht.visible && (!ht.hasEnd || ht.end.distanceTo(Ht.pos) < 0.8)
-            ? (l.tilt.updateWorldMatrix(!0, !1), l.lures.anchor(T))
-            : T.copy(ht.end),
+          (Ht.visible && Ht.lead && Ht.state !== "flying"
+            ? ((Ht.lineDrop = Ht.sink * (0.35 + 0.9 * Sc(Ht.depth, 0, 1))),
+              T.set(Ht.pos.x, Se(Ht.pos.x, Ht.pos.z) - Ht.lineDrop, Ht.pos.z))
+            : Ht.visible && (!ht.hasEnd || ht.end.distanceTo(Ht.pos) < 0.8)
+              ? (l.tilt.updateWorldMatrix(!0, !1), l.lures.anchor(T))
+              : T.copy(ht.end),
           (qt = T));
       if (Ht.visible && Ht.retrieving && l.lures.active && Ht.state !== "flying") {
         l.lures.anchor(O);
@@ -101354,12 +101562,22 @@ function qre(e) {
       } else e.water?.setSurfaceTow?.(0, 0, 0, 0);
       let Le = ht.tension,
         it = ht.slack;
+      // On the lead the line straightens as the lead settles, and the tip's own load adds to the take.
+      Ht.visible &&
+        Ht.lead &&
+        Ht.state !== "flying" &&
+        ((it = Math.min(it, 0.7 - 0.55 * Ht.sink)), (D.takeLoad = Math.max(D.takeLoad || 0, Ht.tipLoad)));
       !qt &&
         sn === "measureHang" &&
         z.hasSnout &&
         ((qt = z.snout), (Le = Sc(0.35 + Ze() * 0.12, 0.35, 0.7)), (it = 0)),
         !qt && S.line.on && ((qt = S.line.end), (Le = S.line.tension), (it = S.line.slack)),
         a.bendRod(qt, Le, S.bow.on ? S.bow : null, D.takeLoad, Me),
+        tipBell.update(
+          Me,
+          a.rod.visible ? a.getRodTip(tipPos) : null,
+          a.rod.visible && (Ht.visible ? Ht.lead : leadFitted()) && e.flow === "playing",
+        ),
         qt
           ? (a.getRodTip(O),
             r.shape(O, qt, it, Le, ve, be() ? Se : null),
@@ -101508,9 +101726,28 @@ function qre(e) {
     takeLoad(kind) {
       b.takeAge = 0;
       b.hardLoad = kind === "hard";
+      // A hard take on the lead slams the tip and rings the bell its hardest.
+      kind === "hard" && b.bob.lead && (tipBell.ring(2.2), a.ringBell(1.6));
     },
     getRodTip() {
       return a.getRodTip(new He());
+    },
+    // For tests: the Sounding Lead on the water (float hidden, the Tip Bell, the tip's load, the lead's sink).
+    leadDebug() {
+      let oe = b.bob;
+      return {
+        lead: oe.lead,
+        bobVisible: oe.visible,
+        floatShown: l.group.visible,
+        ringShown: c.visible,
+        tipLoad: oe.tipLoad,
+        sink: oe.sink,
+        lineDrop: oe.lineDrop ?? 0,
+        state: oe.state,
+        rod: a.rod.visible,
+        tip: a.getRodTip(new He()).toArray(),
+        bell: tipBell.debug(),
+      };
     },
     setLine({ visible: Me = !1, end: ve = null, tension: oe = 0, slack: Qe = 0 } = {}) {
       let Re = b.line;
@@ -101526,9 +101763,15 @@ function qre(e) {
       state: oe = "floating",
       lureId = null,
       retrieving = false,
+      lead = false,
+      depth = 0,
+      dip = 0,
     } = {}) {
       let Qe = b.bob;
       Qe.retrieving = retrieving;
+      Qe.lead = !!lead;
+      Qe.depth = Number.isFinite(depth) ? depth : 0;
+      Qe.dip = Number.isFinite(dip) ? dip : 0;
       Me && l.lures.select(lureId);
       (Qe.visible = !!Me && (!!ve || Qe.visible)),
         ve && Number.isFinite(ve.x) && Qe.pos.set(ve.x, Number.isFinite(ve.y) ? ve.y : 0, ve.z),
@@ -101716,6 +101959,7 @@ function qre(e) {
     dispose() {
       S.abort(), e.render?.scene?.remove?.(t), v.dispose();
       l.lures.dispose();
+      for (let tb of [...tipBell.mats, ...tipBell.geos]) tb?.dispose?.();
       d.dispose();
       for (let Me of [...n.mats, ...a.mats, ...d.mats, ...l.mats]) Me?.dispose?.();
       f?.dispose(), s.dispose(), r.dispose();
@@ -101730,15 +101974,45 @@ function qre(e) {
   }
   function J(Me, ve) {
     let oe = b.bob;
+    if (oe.lead) {
+      // The fish is down at the lead: no splash on top. The bite rings the Tip Bell hard.
+      Me === "bite" && (tipBell.ring(1.6), a.ringBell(1.2));
+      Me === "flying" && ((oe.sink = 0), (oe.tipLoad = 0));
+      return;
+    }
     Me === "bite"
       ? (a.ringBell(1.6),
         e.water?.splash?.(oe.pos.x, oe.pos.z, { size: 0.35, count: 8 }),
         e.water?.addRipple?.(oe.pos.x, oe.pos.z, 1.2))
       : Me === "floating" && ve === "flying" && e.water?.addRipple?.(oe.pos.x, oe.pos.z, 0.6);
   }
-  function Ne(Me, ve) {
+  // The tells on the Sounding Lead, read from the same dip the float would show: a nibble knocks the tip (and
+  // the bell tinkles), a tell nods it slowly and low, a bite pulls it round. The bite schedule is the float's.
+  function leadTells(dt) {
     let oe = b.bob,
-      Qe = l.group,
+      dip = oe.dip || 0,
+      want =
+        oe.state === "flying"
+          ? 0
+          : oe.state === "bite"
+            ? 0.8
+            : oe.state === "hooked"
+              ? 0.5
+              : Sc(Math.abs(dip) * 6, 0, 0.6),
+      quick = oe.state === "nibble" && Math.abs(dip) < 0.1;
+    (oe.tipLoad = rc(oe.tipLoad, want, quick ? 30 : oe.state === "bite" ? 14 : 4, dt)),
+      (c.visible = !1),
+      quick && oe.tipLoad > 0.2 && oe.nibbleRung <= 0
+        ? (tipBell.ring(0.5), a.ringBell(0.4), (oe.nibbleRung = 0.35))
+        : (oe.nibbleRung -= dt);
+    // The lead settles over about half a second in shallow water and two in the deepest.
+    let settle = 0.5 + 1.5 * Sc(oe.depth, 0, 1);
+    oe.state !== "flying" && (oe.sink = Math.min(1, oe.sink + dt / settle));
+  }
+  function Ne(Me, ve) {
+    let oe = b.bob;
+    if (oe.lead) return leadTells(Me);
+    let Qe = l.group,
       Re = l.tilt,
       ge = oe.pos.x,
       k = oe.pos.z,
@@ -102978,7 +103252,7 @@ function GH(e, t, n) {
   return (
     kl(t.fitted) || (t.fitted = { lure: null, bait: null }),
     (typeof t.fitted.lure == "string" && e?.LOOP?.lures?.[t.fitted.lure]?.found === !0) ||
-      (t.fitted = { lure: i.fit ? null : (i.lures[0] ?? null), bait: i.fit }),
+      (t.fitted = { lure: i.fit ? null : (i.lures[0] ?? null), bait: i.fit, depth: t.fitted.depth }),
     kl(t.eveningsAt) || (t.eveningsAt = {}),
     (t.eveningsAt[n] = 0),
     { from: o, to: n, add: a, carry: lc(t) }
@@ -104068,11 +104342,12 @@ function G3(
     rb: l = 0,
     water: i = "mossmere",
     notes: c = null,
+    depth = null,
   } = {},
 ) {
   let d = n8[o] || "calm",
     f = typeof t == "string" ? jg(e, t) : t;
-  if (!f && !n) return zS(e, { light: o, lure: a, bait: s, wickId: r, rb: l, notes: c, water: i });
+  if (!f && !n) return zS(e, { light: o, lure: a, bait: s, wickId: r, rb: l, notes: c, water: i, depth });
   let u = e.placePool(qi(e.SPECIES), { placeId: f?.id ?? null, phase: d, bait: s, wickId: r, water: i }),
     h = G5(e, {
       pool: u,
@@ -104084,6 +104359,7 @@ function G3(
       rb: l,
       notes: c,
       water: i,
+      depth,
     }),
     m = {};
   for (let g of qi(h.entries)) g.sp?.id && (m[g.sp.id] = (m[g.sp.id] || 0) + na(g.p));
@@ -104141,6 +104417,7 @@ function hF(
     M = lc(c),
     A = x === Pr(t) && !(M.rod || M.line || M.reel || M.cast),
     S = md(t, c, O.hold);
+  let sheetDepth = soundingLeadFishes(c, d, g) ? "lead" : null;
   for (let re of t8) (h[re] = ju(t, c, re)), (E[re] = h[re]);
   (Object.keys(O.hold).length || !A) && (E.hold = { ...S });
   let P = new Set(qi(c.lifted)),
@@ -104463,6 +104740,7 @@ function hF(
             rb: ie,
             water: d,
             notes: T,
+            depth: sheetDepth,
           }),
     qt = [],
     Le = 0;
@@ -104584,6 +104862,7 @@ function hF(
               rb: ie - De,
               water: d,
               notes: T,
+              depth: sheetDepth,
             }),
         at = null;
       for (let ct of qt) {
@@ -104760,6 +105039,7 @@ function hF(
         unmet: Le,
         ref: ee,
         legend: legendShare === 1 ? _t : null,
+        depth: sheetDepth,
       },
       fresh: lt,
     }
@@ -104915,7 +105195,8 @@ function yF(e) {
     holdSlots: ha(e?.LOOP?.hold?.start, 3) || 3,
     tackle: { rod: 0, line: 0, reel: 0 },
     lures: t.lures,
-    fitted: { lure: null, bait: t.fit },
+    fitted: { lure: null, bait: t.fit, depth: "float" },
+    parts: ["cork_float"],
     bait: t.bait,
     maps: { lakes: [il(e)], places: [] },
     raft: { oars: 0, keel: 0, lantern: 0 },
@@ -104951,6 +105232,18 @@ function yF(e) {
 // line too weak for her.
 function freshHuntRecord() {
   return { lineLesson: false };
+}
+// The Sounding Lead fishes when it is owned and fitted, in a water with a depth table, and no lure is on (a lure
+// swims at its own depth). Otherwise the rig fishes under the Cork Float, as it always has.
+function soundingLeadFishes(loop, water, lure) {
+  return (
+    loop?.fitted?.depth === "lead" &&
+    !lure &&
+    Array.isArray(loop.parts) &&
+    loop.parts.includes("sounding_lead") &&
+    typeof water == "string" &&
+    !!bs[water]?.depth
+  );
 }
 function a8(e, t, { hasTrip: n = !1 } = {}) {
   if (!Ln(e)) return e;
@@ -105059,6 +105352,10 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
     p != null && typeof p != "string" && (c.fit[g] = null), c.fit[g] === void 0 && (c.fit[g] = null);
   }
   m && (c.eveningsAt = { [i]: c.evenings });
+  // Rig parts: known ids only, the Cork Float always owned; the fitted depth must be an owned part's.
+  c.parts = c.parts.filter((g, p, w) => typeof t?.LOOP?.rig?.parts?.[g] == "object" && w.indexOf(g) === p);
+  c.parts.includes("cork_float") || c.parts.unshift("cork_float");
+  (c.fitted.depth === "lead" && c.parts.includes("sounding_lead")) || (c.fitted.depth = "float");
   for (let [lake, record] of Object.entries(o.hunt)) {
     let saved = Ln(c.hunt[lake]) ? c.hunt[lake] : (c.hunt[lake] = record);
     for (let [key, value] of Object.entries(record))
@@ -106163,6 +106460,16 @@ function CF(e) {
     let je = Je(H, Ee),
       { lines: K, total: we } = xF(H, Ee, ze, { D: n(), saleOf: A });
     if (je) for (let Ce of K) je.fills.has(Ce.uid) && (Ce.order = !0);
+    // Murk's gift (mossmere-gear.md G6): the Sounding Lead at the first tally with a sale in a water that fishes
+    // by depth, or at the next such tally for a save that sold before the lead existed. Owning it is the record,
+    // so it is given once. (A later step replaces this with a queue of arrivals, one new thing per tally.)
+    let gift =
+      !!bs[ze.zone]?.depth &&
+      !Sle(H.parts).includes("sounding_lead") &&
+      (K.length > 0 || H.said?.firstSale === !0)
+        ? "sounding_lead"
+        : null;
+    gift && (Array.isArray(H.parts) || (H.parts = ["cork_float"]), H.parts.push(gift));
     if (
       (typeof H.fitted?.bait == "string" &&
         !(ha(H.bait?.[ze.zone]?.[H.fitted.bait]) > 0) &&
@@ -106175,6 +106482,7 @@ function CF(e) {
         lines: K,
         seen: !1,
         ...(x(ze).capLost ? { away: !0 } : {}),
+        ...(gift ? { gift } : {}),
       }),
       je)
     ) {
@@ -106495,6 +106803,39 @@ function CF(e) {
       (e.pending?.size ?? 0) > 0
     );
   };
+  // Fits a Depth part by what it fits as: "float" (the Cork Float) or "lead" (the Sounding Lead). Like a bait
+  // change it waits while a fish is on, and reels a cast in first.
+  function fitDepth(ze) {
+    let H = p();
+    if (!H) return { ok: !1, reason: "off" };
+    let Ee = Object.entries(f().rig?.parts || {}).find(([, K]) => K?.slot === "depth" && K.fit === ze)?.[0];
+    if (!Ee || !Sle(H.parts).includes(Ee)) return { ok: !1, reason: "part" };
+    if (!de()) return { ok: !1, reason: "fish" };
+    if (H.fitted.depth === ze) return { ok: !0, changed: !1, reeled: !1, depth: ze };
+    let je = a(),
+      K = !1;
+    if (r(je) && q().out === !0)
+      try {
+        K = t.fishing?.reelInQuiet?.()?.ok === !0;
+      } catch (we) {
+        l("reelInQuiet", we);
+      }
+    return (
+      (H.fitted.depth = ze),
+      c(),
+      d("loop:fit", { slot: "depth", id: ze }),
+      { ok: !0, changed: !0, reeled: K, depth: ze }
+    );
+  }
+  // Whether the Sounding Lead fishes right now: on a trip, in the trip's water with the run's lure; at home, in
+  // the barge's water with the fitted lure.
+  function leadFishes() {
+    let ze = p(),
+      H = a();
+    return r(H)
+      ? soundingLeadFishes(ze, H.zone, H.lure)
+      : soundingLeadFishes(ze, ze?.barge?.water, ze?.fitted?.lure);
+  }
   function de() {
     if (!p()) return !1;
     let ze = a();
@@ -107077,6 +107418,8 @@ function CF(e) {
     changeHook: Be,
     fitFound: mt,
     unfitFound: Ge,
+    fitDepth,
+    leadFishes,
   };
   return (
     (e.loopInternal = {
@@ -127753,7 +128096,11 @@ function Y0e(e) {
         (b.position = I),
         (b.state = Q),
         (b.lureId = i.castVisualLure),
-        (b.retrieving = !!i.retrieve || (r === "bite" && i.spinContact));
+        (b.retrieving = !!i.retrieve || (r === "bite" && i.spinContact)),
+        (b.lead = !!i.castLead),
+        (b.depth = Bt(i.depth, 0)),
+        // How far below the water the float would sit: on the lead the rod tip shows it instead.
+        (b.dip = I ? x(I.x, I.z) - Bt(I.y, 0) : 0);
       try {
         Pe.setBobber(b);
       } catch (Ke) {
@@ -128873,6 +129220,9 @@ function Y0e(e) {
         (i.castItem = i.castLoadout.item ?? null),
         i.tutorial && (i.tutorial.casts = Bt(i.tutorial.casts, 0) + 1));
     i.castVisualLure = k() ?? (t().CATCH_V3?.items?.[i.castItem]?.kind === "lure" ? i.castItem : null);
+    // Whether this cast fishes on the Sounding Lead, fixed at the release like the bait.
+    i.castLead = xe() && !k() && p(() => N()?.leadFishes?.()) === !0;
+    s.onLead = i.castLead;
     let tn = null;
     try {
       tn = e.actors?.getRodTip?.();
@@ -129143,6 +129493,13 @@ function Y0e(e) {
         });
     } else g("fishing:land", { position: c.bob.clone() });
     (i.depth = ye(R, I)), (s.depth = i.depth);
+    // On the Sounding Lead a word says how deep the bait lies. (The fourth word, for the deepest water in the
+    // lake, is for a later step: the hunt hides it until her water is found.)
+    if (i.castLead) {
+      let words = t().TEXT_LOOP?.depth?.words || {},
+        word = words[ne(i.depth)];
+      word && p(() => e.ui?.floatText?.(c.bob.clone().setY(i.clean ? 1.3 : 0.6), word, "info"));
+    }
     let Q = Bt(n("spots").radius, 2.6),
       Pe = 1 / 0;
     if (!Lc())
@@ -129342,6 +129699,7 @@ function Y0e(e) {
           comeback: Q?.comeback ?? null,
           notes: qe(),
           water: Re(),
+          depth: i.castLead ? "lead" : null,
         })
       : null;
   }
@@ -129667,6 +130025,7 @@ function Y0e(e) {
         ...(hardTake ? { hardTake: true } : {}),
         waterKey: i.cast?.waterKey ?? null,
         ...(bn ? { comeback: !0 } : {}),
+        ...(i.castLead ? { onLead: !0 } : {}),
       });
     } else g("fishing:bite", ue({ sizeClass: Ot(), biteTell: i.tell }));
   }
@@ -129724,14 +130083,17 @@ function Y0e(e) {
     let tn = c.bob.x,
       yn = c.bob.z;
     if (
-      (p(() =>
-        e.water?.splash?.(tn, yn, {
-          size: Dt ? 0.5 + 0.12 * Math.max(0, yd(i.sizeClass) - 1) : 0.5,
-          count: 12,
-        }),
-      ),
-      p(() => e.water?.addRipple?.(tn, yn, 1.2)),
-      Nr() ||
+      // On the Sounding Lead the bite is down at the bottom: the rod tip shows it, not the water.
+      (i.castLead ||
+        (p(() =>
+          e.water?.splash?.(tn, yn, {
+            size: Dt ? 0.5 + 0.12 * Math.max(0, yd(i.sizeClass) - 1) : 0.5,
+            count: 12,
+          }),
+        ),
+        p(() => e.water?.addRipple?.(tn, yn, 1.2))),
+      i.castLead ||
+        Nr() ||
         (o.pulse(tn, yn, {
           color: i.castBait ? 0xb4c9c2 : 16747098,
           r0: 0.2,
@@ -129838,6 +130200,7 @@ function Y0e(e) {
             lead: mt(Math.max(0, i.waitDur - i.stateT)),
             dur: mt(i.tellTotal),
             lastDip: Pe,
+            ...(i.castLead ? { onLead: !0 } : {}),
           }),
         ),
         !i.letPassTip &&
@@ -129871,7 +130234,7 @@ function Y0e(e) {
       if (i.stateT >= Ke) {
         i.lastDipDone ||
           ((i.lastDipDone = !0),
-          o.pulse(I, Q, { color: 15327951, r0: 0.12, r1: 0.7, duration: 0.3, alpha: 0.7 }));
+          i.castLead || o.pulse(I, Q, { color: 15327951, r0: 0.12, r1: 0.7, duration: 0.3, alpha: 0.7 }));
         let yn = Dn((i.stateT - Ke) / Pe, 0, 1);
         return {
           dip: Math.max(tn.dip, 0) + 0.12 * Math.sin(Math.PI * Math.min(1, yn * 1.25)),
@@ -129883,6 +130246,8 @@ function Y0e(e) {
     }
     return Ue(R);
   }
+  // The float tells, as dip, slide and the water effects; on the Sounding Lead only the dip is used (the rod tip
+  // nods with it) and the water stays still.
   function Ue(R) {
     let I = c.bob.x,
       Q = c.bob.z;
@@ -129893,7 +130258,7 @@ function Y0e(e) {
         return (
           i.tellPops < Ke &&
             ((i.tellPops = Ke),
-            o.pulse(I, Q, { color: 15327951, r0: 0.1, r1: 0.55, duration: 0.3, alpha: 0.7 })),
+            i.castLead || o.pulse(I, Q, { color: 15327951, r0: 0.1, r1: 0.55, duration: 0.3, alpha: 0.7 })),
           { dip: Pe ? 0.08 : 0, slide: 0, state: Pe ? "nibble" : "floating" }
         );
       }
@@ -129901,28 +130266,32 @@ function Y0e(e) {
         return (
           i.tellPops ||
             ((i.tellPops = 1),
-            o.pulse(I, Q, { color: 15327951, r0: 0.2, r1: 1.6, duration: 0.9, width: 0.06, alpha: 0.75 })),
+            i.castLead ||
+              o.pulse(I, Q, { color: 15327951, r0: 0.2, r1: 1.6, duration: 0.9, width: 0.06, alpha: 0.75 })),
           { dip: Bt(n("bite").plunge, 0.25) * Pa(0, 1, R), slide: 0.25 * R, state: "nibble" }
         );
       case "flatSlide":
         return (
           i.tellPops ||
             ((i.tellPops = 1),
-            o.pulse(I, Q, { color: 11552828, r0: 0.25, r1: 1.4, duration: 0.8, width: 0.07, alpha: 0.8 })),
-          R > 0.3 && p(() => e.water?.addWake?.(I, Q, i.tellDir.x, i.tellDir.z, 0.35)),
+            i.castLead ||
+              o.pulse(I, Q, { color: 11552828, r0: 0.25, r1: 1.4, duration: 0.8, width: 0.07, alpha: 0.8 })),
+          R > 0.3 && !i.castLead && p(() => e.water?.addWake?.(I, Q, i.tellDir.x, i.tellDir.z, 0.35)),
           { dip: -0.03, slide: 0.7 * Pa(0.3, 1, R), state: "floating" }
         );
       case "dome":
         return (
           i.tellPops < 1 &&
             ((i.tellPops = 1),
-            o.pulse(I, Q, { color: 1711916, r0: 0.3, r1: 2.6, duration: 1, width: 0.14, alpha: 0.9 }),
-            p(() => e.water?.addRipple?.(I, Q, 1.6))),
+            i.castLead ||
+              o.pulse(I, Q, { color: 1711916, r0: 0.3, r1: 2.6, duration: 1, width: 0.14, alpha: 0.9 }),
+            i.castLead || p(() => e.water?.addRipple?.(I, Q, 1.6))),
           i.tellPops < 2 &&
             R > 0.55 &&
             ((i.tellPops = 2),
-            o.pulse(I, Q, { color: 14209279, r0: 0.4, r1: 3.2, duration: 0.8, width: 0.05, alpha: 0.55 }),
-            p(() => e.water?.addRipple?.(I, Q, 2.2))),
+            i.castLead ||
+              o.pulse(I, Q, { color: 14209279, r0: 0.4, r1: 3.2, duration: 0.8, width: 0.05, alpha: 0.55 }),
+            i.castLead || p(() => e.water?.addRipple?.(I, Q, 2.2))),
           { dip: -0.18 * Pa(0, 0.8, R), slide: 0, state: "floating" }
         );
       case "sinkUnder":
@@ -130172,7 +130541,7 @@ function Y0e(e) {
     O(false);
     c.tmp.set(xPos, x(xPos, zPos) - 0.32, zPos);
     E(true, c.tmp, 0.83, 0.015);
-    p(() => e.water?.splash?.(xPos, zPos, { size: 0.9, count: 18, ring: !Nr() }));
+    i.castLead || p(() => e.water?.splash?.(xPos, zPos, { size: 0.9, count: 18, ring: !Nr() }));
     wn([75, 35, 55]);
   }
   function pn(R) {
@@ -134568,30 +134937,34 @@ function Y0e(e) {
         (i.dipKind = "feint"), (i.dipT = 0.32);
         let qn = i.tells >= 2;
         (s.tell = qn ? "grey" : null),
-          o.pulse(bn, vn, {
-            color: qn ? 6976118 : 15327951,
-            r0: 0.2,
-            r1: 1.4,
-            duration: 0.6,
-            alpha: qn ? 0.8 : 0.7,
-          }),
-          p(() => e.water?.addRipple?.(bn, vn, 0.6)),
-          g("fishing:nibble", { feint: !0 });
+          // On the Sounding Lead nibbles and tells show on the rod tip (the actors read the dip), not the water.
+          i.castLead ||
+            (o.pulse(bn, vn, {
+              color: qn ? 6976118 : 15327951,
+              r0: 0.2,
+              r1: 1.4,
+              duration: 0.6,
+              alpha: qn ? 0.8 : 0.7,
+            }),
+            p(() => e.water?.addRipple?.(bn, vn, 0.6))),
+          g("fishing:nibble", { feint: !0, ...(i.castLead ? { onLead: !0 } : {}) });
       } else
         Pe.type === "tell"
           ? ((i.dipKind = "tell"),
             (i.dipT = 0.56),
             (s.tell = "gold"),
-            Nr()
-              ? p(() => e.water?.addRipple?.(bn, vn, 0.55))
-              : (o.pulse(bn, vn, { color: 16765562, r0: 0.15, r1: 0.9, duration: 0.45, alpha: 1 }),
-                o.pulse(bn, vn, { color: 16765562, r0: 0.15, r1: 1.3, duration: 0.7, alpha: 0.8 })),
-            g("fishing:nibble", { tell: !0 }))
+            i.castLead ||
+              (Nr()
+                ? p(() => e.water?.addRipple?.(bn, vn, 0.55))
+                : (o.pulse(bn, vn, { color: 16765562, r0: 0.15, r1: 0.9, duration: 0.45, alpha: 1 }),
+                  o.pulse(bn, vn, { color: 16765562, r0: 0.15, r1: 1.3, duration: 0.7, alpha: 0.8 }))),
+            g("fishing:nibble", { tell: !0, ...(i.castLead ? { onLead: !0 } : {}) }))
           : ((i.dipKind = "nibble"),
             (i.dipT = Bt(I.nibbleDur, 0.22)),
             (s.tell = null),
-            o.pulse(bn, vn, { color: 15327951, r0: 0.15, r1: 0.8, duration: 0.45, alpha: 0.55 }),
-            g("fishing:nibble", {}));
+            i.castLead ||
+              o.pulse(bn, vn, { color: 15327951, r0: 0.15, r1: 0.8, duration: 0.45, alpha: 0.55 }),
+            g("fishing:nibble", i.castLead ? { onLead: !0 } : {}));
     }
     let Ke = 0;
     if (i.dipT > 0)
@@ -135530,13 +135903,19 @@ function Y0e(e) {
                 }
               : null,
           fishLinger: () => null,
-          fishPoolRoll: (I = 1e3, { place: Q = null, bait: Pe = null, rb: Ke = 0 } = {}) => {
+          // With preroll { speciesId, base }: the odds as a cast on a sign or a sighted fish of that kind would roll.
+          fishPoolRoll: (
+            I = 1e3,
+            { place: Q = null, bait: Pe = null, rb: Ke = 0, preroll: pr = null } = {},
+          ) => {
             if (!xe()) return null;
             let At = i.cast,
               Dt = i.forcePlace,
-              tn = i.taperRule;
+              tn = i.taperRule,
+              castLead = i.castLead;
             try {
-              i.forcePlace = Q || null;
+              // Rolled as a cast released now would be: on the Sounding Lead if it fishes.
+              (i.castLead = !k() && p(() => N()?.leadFishes?.()) === !0), (i.forcePlace = Q || null);
               let yn = P();
               if (((i.cast = Ht(yn.x, yn.z, ye(yn.x, yn.z), Pe, !1)), i.cast.mist))
                 return { place: null, mist: i.cast.mist, counts: {} };
@@ -135545,19 +135924,26 @@ function Y0e(e) {
                 let ro = xt(i.depth, Bt(Ke, 0), Pe, null, lt, !0)?.id ?? "none";
                 bn[ro] = (bn[ro] | 0) + 1;
               }
-              let vn = ge() ? Ce(Bt(Ke, 0), Pe) : null,
+              let prSp = pr?.speciesId ? Z(pr.speciesId) : null,
+                vn = ge()
+                  ? Ce(Bt(Ke, 0), Pe, prSp ? { preroll: { sp: prSp, z: 0, base: Bt(pr.base, 1) } } : null)
+                  : null,
                 qn = vn ? {} : void 0;
               if (vn) for (let Qn of vn.entries) qn[Qn.sp.id] = (qn[Qn.sp.id] || 0) + Qn.p;
               return {
                 place: i.cast.place?.id ?? null,
                 mist: null,
                 counts: bn,
+                onLead: !!i.castLead,
+                ...(vn?.entries?.some((Qn) => Qn.from === "preroll")
+                  ? { preroll: vn.entries.find((Qn) => Qn.from === "preroll").p }
+                  : {}),
                 ...(vn ? { area: i.cast.area ?? null, shares: qn } : {}),
               };
             } catch (yn) {
               return y(yn), null;
             } finally {
-              (i.cast = At), (i.forcePlace = Dt), (i.taperRule = tn);
+              (i.cast = At), (i.forcePlace = Dt), (i.taperRule = tn), (i.castLead = castLead);
             }
           },
           fishOdds: () => {
@@ -141131,8 +141517,9 @@ function _de(e) {
       To("fishing:land", (fe) => {
         Ge(), (C.volume = mt(fe.position, C) * 0.6 + 0.4), q("bobber_plop", C);
       }),
-      To("fishing:nibble", () => {
-        Ge(), (C.pan = ks()), q("nibble", C);
+      To("fishing:nibble", (fe) => {
+        // On the Sounding Lead a nibble is the Tip Bell's tinkle, not a float's plop.
+        Ge(), (C.pan = ks()), q(fe?.onLead ? "tip_tinkle" : "nibble", C);
       }),
       To("fishing:bite", (fe) => {
         if (fe.hardTake) {
@@ -141140,6 +141527,13 @@ function _de(e) {
           Ge();
           C.pan = ks();
           q("hook", C);
+          fe.onLead && (Ge(), (C.pan = ks()), (C.volume = 1.15), q("tip_ring", C));
+          return;
+        }
+        if (fe.onLead) {
+          // The bite on the lead: the bell rings hard, then the usual alert chimes without the splash.
+          Ct(), (Ne = null), Ge(), (C.pan = ks()), q("tip_ring", C);
+          Ge(), (C.pan = ks()), (C.alertOnly = !0), q("bite", C);
           return;
         }
         let jt = gz(fe.biteTell);
@@ -141296,7 +141690,7 @@ function _de(e) {
         fe.id && (Ge(), (C.volume = 0.7), (C.pitch = 0.85), q("ui_hover", C));
       }),
       To("fishing:tell", (fe) => {
-        let jt = gz(fe.biteTell);
+        let jt = fe.onLead ? null : gz(fe.biteTell);
         jt &&
           ((Ne = {
             name: jt,
@@ -144166,6 +144560,13 @@ var hG = `/* ui.css \u2014 GLOOMWATER interface, UI style v2 (CONTRACT \xA79, DE
 .gw-tally-total .gw-ico { width: 34px; height: 34px; color: var(--clam); filter: drop-shadow(0 0 8px var(--clam-glow)); }
 .gw-tally-total.gw-on { opacity: 1; transform: none; }
 .gw-tally--empty .gw-murk-line { margin-top: 8px; }
+.gw-tally-gift { display: flex; flex-direction: column; align-items: center; margin-top: 10px; opacity: 0; transform: translateY(4px); transition: opacity .5s .3s, transform .5s .3s; }
+.gw-tally-gift.gw-in { opacity: 1; transform: none; }
+.gw-tally-gift-art { display: block; width: 64px; height: 48px; color: var(--ink); }
+.gw-tally-gift-art svg { display: block; width: 100%; height: 100%; }
+.gw-tally-gift-name { font: 400 18px/1.2 var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+.gw-tally-gift .gw-murk-line { margin-top: 2px; font-size: 19px; }
+.gw-tally-gift-fit { margin: 2px 0 0; font: 400 16px/1.3 var(--f-body); color: var(--ink-dim); text-align: center; }
 .gw-tally-sold { font-size: 23px; transition: opacity .5s, color .3s; }
 .gw-tally-sold.gw-wait { opacity: .38; }
 
@@ -149333,7 +149734,8 @@ function yU(e, t, n, o) {
     return ke;
   }
   function gn(te, ke) {
-    let Ce = te === "waiting" && We.ok ? ke.biteTell : null,
+    // The tell glyph draws a float; on the Sounding Lead the rod tip shows the tell instead.
+    let Ce = te === "waiting" && We.ok && !ke.onLead ? ke.biteTell : null,
       qe = Ce ? KG(Ce, s()) : null;
     if ((p(Z, "tell", "gw-on", !!qe), !qe)) {
       k = "";
@@ -158761,6 +159163,36 @@ function khe(e, { metaLoop: t = null, run: n = null, line: o = null, canChange: 
     log: B ? [w(m.item?.bare)].filter(Boolean) : [],
   }),
     b.push({ kind: "bait", head: r.bait, items: P });
+  // The Depth part, once a second option (the Sounding Lead) is owned, in a water that fishes by depth. With a
+  // lure on, the row says lures swim at their own depth instead of offering a choice.
+  let depthText = i0(e?.TEXT_LOOP?.depth) ? e.TEXT_LOOP.depth : {},
+    depthParts = Ed(s.parts).filter((z) => e?.LOOP?.rig?.parts?.[z]?.slot === "depth");
+  if (bs[c]?.depth && depthParts.length > 1) {
+    let fittedDepth = s.fitted?.depth === "lead" ? "lead" : "float",
+      fittedPart = depthParts.find((z) => e.LOOP.rig.parts[z].fit === fittedDepth);
+    b.push({
+      kind: "depth",
+      head: depthText.head || "Depth",
+      note: x ? depthText.lure || "" : null,
+      // What the fitted part is good for and what it costs you, in a line each under the two chips.
+      lines: x ? null : [depthText.good?.[fittedPart], depthText.cost?.[fittedPart]].filter(Boolean),
+      items: x
+        ? []
+        : depthParts.map((z) => {
+            let fit = e.LOOP.rig.parts[z].fit,
+              on = fit === fittedDepth;
+            return {
+              kind: "depth",
+              key: z,
+              pick: fit,
+              name: depthText.names?.[z] || z,
+              on,
+              plain: z,
+              log: [],
+            };
+          }),
+    });
+  }
   let j = Ed(e?.ZONES).find((z) => z?.id === c)?.name || "";
   return { water: c, waterName: j, gearWater: d, carried: K1(e, s), busy: a === !1, words: r, rows: b };
 }
@@ -158771,11 +159203,13 @@ function Mhe(e) {
       ? ["fitTackle", e.kind, e.pick ?? null]
       : e.kind === "lure"
         ? ["changeHook", { lure: e.pick }]
-        : e.kind === "bait"
-          ? e.pick == null
-            ? ["changeHook", { bait: null, lure: null }]
-            : ["changeHook", { bait: e.pick }]
-          : null;
+        : e.kind === "depth"
+          ? ["fitDepth", e.pick]
+          : e.kind === "bait"
+            ? e.pick == null
+              ? ["changeHook", { bait: null, lure: null }]
+              : ["changeHook", { bait: e.pick }]
+            : null;
 }
 var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" focusable="false">
   <path class="gw-tk-wallf" d="M3 36V45C3 49 5.5 52 10 52H98C102.5 52 105 49 105 45V36"/>
@@ -158789,6 +159223,11 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
   She =
     '<svg class="gw-ico gw-tk-snap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5v5.2"/><path d="M12 7.7c-1.7 0-2.5 1.1-2.5 2.5v6.6c0 1.6.9 2.7 2.5 2.7s2.5-1.1 2.5-2.7v-4.4"/><path d="M14.5 12.4c-.9-.2-1.6.3-1.6 1.1" stroke-opacity=".6"/></svg>',
   dV = {
+    // The two Depth parts, drawn in the same plain line style as the bare hook.
+    cork_float:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V30" stroke-width="2.4"/><path d="M100 30V44" stroke-width="4"/><path d="M100 44C114 44 124 58 124 74C124 92 112 104 100 104C88 104 76 92 76 74C76 58 86 44 100 44Z" stroke-width="5"/><path d="M79 70H121" stroke-width="3" stroke-opacity=".6"/><path d="M100 104V122C100 131 93 134 88 129" stroke-width="3.2"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    sounding_lead:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M92 4V22" stroke-width="2.4"/><circle cx="92" cy="27" r="5" stroke-width="3"/><path d="M92 32V40" stroke-width="3"/><path d="M92 40C100 40 104 52 108 66C114 86 108 104 92 104C76 104 70 86 76 66C80 52 84 40 92 40Z" stroke-width="5"/><path d="M146 40V48" stroke-width="2.4"/><path d="M133 76C133 59 139 48 146 48C153 48 159 59 159 76Z" stroke-width="3.6"/><circle cx="146" cy="82" r="3.2" stroke-width="2.6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     bare: '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M112 14V88C112 112 98 124 82 124C66 124 56 112 56 98V90L70 104" stroke-width="5"/><path d="M106 14H118" stroke-width="4"/><circle cx="112" cy="10" r="5" stroke-width="3.4"/><path d="M70 104L62 108" stroke-width="3.4"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     none: '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V44" stroke-width="3"/><path d="M100 44C90 44 85 51 85 60V100C85 110 91 117 100 117C109 117 115 110 115 100V74" stroke-width="5"/><path d="M115 74C109 72 104 76 104 81" stroke-width="3.6" stroke-opacity=".7"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
   },
@@ -158933,6 +159372,11 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
 .gw-ts-name { position: relative; display: block; font: 400 17px/1.15 var(--f-body); color: inherit; white-space: pre-line; overflow-wrap: normal; word-break: normal; hyphens: manual; text-shadow: var(--ink-shadow); }
 .gw-ts-n { display: block; font: 500 16px/1.15 var(--f-body); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
 .gw-ts-log { display: block; font: italic 400 16px/1.2 var(--f-body); color: var(--ink-dim); text-shadow: var(--ink-shadow); }
+.gw-ts-note { margin: 0; padding: 6px 0 6px 4px; font: italic 400 16px/1.25 var(--f-body); color: var(--ink-dim); text-shadow: var(--ink-shadow); }
+.gw-ts-body { min-width: 0; }
+.gw-ts-row--lines { align-items: start; }
+.gw-ts-row--lines > .gw-ts-h { padding-top: 22px; }
+.gw-ts-body .gw-ts-note { padding: 0 0 2px 4px; }
 .gw-ts-chip:hover, .gw-ts-chip:focus-visible { outline: none; color: var(--ink); background-color: rgba(174, 172, 208, .07); }
 .gw-ts-chip:hover .gw-ts-art, .gw-ts-chip:focus-visible .gw-ts-art { opacity: .95; }
 .gw-ts-chip[aria-pressed=true] { color: var(--ink-hi); }
@@ -158961,6 +159405,7 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
   .gw-ts-chip { grid-template-columns: 52px auto; min-height: 56px; padding-right: 12px; }
   .gw-ts-art { width: 52px; height: 39px; }
   .gw-ts-txt { max-width: 128px; }
+  .gw-ts-row--lines > .gw-ts-h { padding-top: 0; }
   .gw-ts-name { font-size: 16px; }
   .gw-ts-foot { padding-top: 2px; }
   .gw-ts-foot .gw-btn { padding: 2px 1.1em; }
@@ -159335,7 +159780,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     let lt = "";
     if (!J.find)
       try {
-        lt = J.plain ? dV.bare : om(J.art, { uid: Ne });
+        lt = J.plain ? dV[J.plain] || dV.bare : om(J.art, { uid: Ne });
       } catch (xe) {
         o("screen.art", xe);
       }
@@ -159405,7 +159850,12 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       let ve = a("section", "gw-ts-row");
       ve.dataset.row = Me.kind;
       let oe = a("h3", "gw-ts-h");
-      (oe.textContent = Me.head), ve.appendChild(oe);
+      if (((oe.textContent = Me.head), ve.appendChild(oe), Me.note)) {
+        // A row with nothing to choose shows one line instead (the Depth row with a lure on).
+        let note = a("p", "gw-ts-note");
+        (note.textContent = Me.note), ve.appendChild(note), dt.appendChild(ve);
+        continue;
+      }
       let Qe = a("div", "gw-ts-strip");
       Qe.setAttribute("role", "group"),
         Qe.setAttribute("aria-label", Me.head),
@@ -159429,9 +159879,19 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
               ((Qe.scrollLeft += ge), Re.preventDefault());
           },
           { passive: !1 },
-        ),
-        ve.appendChild(Qe),
-        dt.appendChild(ve);
+        );
+      if (Me.lines?.length) {
+        // The Depth row: its chips, then a line each on what the fitted part is good for and costs you.
+        let body = a("div", "gw-ts-body");
+        ve.classList.add("gw-ts-row--lines");
+        body.appendChild(Qe);
+        for (let line of Me.lines) {
+          let note = a("p", "gw-ts-note");
+          (note.textContent = line), body.appendChild(note);
+        }
+        ve.appendChild(body);
+      } else ve.appendChild(Qe);
+      dt.appendChild(ve);
     }
     xe.appendChild(dt);
     let G = a("footer", "gw-ts-foot"),
@@ -162630,6 +163090,18 @@ function WV(e) {
       (Tt.innerHTML = `<div class="gw-tally${Le.empty ? " gw-tally--empty" : ""}">${Qhe()}
       ${Le.empty ? '<p class="gw-murk-line gw-in"></p>' : '<ol class="gw-tally-rows"></ol><div class="gw-tally-total"><span class="gw-tally-plus"></span></div>'}</div>`),
       Le.empty && (Tt.querySelector(".gw-murk-line").textContent = Le.line || "");
+    // Murk's gift at this tally (the Sounding Lead): its name, his line, and where to fit it.
+    let gift = qt.tally?.gift,
+      giftText = f().depth || {};
+    if (gift && giftText.gift) {
+      let g = n("div", `gw-tally-gift${Le.empty ? " gw-in" : ""}`),
+        art = dV[gift] || "";
+      g.innerHTML = `<span class="gw-tally-gift-art" aria-hidden="true">${art}</span><b class="gw-tally-gift-name"></b><p class="gw-murk-line gw-in"></p><p class="gw-tally-gift-fit"></p>`;
+      (g.querySelector(".gw-tally-gift-name").textContent = giftText.names?.[gift] || ""),
+        (g.querySelector(".gw-murk-line").textContent = giftText.gift),
+        (g.querySelector(".gw-tally-gift-fit").textContent = giftText.fit || ""),
+        Tt.querySelector(".gw-tally")?.appendChild(g);
+    }
     let Ct = Tt.querySelector(".gw-tally-rows");
     Le.rows.forEach((We, at) => {
       let ct = n(
@@ -162723,6 +163195,7 @@ function WV(e) {
     });
     let Ft = Le >= Ht.totalAt,
       Ct = qt.querySelector(".gw-tally-total");
+    qt.querySelector(".gw-tally-gift")?.classList.toggle("gw-in", Ft);
     if (Ct) {
       Ct.classList.toggle("gw-on", Ft);
       let ct = Ct.querySelector(".gw-tally-plus"),
@@ -163433,7 +163906,8 @@ function WV(e) {
         ((ye.firstBite = !0), Yo(u()?.evening, 0) !== 1 || se("fe_strike"))
       )
         return;
-      let _t = Khe(o(), e.isTouch);
+      // "It's under." is said of a float; on the Sounding Lead the tip pulls round instead.
+      let _t = bite?.onLead ? f().depth?.strike || Khe(o(), e.isTouch) : Khe(o(), e.isTouch);
       _t && (ne("fe_strike"), (ye.strikeEl = he(_t, { low: !0 })));
     }),
     en("fishing:strike", () => X("strikeEl")),
@@ -164027,6 +164501,8 @@ function GV(e, t, { names: n = {}, phone: o = !1 } = {}) {
       },
       unmet: be.unmet > 0 ? s0(a.log?.unmet || "and {n} you have not met", { n: be.unmet }) : "",
       strike: t?.AUTOFISH?.text?.log?.strike || "",
+      // The Sounding Lead's numbers, shown on this page only (elsewhere: "more often", "less often").
+      depth: be.depth === "lead" ? a.depth?.odds || "" : "",
     };
   return {
     head: b,
@@ -165169,7 +165645,7 @@ function VV(e) {
       }
       Ze.appendChild(N);
     }
-    for (let N of [D.odds.unmet, D.odds.strike])
+    for (let N of [D.odds.depth, D.odds.unmet, D.odds.strike])
       if (N) {
         let _e = document.createElement("p");
         (_e.className = "gw-sh-foot"), (_e.textContent = N), Ze.appendChild(_e);
