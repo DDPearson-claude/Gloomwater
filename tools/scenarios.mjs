@@ -1413,6 +1413,71 @@ const lampsInWorld = (session) =>
     return { raft, rock, lit: g.progression.loop.hobLampLit(), here: g.progression.loop.hobHere() };
   });
 
+// ---- practice orders on Murk's Order Board ----------------------------------------------------------------
+
+// The parts that post practice orders, and the designer's table (mossmere-review-addendum.md section 3): the part,
+// one of its fish, and Murk's line for it.
+const PRACTICE_PARTS = ["minnow_tin", "sounding_lead", "turnback_hook", "chafe_gut"];
+const PRACTICE_TABLE = [
+  ["minnow_tin", "mossback_perch", "Bring me a Mossback Perch, taken on a live minnow."],
+  ["minnow_tin", "milkeye_perch", "Bring me a Milkeye Perch, taken on a live minnow."],
+  ["sounding_lead", "rustfin_sucker", "Bring me a Rustfin Sucker, caught on the bottom."],
+  ["sounding_lead", "bridgechain_sturgeon", "Bring me a Bridgechain Sturgeon, caught on the bottom."],
+  ["turnback_hook", "weeping_carp", "Bring me a Weeping Carp, caught on the Turnback Hook."],
+  ["chafe_gut", "overbold_bass", "Bring me an Overbold Bass, caught on Chafe Gut."],
+];
+// The practice order for the Turnback Hook, as the board keeps it.
+const PRACTICE_CARP = {
+  id: "ord_practice_carp",
+  speciesId: "weeping_carp",
+  kind: "rig",
+  n: 1,
+  have: 0,
+  part: "turnback_hook",
+  rig: { hook: "turnback_hook" },
+  said: true,
+};
+// A hash (FNV-1a) of the 40 seeded refills of a two-order board from mid-mossmere.json (practiceKit's rng, seed
+// 12345), drawn by the build before practice orders (commit 41aa04a).
+const BOARD_BEFORE = "9de5392b";
+
+// Puts window.__practice in the page: a seeded rng, a copy of the loaded loop with a board and parts as asked,
+// and the board's own refill (the game's Uy) for a water.
+const practiceKit = (session) =>
+  session.eval(() => {
+    const g = window.__gw,
+      D = g.data,
+      base = JSON.parse(JSON.stringify(g.progression.loop.state()));
+    window.__practice = {
+      D,
+      rng(seed) {
+        return () => {
+          seed = (seed + 0x6d2b79f5) | 0;
+          let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      },
+      hash(text) {
+        let h = 2166136261;
+        for (const c of text) (h ^= c.charCodeAt(0)), (h = Math.imul(h, 16777619) >>> 0);
+        return h.toString(16);
+      },
+      loop({ board = 1, parts = [], ready = parts, filled = [], places = null } = {}) {
+        const l = JSON.parse(JSON.stringify(base));
+        l.home.orders = board;
+        l.parts = [...new Set([...l.parts, ...parts])];
+        l.practice = { ready: [...ready], filled: [...filled] };
+        l.orders = [];
+        places && (l.maps.places = [...places]);
+        return l;
+      },
+      refill(l, rng, water = "mossmere") {
+        return D.refillOrders(D, l, { listFor: D.orderList, water, rng });
+      },
+    };
+  });
+
 const SCENARIOS = [
   {
     name: "gear: on the water with the lead: no float, the line slants in, the Tip Bell on every rod, the depth word, the tip answers, a real press strikes and lands",
@@ -6336,6 +6401,498 @@ const SCENARIOS = [
         await again.close();
       }
       return r.names.join(", ");
+    },
+  },
+  // ---- practice orders on Murk's Order Board (mossmere-review-addendum.md section 3) -----------------------
+
+  {
+    name: "practice orders: never without a board; with a board and no part ready, the seeded refills are exactly as before",
+    fixture: "mid-mossmere",
+    async run(session) {
+      await session.boot();
+      await practiceKit(session);
+      const r = await session.eval((ALL) => {
+        const P = window.__practice,
+          rng = P.rng(7);
+        let posted = 0,
+          picked = 0;
+        // No board: nothing is posted, though every part is owned and ready; the picker names no practice order.
+        for (let k = 0; k < 200; k++) {
+          posted += P.refill(P.loop({ board: 0, parts: ALL }), rng).length;
+          const one = P.D.pickOrder(P.D, P.loop({ board: 0, parts: ALL }), {
+            rng,
+            listFor: P.D.orderList,
+            water: "mossmere",
+          });
+          one?.kind === "rig" && picked++;
+        }
+        // The 40 seeded refills of a two-order board that the build before practice orders drew.
+        const board = (parts, ready) => {
+          const seeded = P.rng(12345),
+            seq = [];
+          for (let k = 0; k < 40; k++) {
+            const l = P.loop({ board: 2, parts, ready });
+            P.refill(l, seeded);
+            seq.push(
+              l.orders
+                .map((o) => [o.speciesId, o.kind, o.n, o.cls ?? null, o.oz ?? null].join(":"))
+                .join("|"),
+            );
+          }
+          return P.hash(seq.join("\n"));
+        };
+        return { posted, picked, none: board([], []), notReady: board(ALL, []) };
+      }, PRACTICE_PARTS);
+      check(r.posted === 0 && r.picked === 0, `with no board: ${JSON.stringify(r)}`);
+      check(
+        r.none === BOARD_BEFORE && r.notReady === BOARD_BEFORE,
+        `the seeded refills changed: ${r.none} and ${r.notReady}, expected ${BOARD_BEFORE}`,
+      );
+      return "no board, no order; the refills match the build before, with no part and with parts not yet ready";
+    },
+  },
+
+  {
+    name: "practice orders: a part Murk gives at a tally is not offered at that tally, and is from the next",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 600_000,
+    editSave(save) {
+      const loop = save.meta.loop;
+      loop.parts = ["cork_float", "plain_knot", "mere_hook", "sounding_lead"];
+      loop.home.orders = 2;
+      loop.orders = [{ id: "ord_kept", speciesId: "likely_chub", kind: "count", n: 3, have: 0, said: true }];
+    },
+    async run(session) {
+      await session.boot();
+      await session.sail(SLOW_SAIL);
+      await session.catchFish("dusk_minnow");
+      await session.goHomeAndTally();
+      await practiceKit(session);
+      const r = await session.eval(() => {
+        const P = window.__practice,
+          D = P.D,
+          live = window.__gw.progression.loop.state(),
+          rng = P.rng(21),
+          count = (l, n) => {
+            const parts = {};
+            for (let k = 0; k < n; k++) {
+              const copy = JSON.parse(JSON.stringify(l));
+              copy.orders = copy.orders.filter((o) => o.kind !== "rig" && o.id === "ord_kept");
+              P.refill(copy, rng);
+              for (const o of copy.orders) o.kind === "rig" && (parts[o.part] = (parts[o.part] || 0) + 1);
+            }
+            return parts;
+          };
+        const after = {
+          parts: [...live.parts],
+          ready: [...live.practice.ready],
+          board: live.orders.map((o) => o.part ?? o.kind),
+        };
+        const thisTally = count(live, 400);
+        // The next tally: the tin, given at the last one, is ready now.
+        const next = JSON.parse(JSON.stringify(live));
+        D.notePracticeTally(next, null);
+        return { after, thisTally, nextTally: count(next, 400), nextReady: next.practice.ready };
+      });
+      check(r.after.parts.includes("minnow_tin"), `Murk did not give the tin: ${JSON.stringify(r.after)}`);
+      check(
+        JSON.stringify(r.after.ready) === '["sounding_lead"]' && !r.after.board.includes("minnow_tin"),
+        `after the tally that gave the tin: ${JSON.stringify(r.after)}`,
+      );
+      check(
+        !r.thisTally.minnow_tin && r.thisTally.sounding_lead > 0,
+        `refills until the next tally: ${JSON.stringify(r.thisTally)}`,
+      );
+      check(
+        r.nextTally.minnow_tin > 0 && r.nextReady.includes("minnow_tin"),
+        `refills from the next tally: ${JSON.stringify(r)}`,
+      );
+      return `the tin waits a tally (${JSON.stringify(r.thisTally)}), then posts (${JSON.stringify(r.nextTally)})`;
+    },
+  },
+
+  {
+    name: "practice orders: a slot refills with one about 1 time in 2 before its part's order is filled and 1 in 6 after, unfilled parts first",
+    fixture: "mid-mossmere",
+    async run(session) {
+      await session.boot();
+      await practiceKit(session);
+      const r = await session.eval((ALL) => {
+        const P = window.__practice,
+          rng = P.rng(99),
+          N = 3000,
+          rate = (filled) => {
+            let rig = 0;
+            const parts = {};
+            for (let k = 0; k < N; k++) {
+              const l = P.loop({ board: 1, parts: ALL, filled });
+              P.refill(l, rng);
+              const o = l.orders.find((x) => x.kind === "rig");
+              o && (rig++, (parts[o.part] = (parts[o.part] || 0) + 1));
+            }
+            return { rate: rig / N, parts };
+          };
+        return { before: rate([]), after: rate(ALL), tinFilled: rate(["minnow_tin"]) };
+      }, PRACTICE_PARTS);
+      const all = (parts) => PRACTICE_PARTS.every((p) => parts[p] > 0);
+      check(
+        Math.abs(r.before.rate - 0.5) < 0.04 && all(r.before.parts),
+        `never filled: ${JSON.stringify(r.before)}`,
+      );
+      check(
+        Math.abs(r.after.rate - 1 / 6) < 0.03 && all(r.after.parts),
+        `all filled: ${JSON.stringify(r.after)}`,
+      );
+      check(
+        Math.abs(r.tinFilled.rate - 0.5) < 0.04 && !r.tinFilled.parts.minnow_tin,
+        `the tin's filled, the rest not: ${JSON.stringify(r.tinFilled)}`,
+      );
+      return `before ${r.before.rate.toFixed(3)}, after ${r.after.rate.toFixed(3)}, a filled part waits while others are unfilled`;
+    },
+  },
+
+  {
+    name: "practice orders: never two on the board at once",
+    fixture: "mid-mossmere",
+    async run(session) {
+      await session.boot();
+      await practiceKit(session);
+      const r = await session.eval((ALL) => {
+        const P = window.__practice,
+          rng = P.rng(5);
+        let most = 0,
+          withOne = 0;
+        // A three-order board refilled from empty, and one board kept a long while, an order taken off each time.
+        for (let k = 0; k < 600; k++) {
+          const l = P.loop({ board: 3, parts: ALL });
+          P.refill(l, rng);
+          const n = l.orders.filter((o) => o.kind === "rig").length;
+          (most = Math.max(most, n)), n === 1 && withOne++;
+        }
+        const l = P.loop({ board: 3, parts: ALL });
+        for (let k = 0; k < 600; k++) {
+          l.orders.splice(Math.floor(rng() * l.orders.length), 1);
+          P.refill(l, rng);
+          most = Math.max(most, l.orders.filter((o) => o.kind === "rig").length);
+        }
+        return { most, withOne, size: l.orders.length };
+      }, PRACTICE_PARTS);
+      check(
+        r.most === 1 && r.withOne > 0 && r.size === 3,
+        `practice orders on the board: ${JSON.stringify(r)}`,
+      );
+      return `at most one (${r.withOne} of 600 fresh boards had one)`;
+    },
+  },
+
+  {
+    name: "practice orders: the right fish taken on the part fills it and pays double; taken the wrong way it pays the ordinary price and the order stays",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 600_000,
+    editSave(save) {
+      const loop = save.meta.loop;
+      loop.parts = ["cork_float", "plain_knot", "mere_hook", "turnback_hook"];
+      loop.fitted.hook = "turnback_hook";
+      loop.home.orders = 1;
+      loop.orders = [PRACTICE_CARP];
+      loop.practice = { filled: [], ready: ["turnback_hook"] };
+    },
+    async run(session) {
+      await session.boot();
+      // The matcher: any size, only the stated way, and only that fish.
+      const matched = await session.eval((order) => {
+        const D = window.__gw.data,
+          rig = (r) => ({ bait: "mireworm", lead: !1, hook: null, leader: null, ...r }),
+          fish = (speciesId, castRig, more = {}) => ({ speciesId, sizeClass: "small", castRig, ...more });
+        const pairs = {
+          rightSmall: fish("weeping_carp", rig({ hook: "turnback_hook" })),
+          wrongHook: fish("weeping_carp", rig()),
+          noRecord: fish("weeping_carp", undefined),
+          otherFish: fish("overbold_bass", rig({ hook: "turnback_hook" })),
+          giant: fish("weeping_carp", rig({ hook: "turnback_hook" }), { giant: true }),
+        };
+        const out = Object.fromEntries(
+          Object.entries(pairs).map(([k, f]) => [k, D.orderMatches(D, order, f)]),
+        );
+        const way = (r, castRig) =>
+          D.orderMatches(D, { ...order, speciesId: "x", rig: r }, fish("x", castRig));
+        out.minnow = way({ bait: "live_minnow" }, rig({ bait: "live_minnow", lead: true }));
+        out.minnowWrong = way({ bait: "live_minnow" }, rig());
+        out.bottom = way({ depth: "bottom" }, rig({ lead: true }));
+        out.bottomWrong = way({ depth: "bottom" }, rig());
+        out.gut = way({ leader: "chafe_gut" }, rig({ leader: "chafe_gut" }));
+        out.gutWrong = way({ leader: "chafe_gut" }, rig({ leader: "pike_wire" }));
+        return out;
+      }, PRACTICE_CARP);
+      const want = {
+        rightSmall: true,
+        wrongHook: false,
+        noRecord: false,
+        otherFish: false,
+        giant: false,
+        minnow: true,
+        minnowWrong: false,
+        bottom: true,
+        bottomWrong: false,
+        gut: true,
+        gutWrong: false,
+      };
+      for (const [k, v] of Object.entries(want))
+        check(matched[k] === v, `${k}: ${matched[k]}, expected ${v}`);
+      // On the water: a carp on the Turnback Hook, then a carp on the Mere Hook, both kept and sold.
+      await session.sail(SLOW_SAIL);
+      const land = async () => {
+        const landed = await hookAndPlayOut(session, "weeping_carp", "land");
+        check(landed.landed === "weeping_carp", `the carp was not landed: ${JSON.stringify(landed)}`);
+        check(await session.clickButton(/^\d?Keep\b/), "no Keep on the carp's card");
+        await session.pause(800);
+        await session.closeGuides(8000);
+      };
+      await land();
+      await session.eval(() => (window.__gw.progression.loop.state().fitted.hook = "mere_hook"));
+      await land();
+      const creel = await session.eval(() =>
+        window.__gw.state.run.creel
+          .filter((f) => f.speciesId === "weeping_carp")
+          .map((f) => ({ uid: f.uid, castRig: f.castRig ?? null })),
+      );
+      check(
+        creel.length === 2 && creel[0].castRig?.hook === "turnback_hook" && creel[1].castRig?.hook === null,
+        `the carps' records: ${JSON.stringify(creel)}`,
+      );
+      await session.goHomeAndTally();
+      const after = await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        return {
+          lines: s.lastTrip.lines.map((l) => ({
+            uid: l.uid,
+            base: l.base,
+            clams: l.clams,
+            order: !!l.order,
+          })),
+          filled: [...s.practice.filled],
+          board: s.orders.map((o) => o.id),
+        };
+      });
+      const right = after.lines.find((l) => l.uid === creel[0].uid),
+        wrong = after.lines.find((l) => l.uid === creel[1].uid);
+      check(
+        right?.order && right.clams === right.base * 2,
+        `the carp on the Turnback: ${JSON.stringify(right)}`,
+      );
+      check(
+        wrong && !wrong.order && wrong.clams === wrong.base,
+        `the carp on the Mere Hook: ${JSON.stringify(wrong)}`,
+      );
+      check(
+        JSON.stringify(after.filled) === '["turnback_hook"]' && !after.board.includes(PRACTICE_CARP.id),
+        `after the tally: ${JSON.stringify(after)}`,
+      );
+      // Had only the wrong carp come in, the order would stay: the tally's own matcher.
+      const kept = await session.eval(
+        ([order, uid]) => {
+          const D = window.__gw.data;
+          return D.orderMatches(D, order, { speciesId: "weeping_carp", castRig: { hook: null }, uid });
+        },
+        [PRACTICE_CARP, creel[1].uid],
+      );
+      check(kept === false, "the wrong carp matched the order");
+      return `paid ${right.clams} for ${right.base} on the Turnback, ${wrong.clams} on the Mere Hook; the part is filled`;
+    },
+  },
+
+  {
+    name: "practice orders: the sturgeon is named only with Under the Span owned, and a part with two fish names either",
+    fixture: "mid-mossmere",
+    async run(session) {
+      await session.boot();
+      await practiceKit(session);
+      const r = await session.eval(() => {
+        const P = window.__practice,
+          rng = P.rng(13),
+          fishFor = (parts, places) => {
+            const seen = {};
+            for (let k = 0; k < 1500; k++) {
+              const l = P.loop({ board: 1, parts, places });
+              P.refill(l, rng);
+              for (const o of l.orders)
+                o.kind === "rig" && (seen[o.speciesId] = (seen[o.speciesId] || 0) + 1);
+            }
+            return seen;
+          };
+        return {
+          lead: fishFor(["sounding_lead"], ["lily_maze"]),
+          leadSpan: fishFor(["sounding_lead"], ["lily_maze", "under_the_span"]),
+          tin: fishFor(["minnow_tin"], ["lily_maze"]),
+        };
+      });
+      check(
+        JSON.stringify(Object.keys(r.lead)) === '["rustfin_sucker"]',
+        `the lead without Under the Span: ${JSON.stringify(r.lead)}`,
+      );
+      check(
+        r.leadSpan.rustfin_sucker > 0 &&
+          r.leadSpan.bridgechain_sturgeon > 0 &&
+          Object.keys(r.leadSpan).length === 2,
+        `the lead with Under the Span: ${JSON.stringify(r.leadSpan)}`,
+      );
+      check(
+        r.tin.mossback_perch > 0 && r.tin.milkeye_perch > 0 && Object.keys(r.tin).length === 2,
+        `the tin: ${JSON.stringify(r.tin)}`,
+      );
+      return `lead ${JSON.stringify(r.lead)}, with the chart ${JSON.stringify(r.leadSpan)}, tin ${JSON.stringify(r.tin)}`;
+    },
+  },
+
+  {
+    name: "practice orders: a posted one survives a save and reload with its part, and an old save loads with none filled",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session, { page, browser }) {
+      await session.boot();
+      await session.toHome();
+      await practiceKit(session);
+      const posted = await session.eval((ALL) => {
+        const P = window.__practice,
+          live = window.__gw.progression.loop,
+          s = live.state(),
+          rng = P.rng(3),
+          loaded = JSON.parse(JSON.stringify(s.practice ?? null));
+        s.home.orders = 1;
+        for (const id of ALL) s.parts.includes(id) || s.parts.push(id);
+        s.practice.ready = [...ALL];
+        for (let k = 0; k < 50 && !s.orders.some((o) => o.kind === "rig"); k++) {
+          s.orders = [];
+          P.refill(s, rng);
+        }
+        const order = s.orders.find((o) => o.kind === "rig") ?? null;
+        return {
+          loaded,
+          order: JSON.parse(JSON.stringify(order)),
+          text: live.orders().find((o) => o.id === order?.id)?.text,
+        };
+      }, PRACTICE_PARTS);
+      check(
+        JSON.stringify(posted.loaded) === '{"filled":[],"ready":[]}',
+        `the old save's practice record: ${JSON.stringify(posted.loaded)}`,
+      );
+      check(
+        posted.order?.part && posted.order.rig,
+        `no practice order was posted: ${JSON.stringify(posted)}`,
+      );
+      const saved = await session.saved();
+      const again = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await again.boot();
+        await again.toHome();
+        const back = await again.eval((id) => {
+          const loop = window.__gw.progression.loop,
+            s = loop.state();
+          return {
+            order: JSON.parse(JSON.stringify(s.orders.find((o) => o.id === id) ?? null)),
+            text: loop.orders().find((o) => o.id === id)?.text,
+            practice: JSON.parse(JSON.stringify(s.practice)),
+          };
+        }, posted.order.id);
+        const same = ["speciesId", "kind", "n", "part"].every((k) => back.order?.[k] === posted.order[k]);
+        check(
+          same &&
+            JSON.stringify(back.order.rig) === JSON.stringify(posted.order.rig) &&
+            back.text === posted.text,
+          `after the reload: ${JSON.stringify(back)} vs ${JSON.stringify(posted)}`,
+        );
+        check(
+          back.practice.ready.length === PRACTICE_PARTS.length,
+          `the ready parts: ${JSON.stringify(back.practice)}`,
+        );
+        await again.collectGameErrors();
+        check(!again.errors.length, `errors after reloading: ${again.errors.join("; ")}`);
+      } finally {
+        await again.close();
+      }
+      return `"${posted.text}" kept`;
+    },
+  },
+
+  {
+    name: "practice orders: Sporewood's board is unchanged, with every part owned and ready",
+    fixture: "sporewood-crossed",
+    async run(session) {
+      await session.boot();
+      await practiceKit(session);
+      const r = await session.eval((ALL) => {
+        const P = window.__practice,
+          board = (parts) => {
+            const seeded = P.rng(4242),
+              seq = [];
+            for (let k = 0; k < 200; k++) {
+              const l = P.loop({ board: 2, parts });
+              P.refill(l, seeded, "sporewood");
+              seq.push(l.orders.map((o) => `${o.speciesId}:${o.kind}:${o.water ?? ""}`).join("|"));
+            }
+            return seq;
+          },
+          none = board([]),
+          all = board(ALL);
+        return {
+          same: JSON.stringify(none) === JSON.stringify(all),
+          rig: all.join("|").includes(":rig:"),
+          filled: all.filter(Boolean).length,
+        };
+      }, PRACTICE_PARTS);
+      check(r.same && !r.rig && r.filled === 200, `Sporewood's board: ${JSON.stringify(r)}`);
+      return "the same seeded orders with and without the parts, none a practice order";
+    },
+  },
+
+  {
+    name: 'practice orders: Murk says each of the six table lines, the board shows it without "Bring me", and it is said apart from the other orders',
+    fixture: "mid-mossmere",
+    async run(session) {
+      await session.boot();
+      await practiceKit(session);
+      const r = await session.eval(
+        (table) => {
+          const D = window.__practice.D,
+            order = ([part, speciesId], k) => ({
+              id: `o${k}`,
+              speciesId,
+              kind: "rig",
+              n: 1,
+              have: 0,
+              part,
+              rig: { ...D.LOOP.orders.practice.parts[part].rig },
+            }),
+            orders = table.map(order),
+            others = [
+              { id: "a", speciesId: "likely_chub", kind: "count", n: 2, have: 0 },
+              { id: "b", speciesId: "dusk_minnow", kind: "count", n: 1, have: 0 },
+            ];
+          return {
+            said: orders.map((o) => D.orderLine(D, [o]).line),
+            board: orders.map((o) => D.orderBoardText(D, o)),
+            plain: D.orderLine(D, others).line,
+            mixed: D.orderLine(D, [...others, orders[0]]).line,
+          };
+        },
+        PRACTICE_TABLE.map(([part, fish]) => [part, fish]),
+      );
+      PRACTICE_TABLE.forEach(([, , line], k) => {
+        check(r.said[k] === line, `Murk says "${r.said[k]}", expected "${line}"`);
+        const shown = `${line.replace(/^Bring me a/, "A")}`;
+        check(r.board[k] === shown, `the board shows "${r.board[k]}", expected "${shown}"`);
+        // The voice's measures: at most 25 words, plain punctuation.
+        check(line.split(/\s+/).length <= 25 && !/[;–—×+]/.test(line), `"${line}" breaks the voice`);
+      });
+      // With other orders, theirs is said first as it always was, then the practice order's line on its own.
+      const mixed = `${r.plain} ${PRACTICE_TABLE[0][2]}`;
+      check(
+        /^Bring me 2 .* and a Dusk Minnow\.$/.test(r.plain) && r.mixed === mixed,
+        `with other orders: "${r.mixed}", expected "${mixed}"`,
+      );
+      return r.board.join(" / ");
     },
   },
 ];

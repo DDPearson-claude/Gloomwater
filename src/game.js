@@ -30570,6 +30570,15 @@ Ic(vg, {
   quietTerms: () => tte,
   reachOf: () => NP,
   rigArrivalAtTally: () => rigArrivalAtTally,
+  // Murk's Order Board, for the scenario tests: pick one order, refill the board, match a catch, the words.
+  pickOrder: () => fle,
+  refillOrders: () => Uy,
+  orderMatches: () => KA,
+  orderText: () => B3,
+  orderBoardText: () => orderBoardText,
+  orderLine: () => QH,
+  orderList: () => op,
+  notePracticeTally: () => notePracticeTally,
   sailPlan: () => q5,
   sealsFor: () => Tte,
   shoreRFor: () => yee,
@@ -47408,6 +47417,23 @@ wo.orders = {
   rareKinds: { count: 0.6, heavy: 0.4 },
   cls: "prize",
   heavyZ: 0.35,
+  // Practice orders (mossmere-review-addendum.md section 3): one ordinary fish, taken on one part, at the usual
+  // double pay. Mossmere only, one on the board at a time. When a slot refills, a part owned since the last tally
+  // (loop.practice.ready) may post its order: `first` of the time while its order has never been filled, `after`
+  // once it has (loop.practice.filled). Each part's `rig` is what the catch must have been taken on (the catch
+  // record's castRig), and `fish` the kinds it may name, each only while the board's own list has it.
+  practice: {
+    first: 0.5,
+    after: 1 / 6,
+    max: 1,
+    water: "mossmere",
+    parts: {
+      minnow_tin: { rig: { bait: "live_minnow" }, fish: ["mossback_perch", "milkeye_perch"] },
+      sounding_lead: { rig: { depth: "bottom" }, fish: ["rustfin_sucker", "bridgechain_sturgeon"] },
+      turnback_hook: { rig: { hook: "turnback_hook" }, fish: ["weeping_carp"] },
+      chafe_gut: { rig: { leader: "chafe_gut" }, fish: ["overbold_bass"] },
+    },
+  },
 };
 Object.assign(Ca.shelf, {
   feather_fly: "Adds 5 Grip on insect eaters.",
@@ -47430,7 +47456,18 @@ Ca.gearNames = {
 };
 Ca.murk.firstSmall = "Small ones make good bait. Press and hold \u201CLet go\u201D.";
 Ca.castTip = "Press on the water. Let go to cast.";
-Ca.orderWords = { a: "a", an: "an", over: "over" };
+Ca.orderWords = {
+  a: "a",
+  an: "an",
+  over: "over",
+  // How a practice order's fish must be taken, by the part it teaches (wo.orders.practice).
+  rig: {
+    minnow_tin: "taken on a live minnow",
+    sounding_lead: "caught on the bottom",
+    turnback_hook: "caught on the Turnback Hook",
+    chafe_gut: "caught on Chafe Gut",
+  },
+};
 Ca.orderSay = { line: "Bring me {order}.", and: "and", wants: "Murk wants one." };
 Ca.gearItems = {
   feather_fly: "Feather Fly",
@@ -104586,11 +104623,61 @@ function ule(e, t) {
   for (let [s, r] of n) if (((a -= Os(r)), a <= 0)) return s;
   return n[n.length - 1][0];
 }
+// A practice order for this refill, or null for an ordinary one (wo.orders.practice). Draws on `rng` only when
+// some part may post one, so a board with no such part refills exactly as it always has.
+function practiceOrderFor(e, loop, { rng, list, taken, water }) {
+  let rule = e?.LOOP?.orders?.practice;
+  if (!or(rule) || !or(rule.parts) || water !== rule.water || !(Os(loop?.home?.orders) > 0)) return null;
+  if (Ts(loop.orders).filter((o) => or(o) && o.kind === "rig").length >= Os(rule.max, 1)) return null;
+  let listed = new Set([...list.common, ...list.uncommon, ...list.rare].map((p) => p.id)),
+    owned = Ts(loop.parts),
+    ready = Ts(loop.practice?.ready),
+    filled = Ts(loop.practice?.filled),
+    fishOf = (part) => Ts(part.fish).filter((id) => listed.has(id) && !taken.has(id)),
+    open = Object.entries(rule.parts).filter(
+      ([id, part]) => or(part) && owned.includes(id) && ready.includes(id) && fishOf(part).length > 0,
+    );
+  if (!open.length) return null;
+  let unfilled = open.filter(([id]) => !filled.includes(id)),
+    [partId, part] = dle(rng, unfilled.length ? unfilled : open);
+  if (!(rng() < Os(filled.includes(partId) ? rule.after : rule.first))) return null;
+  let order = {
+    id: xc("ord"),
+    speciesId: dle(rng, fishOf(part)),
+    kind: "rig",
+    n: 1,
+    have: 0,
+    part: partId,
+    rig: { ...part.rig },
+  };
+  water !== Pr(e) && (order.water = water);
+  return order;
+}
+// Whether a catch was taken the way a practice order asks: on the Live Minnow, on the bottom (the Sounding Lead),
+// on the Turnback Hook or on Chafe Gut. `cast` is the catch record's castRig, stamped when it was landed.
+function castRigMatches(rig, cast) {
+  if (!or(rig) || !or(cast) || !Object.keys(rig).length) return !1;
+  return Object.entries(rig).every(([key, want]) =>
+    key === "bait"
+      ? cast.bait === want
+      : key === "depth"
+        ? want === "bottom" && cast.lead === !0
+        : key === "hook"
+          ? cast.hook === want
+          : key === "leader"
+            ? cast.leader === want
+            : !1,
+  );
+}
 function fle(e, t, { rng: n = Math.random, taken: o = [], listFor: a = null, water: s = null } = {}) {
   let r = e?.LOOP?.orders || {},
     l = cle(e, t, { listFor: a, water: s }),
-    i = new Set(Ts(o)),
-    c = [...l.common, ...l.uncommon].filter((p) => !i.has(p.id)),
+    i = new Set(Ts(o));
+  {
+    let practice = practiceOrderFor(e, t, { rng: n, list: l, taken: i, water: s || t?.barge?.water });
+    if (practice) return practice;
+  }
+  let c = [...l.common, ...l.uncommon].filter((p) => !i.has(p.id)),
     d = l.rare.filter((p) => !i.has(p.id)),
     f = n() < Os(r.common, 2 / 3) ? c : d;
   if ((f.length || (f = c.length ? c : d), !f.length)) return null;
@@ -104633,6 +104720,8 @@ function Uy(e, t, n = {}) {
 var ZH = ["small", "keeper", "prize", "trophy", "elder", "ancient"];
 function KA(e, t, n) {
   if (!or(t) || !or(n) || n.speciesId !== t.speciesId || n.giant === !0 || n.legendary === !0) return !1;
+  // A practice order: any size, but only taken the stated way.
+  if (t.kind === "rig") return castRigMatches(t.rig, n.castRig);
   if (t.kind === "class") return ZH.indexOf(n.sizeClass) >= ZH.indexOf(t.cls || "prize");
   if (t.kind === "heavy") {
     let o = e?.SPECIES_BY_ID?.[n.speciesId];
@@ -104669,6 +104758,10 @@ function B3(e, t) {
     a = o?.name || String(t.speciesId || ""),
     s = Math.max(1, Math.max(1, cc(t.n, 1)) - Math.max(0, cc(t.have))),
     r = (l) => `${hle.test(l) ? n.an : n.a} ${l}`;
+  if (t.kind === "rig") {
+    let how = n.rig?.[t.part];
+    return how ? `${r(a)}, ${how}` : r(a);
+  }
   if (t.kind === "class") {
     let l = Ts(e?.SIZE_CLASSES).find((i) => i?.id === t.cls)?.label || "Prize";
     return r(`${l} ${a}`);
@@ -104679,13 +104772,32 @@ function B3(e, t) {
       ? r(a)
       : `${s} ${gle(a, s)}`;
 }
+// An order as the board shows it. A practice order is a whole sentence, "A Mossback Perch, taken on a live
+// minnow.", so the way to take it reads plainly; the other orders keep their short form, "2 Dusk Minnows".
+function orderBoardText(e, t) {
+  let text = B3(e, t);
+  return or(t) && t.kind === "rig" && text ? `${text[0].toUpperCase()}${text.slice(1)}.` : text;
+}
 function QH(e, t) {
   let n = e?.TEXT_LOOP?.orderSay || { line: "Bring me {order}.", and: "and" },
     o = Ts(t).filter((r) => or(r) && typeof r.speciesId == "string" && r.said !== !0);
   if (!o.length) return { line: null, ids: [] };
-  let a = o.map((r) => B3(e, r)).filter(Boolean),
-    s = a.length < 2 ? a.join("") : `${a.slice(0, -1).join(", ")} ${n.and} ${a[a.length - 1]}`;
-  return { line: String(n.line || "{order}").replace("{order}", s), ids: o.map((r) => r.id) };
+  // A practice order is said as a sentence of its own, so the way to take it is not read onto the other fish.
+  let say = (text) => String(n.line || "{order}").replace("{order}", text),
+    a = o
+      .filter((r) => r.kind !== "rig")
+      .map((r) => B3(e, r))
+      .filter(Boolean),
+    s = a.length < 2 ? a.join("") : `${a.slice(0, -1).join(", ")} ${n.and} ${a[a.length - 1]}`,
+    lines = [
+      ...(s ? [say(s)] : []),
+      ...o
+        .filter((r) => r.kind === "rig")
+        .map((r) => B3(e, r))
+        .filter(Boolean)
+        .map(say),
+    ];
+  return { line: lines.length ? lines.join(" ") : null, ids: o.map((r) => r.id) };
 }
 function eF(e, t, n = []) {
   let o = Ts(t).filter((r) => or(r) && typeof r.speciesId == "string");
@@ -104697,7 +104809,7 @@ function eF(e, t, n = []) {
   return o.map((r) => ({
     id: r.id,
     speciesId: r.speciesId,
-    text: typeof r.text == "string" ? r.text : B3(e, r),
+    text: typeof r.text == "string" ? r.text : orderBoardText(e, r),
     done: s.includes(r.id),
   }));
 }
@@ -107006,6 +107118,9 @@ function yF(e) {
     home: { orders: 0, baitBed: 0, wall: 0, lights: 0 },
     looks: [],
     orders: [],
+    // Practice orders on Murk's board (wo.orders.practice): the parts whose practice order has been filled, and
+    // the parts that may post one (those owned when the last tally began).
+    practice: { filled: [], ready: [] },
     legends: {},
     giants: {},
     prints: {},
@@ -107355,6 +107470,25 @@ function noteFishArrivalBeats(loop, water, speciesId, { lost = !1, grade = null 
     !shelved("turnback_hook") &&
     noteArrivalBeat(loop, "turnback_hook");
 }
+// At the start of a tally (wo.orders.practice): each practice order the catch fills marks its part as filled,
+// and the parts owned now become the ones that may post a practice order until the next tally.
+function notePracticeTally(loop, fills, rule = wo.orders?.practice) {
+  if (!Ln(loop) || !Ln(rule?.parts)) return;
+  Ln(loop.practice) || (loop.practice = { filled: [], ready: [] });
+  let record = loop.practice,
+    done = Array.isArray(fills?.filled) ? fills.filled : [];
+  Array.isArray(record.filled) || (record.filled = []);
+  for (let order of Array.isArray(loop.orders) ? loop.orders : [])
+    Ln(order) &&
+      order.kind === "rig" &&
+      done.includes(order.id) &&
+      Ln(rule.parts[order.part]) &&
+      !record.filled.includes(order.part) &&
+      record.filled.push(order.part);
+  record.ready = Object.keys(rule.parts).filter((id) =>
+    (Array.isArray(loop.parts) ? loop.parts : []).includes(id),
+  );
+}
 // What reaches Murk's shelf at this tally (mossmere-review-addendum.md section 2), called only on a tally with no
 // gift from Murk: { gift, giftSay } with gift "turnback_hook", "pike_wire" or "leaders", or null. Puts the parts on
 // the shelf. Hob's map drawn before this tally is the leaders' beat; a map Murk passes on at this tally counts from
@@ -107550,6 +107684,15 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
         )
       : [];
   }
+  // Practice orders: known parts only, each once. An old save has none filled, and its parts may post one from
+  // its next tally.
+  for (let key of ["filled", "ready"])
+    c.practice[key] = Array.isArray(c.practice[key])
+      ? c.practice[key].filter(
+          (id, n, all) =>
+            typeof id == "string" && Ln(wo.orders?.practice?.parts?.[id]) && all.indexOf(id) === n,
+        )
+      : [];
   for (let [lake, record] of Object.entries(o.hunt)) {
     let saved = Ln(c.hunt[lake]) ? c.hunt[lake] : (c.hunt[lake] = record);
     normaliseHuntRecord(saved, record);
@@ -108697,6 +108840,9 @@ function CF(e) {
     let je = Je(H, Ee),
       { lines: K, total: we } = xF(H, Ee, ze, { D: n(), saleOf: A });
     if (je) for (let Ce of K) je.fills.has(Ce.uid) && (Ce.order = !0);
+    // Practice orders: note the ones this tally fills, and which parts may post one from now on (the parts owned
+    // as the tally begins, so a part Murk gives below waits for the next tally).
+    notePracticeTally(H, je);
     // The tally after she is landed: Murk pays the bounty (a row of its own, after the fish) and hands over Hob's
     // Lamp. The lamp is that tally's one new thing, so any gift of tackle waits for the next one.
     let ending = herEndingAtTally(H);
@@ -109508,7 +109654,7 @@ function CF(e) {
       } catch (je) {
         l("refillOrders", je);
       }
-    return Ee().map((je) => ({ ...je, text: B3(n(), je) }));
+    return Ee().map((je) => ({ ...je, text: orderBoardText(n(), je) }));
   }
   function Et() {
     let ze = p();
@@ -135345,6 +135491,17 @@ function Y0e(e) {
       );
       CATCH_MARKS.includes(mark) && (tn.mark = mark);
     }
+    // How it was taken, kept on the catch record: a practice order on Murk's board counts only a fish taken the
+    // stated way (castRigMatches). The cast's bait, whether it fished on the Sounding Lead, and its hook and
+    // leader (null for the Mere Hook and the Plain Knot), all fixed when the cast was released.
+    xe() &&
+      !Ke &&
+      (tn.castRig = {
+        bait: typeof i.castBait == "string" ? i.castBait : null,
+        lead: i.castLead === !0,
+        hook: i.castHook ?? null,
+        leader: i.castLeader ?? null,
+      });
     const rival = e.state?.meta?.oldRivals?.active;
     if (
       !R.species &&
