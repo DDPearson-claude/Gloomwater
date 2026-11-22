@@ -1063,6 +1063,101 @@ async function partRow(session, kind) {
   }, kind);
 }
 
+// ---- the line-up and the bite marks (mossmere-hunt-2.md section 3, sketch 3) ---------------------------------
+
+const LINEUP = ["reedjaw_pike", "milkeye_perch", "kissmark_trout", "weeping_carp", "bridgechain_sturgeon"];
+const MURK_LINEUP = "I can think of five fish here big enough to pull a rod in. Catch them and see.";
+const LINEUP_HEAD = "These five fish are big enough to pull a rod in.";
+const LINEUP_FRAME = "It isn't any of these, so far.";
+const LINEUP_NONE = "It's none of them. Nobody here has ever caught it.";
+const STURGEON_WHY = "It is long, but its mouth is a small tube for snails.";
+const PIKE_WHY = "Its teeth cut a line clean. Hob's line was worn, not cut.";
+const RING_LINE =
+  "This fish has a wide ring of fine scrapes, and no tooth holes. Something big had it in a soft, rough mouth.";
+const PIKE_CARD = "Look at its teeth. They leave two rows of small cuts.";
+const CUTS_OPEN = "Something leaves two rows of small cuts.";
+const CUTS_MATCH = "A pike's teeth leave two rows of small cuts.";
+const RING_OPEN = "Something else leaves a wide ring of fine scrapes.";
+const HOOK_HUNT_LINE = "Something out there grabs and runs. There's a new hook on the shelf.";
+
+// withMap, with sketch 3 drawn at the tally of evening 3 as the game draws it: the fish already caught crossed
+// out, and the Kissmark's ring with it. `forget` takes kinds out of the Journal first, so their first catch is
+// still to come.
+const withLineup =
+  (forget = []) =>
+  (save) => {
+    withMap(save);
+    const journal = save.meta.journal || {};
+    for (const id of forget) delete journal[id];
+    const h = save.meta.loop.hunt.mossmere;
+    h.sketches.lineup = 3;
+    h.crossed = Object.fromEntries(LINEUP.filter((id) => journal[id]?.caught > 0).map((id) => [id, 3]));
+    h.marks = { cuts: 0, holes: 0, ring: h.crossed.kissmark_trout ? 3 : 0 };
+  };
+
+// What a notepad element shows on its line-up page: the head line, each fish's row (crossed out or not, its words,
+// how many red strokes), the empty frame's line, and the marks strip.
+const lineupIn = (session, where) =>
+  session.eval((sel) => {
+    const pad = document.querySelector(sel);
+    if (!pad) return null;
+    const rows = [...pad.querySelectorAll(".gw-pad-lu-row")];
+    return {
+      head: pad.querySelector(".gw-pad-lu-head")?.textContent ?? null,
+      rows: rows
+        .filter((r) => r.dataset.fish !== "?")
+        .map((r) => ({
+          fish: r.dataset.fish,
+          out: r.classList.contains("gw-out"),
+          why: r.querySelector(".gw-pad-why")?.textContent ?? "",
+          reds: r.querySelectorAll(".pl.r").length,
+        })),
+      frame: rows.find((r) => r.dataset.fish === "?")?.querySelector(".gw-pad-why")?.textContent ?? null,
+      marks: [...pad.querySelectorAll(".gw-pad-mark")].map((m) => ({
+        mark: m.dataset.mark,
+        words: m.textContent.trim(),
+      })),
+    };
+  }, where);
+
+// The line-up as the Journal's Notepad tab shows it.
+async function lineupInJournal(session) {
+  await session.eval(() => window.__gw.ui.openJournal({ tab: "notepad" }));
+  await session.waitFor("the notepad tab", 10_000, () => !!document.querySelector(".gw-journal-pad .gw-pad"));
+  const shown = await lineupIn(session, ".gw-journal-pad .gw-pad");
+  await session.eval(() => window.__gw.ui.closeAll());
+  await session.pause(600);
+  return shown;
+}
+
+// Lands a fish through the debug hook and reads its catch card before keeping it: the line under the picture and
+// the ink mark drawn on it (its class), or null for each.
+async function catchAndReadCard(session, speciesId) {
+  const ok = await session.eval((id) => window.__gw.debug.instantCatch(id), speciesId);
+  check(ok, `instantCatch(${speciesId}) refused`);
+  let card = null;
+  for (const end = Date.now() + 30_000; Date.now() < end && !card; ) {
+    await session.pause(400);
+    if (await session.clickButton(/^Got it$/)) continue;
+    card = await session.eval(() => {
+      const keep = [...document.querySelectorAll("button")].some(
+        (b) => /^\d?Keep\b/.test(b.textContent.trim()) && b.getBoundingClientRect().width > 0,
+      );
+      return keep
+        ? {
+            line: document.querySelector(".gw-cc-markline")?.textContent ?? null,
+            ink: document.querySelector(".gw-cc-art .gw-cc-mark")?.getAttribute("class") ?? null,
+          }
+        : null;
+    });
+  }
+  check(card, `no catch card for ${speciesId}; ${JSON.stringify(await session.state())}`);
+  await session.clickButton(/^\d?Keep\b/);
+  await session.pause(600);
+  await session.closeGuides(8000);
+  return card;
+}
+
 const SCENARIOS = [
   {
     name: "gear: on the water with the lead: no float, the line slants in, the Tip Bell on every rod, the depth word, the tip answers, a real press strikes and lands",
@@ -3053,7 +3148,8 @@ const SCENARIOS = [
     fixture: "mid-mossmere",
     debug: true,
     timeoutMs: 900_000,
-    editSave: withMap,
+    // The line-up was drawn at the tally after the map, so this tally has only its own word.
+    editSave: withLineup(),
     async run(session, { page, browser }) {
       await session.sail(SLOW_SAIL);
       await listenForToasts(session);
@@ -3202,7 +3298,8 @@ const SCENARIOS = [
     fixture: "mid-mossmere",
     debug: true,
     timeoutMs: 720_000,
-    editSave: withMap,
+    // The line-up was drawn at the tally after the map, so this tally has only its own word.
+    editSave: withLineup(),
     async run(session) {
       // Evening 5: away from Hob's part all night.
       await session.sail(SLOW_SAIL);
@@ -3706,6 +3803,356 @@ const SCENARIOS = [
       const lost = await loseSmallFish(session, "reedjaw_pike");
       check(lost?.partLossText === LOSS_TEETH && !lost.overCap, `the pike's loss: ${JSON.stringify(lost)}`);
       return "each once a night, only with the part on the shelf, never on the better part or a lure";
+    },
+  },
+  {
+    name: "line-up: Murk names the five fish once, at the first tally after Hob's map (not the tale's tally, nor the one that passes the map on); sketch 3 opens with the fish already caught crossed out",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 720_000,
+    // An older record, from before the line-up: Hob's map on evening 3, no crossed or marks fields.
+    editSave: withMap,
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      const filled = await huntOf(session);
+      check(
+        JSON.stringify(filled.crossed) === "{}" &&
+          JSON.stringify(filled.marks) === '{"cuts":0,"holes":0,"ring":0}' &&
+          filled.sketches.lineup === 0,
+        `the old record was not filled in: ${JSON.stringify(filled)}`,
+      );
+      // The game's own tally rule on copies of the record: a map drawn before the tale waits past the tale's
+      // tally; a map Murk passes on waits past that tally; then it comes once.
+      const rule = await session.eval(() => {
+        const g = window.__gw.data,
+          base = JSON.parse(JSON.stringify(window.__gw.progression.loop.state().hunt.mossmere)),
+          rec = (over) => ({ ...JSON.parse(JSON.stringify(base)), ...over }),
+          tally = (r, evening) => {
+            const loop = { hunt: { mossmere: r }, evenings: evening };
+            const beat = g.mossmereTallyBeat(loop, { zone: "mossmere", evening }, undefined, { journal: {} });
+            return beat ? Object.keys(beat).join("+") + (beat.murk ? ":" + beat.murk : "") : "none";
+          },
+          early = rec({ taleAt: 0, sketches: { ...base.sketches, map: 2 } }),
+          passed = rec({ taleAt: 4, murkNudged: true, sketches: { ...base.sketches, map: 0 } });
+        return {
+          taleTally: tally(early, 2),
+          afterTale: tally(early, 3),
+          again: tally(early, 4),
+          passTally: tally(passed, 6),
+          afterPass: tally(passed, 7),
+          sporewood: g.mossmereTallyBeat(
+            { hunt: { mossmere: rec({}) } },
+            { zone: "sporewood", evening: 5 },
+            undefined,
+            { journal: {} },
+          ),
+        };
+      });
+      check(
+        rule.taleTally === "tale" &&
+          rule.afterTale.includes("lineup") &&
+          !rule.again.includes("lineup") &&
+          rule.passTally === "murk:mapPassed" &&
+          rule.afterPass.includes("lineup") &&
+          rule.sporewood === null,
+        `the tally rule: ${JSON.stringify(rule)}`,
+      );
+      // The real tally of evening 5: Murk's line, and the notepad opens on Suspects with sketch 3.
+      let look = null;
+      const { hunt, pad } = await tallyAndPad(session, {
+        look: async () => (look = await lineupIn(session, '.gw-modal[data-modal="notepad"].gw-in .gw-pad')),
+      });
+      check(hunt.includes(MURK_LINEUP), `the tally: "${hunt}"`);
+      check(
+        pad && pad.page === "suspects" && pad.drawn.includes("lineup") && pad.drawn.includes("map"),
+        `the notepad at the tally: ${JSON.stringify(pad)}`,
+      );
+      const caught = ["reedjaw_pike", "milkeye_perch", "kissmark_trout", "weeping_carp"];
+      check(look?.head === LINEUP_HEAD && look.rows.length === 5, `the line-up: ${JSON.stringify(look)}`);
+      for (const row of look.rows) {
+        const out = caught.includes(row.fish);
+        check(
+          row.out === out && (out ? row.why.length > 10 && row.reds >= 1 : row.why === "" && row.reds === 0),
+          `the ${row.fish} row: ${JSON.stringify(row)}`,
+        );
+      }
+      check(look.frame === LINEUP_FRAME, `the empty frame: ${look.frame}`);
+      check(
+        JSON.stringify(look.marks) === JSON.stringify([{ mark: "ring", words: RING_OPEN }]),
+        `the marks strip: ${JSON.stringify(look.marks)}`,
+      );
+      const record = await huntOf(session);
+      check(
+        record.sketches.lineup === 5 &&
+          JSON.stringify(Object.keys(record.crossed).sort()) === JSON.stringify([...caught].sort()) &&
+          record.marks.ring === 5 &&
+          record.padUnseen.length === 0,
+        `the record: ${JSON.stringify(record)}`,
+      );
+      return `"${MURK_LINEUP}" at evening 5; four crossed out on the page; the rule waits past the tale and the pass`;
+    },
+  },
+
+  {
+    name: "line-up: a first catch of a line-up fish crosses it out with its reason and the sketch line; all five crossed out changes the frame's line; the notepad opens on it at the tally",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 720_000,
+    editSave: withLineup(),
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      await listenForToasts(session);
+      await session.catchFish("bridgechain_sturgeon");
+      await session.pause(1200);
+      let toasts = await toastsSeen(session);
+      const why = toasts.indexOf(STURGEON_WHY);
+      check(why >= 0 && toasts.indexOf(DRAWN, why) > why, `the lines: ${JSON.stringify(toasts)}`);
+      let record = await huntOf(session);
+      check(
+        record.crossed.bridgechain_sturgeon === 5 && record.padUnseen.includes("cross:bridgechain_sturgeon"),
+        `the record: ${JSON.stringify(record)}`,
+      );
+      // A line-up fish already crossed out is not crossed again.
+      await session.catchFish("reedjaw_pike");
+      await session.pause(1200);
+      toasts = await toastsSeen(session);
+      check(
+        !toasts.includes(PIKE_WHY) && toasts.filter((t) => t === DRAWN).length === 1,
+        `a second crossing: ${JSON.stringify(toasts)}`,
+      );
+      let look = null;
+      const { pad } = await tallyAndPad(session, {
+        look: async () => (look = await lineupIn(session, '.gw-modal[data-modal="notepad"].gw-in .gw-pad')),
+      });
+      check(pad && pad.page === "suspects", `the notepad at the tally: ${JSON.stringify(pad)}`);
+      check(
+        look && look.rows.every((r) => r.out && r.reds >= 1),
+        `not every fish crossed out: ${JSON.stringify(look)}`,
+      );
+      check(
+        look.rows.find((r) => r.fish === "bridgechain_sturgeon")?.why === STURGEON_WHY,
+        `the sturgeon's words: ${JSON.stringify(look.rows)}`,
+      );
+      check(look.frame === LINEUP_NONE, `the frame: ${look.frame}`);
+      record = await huntOf(session);
+      check(record.padUnseen.length === 0 && !record.padDue, `after the notepad: ${JSON.stringify(record)}`);
+      return "the sturgeon crossed out with its words; all five out; the frame says none of them";
+    },
+  },
+
+  {
+    name: "bite marks: the roll puts cuts and holes only on their fish, in their places and light, about 1 in 8; the ring on every Kissmark; near her water only in her time and with Hob's map, about 1 in 2",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withMap,
+    async run(session) {
+      await session.boot();
+      const r = await session.eval(() => {
+        const g = window.__gw.data;
+        let seed = 7;
+        const rng = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+        const N = 8000,
+          share = (fn) => {
+            const n = {};
+            for (let i = 0; i < N; i++) {
+              const m = fn() ?? "none";
+              n[m] = (n[m] || 0) + 1;
+            }
+            return Object.fromEntries(Object.entries(n).map(([k, v]) => [k, v / N]));
+          },
+          roll = (id, area, phase) => share(() => g.catchMarkRoll(id, area, phase, rng));
+        const loop = window.__gw.progression.loop.state(),
+          noMap = { hunt: { mossmere: { ...loop.hunt.mossmere, sketches: { map: 0 } } } },
+          run = (t, over = {}) => ({
+            outing: "trip",
+            zone: "mossmere",
+            evening: 5,
+            phase: "gloomtide",
+            phaseTime: t,
+            ...over,
+          }),
+          near = (l, rn, id = "weeping_carp", x = -4 + 10, z = -14) =>
+            share(() => g.catchMarkFor(l, rn, { speciesId: id, area: "open", phase: rn.phase, x, z }, rng));
+        return {
+          cutsReeds: roll("mossback_perch", "reeds", "calm"),
+          cutsPads: roll("lampsipper", "pads", "dusk"),
+          cutsOpen: roll("mossback_perch", "open", "calm"),
+          cutsWrongFish: roll("weeping_carp", "reeds", "calm"),
+          holesNight: roll("rustfin_sucker", "deep", "gloomtide"),
+          holesDuskDrop: roll("dusk_minnow", "dropoff", "dusk"),
+          holesDay: roll("rustfin_sucker", "deep", "calm"),
+          holesWrongFish: roll("likely_chub", "deep", "gloomtide"),
+          kissmark: roll("kissmark_trout", "open", "calm"),
+          herTime: near(loop, run(75)),
+          beforeMidnight: near(loop, run(30)),
+          afterHerTime: near(loop, run(60 + 200)),
+          tooFar: near(loop, run(75), "weeping_carp", -4 + 17, -14),
+          noMap: near(noMap, run(75)),
+          kissmarkNoMap: near(noMap, run(75), "kissmark_trout"),
+          legend: g.catchMarkFor(loop, run(75), {
+            speciesId: "belled_matriarch",
+            legendary: true,
+            x: -4,
+            z: -14,
+          }),
+          sporewood: g.catchMarkFor(loop, run(75, { zone: "sporewood" }), { speciesId: "kissmark_trout" }),
+        };
+      });
+      const about = (v, want) => Math.abs((v || 0) - want) < 0.025;
+      check(about(r.cutsReeds.cuts, 1 / 8) && about(r.cutsPads.cuts, 1 / 8), `cuts: ${JSON.stringify(r)}`);
+      check(
+        about(r.holesNight.holes, 1 / 8) && about(r.holesDuskDrop.holes, 1 / 8),
+        `holes: ${JSON.stringify(r)}`,
+      );
+      for (const k of [
+        "cutsOpen",
+        "cutsWrongFish",
+        "holesDay",
+        "holesWrongFish",
+        "beforeMidnight",
+        "afterHerTime",
+        "tooFar",
+        "noMap",
+        "kissmarkNoMap",
+      ])
+        check(r[k].none === 1, `${k} carried a mark: ${JSON.stringify(r[k])}`);
+      check(r.kissmark.ring === 1, `the Kissmark: ${JSON.stringify(r.kissmark)}`);
+      check(
+        about(r.herTime.ring, 0.5) && about(r.herTime.none, 0.5),
+        `near her water: ${JSON.stringify(r.herTime)}`,
+      );
+      check(r.legend === null && r.sporewood === null, `her or Sporewood: ${r.legend} ${r.sporewood}`);
+      return `cuts ${r.cutsReeds.cuts.toFixed(3)}, holes ${r.holesNight.holes.toFixed(3)}, near her ${r.herTime.ring.toFixed(3)}`;
+    },
+  },
+
+  {
+    name: "bite marks: a mark shows on the catch card with its line and is kept on the catch; its first sighting adds it to the strip; the pike's card names its cuts and matches them; all kept after a reload",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 720_000,
+    editSave: withLineup(["kissmark_trout", "reedjaw_pike"]),
+    async run(session, { page, browser }) {
+      await session.sail(SLOW_SAIL);
+      await listenForToasts(session);
+      const kiss = await catchAndReadCard(session, "kissmark_trout");
+      check(
+        kiss.line === RING_LINE && /gw-cc-mark--ring/.test(kiss.ink || ""),
+        `the Kissmark's card: ${JSON.stringify(kiss)}`,
+      );
+      await session.pause(1000);
+      const toasts = await toastsSeen(session);
+      check(toasts.includes(DRAWN), `no "${DRAWN}": ${JSON.stringify(toasts)}`);
+      let record = await huntOf(session);
+      check(
+        record.marks.ring === 5 &&
+          record.padUnseen.includes("mark:ring") &&
+          record.padUnseen.includes("cross:kissmark_trout"),
+        `after the Kissmark: ${JSON.stringify(record)}`,
+      );
+      const kept = await session.eval(() =>
+        window.__gw.state.run.creel.map((f) => `${f.speciesId}:${f.mark ?? ""}`),
+      );
+      check(kept.includes("kissmark_trout:ring"), `the creel: ${JSON.stringify(kept)}`);
+      // A fish with no mark has no line; the cuts seen once (put in the record as a sighting would), then the pike.
+      const carp = await catchAndReadCard(session, "weeping_carp");
+      check(carp.line === null && carp.ink === null, `the carp's card: ${JSON.stringify(carp)}`);
+      await session.eval(() => (window.__gw.progression.loop.state().hunt.mossmere.marks.cuts = 5));
+      let strip = (await lineupInJournal(session)).marks;
+      check(
+        JSON.stringify(strip) ===
+          JSON.stringify([
+            { mark: "cuts", words: CUTS_OPEN },
+            { mark: "ring", words: RING_OPEN },
+          ]),
+        `the strip before the pike: ${JSON.stringify(strip)}`,
+      );
+      const pike = await catchAndReadCard(session, "reedjaw_pike");
+      check(pike.line === PIKE_CARD && pike.ink === null, `the pike's card: ${JSON.stringify(pike)}`);
+      strip = (await lineupInJournal(session)).marks;
+      check(
+        strip[0]?.words === CUTS_MATCH && strip[1]?.words === RING_OPEN,
+        `the strip after: ${JSON.stringify(strip)}`,
+      );
+      // Reloaded, the trip goes on: the marks, the crossings and the scraped Kissmark in the creel are kept.
+      const saved = await session.saved();
+      const next = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await next.boot();
+        await next.sail(SLOW_SAIL);
+        const h = await huntOf(next);
+        check(
+          h.marks.ring === 5 &&
+            h.marks.cuts === 5 &&
+            h.crossed.kissmark_trout === 5 &&
+            h.crossed.reedjaw_pike === 5,
+          `after a reload: ${JSON.stringify(h)}`,
+        );
+        const creel = await next.eval(() =>
+          (window.__gw.state.run.creel || []).map((f) => `${f.speciesId}:${f.mark ?? ""}`),
+        );
+        check(creel.includes("kissmark_trout:ring"), `the creel after a reload: ${JSON.stringify(creel)}`);
+        await next.collectGameErrors();
+        check(!next.errors.length, `errors after reloading: ${next.errors.join("; ")}`);
+      } finally {
+        await next.close();
+      }
+      return "the ring on the Kissmark's card and in the strip; the pike's card; the cuts matched; kept";
+    },
+  },
+
+  {
+    name: "bite marks: the first ring of scrapes is a beat for the Turnback Hook, which Murk then brings with his hunt line; Sporewood catches note nothing",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withMap,
+    async run(session) {
+      await session.boot();
+      const r = await session.eval(() => {
+        const g = window.__gw.data,
+          base = JSON.parse(JSON.stringify(window.__gw.progression.loop.state().hunt.mossmere)),
+          loop = () => ({
+            parts: ["cork_float", "plain_knot", "mere_hook", "sounding_lead", "minnow_tin"],
+            evenings: 4,
+            arrivals: {
+              seq: 0,
+              beats: { turnback_hook: 0, pike_wire: 0, leaders: 0 },
+              shelved: ["pike_wire", "chafe_gut"],
+            },
+            hunt: { mossmere: JSON.parse(JSON.stringify(base)) },
+          }),
+          trip = { zone: "mossmere", evening: 5 };
+        const ring = loop(),
+          noted = g.noteHuntCatch(ring, trip, "mossback_perch", { mark: "ring" }),
+          beat = ring.arrivals.beats.turnback_hook,
+          gift = g.rigArrivalAtTally(ring, "mossmere"),
+          again = g.noteHuntCatch(ring, trip, "mossback_perch", { mark: "ring" });
+        const cuts = loop();
+        g.noteHuntCatch(cuts, trip, "mossback_perch", { mark: "cuts" });
+        const spore = loop(),
+          sporeNoted = g.noteHuntCatch(spore, { zone: "sporewood", evening: 5 }, "kissmark_trout", {
+            mark: "ring",
+          });
+        return {
+          noted,
+          beat,
+          gift,
+          again,
+          cutsBeat: cuts.arrivals.beats.turnback_hook,
+          cutsMarks: cuts.hunt.mossmere.marks,
+          sporeNoted,
+          sporeMarks: spore.hunt.mossmere.marks,
+          line: window.__gw.data.TEXT_LOOP.arrivals.lines.hookHunt,
+        };
+      });
+      check(r.noted?.mark === "ring" && r.beat === 1 && r.again === null, `the ring: ${JSON.stringify(r)}`);
+      check(
+        r.gift?.gift === "turnback_hook" && r.gift.giftSay === "hunt" && r.line === HOOK_HUNT_LINE,
+        `the tally: ${JSON.stringify(r.gift)}`,
+      );
+      check(r.cutsBeat === 0 && r.cutsMarks.cuts === 5, `the cuts: ${JSON.stringify(r)}`);
+      check(r.sporeNoted === null && r.sporeMarks.ring === 0, `Sporewood: ${JSON.stringify(r)}`);
+      return `the ring noted the hook's beat; Murk says "${HOOK_HUNT_LINE}"`;
     },
   },
 ];

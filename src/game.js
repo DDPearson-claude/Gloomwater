@@ -30550,6 +30550,10 @@ Ic(vg, {
   nice: () => CP,
   nightCurve: () => Y7,
   noteArrivalBeat: () => noteArrivalBeat,
+  catchMarkRoll: () => catchMarkRoll,
+  catchMarkFor: () => catchMarkFor,
+  noteHuntCatch: () => noteHuntCatch,
+  mossmereTallyBeat: () => mossmereTallyBeat,
   obstacleRadius: () => PS,
   placeAt: () => Tee,
   placeAtV3: () => Ste,
@@ -47421,8 +47425,8 @@ wo.rigBiteFloor = 0.35;
 // came first arrives and a tie goes in `order` (the hook before a leader); the other waits a tally. The hook also
 // comes on a quiet tally (nothing due) after the tin's.
 //   turnback_hook: one of `runs` lost after it ran before the hook was set (struck, or a hard take). The hunt's
-//     other beats for it, the theft and the first ring of scrapes, are to call noteArrivalBeat(loop,
-//     "turnback_hook") when they are built, with their own line (Ca.arrivals.lines).
+//     other beats for it: the first ring of scrapes seen (noteMarkSeen), after which Murk says his hunt line
+//     (Ca.arrivals.lines.hookHunt); and the theft, which is to call noteArrivalBeat(loop, "turnback_hook") too.
 //   pike_wire: the first Reedjaw Pike landed or lost. Pike Wire alone.
 //   leaders: Hob's map drawn (sketches.map, which carries his worn line end). Chafe Gut never comes sooner.
 wo.arrivals = {
@@ -47517,12 +47521,15 @@ Ca.arrivals = {
     pike_wire: "Pike Wire",
     leaders: "Pike Wire and Chafe Gut",
     gutOnly: "Chafe Gut",
+    hookHunt: "Turnback Hook",
   },
   lines: {
     turnback_hook: "Carp grab and run. There's a hook on the shelf that sets itself.",
     pike_wire: "Pike teeth cut line. Pike Wire is on the shelf now.",
     leaders: "Hob gave you his old line end? Leaders are on the shelf now.",
     gutOnly: "Hob gave you his old line end? Chafe Gut is on the shelf now.",
+    // The Turnback Hook once the ring of scrapes has been seen (mossmere-review-addendum.md section 2, "Hunt").
+    hookHunt: "Something out there grabs and runs. There's a new hook on the shelf.",
   },
 };
 Object.assign(Ca.shelf, {
@@ -47534,6 +47541,28 @@ Object.assign(Ca.shelf, {
 // evening 2, the fisherman's notepad, and Hob on Mossbell Isle with his map (sketch 1). Distances are metres
 // from the middle of Mossbell Isle. Sketches 2 to 5 come in later steps, so their places stay blank.
 wo.hunt = { taleEvening: 2, lampEvening: 2, hobReach: 12, hobLeave: 16 };
+// The line-up (sketch 3, section 3): the five big fish Murk names, in the order they are drawn.
+wo.hunt.lineup = ["reedjaw_pike", "milkeye_perch", "kissmark_trout", "weeping_carp", "bridgechain_sturgeon"];
+// The bite marks a landed fish can carry (B3 "Marks" and "Ring mark"), once Hob's map is drawn. cuts and holes:
+// on the listed fish caught in the listed areas (and lights), at `chance`. ring: on every fish in `always`, and on
+// `nearChance` of the fish landed with the float within `near` metres of her centre in her time. `leftBy`: the
+// fish whose catch matches a mark (the ring has none: nothing you can catch leaves it).
+wo.hunt.marks = {
+  order: ["cuts", "holes", "ring"],
+  cuts: {
+    fish: ["dusk_minnow", "mossback_perch", "likely_chub", "lampsipper"],
+    areas: ["reeds", "pads"],
+    chance: 1 / 8,
+  },
+  holes: {
+    fish: ["dusk_minnow", "mossback_perch", "rustfin_sucker"],
+    areas: ["dropoff", "deep"],
+    phases: ["dusk", "gloomtide"],
+    chance: 1 / 8,
+  },
+  ring: { always: ["kissmark_trout"], near: 16, nearChance: 0.5 },
+  leftBy: { cuts: "reedjaw_pike", holes: "milkeye_perch" },
+};
 Ca.hunt = {
   tale: "Things go missing on Mossmere at night. Birds go, and floats, and once a whole rod. People say the gloom takes them.",
   murk: {
@@ -47546,8 +47575,22 @@ Ca.hunt = {
     sail: "Sail out there before dark, and wait for the bell.",
     boils: "Watch for boils after the bell, and fish right under them.",
     found: "Right off your line? I've marked the spot on your chart.",
+    // At the first tally after Hob's map is drawn, with sketch 3 (section 3).
+    lineup: "I can think of five fish here big enough to pull a rod in. Catch them and see.",
   },
   drawn: "You draw it in your notepad.",
+  // The bite marks (section 3 and B6), each on the catch card under the fish picture. The ring's line ends as
+  // the review addendum changed it ("a soft, rough mouth"). `leaves`: the line on the card of the fish that
+  // leaves a mark, the Reedjaw Pike's (the cuts) and the Milkeye Perch's (the holes).
+  marks: {
+    ring: "This fish has a wide ring of fine scrapes, and no tooth holes. Something big had it in a soft, rough mouth.",
+    cuts: "This fish has two rows of small cuts. Something with sharp teeth had a go at it.",
+    holes: "This fish has two deep holes, a thumb apart. Something with long fangs had a go at it.",
+    leaves: {
+      cuts: "Look at its teeth. They leave two rows of small cuts.",
+      holes: "Look at its two long fangs. They leave two deep holes.",
+    },
+  },
   // Her water (section 4 and B6): the boils in her time, the theft that finds it, and what marks it after.
   water: {
     boil: "Something big boils up on the water, {where}.",
@@ -47611,6 +47654,52 @@ Ca.hunt = {
       end: "An old line end taped to the page, its end worn rough",
       taken:
         "A pencil close-up of Hob's shaded part, with an X where the float went under and the toll-tower far off",
+    },
+    // Sketch 3, the line-up (section 3): its head line, each fish's name and the words written when it is
+    // crossed out, the empty frame's line before and after all five are crossed out, and the marks strip, whose
+    // line for a mark changes once the fish that leaves it is caught ("match").
+    lineup: {
+      head: "These five fish are big enough to pull a rod in.",
+      frame: "It isn't any of these, so far.",
+      none: "It's none of them. Nobody here has ever caught it.",
+      fish: {
+        reedjaw_pike: {
+          name: "Reedjaw Pike",
+          why: "Its teeth cut a line clean. Hob's line was worn, not cut.",
+        },
+        milkeye_perch: {
+          name: "Milkeye Perch",
+          why: "Its two fangs leave two holes. The thief leaves a ring.",
+        },
+        kissmark_trout: {
+          name: "Kissmark Trout",
+          why: "It has the ring of scrapes on it. Something had it, and let go.",
+        },
+        weeping_carp: {
+          name: "Weeping Carp",
+          why: "It has soft lips and no teeth. It eats worms and weed, not birds.",
+        },
+        bridgechain_sturgeon: {
+          name: "Bridgechain Sturgeon",
+          why: "It is long, but its mouth is a small tube for snails.",
+        },
+      },
+      marks: {
+        cuts: {
+          open: "Something leaves two rows of small cuts.",
+          match: "A pike's teeth leave two rows of small cuts.",
+        },
+        holes: { open: "Something leaves two deep holes.", match: "A Milkeye's fangs leave two deep holes." },
+        ring: { open: "Something else leaves a wide ring of fine scrapes." },
+      },
+      labels: { cut: "cut", hobs: "Hob's", thumb: "a thumb" },
+      art: {
+        frame: "An empty frame with a question mark",
+        out: "crossed out",
+        cuts: "A small fish with two rows of small cuts",
+        holes: "A small fish with two deep holes",
+        ring: "A small fish with a wide ring of fine scrapes",
+      },
     },
     close: "Got it",
   },
@@ -106154,7 +106243,8 @@ function freshHuntRecord() {
     // Who drew Hob's map: "hob", or "murk" when he passed it on after two evenings without meeting Hob.
     mapBy: "",
     // Sketches not yet drawn in front of the player, and whether the notepad opens by itself when next at home
-    // after a tally. padIntro: its first opening has shown the line that says what it is.
+    // after a tally. padIntro: its first opening has shown the line that says what it is. Besides sketch keys,
+    // "cross:<fish id>" and "mark:<mark>" are line-up fish crossed out and bite marks added since it last opened.
     padUnseen: [],
     padDue: false,
     padIntro: false,
@@ -106178,6 +106268,10 @@ function freshHuntRecord() {
     partAt: 0,
     nudged: { midnight: 0, sail: 0, boils: 0, boost: 0 },
     murkFound: false,
+    // The line-up (sketch 3, B4): the evening each of its five fish was crossed out, by fish id; and the evening
+    // each bite mark was first seen (0 until then), which adds it to the strip at the foot of the page.
+    crossed: {},
+    marks: { cuts: 0, holes: 0, ring: 0 },
   };
 }
 // Back-fills one lake's hunt record from a fresh one: a missing or wrongly typed field takes its default, one
@@ -106200,16 +106294,106 @@ function drawHuntSketch(record, key, evening) {
   (record.sketches[key] = Math.max(1, ha(evening))),
     record.padUnseen.includes(key) || record.padUnseen.push(key);
 }
+// ---- The line-up and the bite marks (sketch 3: mossmere-hunt-2.md section 3, B3 and B4) ----------------------
+const CATCH_MARKS = ["cuts", "holes", "ring"];
+// The mark a fish of this kind carries by the table alone (B3 "Marks"): the ring on every Kissmark Trout; the
+// cuts on the listed fish caught in reeds or pads, and the holes on the listed fish caught on a drop-off or in
+// deep water at dusk or night, each at its chance. `phase` is the run's ("calm", "dusk", "gloomtide"). Returns
+// "ring", "cuts", "holes" or null; `rng` gives a number from 0 to 1.
+function catchMarkRoll(speciesId, area, phase, rng = Math.random, rule = wo.hunt.marks) {
+  if (Sr(rule.ring.always).includes(speciesId)) return "ring";
+  let { cuts, holes } = rule;
+  if (Sr(cuts.fish).includes(speciesId) && Sr(cuts.areas).includes(area))
+    return rng() < cuts.chance ? "cuts" : null;
+  if (
+    Sr(holes.fish).includes(speciesId) &&
+    Sr(holes.areas).includes(area) &&
+    Sr(holes.phases).includes(phase)
+  )
+    return rng() < holes.chance ? "holes" : null;
+  return null;
+}
+// The mark on an ordinary fish just landed on a Mossmere trip (B3), or null. There are none before Hob's map is
+// drawn (her signs wait for it, and before it there is no page to draw them on). In her time, with the float
+// within `near` metres of her centre, a fish carries the ring at `nearChance`; otherwise the table decides.
+function catchMarkFor(
+  loop,
+  run,
+  { speciesId = null, area = null, phase = null, x = NaN, z = NaN, legendary = !1 } = {},
+  rng = Math.random,
+  rule = wo.hunt.marks,
+) {
+  if (legendary || !speciesId || run?.zone !== "mossmere" || !(huntRecordOf(loop)?.sketches?.map > 0))
+    return null;
+  if (
+    !Sr(rule.ring.always).includes(speciesId) &&
+    herTimeOpen(run) &&
+    Number.isFinite(x) &&
+    Number.isFinite(z) &&
+    Math.hypot(x - HER_WATER.x, z - HER_WATER.z) <= rule.ring.near &&
+    rng() < rule.ring.nearChance
+  )
+    return "ring";
+  return catchMarkRoll(speciesId, area, phase, rng, rule);
+}
+// A mark seen for the first time: its evening in `marks`, and (`unseen`) it draws into the strip when the
+// notepad next opens. The first ring of scrapes is also a beat for the Turnback Hook (wo.arrivals), in a water
+// with hooks while the hook is not on the shelf yet. Returns whether it was new.
+function noteMarkSeen(loop, record, mark, evening, water, { unseen = !0 } = {}) {
+  if (!CATCH_MARKS.includes(mark) || ha(record.marks[mark]) > 0) return !1;
+  record.marks[mark] = Math.max(1, ha(evening));
+  unseen && !record.padUnseen.includes(`mark:${mark}`) && record.padUnseen.push(`mark:${mark}`);
+  mark === "ring" &&
+    typeof water == "string" &&
+    bs[water]?.hookSet &&
+    !wo.arrivals.turnback_hook.parts.every((id) => Sr(loop?.arrivals?.shelved).includes(id)) &&
+    noteArrivalBeat(loop, "turnback_hook");
+  return !0;
+}
+// Crosses a line-up fish out, once: its evening in `crossed`, drawn in when the notepad next opens (`unseen`).
+// The Kissmark Trout is crossed out for the ring of scrapes on it, so that mark counts as seen with it.
+function crossLineupFish(loop, record, speciesId, evening, water, { unseen = !0 } = {}) {
+  if (!Sr(wo.hunt.lineup).includes(speciesId) || ha(record.crossed[speciesId]) > 0) return !1;
+  record.crossed[speciesId] = Math.max(1, ha(evening));
+  unseen && !record.padUnseen.includes(`cross:${speciesId}`) && record.padUnseen.push(`cross:${speciesId}`);
+  Sr(wo.hunt.marks.ring.always).includes(speciesId) &&
+    noteMarkSeen(loop, record, "ring", evening, water, { unseen });
+  return !0;
+}
+// Sketch 3 drawn at a tally: the five fish, with those already caught (journal) crossed out as part of it.
+function drawLineup(loop, record, evening, journal, water) {
+  drawHuntSketch(record, "lineup", evening);
+  for (let id of Sr(wo.hunt.lineup))
+    Number(journal?.[id]?.caught) > 0 && crossLineupFish(loop, record, id, evening, water, { unseen: !1 });
+}
+// A fish landed on a Mossmere trip, once Hob's map is drawn: a mark on it never seen before goes into the strip,
+// and, once the line-up is drawn, a line-up fish not crossed out yet is crossed out. Returns what was new
+// ({ mark, crossed }) or null.
+function noteHuntCatch(loop, trip, speciesId, fish = null) {
+  let record = huntRecordOf(loop);
+  if (trip?.zone !== "mossmere" || !record || !(record.sketches?.map > 0) || !speciesId) return null;
+  let evening = ha(trip.evening) || ha(loop.evenings) + 1,
+    seen = {};
+  noteMarkSeen(loop, record, fish?.mark, evening, trip.zone) && (seen.mark = fish.mark);
+  record.sketches.lineup > 0 &&
+    crossLineupFish(loop, record, speciesId, evening, trip.zone) &&
+    (seen.crossed = speciesId);
+  return seen.mark || seen.crossed ? seen : null;
+}
 // The hunt's moment at a Mossmere tally (mossmere-hunt-2.md sections 1, 2 and 4): the tale at the tally of
 // evening 2, or at an older save's next tally; then, while Hob's map is missing, Murk's word after one evening
 // and the map passed on after two. Returns what the tally shows ({ tale, murk }) or null. The notepad is marked
 // to open by itself after this tally when the tale is told or a sketch waits to be seen. `quiet` (a tally with
-// Murk's gift): nothing is told this time, so the tale and the nudges come one tally later.
-function mossmereTallyBeat(loop, trip, rule = wo.hunt, { quiet = !1 } = {}) {
+// Murk's gift): nothing is told this time, so the tale and the nudges come one tally later. At the first tally
+// after Hob's map is drawn (not the tally that passes it on, nor the tally of the tale itself, which a map drawn
+// before the tale would share), Murk also names the line-up and sketch 3 is drawn, with the fish already in the
+// Journal (`journal`) crossed out ({ lineup: true }).
+function mossmereTallyBeat(loop, trip, rule = wo.hunt, { quiet = !1, journal = null } = {}) {
   let record = loop?.hunt?.mossmere;
   if (trip?.zone !== "mossmere" || !Ln(record)) return null;
   let evening = ha(trip.evening) || ha(loop.evenings),
-    beat = {};
+    beat = {},
+    lineupDue = record.taleAt > 0 && record.sketches.map > 0 && !(record.sketches.lineup > 0);
   if (quiet) record.padUnseen.length && (record.padDue = !0);
   else if (!record.taleAt) {
     if (evening < rule.taleEvening) return null;
@@ -106239,8 +106423,10 @@ function mossmereTallyBeat(loop, trip, rule = wo.hunt, { quiet = !1 } = {}) {
         : nudged.boils && !nudged.boost && stuck >= 2 && (nudged.boost = evening + 1);
     }
   }
+  // Story lines may share a tally (mossmere-review-addendum.md section 2), so the line-up comes with any above.
+  !quiet && lineupDue && (drawLineup(loop, record, evening, journal, trip.zone), (beat.lineup = !0));
   (beat.tale || record.padUnseen.length) && (record.padDue = !0);
-  return beat.tale || beat.murk ? beat : null;
+  return beat.tale || beat.murk || beat.lineup ? beat : null;
 }
 // The Sounding Lead fishes when it is owned and fitted, in a water with a depth table, and no lure is on (a lure
 // swims at its own depth). Otherwise the rig fishes under the Cork Float, as it always has.
@@ -106311,6 +106497,11 @@ function rigArrivalAtTally(loop, water, rule = wo.arrivals) {
   let parts = waiting(gift);
   arrivals.shelved.push(...parts);
   gift === "leaders" && parts.length === 1 && parts[0] === "chafe_gut" && (giftSay = "gutOnly");
+  // The hook after the ring of scrapes has been seen: Murk's hunt line for it.
+  gift === "turnback_hook" &&
+    giftSay === "beat" &&
+    ha(loop.hunt?.mossmere?.marks?.ring) > 0 &&
+    (giftSay = "hunt");
   return { gift, giftSay };
 }
 // The line an ordinary fish lost on a default part says (mossmere-gear-deeper.md B2), once a night for each kind,
@@ -107633,7 +107824,7 @@ function CF(e) {
       H.fitted.bait = [...Sle(f().tins?.[ze.zone]), "cut_strip"].find((id) => ha(stock[id]) > 0) ?? null;
     }
     // The tale and Murk's word about Hob are story, not new tackle, so they may share a tally with his gift.
-    let huntBeat = mossmereTallyBeat(H, ze, f().hunt, { quiet: !1 });
+    let huntBeat = mossmereTallyBeat(H, ze, f().hunt, { quiet: !1, journal: o()?.journal });
     if (
       (typeof H.fitted?.bait == "string" &&
         !(ha(H.bait?.[ze.zone]?.[H.fitted.bait]) > 0) &&
@@ -108086,6 +108277,9 @@ function CF(e) {
       foundBy: record.foundBy,
       // Sketch 2's X: where the float went under (the centre of her hole for a save that bought the chart).
       foundAt: record.foundBy === "theft" ? herWaterCorkAt(p()) : null,
+      // Sketch 3: the line-up fish crossed out and the bite marks seen (ids only).
+      crossed: Sr(f().hunt?.lineup).filter((id) => ha(record.crossed?.[id]) > 0),
+      marks: CATCH_MARKS.filter((k) => ha(record.marks?.[k]) > 0),
     };
   }
   // The notepad opened by itself and was closed: what it drew in has been seen.
@@ -108132,11 +108326,15 @@ function CF(e) {
       (H.fitted[slot] = id), c(), d("loop:fit", { slot, id }), { ok: !0, changed: !0, reeled: K, [slot]: id }
     );
   }
-  // A fish landed on a trip: the first Reedjaw Pike is the beat that brings Pike Wire (wo.arrivals).
-  function noteLanded(speciesId) {
+  // A fish landed on a trip: the first Reedjaw Pike is the beat that brings Pike Wire (wo.arrivals). On Mossmere,
+  // the line-up crosses it out and a new bite mark on it goes into the strip (noteHuntCatch), with their lines.
+  function noteLanded(speciesId, fish = null) {
     let ze = a(),
       H = p();
-    r(ze) && H && noteFishArrivalBeats(H, ze.zone, speciesId);
+    if (!r(ze) || !H) return;
+    noteFishArrivalBeats(H, ze.zone, speciesId);
+    let noted = noteHuntCatch(H, ze, speciesId, fish);
+    noted && (c(), d("hunt:noted", { ...noted }));
   }
   function de() {
     if (!p()) return !1;
@@ -112036,7 +112234,7 @@ function Kle(e) {
       // Which kinds were landed this trip, kept or not: Murk's tin line asks whether a perch was among them.
       Array.isArray(Vn.landedKinds) || (Vn.landedKinds = []);
       Vn.landedKinds.includes(me.id) || Vn.landedKinds.push(me.id);
-      lt?.noteLanded?.(me.id);
+      lt?.noteLanded?.(me.id, ce);
       {
         let fe = ft.stats.biggest;
         (!fe || t().fishWeight(me, ce) > t().fishWeight(m(fe.speciesId), fe)) &&
@@ -133863,6 +134061,19 @@ function Y0e(e) {
     if (!tn || typeof tn != "object" || tn.isStub || !tn.speciesId) {
       Ho({ ...R, legacy: !0 });
       return;
+    }
+    // A bite mark on the fish (mossmere-hunt-2.md B3), kept on the catch record and drawn on its card.
+    if (xe() && !Ke) {
+      let mark = p(() =>
+        catchMarkFor(e.state?.meta?.loop, h(), {
+          speciesId: tn.speciesId,
+          area: i.cast?.area ?? null,
+          phase: Pe,
+          x: c.bob.x,
+          z: c.bob.z,
+        }),
+      );
+      CATCH_MARKS.includes(mark) && (tn.mark = mark);
     }
     const rival = e.state?.meta?.oldRivals?.active;
     if (
@@ -157782,6 +157993,54 @@ function JU({ K: e, L: t, D: n, report: o = () => {}, murkToast: a = null }) {
   }
   return { placeSlots: l, shelfBoard: i, paintHud: f };
 }
+// The bite mark on a catch card (mossmere-hunt-2.md section 3): a small ink mark drawn over the fish picture,
+// with its line under the picture. The 3D models are untouched. The cards of the two fish that leave a mark (the
+// Reedjaw Pike, the Milkeye Perch) say what they leave instead, once Hob's map is drawn and while the thief is
+// unknown. In the fish picture's units (100 by 40, the fish facing right, its middle at 50, 20).
+// Two rows of small cuts; two deep holes a thumb apart; a wide ring of fine scrapes.
+const CATCH_MARK_CUTS =
+  "M52 17.4L53.4 15.8L54.8 17.4L56.2 15.8L57.6 17.4L59 15.8L60.4 17.4L61.8 15.8L63.2 17.4M52 22.6L53.4 24.2L54.8 22.6L56.2 24.2L57.6 22.6L59 24.2L60.4 22.6L61.8 24.2L63.2 22.6";
+function catchMarkSvg(mark) {
+  let body =
+    mark === "holes"
+      ? '<circle cx="58" cy="17.2" r="1.25"/><circle cx="58" cy="23" r="1.25"/>'
+      : mark === "ring"
+        ? `<path d="${padScrapes(58, 20, 5.6, 0.82, 22, 31, [0.7, 0.9])}"/>`
+        : `<path d="${CATCH_MARK_CUTS}"/>`;
+  return `<svg class="gw-cc-mark gw-cc-mark--${mark}" viewBox="0 0 100 40" aria-hidden="true">${body}</svg>`;
+}
+const CATCH_MARK_CSS = `
+.gw-cc-art.gw-cc-marked { position: relative; }
+.gw-cc-mark { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.gw-cc-mark path { fill: none; stroke: rgb(226, 116, 94); stroke-width: .6; stroke-linecap: round; stroke-linejoin: round; }
+.gw-cc-mark circle { fill: rgb(226, 116, 94); }
+/* on a phone the card is one column: the line sits under the picture (the same order, after it) */
+.gw-cc-markline { order: 4; margin: 6px 4px 0; font: italic 400 15px/1.35 var(--f-body); color: var(--ink-dim, #c9c6d6); text-align: center; text-wrap: pretty; }
+`;
+function catchCardMark(art, fish, game, text) {
+  if (!art || !fish || typeof document > "u") return;
+  let words = text?.marks || {},
+    mark = CATCH_MARKS.includes(fish.mark) ? fish.mark : null,
+    line = mark ? words[mark] : null;
+  if (!line) {
+    let meta = game?.state?.meta,
+      leftBy = wo.hunt.marks.leftBy,
+      leaves = Object.keys(leftBy).find((k) => leftBy[k] === fish.speciesId);
+    leaves &&
+      game?.state?.run?.zone === "mossmere" &&
+      huntRecordOf(meta?.loop)?.sketches?.map > 0 &&
+      thiefHidden(meta, "belled_matriarch") &&
+      (line = words.leaves?.[leaves]);
+  }
+  if (!line) return;
+  if (!document.getElementById("gw-cc-mark-css")) {
+    let style = document.createElement("style");
+    (style.id = "gw-cc-mark-css"), (style.textContent = CATCH_MARK_CSS), document.head.appendChild(style);
+  }
+  mark && (art.classList.add("gw-cc-marked"), art.insertAdjacentHTML("beforeend", catchMarkSvg(mark)));
+  let p = document.createElement("p");
+  (p.className = "gw-cc-markline"), (p.dataset.mark = mark || "leaves"), (p.textContent = line), art.after(p);
+}
 function QU({
   ctx: e,
   fish: t,
@@ -164042,8 +164301,9 @@ var npe =
   '<svg class="gw-trow-seal" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c2.2 0 2.6 1.6 4.4 2.3s3.4.1 4 2.1-.8 2.9-.7 4.6.9 3.2-.4 4.6-2.9.6-4.4 1.6-1.9 2.8-3.9 2.8-2.5-1.8-3.9-2.8-3.2-.2-4.4-1.6-.4-2.9-.4-4.6S2.4 9.6 3 7.6s2.3-1.4 4-2.1S9.8 3.2 12 3.2z"/><path class="k" d="M8.6 12.4l2.4 2.4 4.6-5"/></svg>';
 // ---- The fisherman's notepad (mossmere-notepad.md and its mock-up, notepad-mockup.html) -----------------------
 // A sketch is a list of strokes, one short string each. The first letter says how it is drawn:
-//   p pencil, b heavy pencil, f faint pencil, d dotted, h hatching "h<deg>,<gap>|<points>" inside a shape,
-//   w paper (hides what is under it), T tape, t words "t<x>,<y>,<size>,<flags>|text" (flag f: faint).
+//   p pencil, b heavy pencil, f faint pencil, d dotted, r red crayon (crossing out), h hatching
+//   "h<deg>,<gap>|<points>" inside a shape, w paper (hides what is under it), T tape, t words
+//   "t<x>,<y>,<size>,<flags>|text" (flags: f faint, l left-aligned).
 //   A leading _ puts the stroke behind everything drawn so far. Paths use M L Q C Z.
 // Every line gets a seeded wobble and a faint second pass, so a sketch looks the same each time it is drawn.
 // Only ids are saved; the art is drawn from these lists, so it can change without touching saves.
@@ -164329,7 +164589,7 @@ const padEsc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 // Draws one sketch as SVG markup. With `at` (seconds), every stroke also gets its moment to draw in, from
 // that time on, about as fast as a pencil; `end` is when the last stroke is done.
-const PAD_WIDTH = { p: 1, b: 1.65, f: 0.85, d: 1, h: 0.7 };
+const PAD_WIDTH = { p: 1, b: 1.65, f: 0.85, d: 1, h: 0.7, r: 2.3 };
 function padSketchSvg(
   id,
   vb,
@@ -164352,7 +164612,7 @@ function padSketchSvg(
         let r = padRough(pl, R, amp);
         (length += padLength(r)),
           (main += kind === "d" ? padDashes(r, 1.1, 2.2) : padPath(r)),
-          (kind === "p" || kind === "b") && (ghost += padPath(padRough(pl, R, amp * 1.4)));
+          (kind === "p" || kind === "b" || kind === "r") && (ghost += padPath(padRough(pl, R, amp * 1.4)));
       }
       let dur = Math.min(
           1.5,
@@ -164361,7 +164621,7 @@ function padSketchSvg(
         anim = at == null ? "" : ` style="--d:${time.toFixed(2)}s;--t:${dur.toFixed(2)}s"`,
         out =
           (ghost
-            ? `<path class="pl g" d="${ghost}" stroke-width="${padR1(w * 70) / 100}" pathLength="1"${anim}/>`
+            ? `<path class="pl ${kind === "r" ? "rg" : "g"}" d="${ghost}" stroke-width="${padR1(w * 70) / 100}" pathLength="1"${anim}/>`
             : "") +
           `<path class="pl ${kind}" d="${main}" stroke-width="${padR1(w * 100) / 100}" pathLength="1"${anim}/>`;
       (time += dur + (kind === "h" ? 0.02 : 0.04)), (isBack ? back : front).push(out);
@@ -164371,7 +164631,7 @@ function padSketchSvg(
     isBack && (raw = raw.slice(1));
     let k = raw[0],
       body = raw.slice(1);
-    if ("pbfd".includes(k)) stroke(k, padPolylines(body), isBack);
+    if ("pbfdr".includes(k)) stroke(k, padPolylines(body), isBack);
     else if (k === "h") {
       let [head, pts] = body.split("|"),
         [deg, gap] = head.split(",").map(Number);
@@ -164383,7 +164643,7 @@ function padSketchSvg(
       let [head, words] = body.split("|"),
         [x, y, size, flags = ""] = head.split(",");
       (isBack ? back : front).push(
-        `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle"${flags.includes("f") ? ' class="f"' : ""}${timing()}>${padEsc(words)}</text>`,
+        `<text x="${x}" y="${y}" font-size="${size}" text-anchor="${flags.includes("l") ? "start" : "middle"}"${flags.includes("f") ? ' class="f"' : ""}${timing()}>${padEsc(words)}</text>`,
       ),
         (time += 0.24);
     }
@@ -164622,7 +164882,399 @@ function padTakenAtMidnight(labels, X = -4, Z = -14) {
     ...tally,
   ];
 }
-// The five places: their pages, and how a drawn one is made (sketches 3 to 5 come in later steps).
+// ---- Sketch 3, the line-up (mossmere-notepad.md and its mock-up). One fish to a row: the fish on the left, and
+// once it is crossed out, a red line over it and the reason it could not be the thief drawn large on the right.
+// Then a frame holding only a "?", and the strip of bite marks found on catches, each on a small fish.
+// The fish outlines were traced once from their field-guide portraits: 200 units long, `h` high.
+const PAD_FISH = {
+  pike: {
+    h: 46.0,
+    p: "4,6 6,6 36,21 42,19 40,17 41,8 42,4 48,0 56,0 62,2 69,6 74,12 112,8 149,9 163,13 180,22 199,26 199,28 197,28 177,30 164,35 154,38 120,36 110,42 106,42 106,37 94,42 94,38 98,34 78,33 66,41 56,42 54,40 54,30 36,27 6,42 4,42 4,40 12,30 14,24 4,8",
+  },
+  milkeye: {
+    h: 83.5,
+    p: "3,28 5,28 32,44 37,46 48,42 68,34 70,32 68,26 70,19 74,16 75,14 76,14 80,9 83,8 85,6 88,6 90,3 94,4 96,2 101,2 102,1 106,2 111,2 113,4 118,3 120,6 125,6 129,9 132,9 140,22 154,24 176,32 187,37 196,44 200,52 198,60 192,66 182,71 150,78 130,78 108,76 106,78 92,82 92,80 98,74 78,69 68,75 58,76 55,75 54,72 54,62 53,61 35,58 8,74 4,74 4,72 10,62 14,52 3,31",
+  },
+  kissmark: {
+    h: 59.5,
+    p: "2,14 4,14 37,31 54,26 55,22 57,19 62,20 66,22 72,20 72,11 76,4 82,0 86,0 98,4 105,8 110,14 151,14 171,19 191,26 198,32 200,36 198,42 195,46 189,49 178,52 158,55 142,55 121,52 115,56 112,55 111,52 108,52 104,54 92,58 92,56 98,50 78,48 68,54 57,56 54,53 54,42 36,40 10,54 2,57 8,36 2,17",
+  },
+  carp: {
+    h: 90.5,
+    p: "1,24 3,24 37,43 55,36 61,26 70,18 90,3 102,0 107,0 114,2 120,6 128,14 148,16 164,20 186,34 197,42 200,50 200,54 197,60 190,66 186,70 184,70 184,69 171,75 161,79 148,81 108,78 106,80 92,84 92,82 98,76 97,75 78,68 66,74 58,74 54,70 54,60 40,55 34,56 4,74 2,74 7,57 8,47",
+  },
+  sturgeon: {
+    h: 62.5,
+    p: "2,3 6,4 46,29 53,27 52,24 52,18 54,16 57,13 66,14 75,17 79,20 84,21 87,18 92,20 95,17 99,18 102,16 107,18 110,16 114,17 116,16 120,16 122,17 126,16 129,18 134,16 136,18 142,17 144,18 148,18 150,19 156,19 192,31 198,34 198,36 197,38 181,43 154,52 129,52 114,62 112,62 110,60 108,54 99,57 99,55 104,50 102,48 86,45 76,50 70,52 65,52 63,49 63,40 48,37 45,37 27,46 24,46 22,34 8,16 2,5",
+  },
+  minnow: {
+    h: 45.0,
+    p: "4,10 38,24 74,16 76,15 74,9 76,3 81,0 86,0 102,6 106,11 124,10 144,10 174,16 190,20 197,24 199,27 199,30 188,35 175,37 153,39 125,38 116,44 113,44 112,43 113,36 108,36 100,40 92,42 92,40 98,34 78,32 68,38 62,41 56,42 54,40 54,30 53,29 38,28 16,38 6,41 6,39 16,28 16,25 4,12",
+  },
+};
+// Each fish's eye, gills and fins, in the outline's units: "c<x>,<y>,<r>" a circle, "f ..." a faint line.
+const PAD_FISH_DETAIL = {
+  carp: [
+    "c172,45,2.6",
+    "M147 33Q140 53 150 75",
+    "M190 51Q186 55 191 58",
+    "f M42 48Q110 43 166 46",
+    "M112 69L133 58",
+    "f M60 34Q66 30 72 34M78 30Q84 26 90 30M96 27Q102 23 108 27M114 26Q120 22 126 26M70 42Q76 38 82 42M88 38Q94 34 100 38M106 35Q112 31 118 35",
+  ],
+  milkeye: [
+    "c174,51,7",
+    "c175,50,1.8",
+    "M147 38Q141 55 150 71",
+    "M60 44L58 72M80 40L78 74M100 36L100 76M120 36L121 75",
+    "M76 30L88 4M92 29L100 2M108 28L114 3M124 28L128 6",
+    "M112 66L134 58",
+  ],
+  pike: [
+    "c157,21,2.2",
+    "M136 15Q130 28 139 37",
+    "M163 27L197 25",
+    "M168 26L170 29L173 26L176 29L179 26L182 28L185 26",
+    "f M42 24L150 23",
+    "M58 14L66 32M74 13L82 33M92 12L99 33M110 12L116 32",
+    "M112 33L128 41",
+  ],
+  sturgeon: [
+    "c158,33,1.8",
+    "M140 25Q136 36 142 46",
+    "M56 22L60 18L64 22M72 20L76 16L80 20M88 19L92 15L96 19M104 18L108 14L112 18M120 17L124 13L128 17",
+    "f M50 33L150 33",
+  ],
+  kissmark: [
+    "c174,33,2.5",
+    "M150 26Q144 40 152 52",
+    "c123,36,5",
+    "f M44 38L150 36",
+    "c80,30,1.4",
+    "c96,26,1.2",
+    "c140,22,1.3",
+    "c66,34,1.2",
+  ],
+  minnow: ["c172,25,2.5", "M148 15Q142 26 150 38", "f M40 25L146 25"],
+};
+// Path data moved point by point (map([x, y]) gives the new point), as pencil runs.
+function padMovePath(d, map) {
+  return padPolylines(d)
+    .map((pl) => padPath(pl.map(map)) + (pl.closed ? "Z" : ""))
+    .join("");
+}
+// A traced fish as strokes: paper under it, its outline, then its details, `w` units long with its top left at
+// (x, y).
+function padFishStrokes(name, x, y, w) {
+  let F = PAD_FISH[name],
+    s = w / 200,
+    map = ([u, v]) => [x + u * s, y + v * s],
+    outline = padPath(padParsePts(F.p).map(map)) + "Z",
+    list = ["w" + outline, "p" + outline];
+  for (let dd of PAD_FISH_DETAIL[name] || []) {
+    if (dd[0] === "c") {
+      let [cx, cy, r] = dd.slice(1).split(",").map(Number);
+      list.push("p" + padEll(x + cx * s, y + cy * s, r * s, r * s));
+    } else if (dd.startsWith("f ")) list.push("f" + padMovePath(dd.slice(2), map));
+    else list.push("p" + padMovePath(dd, map));
+  }
+  return list;
+}
+// Strokes moved to a new place: map gives each point's new place, and words grow by k (the scale map applies).
+function padMoveStrokes(list, map, k) {
+  return list.map((raw) => {
+    let back = raw[0] === "_" ? "_" : "",
+      body = back ? raw.slice(1) : raw,
+      kind = body[0];
+    body = body.slice(1);
+    if ("pbfdrwT".includes(kind)) return back + kind + padMovePath(body, map);
+    if (kind !== "t") return raw;
+    let [head, words] = body.split("|"),
+      [x, y, size, flags = ""] = head.split(","),
+      [nx, ny] = map([Number(x), Number(y)]);
+    return `${back}t${padR1(nx)},${padR1(ny)},${padR1(Number(size) * k)},${flags}|${words}`;
+  });
+}
+// The box round a list of strokes (words measured roughly), so a reason can be fitted to its part of the row.
+function padStrokesBox(list) {
+  let x0 = 1e9,
+    y0 = 1e9,
+    x1 = -1e9,
+    y1 = -1e9,
+    grow = (x, y) => {
+      (x0 = Math.min(x0, x)), (y0 = Math.min(y0, y)), (x1 = Math.max(x1, x)), (y1 = Math.max(y1, y));
+    };
+  for (let raw of list) {
+    raw[0] === "_" && (raw = raw.slice(1));
+    let kind = raw[0],
+      body = raw.slice(1);
+    if ("pbfdrwT".includes(kind)) padPolylines(body).forEach((pl) => pl.forEach(([x, y]) => grow(x, y)));
+    else if (kind === "t") {
+      let [head, words] = body.split("|"),
+        [x, y, size, flags = ""] = head.split(","),
+        w = words.length * Number(size) * 0.46,
+        left = flags.includes("l") ? Number(x) : Number(x) - w / 2;
+      grow(left, Number(y) - Number(size) * 0.8), grow(left + w, Number(y) + Number(size) * 0.25);
+    }
+  }
+  return { x0, y0, x1, y1 };
+}
+// A row of teeth along a jaw from (x0, y0) to (x1, y1), n of them, pointing h to one side.
+function padTeeth(x0, y0, x1, y1, n, h) {
+  let dx = x1 - x0,
+    dy = y1 - y0,
+    L = Math.hypot(dx, dy),
+    nx = (-dy / L) * h,
+    ny = (dx / L) * h,
+    pts = [];
+  for (let i = 0; i <= n * 2; i++) {
+    let t = i / (n * 2),
+      x = x0 + dx * t,
+      y = y0 + dy * t;
+    pts.push(i % 2 ? [x + nx, y + ny] : [x, y]);
+  }
+  return padPath(pts);
+}
+function padSpiral(cx, cy, r0, sy, turns, ph, k = 0.8) {
+  let pts = [],
+    n = Math.round(turns * 30);
+  for (let i = 0; i <= n; i++) {
+    let t = i / n,
+      a = ph + t * turns * PAD_TAU,
+      r = r0 * (1 - t * k);
+    pts.push([cx + r * Math.cos(a), cy + r * sy * Math.sin(a)]);
+  }
+  return padPath(pts);
+}
+// A ring of fine scrapes: n short cuts round an oval at (cx, cy), r across, squashed to sy.
+function padScrapes(cx, cy, r, sy, n, seed, len = [1.6, 1.6]) {
+  let R = padRng(seed),
+    d = "";
+  for (let i = 0; i < n; i++) {
+    let a = (i / n) * PAD_TAU + R() * 0.1,
+      r0 = r + R() * r * 0.11,
+      l = len[0] + R() * len[1];
+    d += padPath([
+      [cx + Math.cos(a) * r0, cy + Math.sin(a) * r0 * sy],
+      [cx + Math.cos(a + 0.08) * (r0 + l), cy + Math.sin(a + 0.08) * (r0 + l) * sy],
+    ]);
+  }
+  return d;
+}
+const PAD_LU = {
+  vb: [0, 0, 400, 96],
+  fish: { cx: 74, cy: 48 },
+  why: { x0: 166, x1: 396, y0: 4, y1: 92 },
+  frameVb: [0, 0, 400, 70],
+  markVb: [0, 0, 120, 42],
+  art: {
+    reedjaw_pike: { name: "pike", w: 148 },
+    milkeye_perch: { name: "milkeye", w: 116 },
+    kissmark_trout: { name: "kissmark", w: 140 },
+    weeping_carp: { name: "carp", w: 108 },
+    bridgechain_sturgeon: { name: "sturgeon", w: 150 },
+  },
+};
+// Where a line-up fish sits in its row: its top left, width, height and scale.
+function padLineupFishAt(id) {
+  let art = PAD_LU.art[id],
+    s = art.w / 200,
+    h = PAD_FISH[art.name].h * s;
+  return { x: PAD_LU.fish.cx - art.w / 2, y: PAD_LU.fish.cy - h / 2, w: art.w, h, s };
+}
+// Why each fish could not be the thief, drawn large beside it once it is crossed out (before fitting).
+function padLineupReason(id, labels = {}) {
+  if (id === "reedjaw_pike")
+    // a jaw full of saw teeth; a line cut clean beside Hob's worn one
+    return [
+      "pM22 96L62 78Q72 74 80 76",
+      "pM22 98L58 108Q70 112 78 108",
+      "p" + padTeeth(30, 92.4, 76, 77.4, 7, 3.4),
+      "p" + padTeeth(30, 101, 74, 108.6, 7, -3.4),
+      "pM22 96Q12 92 6 84M22 98Q12 104 6 112",
+      "p" + padEll(18, 88, 1.4, 1.4),
+      "bM104 66L104 100",
+      "bM100.6 100.2L107.4 99.8",
+      "bM132 66L132 84",
+      ...padWornEnd((u, v) => [132 + v, u], 84, 100, 1.05, 77),
+      `t104,116,10|${labels.cut || ""}`,
+      `t132,116,10|${labels.hobs || ""}`,
+    ];
+  if (id === "milkeye_perch")
+    // a head with two long fangs, and the two holes they leave, a thumb apart
+    return [
+      "pM14 74Q42 64 62 76Q70 82 74 88L60 91.4",
+      "pM61 92.4Q58 106 44 109.4Q28 112 14 104",
+      "p" + padEll(52, 80, 3.4, 3.4),
+      "p" + padEll(52.6, 79.6, 1, 1),
+      "wM62.4 90.6L64.4 104L66.4 90.2Z",
+      "bM62.4 90.6L64.4 104L66.4 90.2",
+      "wM68.4 89.4L70.4 102.6L72.4 89Z",
+      "bM68.4 89.4L70.4 102.6L72.4 89",
+      "fM40 74Q34 90 42 104",
+      "b" + padEll(104, 82, 2.4, 2.4),
+      "b" + padEll(104, 100, 2.4, 2.4),
+      "fM111 82L115 82L115 100L111 100",
+      `t119,94.5,10,l|${labels.thumb || ""}`,
+    ];
+  if (id === "kissmark_trout")
+    // the ring of scrapes close up
+    return ["p" + padEll(60, 98, 18, 15), "p" + padScrapes(60, 98, 11, 0.8, 26, 5)];
+  if (id === "weeping_carp")
+    // soft lips pushed out like a tube, a worm and some weed
+    return [
+      "pM12 74Q44 66 64 80Q68 84 70 86L82 85L83 95L70 95Q52 110 12 108",
+      "p" + padEll(83, 90, 1.6, 4.8),
+      "p" + padEll(54, 82, 1.8, 1.8),
+      "fM40 74Q34 90 42 104",
+      "pM96 98Q100 92 104 98Q108 104 112 98Q116 92 120 98",
+      "pM138 112Q134 102 139 94Q143 86 138 76",
+      "pM148 112Q152 104 147 98Q143 92 148 84",
+      "fM139 96Q144 94 147 98M138 86Q133 84 131 88",
+    ];
+  // the Bridgechain Sturgeon: its long snout seen from below, a tiny mouth, and a snail
+  return [
+    "pM10 82Q48 84 96 90Q48 96 10 98",
+    "pM10 82Q4 90 10 98",
+    "p" + padEll(26, 90, 2.4, 3),
+    "fM38 86L38 94M44 87L44 93",
+    "fM72 84Q76 90 72 96",
+    "p" + padSpiral(128, 92, 8, 0.9, 2.2, 0, 0.85),
+    "pM120 98Q112 100 108 98Q110 94 116 94",
+    "fM108 98L104 94M109 97L105 99",
+  ];
+}
+// A crossed-out fish: the red line over it (and the Kissmark's scar ringed in red), then its reason, fitted large
+// into the right part of the row.
+function padLineupCrossing(id, labels) {
+  let f = padLineupFishAt(id),
+    list = [
+      "r" +
+        padPath([
+          [f.x + 2, f.y + f.h + 3],
+          [f.x + f.w, f.y - 3],
+        ]),
+    ];
+  id === "kissmark_trout" && list.push("r" + padEll(f.x + 123 * f.s, f.y + 36 * f.s, 7.5, 6.8));
+  let reason = padLineupReason(id, labels),
+    bb = padStrokesBox(reason),
+    slot = PAD_LU.why,
+    k = Math.min((slot.x1 - slot.x0) / (bb.x1 - bb.x0), (slot.y1 - slot.y0) / (bb.y1 - bb.y0), 2.6),
+    cx = (slot.x0 + slot.x1) / 2,
+    cy = (slot.y0 + slot.y1) / 2,
+    mx = (bb.x0 + bb.x1) / 2,
+    my = (bb.y0 + bb.y1) / 2;
+  return list.concat(padMoveStrokes(reason, ([x, y]) => [cx + (x - mx) * k, cy + (y - my) * k], k));
+}
+// A bite mark on a small fish, for the strip.
+function padMarkStrokes(mark) {
+  let fish = padFishStrokes("minnow", 10, 6, 100);
+  if (mark === "cuts")
+    return [...fish, "b" + padTeeth(46, 20, 66, 19, 4, 2.4), "b" + padTeeth(46, 28, 66, 27.6, 4, -2.4)];
+  if (mark === "holes") return [...fish, "b" + padEll(52, 18, 1.7, 1.7) + padEll(52, 30, 1.7, 1.7)];
+  return [...fish, "p" + padEll(56, 24, 8.6, 7.8), "p" + padScrapes(56, 24, 8.6, 0.9, 20, 12, [1.2, 1.4])];
+}
+// Sketch 3's panel. view.crossed and view.marks say what is drawn; `at` (seconds) draws the whole sketch in, or
+// `fresh` lists the crossings ("cross:<id>") and marks ("mark:<mark>") that draw in now over a still page.
+function padLineupPanel(text, view, at = null, fresh = []) {
+  let lu = text.lineup || {},
+    labels = lu.labels || {},
+    crossed = Sr(view.crossed),
+    marks = Sr(view.marks),
+    t = at,
+    // When the last fresh crossing ends: a line it rewrites (the frame's, a matched mark's) writes in then.
+    freshEnd = 0.6,
+    // The next start time for a part drawn in now: in turn for the whole sketch, all at once for fresh parts.
+    timeFor = (isNew) => (t != null ? t : isNew ? 0.6 : null),
+    advance = (sk) => t != null && (t = sk.end + 0.2),
+    cap = (cls, words, when) =>
+      `<p class="gw-pad-cap ${cls}${when == null ? " gw-pad-still" : ""}"${when == null ? "" : ` style="--d:${when.toFixed(2)}s"`}>${padEsc(words)}</p>`,
+    sketch = (id, vb, list, when, label, still) => {
+      // Drawn faster than the other sketches: the page has many small drawings.
+      let sk = padSketchSvg(id, vb, list, { sw: 1.25, amp: 0.45, label, at: when, speed: 3 });
+      return {
+        html: still ? sk.html.replace('class="gw-pad-sk', 'class="gw-pad-sk gw-pad-still') : sk.html,
+        end: sk.end,
+      };
+    },
+    html = cap("gw-pad-lu-head", lu.head || "", t);
+  t != null && (t += 0.6);
+  for (let id of Sr(wo.hunt.lineup)) {
+    let art = PAD_LU.art[id],
+      words = lu.fish?.[id] || {},
+      out = crossed.includes(id),
+      isNew = out && fresh.includes(`cross:${id}`),
+      fishWhen = t,
+      fish = sketch(
+        `lu-${art.name}`,
+        PAD_LU.vb,
+        padFishStrokes(art.name, padLineupFishAt(id).x, padLineupFishAt(id).y, art.w),
+        fishWhen,
+        words.name || "",
+        fishWhen == null,
+      );
+    advance(fish);
+    let mark = "",
+      why = "";
+    if (out) {
+      let when = timeFor(isNew),
+        x = sketch(
+          `lu-x-${art.name}`,
+          PAD_LU.vb,
+          padLineupCrossing(id, labels),
+          when,
+          lu.art?.out || "",
+          when == null,
+        );
+      advance(x), (mark = x.html), (why = cap("gw-pad-why", words.why || "", when == null ? null : x.end));
+      isNew && t == null && (freshEnd = Math.max(freshEnd, x.end));
+    }
+    html += `<figure class="gw-pad-lu-row${out ? " gw-out" : ""}" data-fish="${id}"><span class="gw-pad-lu-nm">${padEsc(words.name || "")}</span><div class="gw-pad-lu-box">${fish.html}${mark}</div>${why}</figure>`;
+  }
+  // The empty frame: its line changes once all five are crossed out.
+  let all = Sr(wo.hunt.lineup).every((id) => crossed.includes(id)),
+    frameWhen = t,
+    frame = sketch(
+      "lu-q",
+      PAD_LU.frameVb,
+      [
+        "p" +
+          padPath([
+            [52, 6],
+            [348, 4],
+            [350, 64],
+            [50, 66],
+            [52, 4],
+          ]),
+        "t200,54,50|?",
+      ],
+      frameWhen,
+      lu.art?.frame || "",
+      frameWhen == null,
+    );
+  advance(frame);
+  let lastNew = fresh.some((k) => k.startsWith("cross:")),
+    frameCapWhen = frameWhen != null ? frame.end : all && lastNew ? freshEnd : null;
+  html += `<figure class="gw-pad-lu-row gw-pad-lu-q" data-fish="?"><div class="gw-pad-lu-box">${frame.html}</div>${cap("gw-pad-why", all ? lu.none : lu.frame, frameCapWhen)}</figure>`;
+  // The marks strip, with no heading: each mark's own line says what it is, and what leaves it once matched.
+  let strip = "";
+  for (let k of CATCH_MARKS) {
+    if (!marks.includes(k)) continue;
+    let by = wo.hunt.marks.leftBy?.[k],
+      matched = !!by && crossed.includes(by),
+      words = (matched && lu.marks?.[k]?.match) || lu.marks?.[k]?.open || "",
+      isNew = fresh.includes(`mark:${k}`),
+      when = timeFor(isNew),
+      sk = sketch(`mk-${k}`, PAD_LU.markVb, padMarkStrokes(k), when, lu.art?.[k] || "", when == null);
+    advance(sk);
+    let rewritten = matched && fresh.includes(`cross:${by}`),
+      capWhen = when != null ? sk.end : rewritten ? freshEnd : null;
+    strip += `<figure class="gw-pad-mark" data-mark="${k}"><div class="gw-pad-box">${sk.html}</div>${cap("", words, capWhen)}</figure>`;
+  }
+  strip && (html += `<div class="gw-pad-marks">${strip}</div>`);
+  return `<div class="gw-pad-pnl gw-pad-lu">${html}</div>`;
+}
+// The five places: their pages, and how a drawn one is made (sketches 4 and 5 come in later steps).
 const PAD_PLACES = [
   { key: "map", n: 1, page: "where" },
   { key: "taken", n: 2, page: "where" },
@@ -164630,8 +165282,13 @@ const PAD_PLACES = [
   { key: "swirl", n: 4, page: "gear" },
   { key: "back", n: 5, page: "gear" },
 ];
-const padPageOf = (key) => PAD_PLACES.find((p) => p.key === key)?.page || "where";
-function padPanels(key, text, at, view = {}) {
+// The page a sketch is on; a line-up crossing or a bite mark ("cross:..." or "mark:...") is on the line-up's.
+const padPageOf = (key) =>
+  /^(cross|mark):/.test(key) ? "suspects" : PAD_PLACES.find((p) => p.key === key)?.page || "where";
+// A drawn sketch's panels. `at` draws it all in from that time; `fresh` lists the parts of the line-up that draw
+// in now on a page already drawn.
+function padPanels(key, text, at, view = {}, fresh = []) {
+  if (key === "lineup") return padLineupPanel(text, view, at, fresh);
   if (key === "taken") {
     let spot = view.foundAt || { x: -4, z: -14 },
       sk = padSketchSvg("s2-0", [-37, -52, 68, 49], padTakenAtMidnight(text.labels || {}, spot.x, spot.z), {
@@ -164683,7 +165340,9 @@ function notepadElement(h, text, view, { page = "where", animate = [], intro = !
     pages = text.pages || {},
     fig = (place) => {
       let drawn = view.sketches?.[place.key] > 0,
-        panels = drawn ? padPanels(place.key, text, animate.includes(place.key) ? 0.6 : null, view) : null;
+        panels = drawn
+          ? padPanels(place.key, text, animate.includes(place.key) ? 0.6 : null, view, animate)
+          : null;
       return `<figure class="gw-pad-fig${panels ? "" : " gw-pad-blank"}" data-sketch="${place.key}"${panels ? ' data-drawn="1"' : ""}><div class="gw-pad-fig-h"><span class="n">${place.n}</span>${padEsc(titles[place.key] || "")}</div><div class="gw-pad-panels">${panels || `<p class="gw-pad-none">${padEsc(text.blank || "")}</p>`}</div></figure>`;
     };
   el.dataset.loop = "notepad";
@@ -164734,6 +165393,7 @@ function tallyHuntBlock(h, text, beat, now) {
     (el.dataset.loop = "tallyhunt"),
     beat.tale && (add("gw-tally-tale", text.tale), add("gw-murk-line gw-in", text.murk?.tale)),
     beat.murk && add("gw-murk-line gw-in", text.murk?.[beat.murk]),
+    beat.lineup && add("gw-murk-line gw-in", text.murk?.lineup),
     el
   );
 }
@@ -164780,6 +165440,21 @@ const NOTEPAD_CSS = `
 .gw-pad-sk .tape { fill: rgba(232, 214, 160, .62); stroke: rgba(140, 116, 70, .35); stroke-width: .3; }
 .gw-pad-sk text { font-family: var(--f-hand); fill: rgb(48, 41, 56); }
 .gw-pad-sk text.f { opacity: .7; }
+.gw-pad-sk .pl.r { stroke: rgb(150, 58, 42); opacity: .88; }
+.gw-pad-sk .pl.rg { stroke: rgb(150, 58, 42); opacity: .3; }
+/* sketch 3, the line-up: one fish to a row, its reason drawn over the right part once it is crossed out */
+.gw-pad-lu-head { margin: 0 6px 6px; font-size: 20px; }
+.gw-pad-lu-row { margin: 0; padding: 6px 0 8px; border-top: 1px dashed rgba(38, 29, 44, .18); }
+.gw-pad-lu-nm { display: block; margin: 0 0 0 4px; font: 400 15px/1.15 var(--f-fell); letter-spacing: .04em; color: rgb(38, 29, 44); }
+.gw-pad-lu-row.gw-out .gw-pad-lu-nm { color: rgba(38, 29, 44, .62); }
+.gw-pad-lu-box { position: relative; }
+.gw-pad-lu-box > .gw-pad-sk + .gw-pad-sk { position: absolute; left: 0; top: 0; }
+.gw-pad-cap.gw-pad-why { margin: 0 4px; font-size: 18.5px; line-height: 1.2; transform: rotate(-.5deg); }
+.gw-pad-marks { margin-top: 2px; padding-top: 4px; border-top: 1.5px solid rgba(38, 29, 44, .3); }
+.gw-pad-mark { margin: 0; display: grid; grid-template-columns: 34% 1fr; align-items: center; gap: 0 10px; padding: 3px 0; }
+.gw-pad-mark .gw-pad-cap { margin: 0; text-align: left; font-size: 18px; line-height: 1.18; transform: rotate(-.5deg); }
+/* parts of a page already drawn stay still while something new draws in beside them */
+.gw-pad-anim .gw-pad-still :is(.pl, .pp, .tape, text), .gw-pad-anim .gw-pad-cap.gw-pad-still { animation: none; }
 /* drawing in: each stroke after the one before, its words wiped in after it */
 .gw-pad-anim .pl { stroke-dasharray: 1 2; animation: gwPadDraw var(--t, .3s) ease-out var(--d, 0s) both; }
 .gw-pad-anim .pp, .gw-pad-anim .tape { animation: gwPadShow .3s ease-out var(--d, 0s) both; }
@@ -164848,6 +165523,11 @@ function huntView(K) {
       found.onLead || say(words.spareFloat);
       say(text().drawn);
       (state.liftDue = !0), (state.corkDue = !0);
+    });
+    // A line-up fish crossed out (its reason) or a bite mark seen for the first time, drawn into sketch 3.
+    t.bus?.on?.("hunt:noted", (noted = {}) => {
+      noted.crossed && say(text().pad?.lineup?.fish?.[noted.crossed]?.why);
+      say(text().drawn);
     });
     t.bus?.on?.("place:lift", (lift = {}) => {
       if (lift.placeId !== HER_WATER.place || lift.phase !== "end" || !state.corkDue) return;
@@ -165725,10 +166405,14 @@ function WV(e) {
       giftText = f().depth || {},
       liveText = f().live || {},
       // A leader or the Turnback Hook put on Murk's shelf (wo.arrivals): its name and his line. "gutOnly" is the
-      // leaders' tally after Pike Wire came alone.
+      // leaders' tally after Pike Wire came alone; "hookHunt" the hook's once the ring of scrapes has been seen.
       arrivalText = f().arrivals || {},
       gutOnly = gift === "leaders" && qt.tally?.giftSay === "gutOnly",
-      arrivalKey = gutOnly ? "gutOnly" : gift,
+      arrivalKey = gutOnly
+        ? "gutOnly"
+        : gift === "turnback_hook" && qt.tally?.giftSay === "hunt"
+          ? "hookHunt"
+          : gift,
       giftShown =
         gift === "minnow_tin"
           ? { name: liveText.tin, line: liveText.gift?.[qt.tally?.giftSay] || liveText.gift?.plain, fit: "" }
@@ -169944,6 +170628,7 @@ function YV(e) {
           e.report("fishart", Qt);
         }
         no.appendChild(pi),
+          qe && catchCardMark(no, we, t, d().TEXT_LOOP?.hunt),
           fpe(fn, Jt),
           fn.querySelector("[data-room]")?.addEventListener("click", () => {
             (zt.room = !zt.room), p("ui_click"), st.render();
