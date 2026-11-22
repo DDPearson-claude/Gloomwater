@@ -31021,8 +31021,9 @@ var O5 = {
     {
       id: "nightbloom_carp",
       name: "Nightbloom Carp",
-      journal: "By day it is just a carp, and a little embarrassed about it.",
-      haunt: "Deep water at night. Sign: amber points opening below the float.",
+      journal:
+        "A plum-coloured carp. At night its scales shine amber in the lamplight. By day it is just a carp, and a little embarrassed about it.",
+      haunt: "It bites only at night, and it likes the lily pads best.",
       play: "Sinker. Bores down on its weight and stays there. Tests the line.",
       sizeModel: { L50: 73.4, sigma: 0.14 },
       hours: "night",
@@ -41508,8 +41509,8 @@ var Nf = [
         eyes: "normal",
         scale: 1.2,
       },
-      hint: "Anywhere in the Pools, but only at night, when its scales open.",
-      lore: "A plum carp whose scales open at night like amber spore-lamps. By day it is just a carp, and a little embarrassed about it.",
+      hint: "It bites only at night, and it likes the lily pads best.",
+      lore: "A plum-coloured carp. At night its scales shine amber in the lamplight. By day it is just a carp, and a little embarrassed about it.",
     },
     mi(
       "mildew_angler",
@@ -168934,40 +168935,16 @@ function YV(e) {
           st.insertAdjacentHTML("beforeend", '<div class="gw-group">Fishing</div>'),
           S())
         ) {
-          let U = n("div", "gw-set-row");
-          U.innerHTML =
-            '<span class="gw-set-label">Strike ring<small>A thin ring that closes on the float while a bite is live</small></span>';
-          let ue = n("div", "gw-seg"),
-            Oe = i(d().AUTOFISH?.strike?.ring?.options).length
-              ? d().AUTOFISH.strike.ring.options
-              : ["always", "firstExpedition", "never"],
-            ut = Oe.includes(Ce.strikeRing)
-              ? Ce.strikeRing
-              : d().AUTOFISH?.strike?.ring?.default || "firstExpedition";
-          for (let Ot of Oe) {
-            let Yt = n(
-              "button",
-              `gw-seg-b${ut === Ot ? " gw-on" : ""}`,
-              Ot === "firstExpedition" ? (we ? o(we.ringFirst) : "First outing") : mp(Ot),
-            );
-            (Yt.type = "button"),
-              Yt.addEventListener("click", () => {
-                (Ce.strikeRing = Ot), p("ui_click"), Mt(), te.render();
-              }),
-              ue.appendChild(Yt);
-          }
-          U.appendChild(ue),
-            st.appendChild(U),
-            st.appendChild(
-              Ut(
-                "hurry",
-                "Hold to hurry",
-                !0,
-                we
-                  ? we.hurry
-                  : "From your second outing, hold anywhere to hurry a small fish in. It never changes the outcome",
-              ),
-            );
+          st.appendChild(
+            Ut(
+              "hurry",
+              "Hold to hurry",
+              !0,
+              we
+                ? we.hurry
+                : "From your second outing, hold anywhere to hurry a small fish in. It never changes the outcome",
+            ),
+          );
         } else
           st.appendChild(Ut("reelToggle", "Tap to reel", !1, "Tap once to start reeling, tap again to ease"));
         d().V3_ENABLED &&
