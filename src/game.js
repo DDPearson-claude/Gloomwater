@@ -30779,8 +30779,10 @@ var O5 = {
     {
       id: "dusk_minnow",
       name: "Dusk Minnow",
-      journal: "Caught on a scrap of silver paper. It still thinks that was a fair trade.",
-      haunt: "Shallow open water, in shoals. Sign: a patch of small rise rings.",
+      journal:
+        "Small and silver, they swim in big shoals just under the top. They snap up any fly that lands on the water.",
+      haunt:
+        "They bite at any hour, along the shallow edges and in the reeds, most of all at dusk. Mire Worms suit them best.",
       play: "Darter. A two-second flick with no runs. Lost only as a spat hook.",
       sizeModel: { L50: 21.2, sigma: 0.1 },
       hours: "any",
@@ -30796,8 +30798,10 @@ var O5 = {
     {
       id: "mossback_perch",
       name: "Mossback Perch",
-      journal: "Wears a small garden on its back and takes the worm anyway.",
-      haunt: "Mid to deep water by stones and piers. Sign: slow single rings.",
+      journal:
+        "Its back is green as moss, with dark stripes and a spiky fin. It hunts small fish in groups, but it never says no to a worm.",
+      haunt:
+        "It bites at any hour, by stones and where the shallows end. Mire Worms and the Bone Jig suit it best.",
       play: "Steady. One short run, then it comes. Raises its spines at the reveal.",
       sizeModel: { L50: 28.3, sigma: 0.1 },
       hours: "any",
@@ -30814,7 +30818,8 @@ var O5 = {
       id: "likely_chub",
       name: "Likely Chub",
       journal: "It looks like a chub. Nobody has checked.",
-      haunt: "Shallows under overhanging stone and reeds. Sign: a soft kiss on the surface.",
+      haunt:
+        "It bites by day and at dusk, by stones and reeds and at the Sluice Veil. The Feather Fly suits it best.",
       play: "Darter. One bolt for cover at the take, then steady. Often spat at the raft.",
       sizeModel: { L50: 37.7, sigma: 0.1 },
       hours: "day, dusk",
@@ -30830,8 +30835,8 @@ var O5 = {
     {
       id: "overbold_bass",
       name: "Overbold Bass",
-      journal: "Attacks lures its own size. It has never once won.",
-      haunt: "Rocky shallows and drop-offs. Sign: a sharp strike splash.",
+      journal: "It attacks lures its own size. It has never once won.",
+      haunt: "It bites by day and at dusk, by stones and where the shallows end. The Bone Jig suits it best.",
       play: "Leaper. Jumps on the first run and shakes its head. Thrown hooks on the leap.",
       sizeModel: { L50: 32.5, sigma: 0.1 },
       hours: "day, dusk",
@@ -30847,8 +30852,9 @@ var O5 = {
     {
       id: "rustfin_sucker",
       name: "Rustfin Sucker",
-      journal: "Kisses every stone on the bottom, in case one of them is home.",
-      haunt: "Stony bottom where water moves under the Span. Sign: a bubble trail.",
+      journal: "Its soft lips point down. It kisses every stone on the bottom, in case one of them is home.",
+      haunt:
+        "It bites at any hour, most of all at the Sluice Veil, where the water runs in. Mire Worms suit it best.",
       play: "Steady. Heavy and slow, no runs. Slides off at the raft: lost as a spat hook.",
       sizeModel: { L50: 37.7, sigma: 0.1, body: "sucker" },
       hours: "any",
@@ -30864,9 +30870,10 @@ var O5 = {
     {
       id: "milkeye_perch",
       name: "Milkeye Perch",
-      journal: "Eyes like two spilt saucers of milk. It sees you perfectly well.",
+      journal:
+        "Its eyes look like milk, but they are made for seeing in the dark. It sees you perfectly well.",
       haunt:
-        "Deep murky water by day, the shallows after dark. Sign: two pale eye-points; nervous water at dusk.",
+        "It bites only at dusk and at night, where the shallows end. After dark it hunts the shallow edges too. Cut Strip and the Bone Jig suit it best.",
       play: "Darter. Quick stabbing take, short head-shaking surges. A pack fish: bites come in threes.",
       sizeModel: { L50: 52.6, sigma: 0.12, body: "slimperch" },
       hours: "dusk, night",
@@ -30882,8 +30889,10 @@ var O5 = {
     {
       id: "weeping_carp",
       name: "Weeping Carp",
-      journal: "They have never once said they were not mourning.",
-      haunt: "Deep, soft bottom. Sign: a trail of bubbles and stirred silt.",
+      journal:
+        "Dark streaks run from its eyes like tears. It roots in the soft mud for worms. It has never once said it was not mourning.",
+      haunt:
+        "It bites at any hour, along the shallow edges, in the reeds and on the lily pads. Lumen Moss suits it best.",
       play: "Sinker. Bores down and holds; one slow heavy run. Tests the line.",
       sizeModel: { L50: 52.6, sigma: 0.12 },
       hours: "any",
@@ -30899,8 +30908,10 @@ var O5 = {
     {
       id: "reedjaw_pike",
       name: "Reedjaw Pike",
-      journal: "Lies in the reeds until it forgets it is not one.",
-      haunt: "Reed edges and drowned timber, mid to deep. Sign: nervous water, then a strike splash.",
+      journal:
+        "Its stripes match the reeds it hides in. It waits so still and so long that it forgets it is not a reed. Then a small fish swims by.",
+      haunt:
+        "It bites at any hour, in the reeds and on the lily pads, most of all by day. Cut Strip and the Glimmer Spoon suit it best.",
       play: "Thrasher. Lunging take, head-shakes on top, short savage runs. Small ones throw the hook.",
       sizeModel: { L50: 61.2, sigma: 0.14 },
       hours: "any",
@@ -30916,8 +30927,10 @@ var O5 = {
     {
       id: "kissmark_trout",
       name: "Kissmark Trout",
-      journal: "Star-spotted, and wearing one round scar where something let go.",
-      haunt: "The deepest open water. Sign: none on top; a long slow drag-under.",
+      journal:
+        "It is a spotted trout that grows large by eating other fish. It wears one round scar where something let go.",
+      haunt:
+        "It bites at any hour, in deep open water and at the Sluice Veil. The Glimmer Spoon suits it best.",
       play: "Sinker. Dives straight down and circles deep in steady surges. Can straighten a hook: spat.",
       sizeModel: { L50: 65.7, sigma: 0.12 },
       hours: "any",
@@ -30933,9 +30946,10 @@ var O5 = {
     {
       id: "thousandcast_pike",
       name: "Thousandcast Pike",
-      journal: "Follows the lure to the raft, looks at you, and leaves. Ten thousand times.",
+      journal:
+        "It follows the lure to the raft, looks at you, and leaves. It has done this ten thousand times.",
       haunt:
-        "Old water under the Span, beside one drowned rock. Sign: a long shadow that follows the float and turns away.",
+        "It lives only Under the Span, and bites most at dusk and at night. The Harbour-Bell Spinner suits it best.",
       play: "Thrasher. Follows and turns away before it ever bites. Slamming take, two leaps with head-shakes, a run under the raft.",
       sizeModel: { L50: 69.4, sigma: 0.16 },
       hours: "dusk",
@@ -30951,9 +30965,10 @@ var O5 = {
     {
       id: "hullkiss_lamprey",
       name: "Hullkiss Lamprey",
-      journal: "It only wants to hold on to something. Anything. You will do.",
+      journal:
+        "It has no jaws, only a round mouth ringed with teeth. It just wants to hold on to something, and you will do.",
       haunt:
-        "Night water at the Buoy Lights, on the lit buoys and under the hull. Sign: seven lavender points in a row.",
+        "It lives only at the Buoy Lights, and bites only at night. The Harbour-Bell Spinner suits it best.",
       play: "Sulker. No runs: it latches and hangs as dead weight through long holds, then lets go all at once. Spat.",
       sizeModel: { L50: 70.2, sigma: 0.16 },
       hours: "night",
@@ -30969,8 +30984,10 @@ var O5 = {
     {
       id: "rosefleck_trout",
       name: "Rosefleck Trout",
-      journal: "Blunt-nosed and rose-flecked, like something pressed in a book.",
-      haunt: "Fast clear water at the foot of the Stilled Cascade. Sign: a rise ring in the current.",
+      journal:
+        "Its sides are flecked with rose, like flowers pressed in a book. It lives in cold, clear running water.",
+      haunt:
+        "It bites in Veilback Brook at any hour, and at the Sluice Veil by day and at dusk. The Feather Fly suits it best.",
       play: "Darter. Uses the fast water: short downstream bursts, then steady.",
       sizeModel: { L50: 43.8, sigma: 0.12 },
       hours: "day, dusk",
@@ -30986,8 +31003,9 @@ var O5 = {
     {
       id: "rainglass_darter",
       name: "Rainglass Darter",
-      journal: "Carries the last rain on its sail and will not let it dry.",
-      haunt: "The Stilled Cascade: fast shallow water. Sign: a sail tip cutting the surface.",
+      journal:
+        "It is speckled like rain on glass. It sits still on the stones in fast water, then darts off in a blink.",
+      haunt: "Only in Veilback Brook, by day and at dusk. The Feather Fly suits it best.",
       play: "Darter. Raises the sail across the current and kites. Light, quick, often thrown.",
       sizeModel: { L50: 31, sigma: 0.14 },
       hours: "day, dusk",
@@ -33791,7 +33809,7 @@ var Ms = [
         eyes: "normal",
         scale: 0.45,
       },
-      lore: "They school beneath the raft like thrown pennies, each one wishing for nothing at all.",
+      lore: "Small and silver, they swim in big shoals just under the top. They snap up any fly that lands on the water.",
     },
     {
       id: "mossback_perch",
@@ -33818,7 +33836,7 @@ var Ms = [
         eyes: "normal",
         scale: 0.8,
       },
-      lore: "Moss takes root on its back by its third winter. By its tenth, it is mostly a small, slow garden.",
+      lore: "Its back is green as moss, with dark stripes and a spiky fin. It hunts small fish in groups, but it never says no to a worm.",
     },
     {
       id: "gutter_crayfish",
@@ -33845,7 +33863,7 @@ var Ms = [
         eyes: "normal",
         scale: 0.6,
       },
-      lore: "It hoards drowned buttons in its burrow. No one knows whose coat it is trying to finish.",
+      lore: "It hides under the stones by day. At night it walks the bottom and grabs nearly anything, even a drowned button.",
     },
     {
       id: "weeping_carp",
@@ -33872,7 +33890,7 @@ var Ms = [
         eyes: "normal",
         scale: 1.15,
       },
-      lore: "Old fishers swore the carp were mourning. The carp have never once said otherwise.",
+      lore: "Dark streaks run from its eyes like tears. It roots in the soft mud for worms. It has never once said it was not mourning.",
     },
     {
       id: "candlefin_koi",
@@ -33899,7 +33917,7 @@ var Ms = [
         eyes: "normal",
         scale: 1,
       },
-      lore: "Its fins burn without heat. More than one Wick has mistaken it for kin, and leaned too far.",
+      lore: "Its long fins are the colour of candle flame. It was bred for a garden pond, and it still swims up to see what you brought.",
     },
     {
       id: "reedjaw_pike",
@@ -33926,7 +33944,7 @@ var Ms = [
         eyes: "normal",
         scale: 1.3,
       },
-      lore: "It lies among the drowned reeds until it forgets it is not one. Then something swims by.",
+      lore: "Its stripes match the reeds it hides in. It waits so still and so long that it forgets it is not a reed. Then a small fish swims by.",
     },
     {
       id: "gloam_eel",
@@ -33953,8 +33971,8 @@ var Ms = [
         eyes: "glow",
         scale: 1.25,
       },
-      hint: "Rises with the Gloomtide, in deep water. Drawn to the glow of Lumen Moss.",
-      lore: "It rises only when the Gloom does. Some say it is the Gloom, slowly learning to be a fish.",
+      hint: "It bites only at the Buoy Lights at night, and only on Lumen Moss.",
+      lore: "A long black eel with pale violet spots. It hunts at night and hides by day.",
     },
     {
       id: "belled_matriarch",
@@ -39768,8 +39786,8 @@ var IS = {
         eyes: "normal",
         scale: 0.6,
       },
-      hint: "Under the Stilled Cascade, while the light lasts.",
-      lore: "Rain that fell into the cascade the moment it froze, and decided to stay.",
+      hint: "Only in Veilback Brook, by day and at dusk. The Feather Fly suits it best.",
+      lore: "It is speckled like rain on glass. It sits still on the stones in fast water, then darts off in a blink.",
     },
     {
       id: "the_clapper",
@@ -41218,7 +41236,7 @@ var Nf = [
       { size: Ga(22, 0.12, "minnow"), family: "insect", prefers: "drip", phase: 1, src: "v1" },
       {
         model: { fin: 9063226, pattern: "scales" },
-        lore: "They school beneath the raft like thrown pennies, pewter flecked with rust, each one wishing for nothing at all.",
+        lore: "Small and silver, they swim in big shoals just under the top. They snap up any fly that lands on the water.",
       },
     ),
     mi(
@@ -41226,7 +41244,7 @@ var Nf = [
       { size: Ga(36, 0.13, "perch"), family: "bottom", prefers: "hush", phase: 1, src: "v1" },
       {
         model: { body: 5791334, fin: 9063226 },
-        lore: "A pale lichen tuft takes root on its back by its third winter, and blooms a little more every year it is not caught.",
+        lore: "Its back is green as moss, with dark stripes and a spiky fin. It hunts small fish in groups, but it never says no to a worm.",
       },
     ),
     mi("gutter_crayfish", {
@@ -41267,14 +41285,14 @@ var Nf = [
         scale: 0.5,
         mouth: "up",
       },
-      hint: "Only at night, in the shallows. It rises to your own lantern.",
-      lore: "Two moth-wing spots on its flanks, an upturned mouth, and a weakness for lanterns. It drinks the light off the water like milk.",
+      hint: "It bites only at night, on the lily pads and along the shallow edges. The Feather Fly suits it best.",
+      lore: "Its mouth turns up, made for sipping flies off the top. It eats water weed as well, which few fish do.",
     },
     mi(
       "weeping_carp",
       { size: Ga(56, 0.16, "carp"), family: "bottom", prefers: "drip", phase: 1, src: "v1" },
       {
-        lore: "Pewter and ivory, streaked as if with tears. The oldest trail barbels like mourning ribbons. They have never once said they were not mourning.",
+        lore: "Dark streaks run from its eyes like tears. It roots in the soft mud for worms. It has never once said it was not mourning.",
       },
     ),
     mi("candlefin_koi", {
@@ -41290,7 +41308,7 @@ var Nf = [
       { size: Ga(70, 0.15, "pike"), family: "predator", prefers: "mist", phase: 1, src: "v1", reference: !0 },
       {
         model: { body: 4082268, fin: 1843760, pattern: "stripes" },
-        lore: "Slate-blue, barred like reeds in ink. It lies among the drowned reeds until it forgets it is not one. The old ones carry pale scars from everyone who almost had them.",
+        lore: "Its stripes match the reeds it hides in. It waits so still and so long that it forgets it is not a reed. Then a small fish swims by.",
       },
     ),
     mi(
@@ -41305,8 +41323,8 @@ var Nf = [
       },
       {
         model: { body: 1446954, glow: 12167423 },
-        hint: "Rises at night, in deep water. Drawn to the glow of Lumen Moss, and to the drowned buoy-lights.",
-        lore: "An ink eel strung with moon-violet lights. It rises only when the Gloom does. Some say it is the Gloom, slowly learning to be a fish.",
+        hint: "It bites only at the Buoy Lights at night, and only on Lumen Moss.",
+        lore: "A long black eel with pale violet spots. It hunts at night and hides by day.",
       },
     ),
     {
@@ -41412,8 +41430,8 @@ var Nf = [
         eyes: "normal",
         scale: 1.3,
       },
-      hint: "Under the broken bridge, but only when the water goes still as a mirror.",
-      lore: "Rust scutes run down its back like the links of the chain that held the bridge. The Mossmere's longest fish, and it knows it.",
+      hint: "It lives only Under the Span, and bites at any hour. Mire Worms and Cut Strip suit it best.",
+      lore: "Bony plates run down its back like the links of the old bridge chain. It has a small mouth under its snout, and noses along the bottom for snails and worms.",
     },
     mi(
       "belled_matriarch",
