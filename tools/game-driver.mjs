@@ -19,6 +19,8 @@ export const SAVE_KEY = "gloomwater.save.v1";
 // On a busy machine the game runs slowly and the fixed time limits fail tests that are only slow. Set GW_SLOW=2
 // (or more) to stretch every time limit by that factor; it changes no check.
 export const SLOW = Math.max(1, Number(process.env.GW_SLOW) || 1);
+// The button of Murk's speech box while it is up ("Next" on each page, "Got it" on the last).
+export const MURK_BOX_BUTTON = '.gw-modal.gw-in[data-modal="murktalk"] .gw-speech-ok';
 
 // Small viewport: Chromium renders WebGL on the CPU here (SwiftShader), and every frame costs.
 const VIEWPORT = { width: 480, height: 270 };
@@ -129,10 +131,17 @@ export class GameSession {
   }
 
   // Clicks the first visible button whose text (whitespace collapsed) matches; returns its text or null.
+  // While Murk's speech box is up (over his tally or the jetty), a press meant to get past a box ("Got it" or
+  // "Sold") presses the box's own button instead: "Next" on each page, "Got it" on the last.
   clickButton(re) {
     return this.eval(
-      ([source, flags]) => {
+      ([source, flags, murkButton]) => {
         const want = new RegExp(source, flags);
+        const murk = document.querySelector(murkButton);
+        if (murk && (want.test("Got it") || want.test("Sold"))) {
+          murk.click();
+          return murk.textContent.trim();
+        }
         const b = [...document.querySelectorAll("button")].find(
           (el) =>
             el.getBoundingClientRect().width > 0 && want.test(el.textContent.trim().replace(/\s+/g, " ")),
@@ -141,7 +150,7 @@ export class GameSession {
         b.click();
         return b.textContent.trim().replace(/\s+/g, " ");
       },
-      [re.source, re.flags],
+      [re.source, re.flags, MURK_BOX_BUTTON],
     );
   }
 
@@ -184,7 +193,7 @@ export class GameSession {
     let chartWaits = 0;
     while (Date.now() < end) {
       const act = await this.eval(
-        ([wickLabel, waterId]) => {
+        ([wickLabel, waterId, murkButton]) => {
           const button = (text) =>
             [...document.querySelectorAll("button")].find(
               (b) =>
@@ -206,6 +215,8 @@ export class GameSession {
             const skip = document.querySelector(".gw-intro-skip");
             return skip ? (skip.click(), "skip intro") : "wait";
           }
+          const murk = document.querySelector(murkButton);
+          if (murk) return murk.click(), "hear Murk";
           if (button("Got it")) return button("Got it").click(), "close guide";
           if (button("Sold")) return button("Sold").click(), "close tally";
           if (button("Tow")) return button("Tow").click(), "agree to the tow"; // the barge to another water
@@ -222,7 +233,7 @@ export class GameSession {
             return button("Chart").click(), "open chart";
           return "wait";
         },
-        [wick, picked ? null : water],
+        [wick, picked ? null : water, MURK_BOX_BUTTON],
       );
       if (act.startsWith("pick ")) picked = true;
       if (act === "key:Enter") await this.page.keyboard.press("Enter");

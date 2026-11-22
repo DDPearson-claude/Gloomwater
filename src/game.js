@@ -49166,6 +49166,8 @@ Ca.murk.at = {
     away: "Lost a big one? Rootthread holds them.",
   },
 };
+// Murk's speech box, the same box Hob talks in: his name on its tag, and the words of Hob's two buttons.
+Ca.murkTalk = { tag: "Murk", next: "Next", ok: "Got it" };
 // The leaving card before a first tow. Each lake keeps its own kit and purse, and only the monster's item and
 // your finds travel (decisions.md "Between lakes").
 Ca.leave = {
@@ -109359,6 +109361,12 @@ function CF(e) {
     let H = p();
     !Ln(H?.lastTrip) || H.lastTrip.id !== ze || H.lastTrip.seen === !0 || ((H.lastTrip.seen = !0), i());
   }
+  // Murk's box has spoken this tally's lines: a reload shows the card again, but not his box. (An older save's
+  // tally has no mark, so it is spoken once more at most.)
+  function markTallySpoken(ze) {
+    let H = p();
+    !Ln(H?.lastTrip) || H.lastTrip.id !== ze || H.lastTrip.spoken === !0 || ((H.lastTrip.spoken = !0), i());
+  }
   let Ne = [],
     Xe = ["tackle", "raft", "bait", "maps", "home"];
   function lt() {
@@ -110474,6 +110482,7 @@ function CF(e) {
     endTrip: ee,
     lastTrip: pe,
     markTallySeen: J,
+    markTallySpoken,
     shelf: lt,
     goal: Ze,
     buy: xe,
@@ -168765,19 +168774,78 @@ const NOTEPAD_CSS = `
 /* the one press that closes it stays in reach at the foot of the screen */
 .gw-pad-close { position: sticky; bottom: calc(var(--sab, 0px) + 10px); z-index: 5; display: block; margin: 16px auto 0; min-width: 160px; min-height: 48px;
   border-radius: 999px; background: rgba(10, 12, 25, .9); box-shadow: 0 6px 18px rgba(4, 5, 12, .6); }
-.gw-m-hob .gw-modal-body { position: static; }
-.gw-hob-box { position: absolute; left: 50%; bottom: calc(var(--sab, 0px) + 28px); transform: translateX(-50%); box-sizing: border-box; width: min(400px, calc(100vw - 32px)); padding: 14px 20px 10px;
+.gw-journal-pad { padding: 14px 16px 24px; }
+`;
+// The speech box (Hob's look, shared with Murk). While Murk speaks at the jetty, the jetty's own copy of his line
+// steps back, so his words are not on screen twice; it is there again when he is done.
+const SPEECH_CSS = `
+.gw-m-hob .gw-modal-body, .gw-m-murktalk .gw-modal-body { position: static; }
+.gw-speech { position: absolute; left: 50%; bottom: calc(var(--sab, 0px) + 28px); transform: translateX(-50%); box-sizing: border-box; width: min(400px, calc(100vw - 32px)); padding: 14px 20px 10px;
   border-radius: 14px; color: var(--ink); text-align: left; pointer-events: auto;
   background: radial-gradient(120% 90% at 0% 0%, rgba(120, 96, 60, .3), rgba(120, 96, 60, 0) 60%), rgb(19, 22, 50);
   box-shadow: 0 12px 36px rgba(4, 5, 12, .72), 0 0 42px rgba(232, 190, 119, .14); }
-.gw-hob-tag { display: flex; align-items: center; gap: 6px; font: 400 13px/1 var(--f-display); letter-spacing: .24em; text-transform: uppercase; color: var(--gold, #e8be77); }
-.gw-hob-tag .gw-ico { width: 15px; height: 15px; }
-.gw-hob-text { margin: 9px 0 8px; font: italic 400 18px/1.42 var(--f-body); color: var(--ink); text-wrap: pretty; }
-.gw-hob-foot { display: flex; justify-content: flex-end; }
-.gw-hob-ok { min-height: 44px; padding: 0 22px; border: 0; border-radius: 999px; cursor: pointer; background: rgba(126, 129, 180, .26); color: var(--ink-hi, #fff);
+.gw-speech-tag { display: flex; align-items: center; gap: 6px; font: 400 13px/1 var(--f-display); letter-spacing: .24em; text-transform: uppercase; color: var(--gold, #e8be77); }
+.gw-speech-tag .gw-ico { width: 15px; height: 15px; }
+.gw-speech-text { margin: 9px 0 8px; font: italic 400 18px/1.42 var(--f-body); color: var(--ink); text-wrap: pretty; }
+.gw-speech-foot { display: flex; justify-content: flex-end; }
+.gw-speech-ok { min-height: 44px; padding: 0 22px; border: 0; border-radius: 999px; cursor: pointer; background: rgba(126, 129, 180, .26); color: var(--ink-hi, #fff);
   font: 400 16px/1 var(--f-display); letter-spacing: .16em; text-transform: uppercase; }
-.gw-journal-pad { padding: 14px 16px 24px; }
+.gw-m-jetty:has(~ .gw-m-murktalk.gw-in) :is(.gw-jetty-say, .gw-jetty-goal) { visibility: hidden; }
 `;
+// One speech box for the people who talk to the player: Hob on his rock, and Murk at the tally and at the jetty.
+// It shows the speaker's name tag and icon, one line a page, and a button that says `next`, then `ok` on the last
+// page. `id` is the box's modal; `kind` ("hob", "murk") also names its parts (gw-hob-text and so on), so each
+// man's box can be told apart. Enter, Space and the button go on a page. `escape`: "end" closes the whole talk
+// (Hob's box, as it always has), "page" goes on a page like the button (Murk's). Returns whether it opened.
+function openSpeechBox(K, { id, kind, tag, icon, pages, next, ok, escape = "end", onDone = null }) {
+  let lines = (Array.isArray(pages) ? pages : []).filter(Boolean);
+  if (!lines.length || typeof K?.openModal != "function") return !1;
+  if (typeof document < "u" && !document.getElementById("gw-speech-css")) {
+    let style = document.createElement("style");
+    (style.id = "gw-speech-css"), (style.textContent = SPEECH_CSS), document.head.appendChild(style);
+  }
+  let at = 0,
+    words = null,
+    button = null,
+    done = () => {
+      K.closeModal(id), K.sfx?.("ui_click", { volume: 0.45 });
+      onDone?.();
+    },
+    step = () => {
+      if (++at >= lines.length) return done();
+      (words.textContent = lines[at]), (button.textContent = at === lines.length - 1 ? ok : next);
+      K.sfx?.("ui_click", { volume: 0.35 });
+    };
+  K.openModal(
+    id,
+    (M, A) => {
+      let box = K.h("div", `gw-speech gw-${kind}-box`);
+      (box.dataset.loop = kind),
+        box.setAttribute("role", "note"),
+        (box.innerHTML = `<div class="gw-speech-tag gw-${kind}-tag">${K.icon ? K.icon(icon) : ""}<span></span></div><p class="gw-speech-text gw-${kind}-text"></p><div class="gw-speech-foot gw-${kind}-foot"><button type="button" class="gw-speech-ok gw-${kind}-ok" data-autofocus="1"></button></div>`),
+        (box.querySelector(".gw-speech-tag span").textContent = tag),
+        (words = box.querySelector(".gw-speech-text")),
+        (button = box.querySelector(".gw-speech-ok")),
+        (words.textContent = lines[at]),
+        (button.textContent = at === lines.length - 1 ? ok : next),
+        button.addEventListener("click", step),
+        A.appendChild(box);
+    },
+    {
+      blocking: !0,
+      quiet: !0,
+      dismissable: !1,
+      cls: `gw-m-guide gw-m-${id}`,
+      onEscape: escape === "page" ? step : done,
+      onKey: (k) =>
+        k === "Enter" || k === "Space" || k === "NumpadEnter" || (escape === "page" && k === "Escape")
+          ? (step(), !0)
+          : k !== "Tab",
+    },
+  );
+  K.sfx?.("ui_open", { volume: 0.4 });
+  return !0;
+}
 // The hunt on screen: Hob's talk when the raft comes near his lit lamp, the line when a sketch is drawn, and the
 // notepad opening by itself at home after a tally that has something new for it.
 function huntView(K) {
@@ -168862,49 +168930,23 @@ function huntView(K) {
             ? [hob.nights?.[talk.line]]
             : [hob.greeting];
     if (!(boxes = boxes.filter(Boolean)).length) return;
-    let at = 0,
-      words = null,
-      ok = null,
-      done = () => {
-        K.closeModal("hob"), K.sfx?.("ui_click", { volume: 0.45 });
-        talk.drew &&
-          K.toast?.(text().drawn || "", "lore", {
-            icon: "quill",
-            cls: "gw-toast--loop gw-toast--drawn",
-            dur: 4600,
-          });
-      },
-      step = () => {
-        if (++at >= boxes.length) return done();
-        (words.textContent = boxes[at]), (ok.textContent = at === boxes.length - 1 ? hob.ok : hob.next);
-        K.sfx?.("ui_click", { volume: 0.35 });
-      };
     state.talks++;
-    K.openModal(
-      "hob",
-      (M, A) => {
-        let box = K.h("div", "gw-hob-box");
-        (box.dataset.loop = "hob"),
-          box.setAttribute("role", "note"),
-          (box.innerHTML = `<div class="gw-hob-tag">${K.icon ? K.icon("lantern") : ""}<span></span></div><p class="gw-hob-text"></p><div class="gw-hob-foot"><button type="button" class="gw-hob-ok" data-autofocus="1"></button></div>`),
-          (box.querySelector(".gw-hob-tag span").textContent = hob.tag || "Hob"),
-          (words = box.querySelector(".gw-hob-text")),
-          (ok = box.querySelector(".gw-hob-ok")),
-          (words.textContent = boxes[at]),
-          (ok.textContent = boxes.length > 1 ? hob.next : hob.ok),
-          ok.addEventListener("click", step),
-          A.appendChild(box);
-      },
-      {
-        blocking: !0,
-        quiet: !0,
-        dismissable: !1,
-        cls: "gw-m-guide gw-m-hob",
-        onEscape: () => done(),
-        onKey: (k) => (k === "Enter" || k === "Space" || k === "NumpadEnter" ? (step(), !0) : k !== "Tab"),
-      },
-    );
-    K.sfx?.("ui_open", { volume: 0.4 });
+    openSpeechBox(K, {
+      id: "hob",
+      kind: "hob",
+      tag: hob.tag || "Hob",
+      icon: "lantern",
+      pages: boxes,
+      next: hob.next,
+      ok: hob.ok,
+      onDone: () =>
+        talk.drew &&
+        K.toast?.(text().drawn || "", "lore", {
+          icon: "quill",
+          cls: "gw-toast--loop gw-toast--drawn",
+          dur: 4600,
+        }),
+    });
   }
   function closePad() {
     K.has?.("notepad") &&
@@ -169346,6 +169388,9 @@ function WV(e) {
     if (
       (!_t && !w.isActive() && (_t = i("sayOrders") || null),
       (Ne.line = _t || null),
+      // Every line the jetty is given here is one Murk says once (sayOnce, sayOrders), so his box speaks it too.
+      // While the first evening's lessons run the jetty shows their lines instead, and so does not his.
+      w.isActive() || murkSaysOnce(Ne.line),
       (Ne.lineT = 0),
       (Ne.lineHold = _t ? 4.5 + 0.05 * String(_t).length : 0),
       (Ne.press = Pt || null),
@@ -169689,7 +169734,19 @@ function WV(e) {
       return;
     }
     let Pt = Bhe(_t, { D: o() }),
-      ht = { tally: _t, plan: Pt, t: 0, done: !1, ticks: new Map(), soldAt: 0 };
+      // murkPages: Murk's lines on this card, as his box speaks them (set as the card is drawn); murkSpoken: the
+      // box has had them, at this showing or before a reload (the save keeps it on the tally).
+      ht = {
+        tally: _t,
+        plan: Pt,
+        t: 0,
+        done: !1,
+        ticks: new Map(),
+        soldAt: 0,
+        murkPages: [],
+        murkSpoken: _t.spoken === !0,
+        murkWait: 0,
+      };
     e.closeModal("jetty", { silent: !0, instant: !0 });
     let Ht = _V.tally,
       qt = e.openModal("tally", ve, {
@@ -169762,6 +169819,13 @@ function WV(e) {
     let huntBeat = qt.tally?.hunt;
     huntBeat &&
       Tt.querySelector(".gw-tally")?.appendChild(tallyHuntBlock(n, f().hunt || {}, huntBeat, Le.empty));
+    // What Murk's box says at this tally: the gift's and the hunt's lines, each its own page, in the order the
+    // card lists them (the gift, where to fit it, the tale, his words). The card keeps them written as they are.
+    qt.murkPages = [
+      ...Tt.querySelectorAll(".gw-tally-gift .gw-murk-line, .gw-tally-gift-fit, .gw-tally-hunt > p"),
+    ]
+      .map((p) => p.textContent)
+      .filter(Boolean);
     let Ct = Tt.querySelector(".gw-tally-rows");
     Le.rows.forEach((We, at) => {
       let ct = n(
@@ -169896,7 +169960,43 @@ function WV(e) {
   function Qe(_t, Pt) {
     let ht = _t.state;
     ht.done || ((ht.t += Math.max(0, Math.min(0.25, Yo(Pt)))), ht.t >= ht.plan.end && (ht.done = !0), oe(_t));
+    murkAtTally(_t, Pt);
   }
+  // Murk's speech box, the box Hob talks in. It is the only box on screen: it waits for a guide box, Hob's box
+  // and the notepad, and they wait for it (they open only over the bare jetty or on the water).
+  let murkBoxFree = () => !e.has("murktalk") && !e.has("guide") && !e.has("hob") && !e.has("notepad");
+  function murkSpeak(pages) {
+    let say = f().murkTalk || {};
+    return openSpeechBox(e, {
+      id: "murktalk",
+      kind: "murk",
+      tag: say.tag || "Murk",
+      icon: "scale",
+      pages,
+      next: say.next || "Next",
+      ok: say.ok || "Got it",
+      escape: "page",
+    });
+  }
+  // At the tally Murk's box comes up over the card by itself, a moment after the count is done (`now`: at once,
+  // for a press of Sold that would otherwise close the card first). Each tally's lines are spoken once: the save
+  // marks the tally as spoken, so a reload shows the card again without the box. Returns whether it opened.
+  function murkAtTally(entry, dt = 0, now = !1) {
+    let st = entry?.state;
+    if (!st?.done || st.murkSpoken || !st.murkPages?.length) return !1;
+    if (!now && (st.murkWait += Math.max(0, Math.min(0.25, Yo(dt)))) < 0.6) return !1;
+    if (e.top()?.id !== "tally" || !murkBoxFree()) return !1;
+    st.murkSpoken = !0;
+    let id = st.tally?.id ?? null;
+    return id != null && i("markTallySpoken", id), murkSpeak(st.murkPages);
+  }
+  // At home a line Murk says only once (a new order, his word after a sale, the line of a chart bought) waits
+  // here, and his box speaks it as soon as the jetty is up with nothing over it. Leaving home lets it go: it was
+  // written where it was said.
+  let murkAtHome = { pages: [], wait: 0 },
+    murkSaysOnce = (line) => {
+      typeof line == "string" && line && murkAtHome.pages.push(line);
+    };
   function Re() {
     let _t = e.entry("tally");
     if (!_t) return;
@@ -169912,6 +170012,8 @@ function WV(e) {
       Re();
       return;
     }
+    // Murk has not spoken yet: this press brings his box up, and the card stays (as it does while he speaks).
+    if (e.has("murktalk") || murkAtTally(_t, 0, !0)) return;
     if (Pt.soldAt) return;
     Pt.soldAt = Date.now();
     let ht = Pt.tally?.id ?? null;
@@ -170215,17 +170317,20 @@ function WV(e) {
         (p(!0, { volume: 0.4 }), e.sfx?.("shop_buy"), e.hud?.dirtyStats?.(), String(Pt).startsWith("place:"))
       ) {
         let Ht = i("sayOnce", "firstMap");
-        Ht && (_t.state.line = Ht);
+        Ht && ((_t.state.line = Ht), murkSaysOnce(Ht));
       }
+      // This line, the map's above and the two below are said once each (a lake's chart is bought once), so
+      // his box speaks them at the jetty too, once the shelf is closed. The shelf's notes (the rig a part went
+      // on) are not.
       if (String(Pt).startsWith("lake:")) {
         let Ht = f().murk?.at?.[String(Pt).slice(5)]?.map;
-        Ht && (_t.state.line = Ht);
+        Ht && ((_t.state.line = Ht), murkSaysOnce(Ht));
       }
       try {
         let Ht = ri(i("shelf")?.tabs).flatMap((qt) => ri(qt.items));
         if (jA(Ht)) {
           let qt = i("sayOnce", "shelfBare");
-          qt && (_t.state.line = qt);
+          qt && ((_t.state.line = qt), murkSaysOnce(qt));
         }
       } catch (Ht) {
         r("shelfBare", Ht);
@@ -170233,7 +170338,8 @@ function WV(e) {
       if (String(Pt).startsWith("orders:")) {
         let Ht = i("sayOrders");
         if (Ht) {
-          (_t.state.line = Ht),
+          murkSaysOnce(Ht),
+            (_t.state.line = Ht),
             _t.render(),
             setTimeout(() => {
               try {
@@ -170618,10 +170724,14 @@ function WV(e) {
       ) {
         (Ne.line = null), (Ne.press = null);
         let Tt = w.isActive() ? null : i("sayOrders");
-        Tt && ((Ne.line = Tt), (Ne.lineT = 0), (Ne.lineHold = 4.5 + 0.05 * Tt.length));
+        Tt && ((Ne.line = Tt), (Ne.lineT = 0), (Ne.lineHold = 4.5 + 0.05 * Tt.length), murkSaysOnce(Tt));
       }
       ht === "jetty" && N(), e.has("jetty") && G();
-    }
+      // Murk's lines said once at home, in his box as soon as the jetty is up and nothing else is.
+      murkAtHome.pages.length && e.top()?.id === "jetty" && murkBoxFree()
+        ? (murkAtHome.wait += Pt) >= 0.2 && ((murkAtHome.wait = 0), murkSpeak(murkAtHome.pages.splice(0)))
+        : (murkAtHome.wait = 0);
+    } else (murkAtHome.pages.length = 0), (murkAtHome.wait = 0);
     if (!h() || t.flow !== "playing") return;
     Se();
     let qt = d("canGoHome", { fromPause: !1 })?.ok === !0;

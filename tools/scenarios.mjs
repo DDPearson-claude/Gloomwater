@@ -24,7 +24,15 @@
 import { readFileSync } from "node:fs";
 import * as acorn from "acorn";
 import { join } from "node:path";
-import { DEFAULT_PAGE, GameSession, ROOT, SLOW, launchBrowser } from "./game-driver.mjs";
+import {
+  DEFAULT_PAGE,
+  GameSession,
+  MURK_BOX_BUTTON,
+  ROOT,
+  SAVE_KEY,
+  SLOW,
+  launchBrowser,
+} from "./game-driver.mjs";
 
 const BUDGET_MS = 3_600_000 * SLOW; // every scenario, launch to exit (GW_SLOW stretches every limit)
 const SCENARIO_TIMEOUT_MS = 240_000;
@@ -933,7 +941,12 @@ async function tallyAndPad(session, { look = null } = {}) {
   for (const end = Date.now() + 15_000; Date.now() < end; ) {
     pad = await notepadShown(session, '.gw-modal[data-modal="notepad"].gw-in .gw-pad');
     if (pad) break;
-    await session.eval(() => document.querySelector(".gw-m-guide .gw-guide-ok")?.click());
+    // A guide card or Murk's box at the jetty comes first: one press each.
+    await session.eval(
+      (murkButton) =>
+        (document.querySelector(".gw-m-guide .gw-guide-ok") || document.querySelector(murkButton))?.click(),
+      MURK_BOX_BUTTON,
+    );
     await session.pause(600);
   }
   if (pad) {
@@ -1613,6 +1626,62 @@ const RIG_PARTS_SAVE = (save) => {
     shelved: ["turnback_hook", "pike_wire", "chafe_gut"],
   };
 };
+
+// ---- Murk's speech box: the box Hob talks in, at the tally and at the jetty --------------------------------
+const MURK_BOX = '.gw-modal.gw-in[data-modal="murktalk"]';
+const FIT_LINE = "To fit it, press the float on the Tackle screen.";
+// From now until the page is left, notes every box that is ever on screen together with Murk's: a guide box,
+// Hob's box or the notepad. murkSharedWith() reads the list.
+const watchMurkAlone = (session) =>
+  session.eval(() => {
+    window.__murkShared = [];
+    const on = (id) => !!document.querySelector(`.gw-modal.gw-in[data-modal="${id}"]`);
+    setInterval(() => {
+      if (!on("murktalk")) return;
+      for (const id of ["guide", "hob", "notepad"])
+        if (on(id) && !window.__murkShared.includes(id)) window.__murkShared.push(id);
+    }, 40);
+  });
+const murkSharedWith = (session) => session.eval(() => window.__murkShared ?? null);
+const murkBoxUp = (session) => session.eval((sel) => !!document.querySelector(sel), MURK_BOX);
+// Waits for Murk's box, then reads each page and goes on until he is done. The first page is turned with the
+// Escape key when `escapeFirst` (it must go on a page, never end the talk). Each page: { tag, text, button,
+// tally } (tally: his card is open under the box).
+async function hearMurk(session, { waitMs = 30_000, escapeFirst = false } = {}) {
+  await session.waitFor("Murk's box", waitMs, (sel) => !!document.querySelector(sel), MURK_BOX);
+  const pages = [];
+  for (let i = 0; i < 12; i++) {
+    const page = await session.eval((sel) => {
+      const box = document.querySelector(sel);
+      return box
+        ? {
+            tag: box.querySelector(".gw-speech-tag").textContent.trim(),
+            text: box.querySelector(".gw-murk-text").textContent,
+            button: box.querySelector(".gw-murk-ok").textContent.trim(),
+            tally: !!document.querySelector('.gw-modal.gw-in[data-modal="tally"]'),
+          }
+        : null;
+    }, MURK_BOX);
+    if (!page) break;
+    pages.push(page);
+    if (escapeFirst && pages.length === 1) await session.page.keyboard.press("Escape");
+    else await session.eval((sel) => document.querySelector(`${sel} .gw-murk-ok`).click(), MURK_BOX);
+    await session.pause(700);
+  }
+  return pages;
+}
+// Saves, reloads the page and presses Continue: back at home as a player coming back to the game.
+async function reloadToHome(session) {
+  await session.eval(() => window.__gw.game.save());
+  // A reloaded file page is sometimes handed an older copy of localStorage (the browser's fault, not the game's),
+  // so the save just written is put back before the game boots.
+  const saved = await session.saved();
+  await session.context.addInitScript(([key, value]) => localStorage.setItem(key, value), [SAVE_KEY, saved]);
+  await session.page.reload({ waitUntil: "domcontentloaded" });
+  await session.boot();
+  await session.clickButton(/^Continue$/);
+  await session.waitFor("home", 60_000, () => window.__gw.flow === "home");
+}
 
 const SCENARIOS = [
   {
@@ -3092,6 +3161,143 @@ const SCENARIOS = [
       );
       await backToJetty(session);
       return "no lamp, Hob or tale on evening 1; the tale and a blank notepad at evening 2's tally";
+    },
+  },
+
+  {
+    name: "murk speaks at the tally: his box over the card says the lead, where to fit it, the tale and his word, a page each in the card's order; Escape turns a page; the card keeps them; a reload does not speak them again; then the notepad opens by itself",
+    fixture: "fresh-first-evening",
+    debug: true,
+    timeoutMs: 600_000,
+    // Evening 2 with nothing caught: the lead (the save has sold before) and the tale share the tally, and the
+    // empty tally's own line ("Nothing? ...") is said every time, so it stays on the card only.
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      await watchMurkAlone(session);
+      for (
+        const homeBy = Date.now() + 60_000 * SLOW;
+        !(await session.eval(() => window.__gw.game.goHome()));
+
+      ) {
+        check(Date.now() < homeBy, `the game will not go home; ${JSON.stringify(await session.state())}`);
+        await session.closeGuides(3000);
+        await session.pause(1000);
+      }
+      await session.waitFor("Murk's tally", 90_000, () => !!document.querySelector(".gw-tally-sold"));
+      check(!(await murkBoxUp(session)), "Murk's box came up before the card");
+      // One press of Sold finishes the count, as a player would; his box then comes up over the card by itself.
+      await session.eval(() => document.querySelector(".gw-tally-sold").click());
+      const pages = await hearMurk(session, { escapeFirst: true });
+      const said = pages.map((p) => p.text);
+      check(
+        sameJson(said, [GIFT_LINE, FIT_LINE, TALE, TALE_MURK]),
+        `Murk's box said ${JSON.stringify(said)}`,
+      );
+      check(
+        pages.every((p) => p.tag === "Murk" && p.tally) &&
+          sameJson(
+            pages.map((p) => p.button),
+            ["Next", "Next", "Next", "Got it"],
+          ),
+        `the pages: ${JSON.stringify(pages)}`,
+      );
+      const card = await session.eval(() => {
+        const text = (sel) => document.querySelector(sel)?.textContent.replace(/\s+/g, " ").trim() ?? "";
+        return {
+          open: !!document.querySelector('.gw-modal.gw-in[data-modal="tally"]'),
+          gift: text(".gw-tally-gift"),
+          hunt: text(".gw-tally-hunt"),
+          spoken: window.__gw.progression.loop.state().lastTrip?.spoken === true,
+        };
+      });
+      check(
+        card.open &&
+          card.gift.includes(GIFT_LINE) &&
+          card.gift.includes(FIT_LINE) &&
+          card.hunt.includes(TALE) &&
+          card.hunt.includes(TALE_MURK) &&
+          card.spoken,
+        `after "Got it", the card: ${JSON.stringify(card)}`,
+      );
+      // A reload before Sold: the save keeps the tally as spoken, and his box stays down. (Today the game comes
+      // back to the jetty, not to the card; if a card is shown, Sold closes it.)
+      await reloadToHome(session);
+      await watchMurkAlone(session);
+      await session.pause(4000 * SLOW);
+      check(!(await murkBoxUp(session)), "Murk's box spoke the tally again after a reload");
+      const kept = await session.eval(() => window.__gw.progression.loop.state().lastTrip?.spoken === true);
+      check(kept, "the save lost the tally's spoken mark");
+      for (let i = 0; i < 3; i++) {
+        await session.eval(() => document.querySelector(".gw-tally-sold")?.click());
+        await session.pause(1500);
+      }
+      check(!(await murkBoxUp(session)), "Murk's box spoke the tally again after a reload");
+      // At the jetty the notepad opens by itself.
+      await session.waitFor(
+        "the notepad, by itself",
+        30_000,
+        () => !!document.querySelector('.gw-modal.gw-in[data-modal="notepad"]'),
+      );
+      check(!(await murkBoxUp(session)), "Murk's box and the notepad are up together");
+      await session.eval(() => document.querySelector(".gw-pad-close").click());
+      const shared = await murkSharedWith(session);
+      check(sameJson(shared, []), `Murk's box was on screen with: ${JSON.stringify(shared)}`);
+      return `${said.length} pages over the card, kept on it, not again after a reload; then the notepad`;
+    },
+  },
+
+  {
+    name: "murk speaks at home: a new order in his box as soon as the jetty is up, before the guide's box and never with it; once only, so a reload brings no box",
+    fixture: "mid-mossmere",
+    debug: true,
+    // The Order Board with one order Murk has not said yet, and the guide's box about Murk not yet seen: both
+    // want the bare jetty at once.
+    editSave(save) {
+      const loop = save.meta.loop;
+      loop.home = { ...loop.home, orders: 1 };
+      loop.orders = [{ id: "murk-box", speciesId: "likely_chub", kind: "count", n: 1, have: 0 }];
+      save.meta.guide.seen.murk = false;
+    },
+    async run(session) {
+      await watchMurkAlone(session);
+      await session.clickButton(/^Continue$/);
+      await session.waitFor("home", 60_000, () => window.__gw.flow === "home");
+      await session.waitFor("Murk's box", 30_000, (sel) => !!document.querySelector(sel), MURK_BOX);
+      // The guide's box waits while he speaks.
+      await session.pause(2500 * SLOW);
+      const held = await session.eval(() => ({
+        guide: !!document.querySelector('.gw-modal.gw-in[data-modal="guide"]'),
+        jettyLine: document.querySelector(".gw-jetty-say .gw-murk-line")?.textContent ?? "",
+      }));
+      check(!held.guide, "the guide's box opened while Murk's box was up");
+      const pages = await hearMurk(session);
+      check(
+        pages.length === 1 &&
+          pages[0].tag === "Murk" &&
+          pages[0].button === "Got it" &&
+          /^Bring me .*Likely Chub.*\.$/.test(pages[0].text) &&
+          pages[0].text === held.jettyLine,
+        `Murk's box: ${JSON.stringify(pages)}; the jetty's line "${held.jettyLine}"`,
+      );
+      const said = await session.eval(() =>
+        window.__gw.progression.loop.state().orders.every((o) => o.said === true),
+      );
+      check(said, "the order is not marked as said");
+      // Then the guide's box, on its own.
+      await session.waitFor(
+        "the guide's box about Murk",
+        20_000,
+        () => !!document.querySelector('.gw-modal.gw-in[data-modal="guide"] .gw-guide--murk'),
+      );
+      check(!(await murkBoxUp(session)), "Murk's box is up with the guide's");
+      await session.closeGuides();
+      const shared = await murkSharedWith(session);
+      check(sameJson(shared, []), `Murk's box was on screen with: ${JSON.stringify(shared)}`);
+      // Coming home again with the same order: no box.
+      await reloadToHome(session);
+      await session.pause(5000 * SLOW);
+      check(!(await murkBoxUp(session)), "Murk's box said the same order again after a reload");
+      return `"${pages[0].text}" once, then the guide's box`;
     },
   },
 
