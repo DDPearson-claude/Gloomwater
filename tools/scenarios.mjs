@@ -1753,7 +1753,10 @@ const SCENARIOS = [
           },
           [light, place === "open" ? null : place, sequence.length, want.seed, want.bait],
         );
-        const at = got.findIndex((id, i) => id !== sequence[i]);
+        // Two of these places are homes of local kinds (wo.localKinds): there a local kind may take its base
+        // fish's bite, and is counted as that base fish; every other bite is as recorded.
+        const home = LOCAL_HOMES[place];
+        const at = got.findIndex((id, i) => (home && id === home ? LOCAL_BASES[id] : id) !== sequence[i]);
         check(at < 0, `${key}: roll ${at} drew ${got[at]}, the recorded build drew ${sequence[at]}`);
         rolls += got.length;
       }
@@ -7268,6 +7271,341 @@ const SCENARIOS = [
       return `${r.start} + 900 = ${r.paid}, waiting in Mossmere`;
     },
   },
+
+  // ---- Mossmere's local kinds (the review addendum, section 6) ----------------------------------------------
+  {
+    name: "local kinds: a seeded run of bites is as before away from their four homes and in her water, and in a home only its base fish's bites change, to its local kind",
+    fixture: "legend-sold",
+    debug: true,
+    timeoutMs: 480_000,
+    async run(session) {
+      // Hob's Lamp is taken away, as in the build the sequences were recorded on.
+      await dropLamp(session);
+      await session.sail();
+      const want = JSON.parse(readFileSync(join(FIXTURES_DIR, "bite-sequence-homes.json"), "utf8"));
+      const seen = {};
+      let same = 0;
+      for (const [key, letters] of Object.entries(want.sequences)) {
+        const [spot, light, bait] = key.split("|");
+        const at = want.spots[spot];
+        const got = await session.eval(
+          ([at, light, bait, n, seed]) => {
+            const g = window.__gw,
+              d = g.debug;
+            if (at && at.x != null) g.player.teleport({ x: at.x, z: at.z }, 0);
+            d.setPhase(light);
+            d.fishSeed(seed);
+            const seq = [];
+            for (let k = 0; k < n; k++) {
+              const r = d.fishPoolRoll(1, { place: at?.place ?? null, bait });
+              seq.push(r?.mist ? `mist:${r.mist}` : Object.keys(r?.counts ?? {})[0]);
+            }
+            return seq;
+          },
+          [at, light, bait, letters.length, want.seed],
+        );
+        // The Buoy Lights are a place only at night: by day they are open water, no home.
+        const home = spot === "buoy_lights" && light !== "gloomtide" ? null : LOCAL_HOMES[spot] || null;
+        [...letters].forEach((letter, i) => {
+          const before = want.kinds[SEQUENCE_LETTERS.indexOf(letter)];
+          if (got[i] === before) return void same++;
+          check(
+            home && got[i] === home && before === LOCAL_BASES[home],
+            `${key}: bite ${i} drew ${got[i]}, the build before drew ${before}`,
+          );
+          seen[home] = (seen[home] || 0) + 1;
+        });
+      }
+      check(
+        Object.keys(LOCAL_BASES).every((id) => seen[id] > 0),
+        `a local kind never bit in its home: ${JSON.stringify(seen)}`,
+      );
+      // The exact share: a quarter of the base fish's bites in its home, none anywhere else.
+      const shares = await session.eval((spots) => {
+        const g = window.__gw,
+          d = g.debug,
+          out = {};
+        for (const [name, at, light, bait] of spots) {
+          if (at.x != null) g.player.teleport({ x: at.x, z: at.z }, 0);
+          d.setPhase(light);
+          out[name] = d.fishPoolRoll(0, { place: at.place ?? null, bait })?.shares ?? null;
+        }
+        return out;
+      }, LOCAL_SHARE_SPOTS);
+      for (const [name, s] of Object.entries(shares)) {
+        const kinds = Object.keys(LOCAL_BASES).filter((id) => s?.[id] > 0);
+        const home = LOCAL_SHARE_SPOTS.find((x) => x[0] === name)[4];
+        check(
+          JSON.stringify(kinds) === JSON.stringify(home ? [home] : []),
+          `${name}: local kinds ${JSON.stringify(kinds)}, expected ${home || "none"}`,
+        );
+        if (!home) continue;
+        const share = s[home] / (s[home] + s[LOCAL_BASES[home]]);
+        check(near(share, 0.25, 1e-9), `${name}: ${home} takes ${share} of the ${LOCAL_BASES[home]}'s bites`);
+      }
+      // Her water: no local kind there, even where a home would reach it (the rule itself).
+      const rule = await session.eval(() => {
+        const at = window.__gw.data.localKindAt;
+        return {
+          stones: at("dusk_minnow", { area: "stones", x: 30, z: 30, light: "calm" }),
+          stonesInHerWater: at("dusk_minnow", { area: "stones", x: -4, z: -9, light: "calm" }),
+          herPlace: at("dusk_minnow", { area: "stones", castPlace: "bell_pool", light: "calm" }),
+          span: at("dusk_minnow", { place: "under_the_span", light: "gloomtide" }),
+          spanInHerWater: at("dusk_minnow", { place: "under_the_span", x: -6, z: -12, light: "calm" }),
+          buoyNight: at("lampsipper", { place: "buoy_lights", light: "gloomtide" }),
+          buoyDay: at("lampsipper", { place: "buoy_lights", light: "calm" }),
+          sporewood: at("dusk_minnow", { water: "sporewood", area: "stones", light: "calm" }),
+        };
+      });
+      check(
+        JSON.stringify(rule) ===
+          JSON.stringify({
+            stones: "stone_minnow",
+            stonesInHerWater: null,
+            herPlace: null,
+            span: "archshade_minnow",
+            spanInHerWater: null,
+            buoyNight: "buoy_rudd",
+            buoyDay: null,
+            sporewood: null,
+          }),
+        `the rule: ${JSON.stringify(rule)}`,
+      );
+      return `${same} bites as before; changed in their homes: ${JSON.stringify(seen)}`;
+    },
+  },
+
+  {
+    name: "local kinds: with Hob's Lamp a local kind never caught takes 3 in 8 of its base fish's bites, and 1 in 4 once caught, and the total does not change",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session) {
+      await session.sail();
+      const roll = () =>
+        session.eval(() => {
+          const d = window.__gw.debug;
+          d.setPhase("calm");
+          return d.fishPoolRoll(0, { place: "under_the_span", bait: "mireworm" }).shares;
+        });
+      const lamp = await session.eval(() =>
+        window.__gw.progression.loop.state().relics.includes("hobs_lamp"),
+      );
+      check(lamp, "the save has no Hob's Lamp");
+      const unmet = await roll();
+      await session.eval(() => (window.__gw.state.meta.journal.archshade_minnow = { caught: 1 }));
+      const met = await roll();
+      const share = (s) => s.archshade_minnow / (s.archshade_minnow + s.dusk_minnow);
+      check(near(share(unmet), 3 / 8, 1e-9), `never caught: ${share(unmet)}`);
+      check(near(share(met), 1 / 4, 1e-9), `caught: ${share(met)}`);
+      check(
+        near(unmet.archshade_minnow + unmet.dusk_minnow, met.archshade_minnow + met.dusk_minnow, 1e-12) &&
+          near(unmet.mossback_perch, met.mossback_perch, 1e-12),
+        `the minnows' total or another fish's share moved: ${JSON.stringify({ unmet, met })}`,
+      );
+      return `${share(unmet).toFixed(3)} never caught, ${share(met).toFixed(3)} caught`;
+    },
+  },
+
+  {
+    name: "local kinds: a small Stone or Archshade Minnow shows Into the tin and goes in as a Live Minnow",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withTin,
+    timeoutMs: 360_000,
+    async run(session) {
+      await session.sail();
+      const seen = [];
+      for (const [k, id] of ["stone_minnow", "archshade_minnow"].entries()) {
+        const card = await catchCard(session, id, -1.5);
+        check(card.tin === `Into the tin (${3 - k} left)`, `${id}: the button reads ${card.tin}`);
+        await session.clickButton(/^Into the tin/);
+        await session.pause(1200);
+        await session.closeGuides(4000);
+        const live = await liveInRun(session);
+        check(live === k + 1, `after the ${id}: ${live} Live Minnows`);
+        seen.push(card.tin);
+      }
+      // The other two never offer it.
+      const rule = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          fish = (speciesId) => ({ uid: `t-${speciesId}`, speciesId, sizeClass: "small" });
+        return { carp: loop.tinRoom(fish("mirror_carp")), rudd: loop.tinRoom(fish("buoy_rudd")) };
+      });
+      check(rule.carp === null && rule.rudd === null, `tinRoom: ${JSON.stringify(rule)}`);
+      return seen.join(", ");
+    },
+  },
+
+  {
+    name: "local kinds: catching one changes no lake list count, catch seal or order, and leaves no bite mark",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 480_000,
+    async run(session) {
+      await session.sail();
+      const counts = () =>
+        session.eval(() => {
+          const loop = window.__gw.progression.loop;
+          return {
+            list: loop.listCount("mossmere"),
+            seals: JSON.stringify(loop.seals()),
+            page: loop.catalogue("mossmere").head,
+          };
+        });
+      const before = await counts();
+      // An order for a Dusk Minnow on the board: a Stone or Archshade Minnow never fills it.
+      const orders = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          fish = (speciesId) => ({ uid: `o-${speciesId}`, speciesId, sizeClass: "keeper", length: 20 });
+        loop.state().orders.push({ id: "ord-local", speciesId: "dusk_minnow", kind: "count", n: 1, have: 0 });
+        const out = {};
+        for (const id of ["dusk_minnow", "stone_minnow", "archshade_minnow"])
+          out[id] = loop.orderFor(fish(id));
+        return out;
+      });
+      check(
+        orders.dusk_minnow === "ord-local" &&
+          orders.stone_minnow === null &&
+          orders.archshade_minnow === null,
+        `orders: ${JSON.stringify(orders)}`,
+      );
+      for (const id of Object.keys(LOCAL_BASES)) await session.catchFish(id, { keep: false });
+      const after = await counts();
+      const got = await session.eval(
+        (ids) => ids.map((id) => window.__gw.state.meta.journal[id]?.caught ?? 0),
+        Object.keys(LOCAL_BASES),
+      );
+      check(
+        got.every((n) => n === 1),
+        `the local kinds are not in the Journal: ${JSON.stringify(got)}`,
+      );
+      check(
+        JSON.stringify(after) === JSON.stringify(before),
+        `the counts moved: ${JSON.stringify({ before, after })}`,
+      );
+      // No bite mark: the mark rule gives a Dusk Minnow in the reeds its cuts, never a local kind.
+      const marks = await session.eval((ids) => {
+        const g = window.__gw.data,
+          loop = { hunt: { mossmere: { sketches: { map: 1 } } } },
+          run = { zone: "mossmere" },
+          mark = (speciesId) =>
+            g.catchMarkFor(loop, run, { speciesId, area: "reeds", phase: "dusk" }, () => 0);
+        return { dusk: mark("dusk_minnow"), locals: ids.map(mark) };
+      }, Object.keys(LOCAL_BASES));
+      check(
+        marks.dusk === "cuts" && marks.locals.every((m) => m === null),
+        `marks: ${JSON.stringify(marks)}`,
+      );
+      return `list ${after.list.have}/${after.list.need} before and after four local kinds`;
+    },
+  },
+
+  {
+    name: "local kinds: the Journal's Local kinds strip shows under a caught base fish only, a ? until caught, then the picture and name, which opens its entry",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 420_000,
+    async run(session) {
+      const strips = () =>
+        session.eval(() =>
+          Object.fromEntries(
+            [...document.querySelectorAll("[data-loop=locals]")].map((s) => [
+              s.dataset.of,
+              {
+                head: s.querySelector(".gw-cat-locals-head")?.textContent ?? null,
+                items: [...s.querySelectorAll(".gw-cat-local")].map((b) =>
+                  b.matches("button")
+                    ? `${b.dataset.species}:${b.textContent.trim()}:${!!b.querySelector("canvas")}`
+                    : `${b.dataset.species}:${b.textContent.trim()}`,
+                ),
+              },
+            ]),
+          ),
+        );
+      await session.toHome();
+      await session.eval(() => window.__gw.ui.openJournal({ zone: "mossmere" }));
+      await session.pause(800);
+      const before = await strips();
+      // Caught in this save: the Dusk Minnow and the Weeping Carp. Not caught: the Lampsipper.
+      check(
+        JSON.stringify(before) ===
+          JSON.stringify({
+            dusk_minnow: { head: "Local kinds", items: ["stone_minnow:?", "archshade_minnow:?"] },
+            weeping_carp: { head: "Local kinds", items: ["mirror_carp:?"] },
+          }),
+        `before: ${JSON.stringify(before)}`,
+      );
+      const names = await session.eval(() => document.querySelector(".gw-cat-scroll")?.textContent ?? "");
+      check(
+        !/Stone Minnow|Archshade|Mirror Carp|Buoy Rudd/.test(names),
+        "a local kind is named before it is caught",
+      );
+      await backToJetty(session);
+      await session.sail();
+      await session.catchFish("stone_minnow");
+      await session.eval(() => window.__gw.ui.openJournal({ zone: "mossmere" }));
+      await session.pause(800);
+      const after = await strips();
+      check(
+        JSON.stringify(after.dusk_minnow?.items) ===
+          JSON.stringify(["stone_minnow:Stone Minnow:true", "archshade_minnow:?"]),
+        `after: ${JSON.stringify(after)}`,
+      );
+      await session.eval(() =>
+        document.querySelector("button.gw-cat-local[data-species=stone_minnow]").click(),
+      );
+      await session.pause(800);
+      const entry = await session.eval(() => ({
+        name: document.querySelector(".gw-cat-species h3")?.textContent ?? null,
+        lore: document.querySelector(".gw-cat-species .gw-lore")?.textContent ?? null,
+        where: document.querySelector(".gw-cat-species .gw-jr-where")?.textContent ?? null,
+      }));
+      check(
+        entry.name === "Stone Minnow" &&
+          entry.lore === LOCAL_LORE.stone_minnow &&
+          entry.where?.startsWith("Only in the stony shallows."),
+        `the entry: ${JSON.stringify(entry)}`,
+      );
+      return `${JSON.stringify(after.dusk_minnow.items)}; entry "${entry.where}"`;
+    },
+  },
+];
+
+// The local kinds, their base fish and homes, as in wo.localKinds.
+const LOCAL_BASES = {
+  stone_minnow: "dusk_minnow",
+  archshade_minnow: "dusk_minnow",
+  mirror_carp: "weeping_carp",
+  buoy_rudd: "lampsipper",
+};
+const LOCAL_HOMES = {
+  stones: "stone_minnow",
+  under_the_span: "archshade_minnow",
+  lily_maze: "mirror_carp",
+  buoy_lights: "buoy_rudd",
+};
+const LOCAL_LORE = {
+  stone_minnow:
+    "It is a small olive minnow with dark blotches along its side and a copper belly. It lives over the stones in the shallows.",
+};
+// tools/fixtures/bite-sequence-homes.json writes each bite as one letter: its place in the fixture's `kinds`.
+const SEQUENCE_LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+// Where the shares are read: [name, spot, light, bait, the local kind expected there or null].
+const LOCAL_SHARE_SPOTS = [
+  ["stones by day", { x: -48, z: 18 }, "calm", "mireworm", "stone_minnow"],
+  ["Under the Span at night", { place: "under_the_span" }, "gloomtide", "mireworm", "archshade_minnow"],
+  ["the Lily Maze at dusk", { place: "lily_maze" }, "dusk", "lumen_moss", "mirror_carp"],
+  // On the Buoy Lights themselves: by day they are open water (a drop-off), no home.
+  [
+    "the Buoy Lights at night",
+    { place: "buoy_lights", x: -48, z: -2 },
+    "gloomtide",
+    "feather_fly",
+    "buoy_rudd",
+  ],
+  ["the Buoy Lights by day", { place: "buoy_lights", x: -48, z: -2 }, "calm", "feather_fly", null],
+  ["her water at night", { place: "bell_pool" }, "gloomtide", "feather_fly", null],
+  ["deep water at night", { x: -24, z: -10 }, "gloomtide", "lumen_moss", null],
 ];
 
 // ---- the runner -----------------------------------------------------------------------------------------

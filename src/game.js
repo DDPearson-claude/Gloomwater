@@ -30561,6 +30561,9 @@ Ic(vg, {
   // Hob's Lamp's bite rule (B5), for the scenario tests.
   lampBiteMult: () => lampBiteMult,
   lampOf: () => lampOf,
+  // Where the local kinds bite (wo.localKinds), for the scenario tests.
+  localKindAt: () => localKindAt,
+  splitLocalKinds: () => splitLocalKinds,
   obstacleRadius: () => PS,
   placeAt: () => Tee,
   placeAtV3: () => Ste,
@@ -32087,9 +32090,14 @@ bs.sporewood = {
   tells: null,
   sight: null,
 };
+// A local kind's base fish (wo.localKinds), else the id itself: a local kind reads its base fish's rows in the hook,
+// depth, leader and hook-set tables, so it takes the same baits and rig. The tables keep no row of their own for it,
+// so nothing that lists a table's fish (who a bait suits) counts it.
+var localKindBase = (speciesId) => wo?.localKinds?.kinds?.[speciesId]?.of ?? speciesId;
 var Ih = (e) => (e && bs[e]?.hook ? bs[e] : y0),
   z7 = (e, t) => {
     let n = Ih(t).hook;
+    e = localKindBase(e);
     return n.table[e] || n.guests?.[e];
   },
   SS = (e) => (e && bs[e]?.geometry ? bs[e] : y0);
@@ -32117,13 +32125,13 @@ bs.mossmere.depth = {
 function depthBiteMult(speciesId, depth, water) {
   if (depth !== "lead") return 1;
   // A null water is the home lake, as in Ih().
-  let feeds = (water == null ? y0 : bs[water])?.depth?.[speciesId] || "any",
+  let feeds = (water == null ? y0 : bs[water])?.depth?.[localKindBase(speciesId)] || "any",
     rule = wo?.depthMult || {};
   return Math.max(ka(rule.floor, 0.5), ka(rule.lead?.[feeds], 1));
 }
 // Where a species feeds in a water, as the depth table above says: "bottom", "high" or "any" (for the Journal).
 function speciesFeedsAt(speciesId, water) {
-  return (water == null ? y0 : bs[water])?.depth?.[speciesId] || "any";
+  return (water == null ? y0 : bs[water])?.depth?.[localKindBase(speciesId)] || "any";
 }
 // A sign or sight take chance on the lead: raised (to at most 0.9, never below what it was) or lowered.
 function depthTakeChance(p, mult) {
@@ -32171,7 +32179,7 @@ bs.mossmere.hookSet = {
 // The tags a fish carries on a leader, as a list (empty for the Plain Knot, an untagged fish or a water without
 // leaders). A null water is the home lake, as in Ih().
 function leaderTags(speciesId, leader, water) {
-  let tag = (water == null ? y0 : bs[water])?.leader?.[speciesId]?.[leader];
+  let tag = (water == null ? y0 : bs[water])?.leader?.[localKindBase(speciesId)]?.[leader];
   return tag == null ? [] : Array.isArray(tag) ? tag : [tag];
 }
 // How much more or less often a species bites on this rig: the Depth part's multiplier times the fitted leader's.
@@ -32195,7 +32203,7 @@ function leaderGrip(speciesId, leader, water) {
 // Early, late and every other hook are left as they are.
 function turnbackStrike(grade, speciesId, hook, water) {
   if (hook !== "turnback_hook") return grade;
-  let tag = (water == null ? y0 : bs[water])?.hookSet?.[speciesId];
+  let tag = (water == null ? y0 : bs[water])?.hookSet?.[localKindBase(speciesId)];
   return tag === "self" && grade === "struck"
     ? "clean"
     : tag === "quick" && grade === "clean"
@@ -32624,6 +32632,50 @@ function lampOf(meta) {
     ? { met: (id) => Number(meta?.journal?.[id]?.caught) > 0 }
     : null;
 }
+// The local kind (wo.localKinds) that takes some of `baseId`'s bites at `at`, or null. `at`: { water (null is the
+// home lake, as in Ih()), place (the place the pool fishes), castPlace, area (open water only), light (a phase or a
+// light), x, z (the float) }. Never in her water: her place, or within her theft reach of her centre.
+function localKindAt(baseId, at) {
+  if (
+    at?.place === HER_WATER.place ||
+    at?.castPlace === HER_WATER.place ||
+    Math.hypot(ka(at?.x, NaN) - HER_WATER.x, ka(at?.z, NaN) - HER_WATER.z) <= HER_WATER.theft
+  )
+    return null;
+  let water = at?.water ?? "mossmere",
+    light = id(at?.light);
+  for (let [kindId, kind] of Object.entries(wo.localKinds?.kinds || {}))
+    if (
+      kind.of === baseId &&
+      kind.water === water &&
+      (!kind.light || kind.light === light) &&
+      (kind.place ? at?.place === kind.place : !at?.place && at?.area === kind.area)
+    )
+      return kindId;
+  return null;
+}
+// Bite odds rows ({ sp, [key] }, as G5 or P7 give them) with each base fish row in a local kind's home split in two,
+// in place: the base fish keeps (1 - s) of it and its local kind, next to it, takes s, where s is wo.localKinds.share
+// times the Lamp's boost while the local kind has never been caught. Every other row and the total stay the same, so
+// a draw that did not land on the base fish lands where it did before. A returning Old Rival's row is left whole.
+function splitLocalKinds(rows, at, { key = "p", lamp = null, data = null } = {}) {
+  if (!Array.isArray(rows) || !rows.length || !wo.localKinds) return rows;
+  let out = [];
+  for (let row of rows) {
+    let kindId =
+        row?.sp?.id && row.from !== "comeback" && ka(row[key], 0) > 0 ? localKindAt(row.sp.id, at) : null,
+      kindSp = kindId
+        ? data?.SPECIES_BY_ID?.[kindId] || Sr(Ms).find((sp) => sp?.id === kindId) || null
+        : null;
+    if (!kindSp) {
+      out.push(row);
+      continue;
+    }
+    let s = Math.min(1, ka(wo.localKinds.share, 0) * lampBiteMult(kindSp, lamp));
+    out.push({ ...row, [key]: row[key] * (1 - s) }, { ...row, sp: kindSp, [key]: row[key] * s, local: !0 });
+  }
+  return out;
+}
 function _7(e, t, n) {
   let o = ka(e, 1);
   return t === 0
@@ -32945,18 +32997,23 @@ function zS(
     if (c)
       for (let O of b)
         O.sp?.rarity === "uncommon" ? (O.w *= 1 + 2 * c) : O.sp?.rarity === "rare" && (O.w *= 1 + 4 * c);
-    let L = P7(b, {
-        lure: n,
-        bait: h,
-        phase: i,
-        wickId: a,
-        D: e,
-        guests: v?.guests,
-        water: f,
-        depth,
-        lamp,
-        leader,
-      }),
+    let L = splitLocalKinds(
+        P7(b, {
+          lure: n,
+          bait: h,
+          phase: i,
+          wickId: a,
+          D: e,
+          guests: v?.guests,
+          water: f,
+          depth,
+          lamp,
+          leader,
+        }),
+        // The local kinds' share of their base fish's bites in this area (splitLocalKinds).
+        { water: l, place: null, area: w, light: i },
+        { key: "w", lamp, data: e },
+      ),
       E = L.reduce((O, T) => O + T.w, 0);
     if (E > 0) {
       for (let O of L) m[O.sp.id] = (m[O.sp.id] || 0) + (y * O.w) / E;
@@ -47394,12 +47451,61 @@ wo.cut = { strips: 3, classes: ["small", "keeper"], hold: 0.6 };
 // The tin holds three and empties at the tally; it is Murk's gift (wo.rig.parts.minnow_tin).
 wo.live = {
   bait: "live_minnow",
-  from: ["dusk_minnow"],
+  // The two local minnows (wo.localKinds) go in as an ordinary Live Minnow too.
+  from: ["dusk_minnow", "stone_minnow", "archshade_minnow"],
   classes: ["small", "keeper"],
   per: 1,
   cap: 3,
   // Landing one of these on the trip before the tin's tally makes Murk say his perch line (Ca.live.gift.hunter).
   hunters: ["mossback_perch", "overbold_bass", "milkeye_perch", "kissmark_trout", "reedjaw_pike"],
+};
+// Mossmere's local kinds (mossmere-review-addendum.md section 6): four fish, each living in one home and in all else
+// its base fish (`of`) in new colours. In its home (a `place`, or an open-water `area`; at the `light` only, when
+// set), when the base fish would be the one that bites, the local kind bites instead `share` of the time (half
+// again as often with Hob's Lamp while it has never been caught). Never in her water (HER_WATER). They stay off the
+// lake's list, the catch seal and the Order Board, carry no bite marks, and show in the Journal in a "Local kinds"
+// strip under their base fish once it is caught. `length`: the local kind's typical length against its base fish's.
+wo.localKinds = {
+  share: 0.25,
+  kinds: {
+    stone_minnow: { of: "dusk_minnow", water: "mossmere", area: "stones" },
+    archshade_minnow: { of: "dusk_minnow", water: "mossmere", place: "under_the_span", length: 0.8 },
+    mirror_carp: { of: "weeping_carp", water: "mossmere", place: "lily_maze" },
+    buoy_rudd: { of: "lampsipper", water: "mossmere", place: "buoy_lights", light: "night" },
+  },
+  // Each one's colours and markings on its base fish's model, for the pictures drawn on the catch card and in the
+  // Journal (the 3D fish is its own portrait, merePortraits).
+  looks: {
+    stone_minnow: { body: 0x4b5230, belly: 0xc98549, fin: 0x776a40, pattern: "blotch" },
+    archshade_minnow: { body: 0x56636e, belly: 0xeef0ea, fin: 0xa7aeb2, pattern: "stripe", mouth: "up" },
+    mirror_carp: { body: 0x2a2925, belly: 0xa8916a, fin: 0x3d3a33, pattern: "mirror" },
+    buoy_rudd: { body: 0xc9a24c, belly: 0xefd9a0, fin: 0x9e2219, glow: null, pattern: "scales" },
+  },
+};
+Ca.localKinds = {
+  strip: "Local kinds",
+  kinds: {
+    stone_minnow: {
+      name: "Stone Minnow",
+      lore: "It is a small olive minnow with dark blotches along its side and a copper belly. It lives over the stones in the shallows.",
+      where: "Only in the stony shallows.",
+    },
+    archshade_minnow: {
+      name: "Archshade Minnow",
+      lore: "It is a tiny silver fish with a bright blue-green stripe and an upturned mouth. It keeps to the shade under the old bridge.",
+      where: "Only Under the Span.",
+    },
+    mirror_carp: {
+      name: "Mirror Carp",
+      lore: "It is a carp with dark bare skin and a few big scales that shine like mirrors. It roots among the lily stems.",
+      where: "Only in the Lily Maze.",
+    },
+    buoy_rudd: {
+      name: "Buoy Rudd",
+      lore: "It is a brassy gold fish with deep red fins. It comes up under the buoy lamps after dark.",
+      where: "Only at the Buoy Lights, at night.",
+    },
+  },
 };
 wo.raft = {
   oars: { prices: [60, 300], with: [1, 1], speed: 1.5 },
@@ -48566,7 +48672,10 @@ function ute(
     c = wo.places?.[t] || null,
     d = c && !(c.kind === "night" && i !== "night") ? { id: t, ...c } : null,
     f = s || c?.water || "mossmere",
-    u = (Array.isArray(e) ? e : []).filter((v) => v && v.zone === f && v.rarity !== "legendary" && !v.cove),
+    // A local kind is never in the pool: it takes its share of its base fish's bites afterwards (splitLocalKinds).
+    u = (Array.isArray(e) ? e : []).filter(
+      (v) => v && v.zone === f && v.rarity !== "legendary" && !v.cove && !v.variantOf,
+    ),
     h = (v) => !v.place && (!v.kind || v.kind === "open"),
     m = [],
     g = null,
@@ -49829,7 +49938,8 @@ function p1(e, t, n = {}) {
   return o.all
     ? a
     : o.species
-      ? o.species.includes(t.id)
+      ? // A local kind holds as its base fish does (wo.localKinds).
+        o.species.includes(t.id) || o.species.includes(localKindBase(t.id))
         ? a
         : 0
       : o.night
@@ -49906,6 +50016,9 @@ registerLakeFight(
 registerLakeFight("cindertail_catfish downcast_catfish velvet_ray", "hold", 1.18, 1.22, 1.5, 0, 0.65, 0.6);
 registerLakeFight("lostsea_mackerel", "runner", 1.1, 1.08, 1, 0.04, 1.35, 1.35);
 registerLakeFight("sleepspore_jelly", "pulse", 0.89, 0.74, -1, 0, 0.42, 0.72);
+// Mossmere's local kinds fight as their base fish do (wo.localKinds).
+for (const [id, kind] of Object.entries(wo.localKinds.kinds))
+  lakeFightProfiles.set(id, lakeFightProfiles.get(kind.of));
 
 function shapeFirstEffort(efforts, profile) {
   const phase = {
@@ -50206,6 +50319,22 @@ if (Su) {
     for (let [g, p] of Object.entries({ gloam_eel: "night" })) {
       let w = Ms.findIndex((y) => y.id === g);
       w >= 0 && (Ms[w] = { ...Ki(Ms[w]), kind: p });
+    }
+    // Mossmere's local kinds (wo.localKinds): each its base fish's live record with its own id, name, lore and
+    // Journal line, marked `variantOf` so the pool and the lake's list leave it out. Its look is its own portrait
+    // (merePortraits). The Archshade Minnow runs smaller, so its weights are worked out again (V5).
+    for (let [g, p] of Object.entries(wo.localKinds.kinds)) {
+      let w = Ms.find((y) => y.id === p.of),
+        y = Ca.localKinds.kinds[g];
+      if (!w || !y || Ms.some((v) => v.id === g)) continue;
+      let v = { ...Ki(w), id: g, name: y.name, lore: y.lore, hint: y.where, variantOf: p.of };
+      delete v.epithet;
+      v.model = { ...v.model, ...wo.localKinds.looks[g] };
+      p.length &&
+        Number.isFinite(v.model.scale) &&
+        (v.model.scale = Math.round(v.model.scale * p.length * 100) / 100);
+      p.length && (v.size = { ...v.size, L50: Math.round(v.size.L50 * p.length * 10) / 10 });
+      Ms.push(V5(v));
     }
     Object.assign(Ds.leaps, wo.leaps);
     for (let g of ["lamprey", "sturgeon", "trout"]) Lf.includes(g) || Lf.push(g);
@@ -87422,6 +87551,32 @@ Object.assign(merePortraits, {
     speed: 2.45,
   },
 });
+// Mossmere's local kinds (wo.localKinds): each its base fish's shape in a coat of its own. "blotch" is a row of
+// dark blotches along the side, "stripe" a bright stripe along it, "mirror" bare skin with a few big pale scales
+// (and no tear streaks), and `mouth: "up"` turns the mouth up. The Buoy Rudd has no moth spots.
+Object.assign(merePortraits, {
+  stone_minnow: {
+    ...merePortraits.dusk_minnow,
+    coat: ["4b5230", "8c8a58", "c98549", "776a40", "b8925a", "2b2a1c"],
+    mark: "blotch",
+  },
+  archshade_minnow: {
+    ...merePortraits.dusk_minnow,
+    coat: ["56636e", "c6cbd1", "eef0ea", "a7aeb2", "dde2df", "0cc8ad"],
+    mark: "stripe",
+    mouth: "up",
+  },
+  mirror_carp: {
+    ...merePortraits.weeping_carp,
+    coat: ["2a2925", "4a453b", "a8916a", "3d3a33", "6f6656", "cdbf92"],
+    mark: "mirror",
+  },
+  buoy_rudd: {
+    ...merePortraits.lampsipper,
+    coat: ["4b4a2c", "c9a24c", "efd9a0", "9e2219", "d2422f", "5a4a28"],
+    mark: "rudd",
+  },
+});
 
 function buildMerePortrait(id) {
   const spec = merePortraits[id],
@@ -87601,7 +87756,7 @@ function buildMerePortrait(id) {
           ? -0.011 * sin(3 * pi * q)
           : form === "arch"
             ? 0.048 * sin(q * pi) ** 2
-            : form === "surface"
+            : form === "surface" || spec.mouth === "up"
               ? 0.034 * q ** 4
               : form === "shovel"
                 ? 0.017 * q ** 4
@@ -87761,9 +87916,15 @@ function buildMerePortrait(id) {
         0.51 * smooth(0.4, 1.36, sin(73 * z + 2 * k) + 0.6 * cos(15 * k - 21 * z)) * smooth(-0.42, 0.4, k),
       );
     if (mark === "moon") c = mix(c, color("56496a"), 0.34 * (0.5 + 0.5 * cos(39 * z - 4 * k)) * fl);
+    if (mark === "stripe")
+      c = mix(
+        c,
+        ink,
+        0.95 * exp(-((k - 0.1) ** 2) / 0.012) * smooth(-0.34, -0.25, z) * (1 - smooth(0.2, 0.27, z)),
+      );
     // Small overlapping scale edges disappear into the smooth skin of the face.
     const scaled =
-      !["netglass", "cinder", "silt", "festival", "lanterncap"].includes(mark) &&
+      !["netglass", "cinder", "silt", "festival", "lanterncap", "mirror"].includes(mark) &&
       !serpent &&
       form !== "shovel" &&
       mark !== "bloom";
@@ -87782,7 +87943,7 @@ function buildMerePortrait(id) {
     }
     if (!serpent) {
       const near = smooth(pike ? 0.36 : 0.432, 0.48, z),
-        jaw = -0.5,
+        jaw = spec.mouth === "up" ? -0.5 + 0.85 * smooth(0.44, 0.5, z) : -0.5,
         dist = abs(k - jaw);
       c = mix(c, dark, 0.63 * near * (1 - smooth(0.017, 0.077, dist)));
     }
@@ -87994,6 +88155,33 @@ function buildMerePortrait(id) {
         );
       }
     }
+    if (mark === "blotch")
+      for (let i = 0; i < 9; i++) {
+        const z = -0.25 + i * 0.058 + 0.01 * (rnd() - 0.5),
+          k = 0.04 + 0.12 * (rnd() - 0.5),
+          r = 0.011 + 0.005 * rnd();
+        flankPatch(
+          z,
+          k,
+          s,
+          r * 1.35,
+          r / (cross(z).h || 0.05),
+          mix(ink, side, 0.12),
+          "oval",
+          mix(ink, side, 0.55),
+        );
+      }
+    if (mark === "mirror")
+      for (const [z, k, r] of [
+        [-0.17, 0.5, 0.024],
+        [-0.085, 0.6, 0.03],
+        [0.005, 0.62, 0.032],
+        [0.095, 0.57, 0.027],
+        [0.18, 0.48, 0.022],
+        [-0.04, 0.06, 0.026],
+        [0.07, 0.02, 0.03],
+      ])
+        flankPatch(z, k, s, r, r / (cross(z).h || 0.05), mix(ink, cream, 0.15), "oval", mix(ink, back, 0.45));
     if (mark === "mesh")
       for (let row = 0; row < 6; row++)
         for (let i = 0; i < 17; i++) {
@@ -88040,9 +88228,9 @@ function buildMerePortrait(id) {
         );
       }
     }
-    if (mark === "tears" || mark === "wax") {
+    if (mark === "tears" || mark === "wax" || mark === "mirror") {
       const base = flank(0.45, -0.56, s);
-      const length = mark === "tears" ? 0.24 : 0.09;
+      const length = mark === "tears" || mark === "mirror" ? 0.24 : 0.09;
       limb(
         detail,
         [
@@ -104687,6 +104875,7 @@ function cle(e, t, { listFor: n = null, water: o = null } = {}) {
   for (let c of Ts(e?.SPECIES))
     c?.zone === a &&
       c.place &&
+      !c.variantOf &&
       l.has(c.place) &&
       !c.giant &&
       c.rarity !== "legendary" &&
@@ -106244,8 +106433,14 @@ function G3(
       lamp,
       leader,
     }),
-    m = {};
-  for (let g of qi(h.entries)) g.sp?.id && (m[g.sp.id] = (m[g.sp.id] || 0) + na(g.p));
+    m = {},
+    // The local kinds' share of their base fish's bites here (splitLocalKinds), as on the water.
+    rows = splitLocalKinds(
+      qi(h.entries),
+      { water: i, place: u?.place ?? null, castPlace: f?.id ?? null, area: f ? null : n, light: d },
+      { lamp, data: e },
+    );
+  for (let g of rows) g.sp?.id && (m[g.sp.id] = (m[g.sp.id] || 0) + na(g.p));
   return m;
 }
 function Tle(e, t, n) {
@@ -107487,7 +107682,14 @@ function catchMarkFor(
   rng = Math.random,
   rule = wo.hunt.marks,
 ) {
-  if (legendary || !speciesId || run?.zone !== "mossmere" || !(huntRecordOf(loop)?.sketches?.map > 0))
+  // The local kinds never carry a mark (wo.localKinds).
+  if (
+    legendary ||
+    !speciesId ||
+    wo.localKinds?.kinds?.[speciesId] ||
+    run?.zone !== "mossmere" ||
+    !(huntRecordOf(loop)?.sketches?.map > 0)
+  )
     return null;
   if (
     herTimeOpen(run) &&
@@ -107729,7 +107931,7 @@ function ordinaryLossWord(
     !hook &&
     !lure &&
     hardTake &&
-    bs[water]?.hookSet?.[speciesId] === "self" &&
+    bs[water]?.hookSet?.[localKindBase(speciesId)] === "self" &&
     offered("turnback_hook") &&
     (kind = "self");
   if (!kind) return null;
@@ -108174,6 +108376,8 @@ function op(e, t) {
         r.rarity !== "epic" &&
         !r.giant &&
         !r.cove &&
+        // The local kinds stay off the lake's list (wo.localKinds).
+        !r.variantOf &&
         s(r) &&
         (!n.plainBaitOnly || !r.bait || r.bait === o),
     )
@@ -108312,8 +108516,18 @@ function $3(e, t, n) {
     s = Ln(t?.LOOP?.places) ? t.LOOP.places : {},
     r = new Set(Array.isArray(a.maps?.places) ? a.maps.places : []),
     // The thief gets no card, glyph or name on the lake page until she is landed.
-    l = (t?.SPECIES || []).filter((L) => Ln(L) && L.zone === n && !L.cove && !thiefHidden(e, L.id)),
+    // The local kinds get no card of their own: they show under their base fish (`locals`, below).
+    l = (t?.SPECIES || []).filter(
+      (L) => Ln(L) && L.zone === n && !L.cove && !L.variantOf && !thiefHidden(e, L.id),
+    ),
     i = new Map(l.map((L) => [L.id, L])),
+    // A caught base fish's local kinds (wo.localKinds), each caught or not, for its "Local kinds" strip.
+    locals = (L) =>
+      oa(o[L.id]?.caught) > 0
+        ? Object.entries(t?.LOOP?.localKinds?.kinds || {})
+            .filter(([kindId, kind]) => kind.of === L.id && t?.SPECIES_BY_ID?.[kindId])
+            .map(([kindId]) => ({ id: kindId, caught: oa(o[kindId]?.caught) > 0 }))
+        : [],
     c = (L, E) => ({
       id: L.id,
       caught: oa(o[L.id]?.caught) > 0,
@@ -108322,6 +108536,7 @@ function $3(e, t, n) {
       hours: TF(t, L),
       place: E,
       bait: Lle(t, L),
+      locals: locals(L),
     }),
     d = new Set(),
     f = (L, E) => (d.add(L.id), c(L, E)),
@@ -113867,7 +114082,8 @@ function Kle(e) {
   }
   function re(ce) {
     let me = n(),
-      ft = (t().SPECIES || []).filter(($n) => $n.zone === ce),
+      // The local kinds (wo.localKinds) count toward neither "half named" nor "every fish named".
+      ft = (t().SPECIES || []).filter(($n) => $n.zone === ce && !$n.variantOf),
       Qt = ft.filter(($n) => (me.journal?.[$n.id]?.caught || 0) > 0).length,
       dn = a("journal"),
       wn = g(ce);
@@ -132651,7 +132867,30 @@ function Y0e(e) {
   }
   function Ce(R, I, Q = null) {
     let Pe = j(),
-      Ke = Qe(I, Pe, i.cast?.place?.id ?? null);
+      Ke = Qe(I, Pe, i.cast?.place?.id ?? null),
+      odds = Ke ? poolOdds(R, I, Q, Pe, Ke) : null;
+    // A local kind takes its share of its base fish's bites in its home (splitLocalKinds), on every bite path.
+    return odds
+      ? {
+          ...odds,
+          entries: splitLocalKinds(
+            odds.entries,
+            {
+              water: Yt(),
+              place: Ke.place ?? null,
+              castPlace: i.cast?.place?.id ?? null,
+              area: Ke.place ? null : (i.cast?.area ?? null),
+              light: Pe,
+              x: i.cast?.x,
+              z: i.cast?.z,
+            },
+            { lamp: p(() => lampOf(e.state?.meta)) ?? null, data: t() },
+          ),
+        }
+      : null;
+  }
+  // The odds of a cast as the pool gives them, before the local kinds take their share (Ce).
+  function poolOdds(R, I, Q, Pe, Ke) {
     return Ke
       ? G5(t(), {
           pool: Ke,
@@ -148381,6 +148620,15 @@ var hG = `/* ui.css \u2014 GLOOMWATER interface, UI style v2 (CONTRACT \xA79, DE
   opacity: .8; overflow-wrap: break-word; text-wrap: balance; }
 .gw-loop-on .gw-cat-card.gw-cat-giant:has(> .gw-cat-need) { padding-bottom: 16px; }   /* (clear of the giant's gold flourish) */
 .gw-loop-on .gw-cat-gcard .gw-cat-need { font-size: 15px; }
+/* a caught base fish's "Local kinds" strip under its card: a small picture and the name of each one caught, "?" for one not yet */
+.gw-loop-on .gw-cat-cell { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+.gw-loop-on .gw-cat-locals { display: flex; flex-direction: column; align-items: center; gap: 1px; margin: -4px 4px 8px; padding: 4px 0 0; border-top: 1px solid rgba(174, 172, 208, .22); }
+.gw-loop-on .gw-cat-locals-head { font: 400 12px/1.2 var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+.gw-loop-on .gw-cat-local { display: flex; align-items: center; gap: 5px; max-width: 100%; min-height: 30px; padding: 2px 4px; border: none; background: none; color: var(--ink); font: 400 14px/1.15 var(--f-body);
+  text-align: left; overflow-wrap: break-word; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.gw-loop-on .gw-cat-local canvas { flex: none; display: block; }
+.gw-loop-on button.gw-cat-local:hover, .gw-loop-on button.gw-cat-local:focus-visible { outline: none; text-decoration: underline; }
+.gw-loop-on .gw-cat-local--unknown { justify-content: center; cursor: default; color: var(--ink-dim); font: 400 18px/1 var(--f-display); }
 .gw-loop-on .gw-cat-glyphs { display: inline-flex; gap: 3px; min-height: 16px; color: var(--ink-faint); }
 .gw-loop-on .gw-cat-glyphs .gw-ico { width: 15px; height: 15px; }
 .gw-loop-on .gw-cat-glyph--kind_open .gw-ico { width: 17px; }
@@ -149861,7 +150109,41 @@ function Qg(e, t, n, o, a, s, r, l) {
       let h = d + (f - d) * (0.28 + u * 0.16);
       e.beginPath(), e.moveTo(i, h * 0.5), e.quadraticCurveTo((i + c) / 2, h, c, h * 0.3), e.stroke();
     }
-  } else if (n === "spots")
+  } else if (n === "blotch")
+    // The Stone Minnow (wo.localKinds): a row of dark blotches along the side.
+    for (let h = 0; h < 8; h++) {
+      let m = i + (c - i) * (0.16 + 0.085 * h) + (s() - 0.5) * 0.02,
+        g = d + (f - d) * (0.45 + (s() - 0.5) * 0.08),
+        p = 0.03 + s() * 0.012;
+      (e.fillStyle = "rgba(7,8,13,.5)"), e.beginPath(), e.ellipse(m, g, p * 1.25, p, 0, 0, 7), e.fill();
+    }
+  else if (n === "stripe") {
+    // The Archshade Minnow (wo.localKinds): one bright stripe from the tail to the gill.
+    let g = d + (f - d) * 0.42;
+    (e.strokeStyle = Gi(Hl(o.belly, "#ffffff", 0.4), 0.9)),
+      (e.lineWidth = 0.028),
+      (e.lineCap = "round"),
+      e.beginPath(),
+      e.moveTo(i + (c - i) * 0.04, g + 0.01),
+      e.quadraticCurveTo(i + (c - i) * 0.4, g - 0.012, i + (c - i) * 0.72, g),
+      e.stroke();
+  } else if (n === "mirror")
+    // The Mirror Carp (wo.localKinds): a few big pale scales on bare skin.
+    for (let [x, y, p] of [
+      [0.3, 0.2, 0.06],
+      [0.42, 0.16, 0.07],
+      [0.54, 0.18, 0.065],
+      [0.36, 0.5, 0.055],
+      [0.5, 0.48, 0.06],
+    ])
+      (e.fillStyle = Gi(Hl(o.belly, "#ffffff", 0.35), 0.8)),
+        (e.strokeStyle = "rgba(7,8,13,.45)"),
+        (e.lineWidth = 0.9 * r),
+        e.beginPath(),
+        e.ellipse(i + (c - i) * x, d + (f - d) * y, p * 1.15, p, 0, 0, 7),
+        e.fill(),
+        e.stroke();
+  else if (n === "spots")
     for (let h = 0; h < 16; h++) {
       let m = i + (c - i) * (0.12 + s() * 0.75),
         g = d + (f - d) * (0.12 + s() * 0.55),
@@ -166516,6 +166798,12 @@ function m4(e, t) {
         gold: a.legend === !0,
         edge: a.giant === !0 ? "gold" : null,
         glyphs: i,
+        // Its local kinds' strip: a caught one by name, an uncaught one as "?" (no name).
+        locals: ri(a.locals).map((k) => ({
+          id: k.id,
+          caught: k.caught === !0,
+          name: k.caught === !0 ? ef(t, k.id)?.name || k.id : null,
+        })),
       };
     },
     o = Oa(e.head) ? e.head : {};
@@ -172413,7 +172701,11 @@ function YV(e) {
               "{hours}",
               joined,
             ),
-      lines = [String(words.line || "It bites {hours}.").replace("{hours}", when)];
+      lines = [String(words.line || "It bites {hours}.").replace("{hours}", when)],
+      // A local kind (wo.localKinds) says its one home first. A home kept to one light already says when.
+      local = d().LOOP?.localKinds?.kinds?.[K.id],
+      where = local ? d().TEXT_LOOP?.localKinds?.kinds?.[K.id]?.where : null;
+    where && (lines = local.light ? [where] : [where, ...lines]);
     lines.push(words.feeds?.[speciesFeedsAt(K.id, K.guestOf || K.zone)] || words.feeds?.any || "");
     K.bait && words.takes && lines.push(words.takes.replace("{bait}", e.baitData(K.bait)?.name || K.bait));
     return lines.filter(Boolean).join(" ");
@@ -174928,6 +175220,54 @@ function YV(e) {
       qe
     );
   }
+  // A caught base fish's card with its "Local kinds" strip under it (wo.localKinds): each local kind by its picture
+  // and name once caught, pressed to open its entry like any fish, else a "?". A fish with none is its card alone.
+  function withLocalKinds(K, card, we) {
+    if (!i(we.locals).length) return card;
+    let te = K.state,
+      cell = n("div", "gw-cat-cell"),
+      strip = n("div", "gw-cat-locals"),
+      head = n("small", "gw-cat-locals-head");
+    (strip.dataset.loop = "locals"),
+      (strip.dataset.of = we.id),
+      (head.textContent = d().TEXT_LOOP?.localKinds?.strip || "Local kinds"),
+      strip.appendChild(head);
+    for (let kind of we.locals) {
+      if (!kind.caught) {
+        let unknown = n("span", "gw-cat-local gw-cat-local--unknown", '<i aria-hidden="true">?</i>');
+        (unknown.dataset.species = kind.id), unknown.setAttribute("aria-label", "\xB7 \xB7 \xB7");
+        strip.appendChild(unknown);
+        continue;
+      }
+      let sp = e.speciesData(kind.id),
+        button = n("button", "gw-cat-local"),
+        art = n("canvas", "gw-fishart");
+      (button.type = "button"),
+        (button.dataset.species = kind.id),
+        button.setAttribute("aria-label", kind.name);
+      try {
+        Or(art, sp, { w: 40, h: 22, pad: 0.06, gain: 6.2, color: "#ece8f4" });
+      } catch (err) {
+        e.report("local kind art", err);
+      }
+      button.appendChild(art);
+      let name = n("span", "gw-cat-local-name");
+      (name.textContent = kind.name), button.appendChild(name);
+      button.addEventListener("click", (ev) => {
+        ev.stopPropagation(),
+          p("ui_click"),
+          (te.pageScroll = button.closest(".gw-cat-scroll")?.scrollTop ?? 0),
+          (te.view = "species"),
+          (te.sel = kind.id),
+          (te.hl = null),
+          (te.big = null),
+          (te.section = null),
+          K.render();
+      });
+      strip.appendChild(button);
+    }
+    return cell.appendChild(card), cell.appendChild(strip), cell;
+  }
   function Ct(K, we) {
     let te = K.state,
       ke = h(),
@@ -175151,7 +175491,7 @@ function YV(e) {
       qe.querySelector(".gw-cat-seals").appendChild(Mt);
     } else qe.querySelector(".gw-cat-seals").remove();
     we.appendChild(qe);
-    for (let xt of te.list) st.appendChild(Ft(K, xt));
+    for (let xt of te.list) st.appendChild(withLocalKinds(K, Ft(K, xt), xt));
     Ce.appendChild(st),
       te.groups.length &&
         Ce.appendChild(
@@ -175171,7 +175511,7 @@ function YV(e) {
       );
       xt.name && (zt.querySelector("b").textContent = xt.name), Mt.appendChild(zt);
       let Ut = n("div", "gw-cat-grid");
-      for (let on of xt.cards) Ut.appendChild(Ft(K, on));
+      for (let on of xt.cards) Ut.appendChild(withLocalKinds(K, Ft(K, on), on));
       Mt.appendChild(Ut), Ce.appendChild(Mt);
     }
     if (te.guests?.length) {

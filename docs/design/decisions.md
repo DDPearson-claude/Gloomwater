@@ -90,6 +90,8 @@ Details are in `mossmere-review-addendum.md`.
 - **Each lake keeps its own kit and purse (built).** A tow sets aside the leaving lake's tackle tiers, bought pieces, creels, raft parts, rig parts, rigs and clams, and brings in the arriving lake's. A lake never visited starts from a new game's kit with no clams. Hob's Lamp, found tackle, finds, the journal, the hunt record, looks, charts and the home's buys travel. Bait and lures were already per lake. Murk's shelf now counts from each lake's own tiers, which closes the shelf fault that was listed under "Still open".
   - Gaps filled during the build: found tackle keeps travelling, as the leaving card always promised. An old save that had towed and come back to Mossmere gets Mossmere's own tiers back from the tow's record, and what it bought on Sporewood's shelf waits in Sporewood; its clams stay where the barge is.
   - Not measured: earning in Sporewood from no clams and plain tackle. The first tackle step there costs 600.
+- **Mossmere's four local kinds (built):** Stone Minnow, Archshade Minnow, Mirror Carp and Buoy Rudd. In its one home a local kind takes 1 in 4 of its base fish's bites (3 in 8 with Hob's Lamp while never caught), so nothing else's share changes. They never bite in her water, carry no bite marks, and stay off the lake's list, the catch seal, "every fish named" and the Order Board. The two minnows go in the tin.
+  - Gaps filled during the build: the "stony shallows" are the open-water stones areas, which include water near docks and stony islands. The "Local kinds" strip sits under the base fish on the Journal's lake page. A local kind keeps its base fish's real hours, so the Mirror Carp bites at any hour like the Weeping Carp.
 
 ## Still open
 
