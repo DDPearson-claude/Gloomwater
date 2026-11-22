@@ -1504,8 +1504,23 @@ const SCENARIOS = [
       }
       check(state === "bite", `no bite on the lead (state ${state})`);
       // The real strike input: a press on the water.
+      // The test window is small, so the rig chip can sit mid-screen: press the first spot of open water.
       const box = await session.page.locator("canvas").first().boundingBox();
-      await session.page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.6);
+      const spot = await session.eval(
+        (b) =>
+          [
+            [0.5, 0.6],
+            [0.5, 0.78],
+            [0.72, 0.62],
+            [0.28, 0.78],
+            [0.8, 0.5],
+          ]
+            .map(([fx, fy]) => [b.x + b.width * fx, b.y + b.height * fy])
+            .find(([x, y]) => document.elementFromPoint(x, y)?.tagName === "CANVAS") ?? null,
+        box,
+      );
+      check(spot, "no open water to press");
+      await session.page.mouse.click(spot[0], spot[1]);
       await session.pause(1500);
       const watch = await session.eval(() => (clearInterval(window.__leadTimer), window.__leadWatch));
       const hooked = await session.eval(() => window.__gw.fishing.state);
