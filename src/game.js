@@ -49048,17 +49048,19 @@ Object.assign(Ca.maps, {
 });
 Ca.murk.at = {
   sporewood: {
-    map: "New water, new tackle. Your hands keep a third.",
+    map: "New water, new tackle. What you own here waits for you.",
     home: "Spore Cake on the hook. They like it sweet here.",
     away: "Lost a big one? Rootthread holds them.",
   },
 };
+// The leaving card before a first tow. Each lake keeps its own kit and purse, and only the monster's item and
+// your finds travel (decisions.md "Between lakes").
 Ca.leave = {
   title: "To {water}",
-  stays: "Bought tackle, raft parts and creels stay here.",
-  keeps: "Your hands keep a third of it.",
-  wait: "Lures and bait wait here.",
-  come: "Found things come with you.",
+  stays: "Your tackle, rigs, raft parts, creels and clams stay in this lake.",
+  keeps: "You start fresh in the new lake, with plain tackle.",
+  wait: "It all waits here for you, just as you left it.",
+  come: "Hob's Lamp and the things you found come with you.",
   tow: "Tow",
   notYet: "Not yet",
 };
@@ -104279,19 +104281,12 @@ function ale(e, t) {
   for (let [l, i] of Object.entries(kl(o.bait) ? o.bait : {})) I0(i) > 0 && (r[l] = I0(i));
   return { lures: s, bait: r, fit: typeof o.fit == "string" && r[o.fit] > 0 ? o.fit : null };
 }
+// The first tow to a lake. The kit and purse of the lake you leave are set aside whole, and the new lake starts
+// from a new game's kit and clams (changeLakeKit). Nothing is carried over any more (decisions.md "Between
+// lakes"), so `add` is always nothing. The new lake's own starting lures and bait are given here, once.
 function GH(e, t, n) {
-  let o = al(e, t),
-    a = WH(e, t),
-    s = lc(t);
-  for (let f of ["rod", "line", "reel", "cast", "slots"]) s[f] += a[f];
-  for (let f of By) s.raft[f] += a.raft[f];
-  (t.carry = s), (t.tackle = { rod: 0, line: 0, reel: 0 });
-  let r = kl(t.fit) ? t.fit : {};
-  t.fit = Object.fromEntries(
-    Ug.map((f) => [f, typeof r[f] == "string" && e?.LOOP?.lostTackle?.[r[f]] ? r[f] : null]),
-  );
-  let l = I0(e?.LOOP?.hold?.start, 3) || 3;
-  (t.holdSlots = l + Math.round(s.slots)), (t.raft = { oars: 0, keel: 0, lantern: 0 }), (t.gearWater = n);
+  let o = al(e, t);
+  changeLakeKit(e, t, n);
   let i = ale(e, n);
   Array.isArray(t.lures) || (t.lures = []);
   for (let f of i.lures) t.lures.includes(f) || t.lures.push(f);
@@ -104299,29 +104294,123 @@ function GH(e, t, n) {
   let c = kl(t.bait[n]) ? t.bait[n] : (t.bait[n] = {});
   for (let [f, u] of Object.entries(i.bait)) c[f] = Math.max(0, I0(c[f])) + u;
   return (
-    kl(t.fitted) || (t.fitted = { lure: null, bait: null }),
-    (typeof t.fitted.lure == "string" && e?.LOOP?.lures?.[t.fitted.lure]?.found === !0) ||
-      (t.fitted = {
-        lure: i.fit ? null : (i.lures[0] ?? null),
-        bait: i.fit,
-        depth: t.fitted.depth,
-        leader: t.fitted.leader,
-        hook: t.fitted.hook,
-      }),
     kl(t.eveningsAt) || (t.eveningsAt = {}),
     (t.eveningsAt[n] = 0),
-    { from: o, to: n, add: a, carry: lc(t) }
+    { from: o, to: n, add: Dy(), carry: lc(t) }
   );
 }
+// The leaving card's terms. Nothing is carried to a new lake, so its carried stats are the arriving lake's own:
+// none for a first visit, else those its waiting kit holds (only an old save's kit has any).
 function UH(e, t, n) {
   let o = Vu(t?.barge?.towed),
     a = typeof n == "string" && n !== Pr(e) && !o.includes(n),
-    s = a ? WH(e, t) : Dy(),
-    r = lc(t),
+    s = Dy(),
+    r = a ? Dy() : lc(kl(t?.kits?.[n]) ? t.kits[n] : t),
     l = { ...r, raft: { ...r.raft } };
-  for (let i of ["rod", "line", "reel", "cast", "slots"]) l[i] += s[i];
-  for (let i of By) l.raft[i] += s.raft[i];
   return { to: n, from: al(e, t), first: a, add: s, carry: l, line: VH(e, l) };
+}
+// ---- Each lake's own kit and purse (mossmere-gear-deeper.md "The rule for travel" and B4 "Each lake's own kit
+// and purse"; decisions.md "Between lakes") ----
+// The live fields below are the kit of the lake whose gear they hold. gearWater names that lake, and it is always
+// the lake the barge is in. A tow sets them aside whole in kits[leaving lake] and brings in the arriving lake's
+// kit, or a new game's kit on a first visit, so nothing that reads clams or gear has to know about kits.
+// Everything else travels: relics, the journal, the hunt record, prints, keepsakes, looks, charts, finds and
+// the home. Bait already lives per lake (bait[lake]) and a lure works only in its own lake, so neither moves.
+var LAKE_KIT_FIELDS = Object.freeze([
+  "clams",
+  "tackle",
+  "fit",
+  "holdSlots",
+  "raft",
+  "carry",
+  "parts",
+  "rigs",
+  "activeRig",
+  "fitted",
+]);
+var copyOfKitValue = (v) => (v === void 0 ? v : JSON.parse(JSON.stringify(v)));
+// A lake's kit and purse as a new game has them: plain tackle, no raft parts, the first creel, the three
+// starting rig parts, no clams, and that lake's starting bait or lure on all three rigs.
+function freshLakeKit(D, water) {
+  let fresh = yF(D),
+    start = ale(D, water),
+    rig = cleanRig({ ...plainRig(D), lure: start.fit ? null : (start.lures[0] ?? null), bait: start.fit });
+  return {
+    clams: fresh.clams,
+    tackle: fresh.tackle,
+    fit: fresh.fit,
+    holdSlots: fresh.holdSlots,
+    raft: fresh.raft,
+    carry: fresh.carry,
+    parts: fresh.parts,
+    rigs: Array.from({ length: RIG_COUNT }, () => ({ ...rig })),
+    activeRig: 0,
+    fitted: { ...rig },
+  };
+}
+// Found tackle (wo.lostTackle) is a found thing, and found things travel: one fitted stays fitted through a
+// tow, and a kit keeps only its own lake's pieces in `fit`.
+var isFoundTackle = (D, id) => typeof id == "string" && kl(D?.LOOP?.lostTackle?.[id]);
+// Moves the live kit to kits[the lake it belongs to] and brings in the kit of `to` (a new game's kit if `to`
+// has none yet). Returns { from, to, first } or null when nothing changed.
+function changeLakeKit(D, loop, to) {
+  if (!kl(loop) || typeof to != "string" || !kl(D?.LOOP?.waters?.[to]) || !kl(D?.LOOP?.gear?.[to]))
+    return null;
+  let from = al(D, loop);
+  if (from === to) return null;
+  syncRigInUse(loop);
+  kl(loop.kits) || (loop.kits = {});
+  let worn = kl(loop.fit) ? loop.fit : {},
+    leaving = {};
+  for (let k of LAKE_KIT_FIELDS) leaving[k] = copyOfKitValue(loop[k]);
+  leaving.fit = Object.fromEntries(
+    Ug.map((s) => [s, typeof worn[s] == "string" && !isFoundTackle(D, worn[s]) ? worn[s] : null]),
+  );
+  let first = !kl(loop.kits[to]),
+    arriving = first ? freshLakeKit(D, to) : loop.kits[to],
+    fresh = first ? arriving : freshLakeKit(D, to);
+  loop.kits[from] = leaving;
+  delete loop.kits[to];
+  for (let k of LAKE_KIT_FIELDS) loop[k] = copyOfKitValue(arriving[k] === void 0 ? fresh[k] : arriving[k]);
+  let fit = kl(loop.fit) ? loop.fit : {};
+  loop.fit = Object.fromEntries(
+    Ug.map((s) => [
+      s,
+      isFoundTackle(D, worn[s])
+        ? worn[s]
+        : typeof fit[s] == "string" && !isFoundTackle(D, fit[s])
+          ? fit[s]
+          : null,
+    ]),
+  );
+  loop.gearWater = to;
+  return { from, to, first };
+}
+// An old save's home lake kit, read back from what its first tow recorded. That tow carried a third of each
+// bought rod, line and reel's Grip, of each raft part and of the extra creel room (WH), rounded up, and then
+// cleared them. Tiers and raft parts read back exactly. For the creel the most room that fits is taken, so
+// nothing the player bought is lost. Clams were never recorded, so the purse starts as a new game's.
+function homeKitFromCarry(D, loop, water) {
+  let kit = freshLakeKit(D, water),
+    carry = lc(loop),
+    rule = D?.LOOP?.carry || {},
+    share = Lr(rule.share, 1 / 3) || 1 / 3,
+    round = rule.round === "up" || rule.round == null ? nle : (v) => Math.max(0, Math.round(v)),
+    hold = D?.LOOP?.hold || {},
+    start = I0(hold.start, 3) || 3,
+    top = I0(D?.LOOP?.gear?.[water]?.hold?.shelfMax, I0(hold.shelfMax, start)) || start;
+  for (let slot of Ug) {
+    let ladder = jr(D, water, slot);
+    for (let tier = ladder.length - 1; tier >= 1; tier--)
+      if (round(DH(D, water, slot, tier) * share) <= carry[slot] && carry[slot] > 0) {
+        kit.tackle[slot] = tier;
+        break;
+      }
+  }
+  for (let part of By) kit.raft[part] = Math.max(0, Math.round(carry.raft[part] / share));
+  kit.holdSlots =
+    start + (carry.slots > 0 ? Math.min(Math.max(0, top - start), Math.round(carry.slots / share)) : 0);
+  return kit;
 }
 var VH = (e, t) =>
   String(e?.TEXT_LOOP?.carry ?? "Carried {r} \xB7 {l} \xB7 {c}")
@@ -107147,6 +107236,9 @@ function yF(e) {
     // The unique items lake monsters gave (wo.relics), by id. They belong to the save, not a lake, so a tow
     // never touches them.
     relics: [],
+    // Each set-aside lake's own kit and purse, by lake (changeLakeKit). The lake the barge is in keeps its kit in
+    // the live fields above, so it is never in here.
+    kits: {},
   };
 }
 // The plain starting rig: the starting bait under the Cork Float, on the Plain Knot and the Mere Hook.
@@ -107186,6 +107278,98 @@ function normaliseRigs(loop, D) {
   loop.rigs = Array.from({ length: RIG_COUNT }, (_, i) => cleanRig(Ln(saved[i]) ? saved[i] : plain, plain));
   loop.activeRig = qy(loop.activeRig, 0, RIG_COUNT - 1);
   syncRigInUse(loop);
+}
+// The loader's part for each lake's own kit (changeLakeKit). A save from before kits that was never towed loads
+// unchanged. One already towed had its gear pointer (gearWater) moved to the new lake by its first tow, and the
+// live tiers, creel, raft parts and carried stats it holds are on that lake's shelf:
+// - still in that lake, it keeps everything it holds there, and the home lake's kit is read back from what the
+//   tow recorded (homeKitFromCarry);
+// - back in the home lake, those pieces wait in the other lake's kit, and the home lake's own tiers, creel and
+//   raft parts come back from that record. Its clams, rig parts and rigs stay where the barge is.
+// The other lake's kit has a copy of the rig parts and rigs (they were never per lake before) and no clams.
+// Last, every stored kit is checked, and if the barge is not in the kit's lake the kits are put right.
+function settleLakeKits(loop, D, hadKits) {
+  let home = il(D),
+    gear = al(D, loop),
+    here = loop.barge?.water;
+  if (!hadKits && gear !== home) {
+    let recorded = homeKitFromCarry(D, loop, home),
+      other = {};
+    for (let k of LAKE_KIT_FIELDS) other[k] = copyOfKitValue(loop[k]);
+    other.clams = 0;
+    if (here === gear) {
+      for (let k of ["tackle", "fit", "holdSlots", "raft", "carry"]) other[k] = recorded[k];
+      loop.kits = { [home]: other };
+      other.fitted = {
+        ...recorded.fitted,
+        depth: other.fitted?.depth,
+        leader: other.fitted?.leader,
+        hook: other.fitted?.hook,
+      };
+    } else {
+      other.fit = Object.fromEntries(
+        Ug.map((s) => [
+          s,
+          typeof loop.fit?.[s] == "string" && !isFoundTackle(D, loop.fit[s]) ? loop.fit[s] : null,
+        ]),
+      );
+      other.fitted = {
+        ...freshLakeKit(D, gear).fitted,
+        depth: "float",
+        leader: other.fitted?.leader,
+        hook: other.fitted?.hook,
+      };
+      loop.kits = { [gear]: other };
+      for (let k of ["tackle", "holdSlots", "raft", "carry"]) loop[k] = recorded[k];
+      loop.fit = Object.fromEntries(Ug.map((s) => [s, isFoundTackle(D, loop.fit?.[s]) ? loop.fit[s] : null]));
+      loop.gearWater = al(D, { gearWater: here });
+    }
+  }
+  Ln(loop.kits) || (loop.kits = {});
+  for (let [water, kit] of Object.entries(loop.kits))
+    !Ln(kit) || !Ln(D?.LOOP?.waters?.[water]) || water === al(D, loop)
+      ? delete loop.kits[water]
+      : normaliseLakeKit(kit, D, water);
+  typeof here == "string" && here !== al(D, loop) && changeLakeKit(D, loop, here);
+}
+// Checks one stored kit the way the loader checks the live one: every field present and of its kind, numbers in
+// range, known rig parts only (the Cork Float and the starting leader and hook always), three clean rigs, and a
+// fitted rig made of owned parts that is also the rig in use.
+function normaliseLakeKit(kit, D, water) {
+  let fresh = freshLakeKit(D, water),
+    hold = D?.LOOP?.hold || {},
+    start = ha(hold.start, 3) || 3,
+    top = Math.max(0, (D?.LOOP?.tackle?.price?.length ?? 7) - 1),
+    parts = D?.LOOP?.rig?.parts || {};
+  for (let k of LAKE_KIT_FIELDS) {
+    let want = fresh[k],
+      have = kit[k];
+    (have === void 0 ||
+      (Ln(want) && !Ln(have)) ||
+      (Array.isArray(want) && !Array.isArray(have)) ||
+      (typeof want == "number" && !Number.isFinite(Number(have)))) &&
+      (kit[k] = want);
+  }
+  kit.clams = Math.max(0, oa(kit.clams));
+  for (let s of Ug) kit.tackle[s] = qy(kit.tackle[s], 0, top);
+  kit.holdSlots = qy(kit.holdSlots, start, ha(hold.max, 8) || 8);
+  for (let p of By) kit.raft[p] = Math.max(0, ha(kit.raft[p]));
+  kit.carry = lc(kit);
+  kit.fit = Object.fromEntries(Ug.map((s) => [s, typeof kit.fit[s] == "string" ? kit.fit[s] : null]));
+  kit.parts = kit.parts.filter((g, i, all) => typeof parts[g] == "object" && all.indexOf(g) === i);
+  kit.parts.includes("cork_float") || kit.parts.unshift("cork_float");
+  for (let [id, part] of Object.entries(parts))
+    part?.start && part.slot !== "depth" && !kit.parts.includes(id) && kit.parts.push(id);
+  kit.rigs = Array.from({ length: RIG_COUNT }, (_, i) =>
+    cleanRig(Ln(kit.rigs[i]) ? kit.rigs[i] : fresh.rigs[i], fresh.fitted),
+  );
+  kit.activeRig = qy(kit.activeRig, 0, RIG_COUNT - 1);
+  let fitted = cleanRig(kit.fitted, fresh.fitted);
+  (fitted.depth === "lead" && kit.parts.includes("sounding_lead")) || (fitted.depth = "float");
+  for (let slot of ["leader", "hook"])
+    kit.parts.includes(fitted[slot]) || (fitted[slot] = fresh.fitted[slot]);
+  kit.fitted = fitted;
+  kit.rigs[kit.activeRig] = { ...fitted };
 }
 // One lake's monster hunt in the save. Only the part built so far: lineLesson is set by the first loss to a
 // line too weak for her.
@@ -107603,7 +107787,9 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
   }
   let u = c.startKit !== !0,
     h = !Ln(c.fit),
-    m = !Ln(c.eveningsAt);
+    m = !Ln(c.eveningsAt),
+    // A save from before each lake kept its own kit (settleLakeKits).
+    hadKits = Ln(c.kits);
   for (let [g, p] of Object.entries(o)) {
     if (c[g] === void 0) {
       c[g] = p;
@@ -107672,6 +107858,7 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
     (t?.LOOP?.rig?.parts?.[c.fitted[slot]]?.slot === slot && c.parts.includes(c.fitted[slot])) ||
       (c.fitted[slot] = o.fitted[slot]);
   normaliseRigs(c, t);
+  settleLakeKits(c, t, hadKits);
   {
     let arrivals = c.arrivals;
     arrivals.seq = ha(arrivals.seq);
@@ -109816,10 +110003,19 @@ function CF(e) {
           : null
         : (Ln(H.barge) || (H.barge = { water: ze, towed: [] }),
           Array.isArray(H.barge.towed) || (H.barge.towed = []),
+          // Back to a lake already visited: its own kit and purse come out again, as left (changeLakeKit).
+          changeLakeKit(n(), H, ze) && ((Ne = []), invalidateTackle()),
           (H.barge.water = ze),
           H.barge.towed.includes(ze) || H.barge.towed.push(ze),
           i(),
           Tt());
+  }
+  // After the kit changes, anything worked out from the old kit is worked out again. (The list of what was just
+  // bought, Ne, is emptied with it, so one lake's buys never mark the other lake's shelf.)
+  function invalidateTackle() {
+    try {
+      e.invalidate?.();
+    } catch {}
   }
   function Ct(ze) {
     let H = p();
@@ -109835,6 +110031,7 @@ function CF(e) {
       } catch (we) {
         return l("applyTow", we), { ok: !1, reason: "water" };
       }
+    else changeLakeKit(n(), H, ze);
     (H.barge.water = ze), H.barge.towed.includes(ze) || H.barge.towed.push(ze), (Ne = []);
     try {
       e.invalidate?.();
@@ -178100,6 +178297,8 @@ function tj(e) {
           Ye(ne.stays || ""), Ye(ne.keeps || "", " gw-leave-keeps");
           let ee = Z.carry || {},
             pe = n("p", "gw-leave-carry");
+          // The carried stats, shown only when there are any. Nothing is carried to a new lake now, so this row
+          // stays empty for every first tow.
           (pe.innerHTML = ["rod", "line", "reel"]
             .map(
               (J) =>
@@ -178107,7 +178306,7 @@ function tj(e) {
             )
             .join("")),
             pe.setAttribute("aria-label", Z.line || ""),
-            le.appendChild(pe),
+            ["rod", "line", "reel"].some((J) => Math.round(Number(ee[J]) || 0) > 0) && le.appendChild(pe),
             Ye(ne.wait || ""),
             Ye(ne.come || ""),
             ie.classList.add("gw-leave-foot"),

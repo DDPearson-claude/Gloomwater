@@ -1478,6 +1478,56 @@ const practiceKit = (session) =>
     };
   });
 
+// ---- each lake's own kit and purse (mossmere-gear-deeper.md B4 "Each lake's own kit and purse") ----------
+// The live fields that are the kit of the lake the barge is in.
+const KIT_KEYS = [
+  "clams",
+  "tackle",
+  "fit",
+  "holdSlots",
+  "raft",
+  "carry",
+  "parts",
+  "rigs",
+  "activeRig",
+  "fitted",
+];
+// The live kit, the stored kits, bait and the gear pointer, as plain data.
+const kitNow = (session) =>
+  session.eval((keys) => {
+    const s = window.__gw.progression.loop.state(),
+      kit = {};
+    for (const k of keys) kit[k] = s[k];
+    return JSON.parse(
+      JSON.stringify({ kit, kits: s.kits, bait: s.bait, gearWater: s.gearWater, water: s.barge.water }),
+    );
+  }, KIT_KEYS);
+// The state change of a tow, as the tow controller makes it (towBarge), without the animation.
+const towKit = (session, water) => session.eval((w) => window.__gw.progression.loop.towBarge(w), water);
+// Murk's Tackle and Raft tabs as id, price, which lake's piece and whether owned, and the fitted tackle's Grip
+// and cast as the Sheet shows them (holdOf).
+const shelfAndGrip = (session) =>
+  session.eval(() => {
+    const loop = window.__gw.progression.loop;
+    return {
+      items: loop
+        .shelf()
+        .tabs.filter((t) => t.id === "tackle" || t.id === "raft")
+        .flatMap((t) =>
+          t.items.map((i) => `${i.id}:${i.price}:${i.itemId ?? "-"}:${i.bought ? "owned" : "sale"}`),
+        ),
+      grip: loop.holdOf(),
+    };
+  });
+// A Mossmere kit with something in every field: rod, line and reel tiers, a creel, oars, the lead and Pike Wire
+// on Rig 1 with Rig 2 in use, and clams.
+async function fillMossmereKit(session) {
+  await buyAtHome(session, ["rod:1", "line:1", "reel:1", "hold:4", "oars:1"]);
+  await session.eval(() => window.__gw.progression.loop.useRig(1));
+}
+const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const NEW_GAME_PARTS = ["cork_float", "plain_knot", "mere_hook"];
+
 const SCENARIOS = [
   {
     name: "gear: on the water with the lead: no float, the line slants in, the Tip Bell on every rod, the depth word, the tip answers, a real press strikes and lands",
@@ -6893,6 +6943,329 @@ const SCENARIOS = [
         `with other orders: "${r.mixed}", expected "${mixed}"`,
       );
       return r.board.join(" / ");
+    },
+  },
+
+  {
+    name: "lake kits: the first tow sets Mossmere's kit and purse aside whole, and Sporewood starts from a new game's kit and clams",
+    fixture: "legend-sold",
+    debug: true,
+    editSave: withParts(["sounding_lead", "pike_wire"], { depth: "lead", leader: "pike_wire" }),
+    async run(session) {
+      await session.toHome();
+      await fillMossmereKit(session);
+      const before = await kitNow(session);
+      check(before.water === "mossmere" && sameJson(before.kits, {}), `before: ${JSON.stringify(before)}`);
+      await towKit(session, "sporewood");
+      const after = await kitNow(session);
+      const grip = await shelfAndGrip(session);
+      check(
+        sameJson(after.kits.mossmere, before.kit),
+        `Mossmere's kit was not set aside whole: ${JSON.stringify(after.kits.mossmere)} vs ${JSON.stringify(before.kit)}`,
+      );
+      const k = after.kit;
+      check(
+        k.clams === 0 &&
+          sameJson(k.tackle, { rod: 0, line: 0, reel: 0 }) &&
+          k.holdSlots === 3 &&
+          sameJson(k.raft, { oars: 0, keel: 0, lantern: 0 }) &&
+          Object.values(k.carry).every((v) => typeof v === "object" || v === 0) &&
+          Object.values(k.carry.raft).every((v) => v === 0) &&
+          sameJson(k.parts, NEW_GAME_PARTS) &&
+          k.activeRig === 0 &&
+          k.rigs.every((r) => r.bait === "spore_cake" && !r.lure && r.depth === "float") &&
+          k.fitted.bait === "spore_cake" &&
+          k.fitted.leader === "plain_knot" &&
+          k.fitted.hook === "mere_hook",
+        `Sporewood's kit is not a new game's: ${JSON.stringify(k)}`,
+      );
+      check(
+        after.gearWater === "sporewood" &&
+          after.bait.sporewood?.spore_cake === 10 &&
+          sameJson(after.bait.mossmere, before.bait.mossmere) &&
+          !after.kits.sporewood,
+        `bait or the gear pointer: ${JSON.stringify(after)}`,
+      );
+      // Nothing of Mossmere's tackle is carried: no Grip but the Wick's own, and Sporewood's own shelf.
+      check(
+        grip.grip.rod === 0 && grip.grip.line === 0 && grip.grip.reel === 0,
+        `carried Grip in Sporewood: ${JSON.stringify(grip.grip)}`,
+      );
+      check(
+        ["rod:1", "line:1", "reel:1"].every((id) =>
+          grip.items.some((i) => i.startsWith(id + ":") && /:(stalkwood|rootthread|capwheel):sale$/.test(i)),
+        ),
+        `Sporewood's shelf: ${grip.items}`,
+      );
+      return `set aside ${before.kit.clams} clams and rod ${before.kit.tackle.rod}; Sporewood starts plain`;
+    },
+  },
+
+  {
+    name: "lake kits: tow back and Mossmere's tiers, parts, rigs, fitted, bait, raft, creel and clams are exactly as left; tow again and Sporewood's are",
+    fixture: "legend-sold",
+    debug: true,
+    editSave: withParts(["sounding_lead", "pike_wire"], { depth: "lead", leader: "pike_wire" }),
+    async run(session) {
+      await session.toHome();
+      await fillMossmereKit(session);
+      const moss = await kitNow(session);
+      await towKit(session, "sporewood");
+      // Sporewood's own kit gets something in it too: clams, a rod and a creel, and the lure on Rig 3.
+      await buyAtHome(session, ["rod:1", "hold:4"]);
+      await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        loop.useRig(2);
+        loop.changeHook({ lure: "seedpod_twirl" });
+      });
+      const spore = await kitNow(session);
+      check(
+        spore.kit.tackle.rod === 1 && spore.kit.holdSlots === 4,
+        `Sporewood's buys: ${JSON.stringify(spore.kit)}`,
+      );
+      await towKit(session, "mossmere");
+      const back = await kitNow(session);
+      check(
+        sameJson(back.kit, moss.kit) &&
+          sameJson(back.bait.mossmere, moss.bait.mossmere) &&
+          back.gearWater === "mossmere",
+        `Mossmere after the trip: ${JSON.stringify(back.kit)} vs ${JSON.stringify(moss.kit)}`,
+      );
+      check(
+        sameJson(back.kits.sporewood, spore.kit),
+        `Sporewood set aside: ${JSON.stringify(back.kits.sporewood)}`,
+      );
+      await towKit(session, "sporewood");
+      const again = await kitNow(session);
+      check(
+        sameJson(again.kit, spore.kit) && sameJson(again.bait.sporewood, spore.bait.sporewood),
+        `Sporewood again: ${JSON.stringify(again.kit)} vs ${JSON.stringify(spore.kit)}`,
+      );
+      check(
+        sameJson(again.kits.mossmere, moss.kit),
+        `Mossmere set aside again: ${JSON.stringify(again.kits)}`,
+      );
+      return `Mossmere ${moss.kit.clams} clams, Sporewood ${spore.kit.clams}, both kept`;
+    },
+  },
+
+  {
+    name: "lake kits: Hob's Lamp, the journal, the hunt record, looks, charts, finds and the home are the same before and after tows",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      const record = () =>
+        session.eval(() => {
+          const g = window.__gw,
+            s = g.progression.loop.state();
+          return JSON.stringify({
+            relics: s.relics,
+            journal: g.state.meta.journal,
+            hunt: s.hunt,
+            looks: s.looks,
+            lakes: s.maps.lakes,
+            places: s.maps.places,
+            prints: s.prints,
+            finds: s.finds,
+            found: s.found,
+            home: s.home,
+            lures: s.lures.filter((id) => id !== "seedpod_twirl"),
+          });
+        });
+      const before = await record();
+      check(before.includes("hobs_lamp"), "the save has no Hob's Lamp");
+      await towKit(session, "sporewood");
+      const there = await record();
+      await towKit(session, "mossmere");
+      const back = await record();
+      check(there === before, `changed by the tow: ${there} vs ${before}`);
+      check(back === before, `changed by the tow back: ${back} vs ${before}`);
+      return "relics, journal, hunt, looks, charts, finds and home unchanged";
+    },
+  },
+
+  {
+    name: "lake kits: after a Sporewood visit, Murk's Tackle and Raft shelf in Mossmere lists the same items at the same prices, and the fitted tackle's Grip is the same",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      await buyAtHome(session, ["rod:1", "line:1", "line:2", "hold:4"]);
+      // The shelf as Murk lays it out on a later visit, not marking what was just bought (a trip's start
+      // empties that list; the trip itself is not started).
+      await session.eval(() => void window.__gw.progression.loop.createTrip({ startZone: "mossmere" }));
+      const before = await shelfAndGrip(session);
+      await towKit(session, "sporewood");
+      const there = await shelfAndGrip(session);
+      // Buying in Sporewood moves Sporewood's tiers only.
+      await buyAtHome(session, ["rod:1", "rod:2", "reel:1", "oars:1"]);
+      await towKit(session, "mossmere");
+      const after = await shelfAndGrip(session);
+      check(!sameJson(there.items, before.items), `Sporewood showed Mossmere's shelf: ${there.items}`);
+      check(sameJson(after.items, before.items), `Mossmere's shelf: ${after.items} vs ${before.items}`);
+      check(
+        sameJson(after.grip, before.grip),
+        `Mossmere's Grip: ${JSON.stringify(after.grip)} vs ${JSON.stringify(before.grip)}`,
+      );
+      return `${after.items.length} shelf rows the same; line Grip ${after.grip.line}`;
+    },
+  },
+
+  {
+    name: "lake kits, old save never towed: it loads unchanged with no stored kits",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session, { fixture }) {
+      await session.toHome();
+      const now = await kitNow(session);
+      const was = fixture.meta.loop;
+      check(sameJson(now.kits, {}) && now.gearWater === "mossmere", `kits: ${JSON.stringify(now)}`);
+      for (const k of ["clams", "tackle", "holdSlots", "raft"])
+        check(
+          sameJson(now.kit[k], was[k]),
+          `${k}: ${JSON.stringify(now.kit[k])} vs ${JSON.stringify(was[k])}`,
+        );
+      return `clams ${now.kit.clams}, kept`;
+    },
+  },
+
+  {
+    name: "lake kits, old save towed and in Sporewood: it keeps all it holds there, and Mossmere's kit is read back from the tow's record",
+    fixture: "sporewood-crossed",
+    debug: true,
+    async run(session, { fixture }) {
+      await session.toHome();
+      const now = await kitNow(session);
+      const was = fixture.meta.loop;
+      check(now.water === "sporewood" && now.gearWater === "sporewood", `where: ${JSON.stringify(now)}`);
+      for (const k of ["clams", "tackle", "holdSlots", "raft", "carry"])
+        check(
+          sameJson(now.kit[k], was[k]),
+          `${k}: ${JSON.stringify(now.kit[k])} vs ${JSON.stringify(was[k])}`,
+        );
+      // The fixture bought the Ashwood rod before its tow, so its record carries a third of the Ashwood's Grip.
+      const moss = now.kits.mossmere;
+      check(
+        moss && moss.tackle.rod === 1 && moss.tackle.line === 0 && moss.clams === 0 && moss.carry.rod === 0,
+        `Mossmere's kit: ${JSON.stringify(moss)}`,
+      );
+      await towKit(session, "mossmere");
+      const home = await shelfAndGrip(session);
+      check(
+        home.items.some((i) => /^rod:2:\d+:-:sale$/.test(i)) &&
+          !home.items.some((i) => /stalkwood|amberheart/.test(i)),
+        `Mossmere's shelf: ${home.items}`,
+      );
+      return `Sporewood kept ${now.kit.clams} clams; Mossmere's rod ${moss.tackle.rod}`;
+    },
+  },
+
+  {
+    name: "lake kits, old save towed and back in Mossmere: Sporewood's pieces wait in Sporewood, Mossmere's own come back, clams stay",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: (save) => {
+      const loop = save.meta.loop;
+      loop.barge.water = "mossmere";
+      loop.tackle = { rod: 1, line: 1, reel: 0 };
+    },
+    async run(session, { fixture }) {
+      await session.toHome();
+      const now = await kitNow(session);
+      const was = fixture.meta.loop;
+      check(now.water === "mossmere" && now.gearWater === "mossmere", `where: ${JSON.stringify(now)}`);
+      check(now.kit.clams === was.clams, `clams: ${now.kit.clams} vs ${was.clams}`);
+      check(
+        sameJson(now.kit.tackle, { rod: 1, line: 0, reel: 0 }) && now.kit.carry.rod === 0,
+        `Mossmere's tackle: ${JSON.stringify(now.kit)}`,
+      );
+      const away = now.kits.sporewood;
+      check(
+        away &&
+          sameJson(away.tackle, { rod: 1, line: 1, reel: 0 }) &&
+          sameJson(away.carry, was.carry) &&
+          away.holdSlots === was.holdSlots &&
+          away.clams === 0,
+        `Sporewood's kit: ${JSON.stringify(away)}`,
+      );
+      const home = await shelfAndGrip(session);
+      check(
+        !home.items.some((i) => /stalkwood|rootthread|capwheel/.test(i)),
+        `Mossmere's shelf: ${home.items}`,
+      );
+      await towKit(session, "sporewood");
+      const there = await kitNow(session);
+      check(
+        sameJson(there.kit.tackle, { rod: 1, line: 1, reel: 0 }),
+        `Sporewood again: ${JSON.stringify(there.kit)}`,
+      );
+      return `Mossmere rod ${now.kit.tackle.rod}, Sporewood rod and line waiting`;
+    },
+  },
+
+  {
+    name: "lake kits: a save and reload in Sporewood keeps both kits",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session, { page, browser }) {
+      await session.toHome();
+      await fillMossmereKit(session);
+      await towKit(session, "sporewood");
+      await buyAtHome(session, ["rod:1"]);
+      const before = await kitNow(session);
+      const saved = await session.saved();
+      const again = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await again.boot();
+        await again.toHome();
+        const after = await kitNow(again);
+        check(
+          after.water === "sporewood" && sameJson(after.kit, before.kit) && sameJson(after.kits, before.kits),
+          `after the reload: ${JSON.stringify(after)} vs ${JSON.stringify(before)}`,
+        );
+        await again.collectGameErrors();
+        check(!again.errors.length, `errors after reloading: ${again.errors.join("; ")}`);
+      } finally {
+        await again.close();
+      }
+      return `Sporewood ${before.kit.clams} clams, Mossmere ${before.kits.mossmere.clams} waiting`;
+    },
+  },
+
+  {
+    name: "lake kits: the 900 bounty is paid at Mossmere's tally into Mossmere's purse, and waits there through a tow",
+    fixture: "legend-sold",
+    debug: true,
+    editSave: unsold(),
+    async run(session) {
+      await session.toHome();
+      const r = await session.eval(() => {
+        const g = window.__gw,
+          loop = g.progression.loop,
+          s = loop.state(),
+          h = s.hunt.mossmere,
+          start = s.clams;
+        // She was landed this evening: the tally pays the bounty.
+        h.landed = s.evenings + 1;
+        h.bountyPaid = false;
+        // Her landing lays down Sporewood's chart (layMonsterChart); here it is laid by hand.
+        s.maps.lakes.includes("sporewood") || s.maps.lakes.push("sporewood");
+        const run = loop.createTrip({ startZone: "mossmere" });
+        g.state.run = run;
+        loop.endTrip();
+        g.state.run = null;
+        return { start, paid: s.clams, zone: run?.zone };
+      });
+      check(r.zone === "mossmere" && r.paid === r.start + 900, `the tally: ${JSON.stringify(r)}`);
+      await session.closeGuides(5000);
+      await towKit(session, "sporewood");
+      const there = await kitNow(session);
+      check(
+        there.kits.mossmere.clams === r.paid && there.kit.clams === 0,
+        `after the tow: ${JSON.stringify({ moss: there.kits.mossmere.clams, here: there.kit.clams })}`,
+      );
+      return `${r.start} + 900 = ${r.paid}, waiting in Mossmere`;
     },
   },
 ];
