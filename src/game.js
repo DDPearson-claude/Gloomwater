@@ -32873,6 +32873,7 @@ function zS(
     notes: r = null,
     water: l = null,
     depth = null,
+    leader = null,
   } = {},
 ) {
   let i = id(t),
@@ -32887,11 +32888,31 @@ function zS(
     let y = ka(d.shares?.[i]?.[w], 0);
     if (!(y > 0)) continue;
     let v = r ? I7(e, r, { area: w, place: null, phase: i }) : null,
-      b = l1(p.list, { area: w, place: null, phase: i, lure: n, bait: h, boost: v?.boost, water: f, depth });
+      b = l1(p.list, {
+        area: w,
+        place: null,
+        phase: i,
+        lure: n,
+        bait: h,
+        boost: v?.boost,
+        water: f,
+        depth,
+        leader,
+      });
     if (c)
       for (let O of b)
         O.sp?.rarity === "uncommon" ? (O.w *= 1 + 2 * c) : O.sp?.rarity === "rare" && (O.w *= 1 + 4 * c);
-    let L = P7(b, { lure: n, bait: h, phase: i, wickId: a, D: e, guests: v?.guests, water: f, depth }),
+    let L = P7(b, {
+        lure: n,
+        bait: h,
+        phase: i,
+        wickId: a,
+        D: e,
+        guests: v?.guests,
+        water: f,
+        depth,
+        leader,
+      }),
       E = L.reduce((O, T) => O + T.w, 0);
     if (E > 0) {
       for (let O of L) m[O.sp.id] = (m[O.sp.id] || 0) + (y * O.w) / E;
@@ -47464,7 +47485,7 @@ Ca.depth = {
     sounding_lead: "Fish that feed higher bite less often, and there is no float to watch.",
   },
   lure: "Lures swim at their own depth.",
-  fit: "Fit it on the Tackle screen, under Depth.",
+  fit: "To fit it, press the float on the Tackle screen.",
   words: { shallow: "Shallow", mid: "Middling", deep: "Deep" },
   gift: "Not every fish looks up. A lead takes your worm down to the ones that don't.",
   strike: "The rod tip pulls round. Press now.",
@@ -47512,6 +47533,78 @@ Ca.hook = {
   },
   lure: "Lures carry their own hooks.",
   setItself: "Set itself",
+};
+// The rig picture (mossmere-gear.md "The rig picture" and B6): the Tackle screen as one slice through the water.
+// Each part is a label on the picture; tapping one opens its tray of options. "good" and "cost" are the lines for
+// options the rows had none for (the Depth, Leader, Hook, Live Minnow and Worm Bunch lines are their own); a bait
+// or lure not listed falls back to its shelf line. "lower" is a rod, reel or line below the best one owned.
+Ca.rig = {
+  parts: {
+    rod: "Rod",
+    reel: "Reel",
+    line: "Line",
+    depth: "Depth",
+    leader: "Leader",
+    hook: "Hook",
+    bait: "Bait",
+    lure: "Lure",
+  },
+  trayBait: "Bait or lure",
+  owned: "Owned",
+  more: "More at Murk's",
+  back: "Back",
+  limit: {
+    line: "Lands up to {class}: the line is the limit.",
+    lure: "Lands up to {class}: the lure is the limit.",
+    bait: "Lands up to {class}: the bait is the limit.",
+    bare: "Lands up to {class}: the bare hook is the limit.",
+  },
+  here: "Here, now",
+  hereNone: "None of the fish you have caught bite this rig here and now.",
+  unmet: {
+    one: "One kind you have not caught yet bites here.",
+    many: "{n} kinds you have not caught yet bite here.",
+  },
+  numbers: [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+  ],
+  good: {
+    rod: "A better rod lands more of the fish you hook.",
+    reel: "A better reel lands more of the fish you hook.",
+    line: "A stronger line lands bigger fish.",
+    bare: "It never runs out.",
+    mireworm: "Nearly every fish takes a worm.",
+    lumen_moss: "The Gloam Eel and the Candlefin Koi take it.",
+    cut_strip: "Hunters take it, and it helps you land them.",
+    bent_spoon: "It swims back, so it is never used up.",
+    feather_fly: "Dusk Minnows, chub, Lampsippers and koi take it.",
+    glimmer_spoon: "Its flash brings pike and the big hunters.",
+    bone_jig: "It hops along the bottom for big perch and bass.",
+    bell_spinner: "The giants of Mossmere come to it.",
+    guard_button: "Most fish take it.",
+  },
+  cost: {
+    best: "It costs you nothing.",
+    lower: "Your {best} lands more fish.",
+    bait: "Each cast uses one.",
+    bare: "Bites come slowly, and it can't land big fish.",
+    lure: "Fish that won't chase a lure leave it alone.",
+    bent_spoon: "It can't land big fish.",
+    cut_strip: "Each cast uses one, and it can't land the biggest fish.",
+    guard_button: "Giants never take it.",
+  },
 };
 Ca.partLoss = {
   toothy: "Bitten through. Pike Wire stops teeth.",
@@ -105682,11 +105775,14 @@ function G3(
     water: i = "mossmere",
     notes: c = null,
     depth = null,
+    // The fitted leader (rigPartFishes), for the rig picture's "Here, now"; the Odds page leaves it out.
+    leader = null,
   } = {},
 ) {
   let d = n8[o] || "calm",
     f = typeof t == "string" ? jg(e, t) : t;
-  if (!f && !n) return zS(e, { light: o, lure: a, bait: s, wickId: r, rb: l, notes: c, water: i, depth });
+  if (!f && !n)
+    return zS(e, { light: o, lure: a, bait: s, wickId: r, rb: l, notes: c, water: i, depth, leader });
   let u = e.placePool(qi(e.SPECIES), { placeId: f?.id ?? null, phase: d, bait: s, wickId: r, water: i }),
     h = G5(e, {
       pool: u,
@@ -105699,6 +105795,7 @@ function G3(
       notes: c,
       water: i,
       depth,
+      leader,
     }),
     m = {};
   for (let g of qi(h.entries)) g.sp?.id && (m[g.sp.id] = (m[g.sp.id] || 0) + na(g.p));
@@ -105718,6 +105815,58 @@ function e8(
   return !Number.isFinite(i) || !Number.isFinite(c) || Math.round(i * 100) === Math.round(c * 100)
     ? null
     : { what: a, from: i, to: c, next: r, night: l };
+}
+// The rig picture's "Here, now" strip (mossmere-gear.md B6, mossmere-gear-deeper.md): the kinds of fish that would
+// bite this rig (`rig`: its bait and lure, as the picture shows them) here and now, from the Odds page's engine
+// (G3) with the Sounding Lead and the fitted leader's shifts. "Here" is the lifted place under the raft, else the
+// last cast's place or area, else (at home) the place picked on the chart, else open water. "Now" is the light out
+// on the water (`live`), else dusk as on the Odds page, and always night at a night place. Only kinds already caught are named, likeliest
+// first, at most `max`; the others are only counted. Legends never show (the thief bites by her own rule).
+function rigHereNow(meta, D, { run = null, live = null, cast = null, rig = {}, max = 5 } = {}) {
+  let loop = tp(meta?.loop) ? meta.loop : {},
+    trip = !!run && run.outing === "trip",
+    water =
+      (trip && typeof run.zone == "string" && run.zone) ||
+      loop.barge?.water ||
+      qi(loop.maps?.lakes)[0] ||
+      "mossmere",
+    lure = typeof rig?.lure == "string" ? rig.lure : null,
+    bait = !lure && typeof rig?.bait == "string" ? rig.bait : null,
+    wickId =
+      typeof D?.loopWickId == "function"
+        ? D.loopWickId(trip ? run.character : loop.wick)
+        : loop.wick || "wick",
+    lifted = new Set(qi(loop.lifted)),
+    places = qi(loop.maps?.places).filter((id) => lifted.has(id) && jg(D, id)),
+    placeId =
+      [live?.place, cast?.place, trip ? null : loop.chartPick?.place].find(
+        (id) => id && places.includes(id),
+      ) || null,
+    place = placeId ? jg(D, placeId) : null,
+    area = !place && typeof cast?.area == "string" && hg.includes(cast.area) ? cast.area : null,
+    light = place?.kind === "night" ? "night" : QA.includes(live?.light) ? live.light : "dusk",
+    shares = G3(D, {
+      place,
+      area,
+      light,
+      lure,
+      bait: bait === U3(D, water) ? null : bait,
+      wickId,
+      rb: Tle(D, (trip && run.stats) || null, bait),
+      water,
+      notes: n1(loop, D),
+      depth: soundingLeadFishes(loop, water, lure) ? "lead" : null,
+      leader: rigPartFishes(loop, "leader", water, lure),
+    }),
+    fish = [],
+    unmet = 0;
+  for (let [id, share] of Object.entries(shares)) {
+    let species = W3(D, id);
+    if (!(share > 0) || species?.rarity === "legendary" || thiefHidden(meta, id)) continue;
+    na(meta?.journal?.[id]?.caught) > 0 ? fish.push({ id, name: species?.name || id, share }) : unmet++;
+  }
+  fish.sort((a, b) => b.share - a.share || (a.id < b.id ? -1 : 1));
+  return { fish: fish.slice(0, max), unmet, place: placeId, area, light, water };
 }
 function hF(
   e,
@@ -109335,6 +109484,11 @@ function CF(e) {
     rigLeader,
     rigHook,
     fitPart,
+    // The rig picture's "Here, now" strip for this rig ({ bait, lure }); live and cast as the sheet takes them.
+    rigHereNow: (live = null, cast = null, rig = {}) => {
+      let run = a();
+      return p() ? rigHereNow(o(), n(), { run: r(run) ? run : null, live, cast, rig }) : null;
+    },
     hobLampLit,
     hobTalk,
     notepad,
@@ -161730,6 +161884,346 @@ function Mhe(e) {
                 : ["changeHook", { bait: e.pick }]
               : null;
 }
+// The rig picture (mossmere-gear.md "The rig picture" and B6, mossmere-gear-deeper.md): the tackle rows (khe) as
+// one slice through the water, a node for each part where it sits. Rod, reel and line always; the Depth part in a
+// water that fishes by depth; the Leader and the Hook once a second option is owned; and the bait or lure. With a
+// lure on, the Depth and the Hook merge into it (its tray says why). Each node's tray lists its options, each with
+// its "good for" and "costs you" lines, then what Murk's shelf (`shelf`, the shop's items) has for it that is not
+// owned. `limit` is the landing limit line, from the same caps as Bd.
+function rigPicture(e, opts = {}, shelf = []) {
+  let m = khe(e, opts),
+    s = i0(opts.metaLoop) ? opts.metaLoop : {},
+    tx = i0(e?.TEXT_LOOP) ? e.TEXT_LOOP : {},
+    rt = i0(tx.rig) ? tx.rig : {},
+    rows = Object.fromEntries(m.rows.map((r) => [r.kind, r])),
+    water = m.water,
+    lure = rows.lure?.items.find((i) => i.on)?.key ?? null,
+    baitOn = rows.bait?.items.find((i) => i.on) || null,
+    bait = !lure && baitOn && baitOn.key !== "bare" ? baitOn.key : null,
+    partLines = (slot, key) => [tx[slot]?.good?.[key], tx[slot]?.cost?.[key]].filter(Boolean),
+    // A rod, reel or line: what a better one does, and whether the best one owned is fitted. A find: what it does.
+    tackleLines = (kind, item, items) => {
+      if (item.find) return [tx.finds?.items?.[item.find]?.does].filter(Boolean);
+      let best = items.filter((i) => !i.find).reduce((b, i) => (!b || i.tier > b.tier ? i : b), null);
+      return [
+        rt.good?.[kind],
+        item === best ? rt.cost?.best : Ab(rt.cost?.lower || "", { best: best?.name || "" }),
+      ].filter(Boolean);
+    },
+    baitLines = (item) => {
+      let k = item.key;
+      if (item.kind === "bait" && k === "live_minnow") return [tx.live?.good, tx.live?.cost].filter(Boolean);
+      if (item.kind === "bait" && k === "heartmoss") return [tx.bunch?.good, tx.bunch?.cost].filter(Boolean);
+      if (k === "bare") return [rt.good?.bare, rt.cost?.bare].filter(Boolean);
+      return [
+        rt.good?.[k] || tx.shelf?.[k] || (item.find ? tx.finds?.items?.[item.find]?.does : null),
+        rt.cost?.[k] || (item.kind === "lure" ? rt.cost?.lure : rt.cost?.bait),
+      ].filter(Boolean);
+    },
+    // What Murk's shelf has for a node that is not owned: the next rod, reel or line, a leader or hook on the shelf,
+    // a lure, or a bait with none in stock.
+    more = (part) =>
+      Ed(shelf)
+        .filter(
+          (it) =>
+            i0(it) &&
+            it.bought !== !0 &&
+            it.sealed !== !0 &&
+            it.price != null &&
+            (Ug.includes(part)
+              ? it.slot === part
+              : part === "leader" || part === "hook"
+                ? it.slot === "part" && e?.LOOP?.rig?.parts?.[it.partId]?.slot === part
+                : part === "bait" &&
+                  (it.slot === "lure" ||
+                    ((it.slot === "tin" || it.slot === "bait") &&
+                      (it.water ?? water) === water &&
+                      !(am(it.count) > 0)))),
+        )
+        .map((it) => ({
+          id: String(it.id),
+          name: String(it.name || ""),
+          price: Math.max(0, Math.round(fh(it.price))),
+          shelf: it,
+          lines:
+            it.slot === "part"
+              ? partLines(e.LOOP.rig.parts[it.partId].slot, it.partId)
+              : Ug.includes(it.slot)
+                ? [rt.good?.[it.slot]].filter(Boolean)
+                : baitLines({
+                    kind: it.slot === "lure" ? "lure" : "bait",
+                    key: it.lureId || it.baitId || "",
+                  }),
+        })),
+    nodes = [],
+    node = (part, items, extra = {}) => {
+      let on = items.find((i) => i.on) || null;
+      nodes.push({
+        part,
+        head: rt.parts?.[part] || part,
+        name: on?.name || "",
+        key: on?.key ?? null,
+        items,
+        more: more(part === "lure" ? "bait" : part),
+        notes: [],
+        ...extra,
+      });
+    };
+  for (let kind of Ug) {
+    let items = Ed(rows[kind]?.items);
+    node(
+      kind,
+      items.map((i) => ({ ...i, lines: tackleLines(kind, i, items) })),
+    );
+  }
+  // The Depth part, the Leader and the Hook: as the rows offer them (a second option owned, in a water that has
+  // the part), each option with its own lines. The Depth and the Hook are not offered under a lure. The cork is
+  // drawn either way.
+  let depthWater = !!bs[water]?.depth,
+    depthFit = s.fitted?.depth === "lead" && Ed(s.parts).includes("sounding_lead") ? "lead" : "float";
+  for (let slot of ["depth", "leader", "hook"]) {
+    let row = rows[slot];
+    if (!row || row.note) continue;
+    node(
+      slot,
+      row.items.map((i) => ({ ...i, lines: partLines(slot, i.key) })),
+    );
+  }
+  // The bait or lure: one node, its tray holding the baits (the bare hook last) and the lures.
+  let baitItems = Ed(rows.bait?.items).map((i) => ({ ...i, lines: baitLines(i) })),
+    lureItems = Ed(rows.lure?.items).map((i) => ({ ...i, lines: baitLines(i) })),
+    lureNotes = lure ? [rows.depth?.note || null, rows.hook?.note || null].filter(Boolean) : [];
+  node(lure ? "lure" : "bait", [...baitItems, ...lureItems], {
+    head: lure ? rt.parts?.lure || "Lure" : rt.parts?.bait || "Bait",
+    tray: rt.trayBait || "Bait or lure",
+    groups: [
+      { head: rt.parts?.bait || "Bait", items: baitItems },
+      { head: rt.parts?.lure || "Lure", items: lureItems },
+    ].filter((g) => g.items.length),
+    notes: lureNotes,
+  });
+  // The tray of a node with nothing else: its options as one group.
+  for (let n of nodes) n.groups || (n.groups = [{ head: null, items: n.items }]), n.tray || (n.tray = n.head);
+  let order = ["rod", "reel", "line", "depth", "leader", "hook", "bait", "lure"];
+  nodes.sort((a, b) => order.indexOf(a.part) - order.indexOf(b.part));
+  return {
+    ...m,
+    nodes,
+    rig: { bait, lure },
+    draw: {
+      depth: lure ? null : depthWater ? depthFit : "float",
+      leader: nodes.some((n) => n.part === "leader") ? nodes.find((n) => n.part === "leader").key : null,
+      hook: nodes.some((n) => n.part === "hook") ? nodes.find((n) => n.part === "hook").key : null,
+      bait,
+      lure,
+    },
+    limit: rigLimitLine(e, s, water, lure ? "lure" : bait ? "bait" : "bare", lure || bait || "bare"),
+  };
+}
+// The rig's landing limit as one line (mossmere-gear.md B6 "Limit line"): the tighter of Bd's item cap (the lure,
+// the bait or the bare hook) and its line cap, the item winning a tie as in Bd. Bd's third cap, the grade, belongs
+// to each fish, not to the rig, so it is left out here.
+function rigLimitLine(e, s, water, kind, item) {
+  let classes = ["small", "keeper", "prize", "trophy", "elder"],
+    cap = e?.LOOP?.gearCap || {},
+    fit = ad(s, e),
+    hold = md(e, s, fit.hold),
+    lineCap =
+      fit.lineCap ||
+      qH(e, water, hold.line) ||
+      Ed(cap.line)[Math.min(Ed(cap.line).length - 1, ju(e, s, "line"))],
+    itemCap = cap.item?.[item] ?? null,
+    by =
+      itemCap &&
+      classes.includes(itemCap) &&
+      (!classes.includes(lineCap) || classes.indexOf(itemCap) <= classes.indexOf(lineCap))
+        ? kind
+        : classes.includes(lineCap)
+          ? "line"
+          : null,
+    words = e?.TEXT_LOOP?.rig?.limit?.[by];
+  return by && words
+    ? {
+        by,
+        cls: by === "line" ? lineCap : itemCap,
+        text: Ab(words, { class: xhe(e, by === "line" ? lineCap : itemCap) }),
+      }
+    : null;
+}
+// The rig picture's slice through the water (mossmere-gear.md B6 "Layout"), as SVG in a 360 by 420 box: the rod
+// and reel above the surface, three bands of water, the bed, and the end tackle where it sits. `draw` is
+// rigPicture's: depth "float" (the cork at the surface, the bait in mid-water), "lead" (the lead and the bait on
+// the bed, the Tip Bell on the rod tip) or null (a lure, in mid-water on its own); the leader and hook drawn as
+// parts only when they are nodes. Returns the SVG and each part's anchor point, where its label's pointer ends.
+var RIG_SLICE = { w: 360, h: 420, surface: 118, bed: 392, butt: [168, 104], tip: [344, 14], labelX: 146 };
+function rigSliceSvg(draw = {}) {
+  let { w, h, surface, bed, butt, tip } = RIG_SLICE,
+    at = (t) => [Zt(butt[0] + (tip[0] - butt[0]) * t), Zt(butt[1] + (tip[1] - butt[1]) * t)],
+    rodPart = (a, b, width, cls = "gw-rig-rod") =>
+      `<path class="${cls}" d="M${at(a).join(" ")} L${at(b).join(" ")}" stroke-width="${width}"/>`,
+    out = [],
+    anchors = {},
+    band = (bed - surface) / 3;
+  // The water: three bands, darker with depth, and the bed.
+  for (let i = 0; i < 3; i++)
+    out.push(
+      `<rect class="gw-rig-band gw-rig-band--${i}" x="0" y="${Zt(surface + i * band)}" width="${w}" height="${Zt(band + 1)}"/>`,
+    );
+  out.push(
+    `<path class="gw-rig-surface" d="M0 ${surface} C30 ${surface - 3} 60 ${surface + 3} 90 ${surface} S150 ${surface - 3} 180 ${surface} S240 ${surface + 3} 270 ${surface} S330 ${surface - 3} 360 ${surface}"/>`,
+    `<path class="gw-rig-bed" d="M0 ${bed + 2} C40 ${bed - 2} 80 ${bed + 4} 120 ${bed} S200 ${bed - 2} 240 ${bed + 2} S320 ${bed + 4} 360 ${bed} V${h} H0Z"/>`,
+  );
+  for (let x = 12; x < w; x += 22) out.push(`<path class="gw-rig-bedhatch" d="M${x} ${bed + 10} l8 -5"/>`);
+  // The rod, butt to tip, thinner as it goes; the reel under the butt.
+  out.push(
+    rodPart(0, 0.14, 7, "gw-rig-rod gw-rig-grip"),
+    rodPart(0.14, 0.45, 4.4),
+    rodPart(0.45, 0.75, 3.2),
+    rodPart(0.75, 1, 2.2),
+  );
+  let reel = [190, 104];
+  out.push(
+    `<path class="gw-rig-ink" d="M${at(0.12).join(" ")} L${reel[0]} ${reel[1] - 8}" stroke-width="2.4"/>`,
+    `<circle class="gw-rig-reel" cx="${reel[0]}" cy="${reel[1]}" r="8"/>`,
+    `<path class="gw-rig-ink" d="M${reel[0] - 4} ${reel[1]} H${reel[0] + 4} M${reel[0]} ${reel[1] - 4} V${reel[1] + 4}" stroke-width="1.2"/>`,
+    `<path class="gw-rig-ink" d="M${reel[0]} ${reel[1]} L${reel[0] + 9} ${reel[1] - 3}" stroke-width="1.8"/>`,
+    `<circle class="gw-rig-knob" cx="${reel[0] + 10}" cy="${reel[1] - 3}" r="2.6"/>`,
+  );
+  anchors.rod = at(0.5);
+  anchors.reel = [reel[0] - 9, reel[1]];
+  let line = (d) => out.push(`<path class="gw-rig-line" d="${d}"/>`),
+    lead = draw.depth === "lead",
+    float = draw.depth === "float";
+  // The end tackle: where the leader, hook and bait sit, upright under the cork or a lure, lying on the bed past
+  // the lead.
+  let end;
+  if (float) {
+    let x = tip[0];
+    line(`M${x} ${tip[1]} V100`);
+    out.push(
+      `<path class="gw-rig-ink" d="M${x} 100 V109" stroke-width="2"/>`,
+      `<ellipse class="gw-rig-cork" cx="${x}" cy="${surface + 2}" rx="7" ry="11"/>`,
+      `<path class="gw-rig-ink" d="M${x - 7} ${surface + 2} H${x + 7}" stroke-width="1"/>`,
+      `<path class="gw-rig-ink" d="M${x} ${surface + 13} V${surface + 18}" stroke-width="1.6"/>`,
+    );
+    anchors.line = [x, 60];
+    anchors.depth = [x - 8, surface + 2];
+    end = { x, y: 252, from: surface + 18, upright: !0 };
+  } else if (lead) {
+    let lx = 318,
+      ly = bed - 22;
+    line(`M${tip[0]} ${tip[1]} L${lx} ${ly}`);
+    // The Tip Bell on the rod tip, and the lead on the bed.
+    out.push(
+      `<path class="gw-rig-ink" d="M${tip[0]} ${tip[1]} V${tip[1] + 7}" stroke-width="1"/>`,
+      `<path class="gw-rig-brass" d="M${tip[0] - 6} ${tip[1] + 16} C${tip[0] - 6} ${tip[1] + 8} ${tip[0] + 6} ${tip[1] + 8} ${tip[0] + 6} ${tip[1] + 16} L${tip[0] + 8} ${tip[1] + 19} H${tip[0] - 8}Z"/>`,
+      `<circle class="gw-rig-knob" cx="${tip[0]}" cy="${tip[1] + 21}" r="1.6"/>`,
+      `<path class="gw-rig-lead" d="M${lx} ${ly} C${lx + 5} ${ly} ${lx + 9} ${ly + 10} ${lx + 9} ${ly + 15} C${lx + 9} ${ly + 20} ${lx + 5} ${ly + 23} ${lx} ${ly + 23} C${lx - 5} ${ly + 23} ${lx - 9} ${ly + 20} ${lx - 9} ${ly + 15} C${lx - 9} ${ly + 10} ${lx - 5} ${ly} ${lx} ${ly}Z"/>`,
+    );
+    anchors.line = [Zt(tip[0] + ((lx - tip[0]) * (60 - tip[1])) / (ly - tip[1])), 60];
+    anchors.depth = [lx - 9, ly + 14];
+    end = { x: 276, y: bed - 4, from: lx - 9, upright: !1 };
+  } else {
+    let x = 334;
+    anchors.line = [Zt(tip[0] + ((x - tip[0]) * (60 - tip[1])) / (222 - tip[1])), 60];
+    end = { x, y: 246, from: null, upright: !0, lure: !0 };
+    line(`M${tip[0]} ${tip[1]} L${x} ${draw.leader ? 222 : end.y}`);
+  }
+  // The leader, just above the hook (or the lure): a plain knot, brass wire or a short length of thick gut.
+  let leaderAt = null;
+  if (draw.leader) {
+    let len = 24;
+    if (end.upright) {
+      let y0 = end.y - len,
+        x = end.x;
+      end.from != null && line(`M${x} ${end.from} V${y0}`);
+      leaderAt = [x, y0 + len / 2];
+      out.push(rigLeaderPath(draw.leader, `M${x} ${y0} V${end.y}`, x, y0, 0, len));
+    } else {
+      let x0 = end.x + len;
+      line(`M${end.from} ${end.y} H${x0}`);
+      leaderAt = [x0 - len / 2, end.y];
+      out.push(rigLeaderPath(draw.leader, `M${x0} ${end.y} H${end.x}`, x0, end.y, 1, len));
+    }
+    anchors.leader = leaderAt;
+  } else if (end.from != null)
+    line(end.upright ? `M${end.x} ${end.from} V${end.y}` : `M${end.from} ${end.y} H${end.x}`);
+  // The lure, or the hook with the bait on it.
+  if (end.lure) {
+    out.push(rigLureSvg(draw.lure, end.x, end.y));
+    anchors.bait = [end.x - 8, end.y + 16];
+  } else {
+    let { x, y } = end,
+      turn = draw.hook === "turnback_hook";
+    out.push(
+      `<path class="gw-rig-hook" d="${
+        end.upright
+          ? turn
+            ? `M${x} ${y} V${y + 14} C${x} ${y + 28} ${x - 18} ${y + 30} ${x - 18} ${y + 18} C${x - 18} ${y + 10} ${x - 10} ${y + 9} ${x - 7} ${y + 14}`
+            : `M${x} ${y} V${y + 18} C${x} ${y + 28} ${x - 14} ${y + 28} ${x - 14} ${y + 18} L${x - 11} ${y + 13}`
+          : turn
+            ? `M${x} ${y} H${x - 14} C${x - 26} ${y} ${x - 28} ${y - 12} ${x - 18} ${y - 13} C${x - 13} ${y - 13} ${x - 12} ${y - 8} ${x - 15} ${y - 6}`
+            : `M${x} ${y} H${x - 18} C${x - 26} ${y} ${x - 26} ${y - 10} ${x - 18} ${y - 10} L${x - 14} ${y - 7}`
+      }"/>`,
+    );
+    let bx = end.upright ? x - 7 : x - 22,
+      by = end.upright ? y + 26 : y - 6;
+    draw.bait && out.push(rigBaitSvg(draw.bait, bx, by));
+    anchors.hook = end.upright ? [x + 1, y + 12] : [x - 8, y + 1];
+    anchors.bait = draw.bait ? [bx - 8, by] : end.upright ? [x - 14, y + 20] : [x - 24, y - 4];
+  }
+  return {
+    svg: `<svg class="gw-rig-svg" viewBox="0 0 ${w} ${h}" aria-hidden="true" focusable="false"><g fill="none" stroke-linecap="round" stroke-linejoin="round">${out.join("")}</g></svg>`,
+    anchors,
+  };
+}
+// A leader drawn along `d` (from x, y, upright or lying, `len` long): a plain knot, a zigzag of brass wire, or a
+// short thick amber length of gut.
+function rigLeaderPath(id, d, x, y, lying, len) {
+  if (id === "pike_wire") {
+    let pts = [];
+    for (let i = 0; i <= 6; i++) {
+      let o = i === 0 || i === 6 ? 0 : i % 2 ? 3 : -3,
+        s = (len * i) / 6;
+      pts.push(lying ? `${Zt(x - s)} ${Zt(y + o)}` : `${Zt(x + o)} ${Zt(y + s)}`);
+    }
+    return `<path class="gw-rig-wire" d="M${pts.join(" L")}"/>`;
+  }
+  if (id === "chafe_gut") return `<path class="gw-rig-gut" d="${d}"/>`;
+  let kx = lying ? x - len / 2 : x,
+    ky = lying ? y : y + len / 2;
+  return `<path class="gw-rig-line" d="${d}"/><ellipse class="gw-rig-knot" cx="${Zt(kx)}" cy="${Zt(ky)}" rx="${lying ? 4 : 3}" ry="${lying ? 3 : 4}"/>`;
+}
+// The bait on the hook at (x, y): a minnow, a strip of meat, a ball of moss, a bunch of worms, or a worm.
+function rigBaitSvg(id, x, y) {
+  let worm = (dx, dy) => `<path class="gw-rig-worm" d="M${x - 10 + dx} ${y + dy} c3 -5 6 5 9 0 s6 5 9 0"/>`;
+  return id === "live_minnow"
+    ? `<path class="gw-rig-fish" d="M${x - 11} ${y} C${x - 5} ${y - 6} ${x + 5} ${y - 6} ${x + 9} ${y} C${x + 5} ${y + 6} ${x - 5} ${y + 6} ${x - 11} ${y}Z M${x + 9} ${y} L${x + 15} ${y - 5} V${y + 5}Z"/><circle class="gw-rig-knob" cx="${x - 6}" cy="${y - 1}" r="1"/>`
+    : id === "cut_strip"
+      ? `<path class="gw-rig-fish" d="M${x - 9} ${y - 3} H${x + 9} L${x + 7} ${y + 3} H${x - 7}Z"/>`
+      : id === "lumen_moss" || id === "glowcap_bulb"
+        ? `<circle class="gw-rig-moss" cx="${x}" cy="${y}" r="6"/><path class="gw-rig-ink" d="M${x - 3} ${y - 2} l3 3 M${x + 1} ${y - 4} l2 3 M${x - 1} ${y + 2} l3 2" stroke-width=".8"/>`
+        : id === "heartmoss"
+          ? worm(0, -5) + worm(2, 0) + worm(-1, 5)
+          : worm(0, 0);
+}
+// A lure hanging from its eye at (x, y): a fly, a jig, a spinner's blade, a little wooden fish, a button, or a
+// spoon.
+function rigLureSvg(id, x, y) {
+  let treble = (ty) =>
+    `<path class="gw-rig-treble" d="M${x} ${ty} V${ty + 6} M${x - 4} ${ty + 4} C${x - 4} ${ty + 9} ${x + 4} ${ty + 9} ${x + 4} ${ty + 4}"/>`;
+  return /fly|moth/.test(id)
+    ? `<path class="gw-rig-lure" d="M${x} ${y} V${y + 22}"/><path class="gw-rig-feather" d="M${x} ${y + 4} C${x - 12} ${y + 8} ${x - 10} ${y + 20} ${x} ${y + 22} C${x + 10} ${y + 20} ${x + 12} ${y + 8} ${x} ${y + 4}Z"/>${treble(y + 22)}`
+    : /jig/.test(id)
+      ? `<circle class="gw-rig-lure" cx="${x}" cy="${y + 7}" r="6"/><path class="gw-rig-feather" d="M${x - 3} ${y + 12} C${x - 8} ${y + 22} ${x - 4} ${y + 30} ${x - 2} ${y + 34} M${x + 3} ${y + 12} C${x + 8} ${y + 22} ${x + 4} ${y + 30} ${x + 2} ${y + 34}"/>`
+      : /spinner|twirl/.test(id)
+        ? `<path class="gw-rig-lure" d="M${x} ${y} V${y + 26}"/><ellipse class="gw-rig-blade" cx="${x + 7}" cy="${y + 10}" rx="5" ry="9" transform="rotate(-20 ${x + 7} ${y + 10})"/><path class="gw-rig-brass" d="M${x - 5} ${y + 24} C${x - 5} ${y + 17} ${x + 5} ${y + 17} ${x + 5} ${y + 24}Z"/>${treble(y + 26)}`
+        : /minnow/.test(id)
+          ? `<path class="gw-rig-lure" d="M${x} ${y} C${x + 6} ${y + 4} ${x + 7} ${y + 18} ${x} ${y + 24} C${x - 7} ${y + 18} ${x - 6} ${y + 4} ${x} ${y}Z"/>${treble(y + 24)}`
+          : /button/.test(id)
+            ? `<circle class="gw-rig-lure" cx="${x}" cy="${y + 8}" r="7"/><circle class="gw-rig-knob" cx="${x - 2}" cy="${y + 7}" r="1.2"/><circle class="gw-rig-knob" cx="${x + 2}" cy="${y + 9}" r="1.2"/>${treble(y + 15)}`
+            : `<path class="gw-rig-lure" d="M${x} ${y} C${x + 8} ${y + 6} ${x + 8} ${y + 24} ${x} ${y + 30} C${x - 8} ${y + 24} ${x - 8} ${y + 6} ${x} ${y}Z"/>${treble(y + 30)}`;
+}
 var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" focusable="false">
   <path class="gw-tk-wallf" d="M3 36V45C3 49 5.5 52 10 52H98C102.5 52 105 49 105 45V36"/>
   <path class="gw-tk-hatch" d="M10 43V49M16 43.5V50M22 44V50.5M28 44V50.5M34 44V50.5M40 44V50.5M46 44V50.5M52 44V50.5M58 44V50.5M64 44V50.5M70 44V50.5M76 44V50.5M82 44V50.5M88 44V50.5M94 44V50M100 43.5V49"/>
@@ -161962,6 +162456,79 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
   .gw-ts-art { width: 52px; height: 39px; }
 }
 @media (prefers-reduced-motion: reduce) { .gw-m-tacklescreen .gw-modal-body { transition: none; } }
+/* The rig picture (mossmere-gear.md B6): a slice through the water, a label for each part down its left side with a
+   dotted pointer to where the part sits, then the limit line and "Here, now". A part's tray covers the screen until
+   an option is fitted or Back is pressed. Every target ≥ 44 px, text ≥ 16 px (the part's kind above its name,
+   14 px capitals like a row head). */
+.gw-rig-wrap { width: 100%; max-width: 440px; margin: 0 auto; }
+.gw-rig { position: relative; width: 100%; aspect-ratio: 360 / 420; }
+.gw-rig-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+.gw-rig-band--0 { fill: rgba(120, 132, 196, .08); }
+.gw-rig-band--1 { fill: rgba(70, 82, 150, .15); }
+.gw-rig-band--2 { fill: rgba(30, 36, 90, .26); }
+.gw-rig-surface { stroke: var(--ink-dim); stroke-width: 1.4; opacity: .8; }
+.gw-rig-bed { fill: rgba(12, 12, 22, .72); stroke: var(--ink-faint); stroke-width: 1.2; }
+.gw-rig-bedhatch { stroke: var(--ink-faint); stroke-width: 1; opacity: .6; }
+.gw-rig-rod, .gw-rig-ink, .gw-rig-knot, .gw-rig-hook { stroke: var(--ink); }
+.gw-rig-grip { stroke: #8a6a48; }
+.gw-rig-knot { stroke-width: 2; }
+.gw-rig-hook { stroke-width: 2.6; }
+.gw-rig-treble { stroke: var(--ink); stroke-width: 1.6; }
+.gw-rig-reel { fill: rgba(20, 22, 40, .9); stroke: var(--ink); stroke-width: 2; }
+.gw-rig-knob, .gw-rig-dot { fill: var(--ink); stroke: none; }
+.gw-rig-line { stroke: var(--ink-dim); stroke-width: 1.3; }
+.gw-rig-cork { fill: #c8743a; stroke: var(--ink); stroke-width: 1.6; }
+.gw-rig-lead { fill: #6f7384; stroke: var(--ink); stroke-width: 1.6; }
+.gw-rig-brass { fill: #c9a44a; stroke: var(--ink); stroke-width: 1.2; }
+.gw-rig-wire { stroke: #d8b25a; stroke-width: 2; }
+.gw-rig-gut { stroke: #c08a3c; stroke-width: 5; }
+.gw-rig-worm { stroke: #c98c86; stroke-width: 3.4; }
+.gw-rig-fish { fill: #9aa6b8; stroke: var(--ink); stroke-width: 1.2; }
+.gw-rig-moss { fill: #5f8a5a; stroke: var(--ink); stroke-width: 1.2; }
+.gw-rig-lure { fill: #b9b4c8; stroke: var(--ink); stroke-width: 1.4; }
+.gw-rig-feather { fill: #8f6a8c; stroke: var(--ink); stroke-width: 1; }
+.gw-rig-blade { fill: #d9d4e4; stroke: var(--ink); stroke-width: 1.2; }
+.gw-rig-pointer { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 2 4; }
+.gw-rig-dot { fill: var(--ink-dim); }
+.gw-rig-hit { fill: transparent; stroke: none; pointer-events: all; cursor: pointer; }
+.gw-rig-node { position: absolute; left: 0; width: calc(146 / 360 * 100%); min-height: 48px; transform: translateY(-50%); display: flex; flex-direction: column;
+  justify-content: center; align-items: flex-start; gap: 1px; padding: 3px 6px 3px 2px; border: none; border-radius: 8px; background: none; color: var(--ink);
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color .2s; }
+.gw-rig-kind { font: 400 14px/1.1 var(--f-display); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); text-shadow: var(--ink-shadow); }
+.gw-rig-name { font: 400 16px/1.15 var(--f-body); color: var(--ink-hi); text-shadow: var(--ink-shadow); overflow-wrap: normal; word-break: normal; }
+.gw-rig-node:hover, .gw-rig-node:focus-visible { outline: none; background-color: rgba(174, 172, 208, .1); }
+.gw-rig-node:hover .gw-rig-name, .gw-rig-node:focus-visible .gw-rig-name { text-shadow: 0 0 14px var(--glow), var(--ink-shadow); }
+.gw-rig-limit { margin: 8px 0 0; font: italic 400 17px/1.3 var(--f-body); color: var(--ink); text-shadow: var(--ink-shadow); }
+.gw-rig-here { margin-top: 10px; }
+.gw-rig-here .gw-ts-h { margin-bottom: 4px; }
+.gw-rig-fish { display: flex; flex-wrap: wrap; gap: 2px 16px; margin: 0; padding: 0; list-style: none; }
+.gw-rig-fishname { font: 400 16px/1.35 var(--f-body); color: var(--ink); text-shadow: var(--ink-shadow); }
+.gw-rig-here .gw-ts-note { padding: 2px 0 0; }
+.gw-rig-tray { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: inherit; background: rgba(var(--veil-rgb), .97); }
+.gw-ts.gw-rig-traying > :not(.gw-rig-tray):not(.gw-ts-pool) { visibility: hidden; }
+.gw-rig-trayhead { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.gw-rig-back { min-height: 48px; }
+.gw-rig-opts { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; display: flex; flex-direction: column; gap: 2px; }
+.gw-rig-opts::-webkit-scrollbar { display: none; }
+.gw-rig-sub { margin: 10px 0 2px; }
+.gw-rig-opt { position: relative; flex: none; display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: start; width: 100%;
+  min-height: 56px; padding: 6px 8px 8px 8px; border: none; border-radius: 10px; background: none; color: var(--ink-dim); text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: background-color .2s; }
+.gw-rig-opt .gw-ts-art { grid-row: 1 / span 4; }
+.gw-rig-txt { grid-column: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.gw-rig-oname { font: 400 17px/1.2 var(--f-body); color: var(--ink); text-shadow: var(--ink-shadow); }
+.gw-rig-owned, .gw-rig-price { font: 500 16px/1.2 var(--f-body); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.gw-rig-price .gw-ico { width: 18px; height: 18px; vertical-align: -3px; }
+.gw-rig-line { grid-column: 2; display: block; font: 400 16px/1.25 var(--f-body); color: var(--ink); text-shadow: var(--ink-shadow); }
+.gw-rig-cost { color: var(--ink-dim); font-style: italic; }
+.gw-rig-log { color: var(--ink-faint); }
+button.gw-rig-opt:hover, button.gw-rig-opt:focus-visible { outline: none; background-color: rgba(174, 172, 208, .08); }
+.gw-rig-opt[aria-pressed=true] .gw-rig-oname { color: var(--ink-hi); text-shadow: 0 0 14px var(--glow), var(--ink-shadow); }
+.gw-rig-opt[aria-pressed=true] .gw-ts-art { opacity: 1; filter: drop-shadow(0 0 7px var(--glow-soft)); }
+.gw-rig-opt[aria-pressed=true]::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--ink-dim); }
+div.gw-rig-shop { cursor: default; opacity: .8; }
+.gw-ts.gw-ts-busy .gw-rig-opt[data-owned=true]:not([aria-pressed=true]) { opacity: .45; }
+@media (max-width: 699px) { .gw-rig-opt { grid-template-columns: 52px minmax(0, 1fr); } }
 /* a trip's tips and Murk's lines wait under the drawer and the Tackle screen (quiet modals, which ui.js's .gw-tipless does not count):
    never a line over a chip or Done */
 .gw-loop-on.gw-tk-veiled .gw-loop-tip, .gw-loop-on.gw-tk-veiled .gw-toast--murk { opacity: 0 !important; visibility: hidden; }
@@ -162251,13 +162818,18 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       let J = i();
       return J && J.outing === "trip" && J.active !== !1 && s.flow !== "home" ? J : null;
     },
+    // The tackle screen's model: the rig picture over the tackle rows, with Murk's shelf for the trays.
     be = () =>
-      khe(n(), {
-        metaLoop: t("state"),
-        run: D(),
-        line: D() ? c() : null,
-        canChange: t("canChangeHook") !== !1,
-      }),
+      rigPicture(
+        n(),
+        {
+          metaLoop: t("state"),
+          run: D(),
+          line: D() ? c() : null,
+          canChange: t("canChangeHook") !== !1,
+        },
+        shelfItems(),
+      ),
     Se = () => {
       let J = n(),
         Ne = J?.loopWickId?.(t("wick")) || "wick",
@@ -162360,6 +162932,233 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       Xe
     );
   }
+  // The rig picture's "Here, now" inputs: on a trip, the lifted place under the raft and the light (as the sheet
+  // reads them), and the last cast's place or area.
+  let hereLive = () => {
+      if (!D()) return null;
+      try {
+        let pos = s.player?.position,
+          w = pos ? s.fishing?.waterAt?.(pos) : null,
+          phase = s.survival?.getPhaseInfo?.()?.phase ?? i()?.phase ?? "calm",
+          lifted = new Set(Ed(t("lifted")));
+        return {
+          place: w && !w.mist && w.placeId && lifted.has(w.placeId) ? w.placeId : null,
+          light: typeof n().loopLight == "function" ? n().loopLight(phase) : "day",
+        };
+      } catch (err) {
+        return o("rig.live", err), null;
+      }
+    },
+    hereCast = () => {
+      try {
+        return D() ? s.fishing?.lastCastArea?.() || null : null;
+      } catch {
+        return null;
+      }
+    },
+    shelfItems = () => Ed(t("shelf")?.tabs).flatMap((tab) => Ed(tab?.items)),
+    // At home the raft is at Murk's jetty, so what he sells can be bought in a tray; out on the water it can't.
+    atMurks = () => !D(),
+    rigWords = () => (i0(n()?.TEXT_LOOP?.rig) ? n().TEXT_LOOP.rig : {}),
+    countWords = (count) => {
+      let w = rigWords(),
+        word = Ed(w.numbers)[count] || String(count);
+      return Ab(count === 1 ? w.unmet?.one || "" : w.unmet?.many || "", { n: word });
+    },
+    focusSig = (el) =>
+      el?.dataset
+        ? `${el.dataset.part || ""}|${el.dataset.key || ""}|${el.dataset.buy || ""}|${el.dataset.action || ""}`
+        : "";
+  // A part's drawing in a tray, as the rows drew it: a plain line drawing, an engraved plate, or a find's picture.
+  function rigArt(item, uid) {
+    let wrap = a("span", "gw-ts-art");
+    wrap.setAttribute("aria-hidden", "true");
+    try {
+      if (item.shelf)
+        wrap.innerHTML =
+          item.shelf.slot === "part"
+            ? dV[item.shelf.partId] || ""
+            : om({ ...item.shelf, art: item.shelf.art || LV[item.shelf.slot] }, { uid });
+      else if (item.find) {
+        let cv = document.createElement("canvas");
+        j0(cv, n(), item.find, { w: 80, h: 60, pad: 0.1 }),
+          (cv.style.width = "100%"),
+          (cv.style.height = "100%");
+        wrap.appendChild(cv);
+      } else wrap.innerHTML = item.plain ? dV[item.plain] || dV.bare : om(item.art, { uid });
+    } catch (err) {
+      o("rig.art", err);
+    }
+    return wrap;
+  }
+  // One option in a tray: its drawing, its name with Owned, its count or its price, and its lines. An owned one
+  // fits when pressed; one on Murk's shelf is bought when pressed at Murk's, and is only shown out on the water.
+  function rigOption(node, item, uid, { shop = !1 } = {}) {
+    let w = rigWords(),
+      buyable = shop && atMurks(),
+      el = a(shop && !buyable ? "div" : "button", `gw-rig-opt${shop ? " gw-rig-shop" : ""}`);
+    el.tagName === "BUTTON" && (el.type = "button");
+    el.dataset.part = node.part;
+    shop
+      ? (el.dataset.buy = item.id)
+      : ((el.dataset.key = item.key), el.setAttribute("aria-pressed", String(!!item.on)));
+    el.dataset.owned = String(!shop);
+    el.appendChild(rigArt(item, uid));
+    let txt = a("span", "gw-rig-txt"),
+      name = a("span", "gw-rig-oname"),
+      tag = a("span", shop ? "gw-rig-price" : "gw-rig-owned");
+    name.textContent = item.name;
+    shop
+      ? (tag.innerHTML = sm(item.price))
+      : (tag.textContent =
+          item.count != null ? String(item.count) : item.key === "bare" ? "" : w.owned || "Owned");
+    txt.appendChild(name), tag.textContent || tag.innerHTML ? txt.appendChild(tag) : null;
+    el.appendChild(txt);
+    Ed(item.lines).forEach((line, k) => {
+      let p = a("span", `gw-rig-line${k ? " gw-rig-cost" : ""}`);
+      (p.textContent = line), el.appendChild(p);
+    });
+    for (let line of Ed(item.log)) {
+      let p = a("span", "gw-rig-line gw-rig-log");
+      (p.textContent = line), el.appendChild(p);
+    }
+    el.setAttribute(
+      "aria-label",
+      [item.name, shop ? `${item.price}` : tag.textContent, ...Ed(item.lines)].filter(Boolean).join(". "),
+    );
+    el.tagName === "BUTTON" &&
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation(), shop ? rigBuy(item.id) : rigFit(node, item);
+      });
+    return el;
+  }
+  // A node's tray, over the picture: its options, then what Murk has for it.
+  function rigTray(model, part, words) {
+    let node = model.nodes.find((nd) => nd.part === part),
+      w = rigWords();
+    if (!node) return null;
+    let tray = a("section", "gw-rig-tray");
+    (tray.dataset.part = part), tray.setAttribute("aria-label", node.tray);
+    let head = a("header", "gw-rig-trayhead"),
+      h = a("h3", "gw-ts-title");
+    h.textContent = node.tray;
+    let back = a("button", "gw-btn gw-rig-back");
+    (back.type = "button"), (back.dataset.action = "back"), (back.textContent = w.back || "Back");
+    back.addEventListener("click", (ev) => {
+      ev.stopPropagation(), l("ui_click"), rigTrayOpen(null);
+    });
+    head.appendChild(h), head.appendChild(back), tray.appendChild(head);
+    let list = a("div", "gw-rig-opts");
+    for (let line of [...Ed(node.notes), model.busy ? words.after : null].filter(Boolean)) {
+      let p = a("p", "gw-ts-note gw-rig-note");
+      (p.textContent = line), list.appendChild(p);
+    }
+    node.groups.forEach((group, gi) => {
+      if (group.head && node.groups.length > 1) {
+        let sub = a("h4", "gw-ts-h gw-rig-sub");
+        (sub.textContent = group.head), list.appendChild(sub);
+      }
+      group.items.forEach((item, k) => list.appendChild(rigOption(node, item, `rig-${part}-${gi}-${k}`)));
+    });
+    if (node.more.length) {
+      let sub = a("h4", "gw-ts-h gw-rig-sub gw-rig-more");
+      (sub.textContent = w.more || "More at Murk's"), list.appendChild(sub);
+      node.more.forEach((item, k) =>
+        list.appendChild(rigOption(node, item, `rig-${part}-m${k}`, { shop: !0 })),
+      );
+    }
+    tray.appendChild(list);
+    return tray;
+  }
+  // The picture: the slice, a label button for each part with a pointer to where it sits, then the limit line and
+  // the "Here, now" strip.
+  function rigCard(model) {
+    let w = rigWords(),
+      card = a("div", "gw-rig");
+    (card.dataset.loop = "rig"),
+      (card.dataset.depth = model.draw.depth || "lure"),
+      (card.dataset.bait = model.rig.bait || ""),
+      (card.dataset.lure = model.rig.lure || "");
+    let slice = rigSliceSvg(model.draw),
+      { h, labelX } = RIG_SLICE,
+      ys = model.nodes.map((_n, k) => 24 + k * 60),
+      pointers = model.nodes
+        .map((nd, k) => {
+          let p = slice.anchors[nd.part === "lure" ? "bait" : nd.part];
+          return p
+            ? `<path class="gw-rig-pointer" d="M${labelX} ${ys[k]} L${p[0]} ${p[1]}"/><circle class="gw-rig-dot" cx="${p[0]}" cy="${p[1]}" r="2.4"/>`
+            : "";
+        })
+        .join("");
+    card.innerHTML = slice.svg.replace("</g></svg>", `${pointers}</g></svg>`);
+    model.nodes.forEach((nd, k) => {
+      let b = a("button", "gw-rig-node");
+      (b.type = "button"),
+        (b.dataset.part = nd.part),
+        (b.dataset.key = nd.key ?? ""),
+        b.setAttribute("aria-haspopup", "dialog"),
+        b.setAttribute("aria-label", `${nd.head}: ${nd.name}`),
+        (b.style.top = `${((ys[k] / h) * 100).toFixed(2)}%`);
+      let kind = a("span", "gw-rig-kind"),
+        name = a("span", "gw-rig-name");
+      (kind.textContent = nd.head), (name.textContent = nd.name), b.appendChild(kind), b.appendChild(name);
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation(), l("ui_click", { volume: 0.42, pitch: 0.7 }), rigTrayOpen(nd.part);
+      });
+      card.appendChild(b);
+    });
+    // The drawn parts open their trays too.
+    for (let nd of model.nodes) {
+      let p = slice.anchors[nd.part === "lure" ? "bait" : nd.part];
+      if (!p) continue;
+      let hit = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      hit.setAttribute("class", "gw-rig-hit"),
+        hit.setAttribute("cx", p[0]),
+        hit.setAttribute("cy", p[1]),
+        hit.setAttribute("r", "16"),
+        (hit.dataset.part = nd.part),
+        hit.addEventListener("click", (ev) => {
+          ev.stopPropagation(), l("ui_click", { volume: 0.42, pitch: 0.7 }), rigTrayOpen(nd.part);
+        });
+      card.querySelector("svg")?.appendChild(hit);
+    }
+    let wrap = a("div", "gw-rig-wrap");
+    wrap.appendChild(card);
+    if (model.limit) {
+      let p = a("p", "gw-rig-limit");
+      (p.dataset.by = model.limit.by), (p.dataset.cls = model.limit.cls), (p.textContent = model.limit.text);
+      wrap.appendChild(p);
+    }
+    let here = null;
+    try {
+      here = t("rigHereNow", hereLive(), hereCast(), model.rig);
+    } catch (err) {
+      o("rig.here", err);
+    }
+    if (here) {
+      let sec = a("section", "gw-rig-here");
+      sec.dataset.loop = "rig-here";
+      let hh = a("h3", "gw-ts-h");
+      (hh.textContent = w.here || "Here, now"), sec.appendChild(hh);
+      if (here.fish.length) {
+        let ul = a("ul", "gw-rig-fish");
+        for (let f of here.fish) {
+          let li = a("li", "gw-rig-fishname");
+          (li.dataset.species = f.id), (li.textContent = f.name), ul.appendChild(li);
+        }
+        sec.appendChild(ul);
+      } else {
+        let p = a("p", "gw-ts-note gw-rig-none");
+        (p.textContent = w.hereNone || ""), sec.appendChild(p);
+      }
+      if (here.unmet > 0) {
+        let p = a("p", "gw-ts-note gw-rig-unmet");
+        (p.dataset.n = String(here.unmet)), (p.textContent = countWords(here.unmet)), sec.appendChild(p);
+      }
+      wrap.appendChild(sec);
+    }
+    return wrap;
+  }
   function X(J, Ne) {
     let Xe = be(),
       lt = Xe.words,
@@ -162384,55 +163183,9 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       (Me.textContent = lt.after), rt.appendChild(Me);
     }
     rt.childNodes.length && N.appendChild(rt), xe.appendChild(N);
+    // The rig as one picture, in place of the rows (mossmere-gear.md B6).
     let dt = a("div", "gw-ts-rows");
-    for (let Me of Xe.rows) {
-      let ve = a("section", "gw-ts-row");
-      ve.dataset.row = Me.kind;
-      let oe = a("h3", "gw-ts-h");
-      if (((oe.textContent = Me.head), ve.appendChild(oe), Me.note)) {
-        // A row with nothing to choose shows one line instead (the Depth row with a lure on).
-        let note = a("p", "gw-ts-note");
-        (note.textContent = Me.note), ve.appendChild(note), dt.appendChild(ve);
-        continue;
-      }
-      let Qe = a("div", "gw-ts-strip");
-      Qe.setAttribute("role", "group"),
-        Qe.setAttribute("aria-label", Me.head),
-        Me.items.forEach((Re, ge) => Qe.appendChild(he(Re, `ts-${Me.kind}-${ge}`))),
-        Qe.addEventListener("scroll", () => ye(Qe), { passive: !0 }),
-        Qe.addEventListener("focusin", (Re) => {
-          let ge = Re.target?.closest?.(".gw-ts-chip");
-          try {
-            ge && (ge.matches(":focus-visible") || ge.classList.contains("gw-padfocus")) && se(Qe, ge);
-          } catch {}
-        }),
-        Qe.addEventListener(
-          "wheel",
-          (Re) => {
-            let ge = Math.abs(Re.deltaY) > Math.abs(Re.deltaX) ? Re.deltaY : 0,
-              k = Qe.scrollWidth - Qe.clientWidth;
-            !ge ||
-              k <= 2 ||
-              (ge < 0 && Qe.scrollLeft <= 0) ||
-              (ge > 0 && Qe.scrollLeft >= k - 1) ||
-              ((Qe.scrollLeft += ge), Re.preventDefault());
-          },
-          { passive: !1 },
-        );
-      if (Me.lines?.length) {
-        // The Depth row: its chips, then a line each on what the fitted part is good for and costs you.
-        let body = a("div", "gw-ts-body");
-        ve.classList.add("gw-ts-row--lines");
-        body.appendChild(Qe);
-        for (let line of Me.lines) {
-          let note = a("p", "gw-ts-note");
-          (note.textContent = line), body.appendChild(note);
-        }
-        ve.appendChild(body);
-      } else ve.appendChild(Qe);
-      dt.appendChild(ve);
-    }
-    xe.appendChild(dt);
+    dt.appendChild(rigCard(Xe)), xe.appendChild(dt);
     let G = a("footer", "gw-ts-foot"),
       Ve = e.screens?.parts?.btn,
       tt = (Me, ve) => {
@@ -162467,40 +163220,29 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         l("ui_click"), le();
       },
     });
-    (wt.dataset.action = "close"), G.appendChild(wt), xe.appendChild(G), Ne.appendChild(xe);
+    (wt.dataset.action = "close"), G.appendChild(wt), xe.appendChild(G);
+    // A part's tray covers the picture until an option is fitted or Back is pressed.
+    let tray = Ze.tray ? rigTray(Xe, Ze.tray, lt) : null;
+    tray ? (xe.appendChild(tray), xe.classList.add("gw-rig-traying")) : (Ze.tray = null);
+    Ne.appendChild(xe);
     let gt = Ze.keep || null;
     Ze.keep = null;
     let Ae = () => {
-      for (let Me of xe.querySelectorAll(".gw-ts-row")) {
-        let ve = Me.querySelector(".gw-ts-strip");
-        if (ve) {
-          if (gt) {
-            let oe = fh(gt.ends?.[Me.dataset.row], 0);
-            if (oe > 0) {
-              let Re = document.createElement("i");
-              (Re.className = "gw-ts-end"),
-                Re.setAttribute("aria-hidden", "true"),
-                (Re.style.width = `${oe}px`),
-                ve.appendChild(Re);
-            }
-            ve.scrollLeft = fh(gt.scroll?.[Me.dataset.row], 0);
-            let Qe = ve.querySelector("[aria-pressed=true]");
-            Qe && se(ve, Qe, { snap: !1 });
-          } else {
-            let oe = ve.querySelector("[aria-pressed=true]");
-            (ve.scrollLeft = 0), oe && se(ve, oe);
-          }
-          ye(ve);
-        }
-      }
-      if (gt && ((dt.scrollTop = fh(gt.top, 0)), gt.focus)) {
-        let Me = [...xe.querySelectorAll(".gw-ts-chip")].find(
-          (ve) => `${ve.dataset.slot}|${ve.dataset.key}` === gt.focus,
-        );
+      dt.scrollTop = fh(gt?.top, 0);
+      let list = xe.querySelector(".gw-rig-opts");
+      list && (list.scrollTop = fh(gt?.trayTop, 0));
+      // Focus follows the move: into a tray as it opens (its fitted option), back to its part as it closes.
+      let target = gt?.focus
+        ? [...xe.querySelectorAll("button")].find((b) => focusSig(b) === gt.focus)
+        : null;
+      gt?.into &&
+        (target =
+          tray?.querySelector(".gw-rig-opt[aria-pressed=true]") || tray?.querySelector(".gw-rig-opt"));
+      gt?.outOf && (target = xe.querySelector(`.gw-rig-node[data-part="${gt.outOf}"]`));
+      if (target && gt?.hadFocus)
         try {
-          Me?.focus({ preventScroll: !0 });
+          target.focus({ preventScroll: !0 }), target.scrollIntoView?.({ block: "nearest" });
         } catch {}
-      }
     };
     if (((Ze.settle = Ae), xe.isConnected)) Ae();
     else
@@ -162508,18 +163250,52 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         requestAnimationFrame(Ae);
       } catch {}
   }
-  function _() {
+  // Renders the screen again, keeping its scroll and focus; `move` says a tray opened ("into") or closed (outOf).
+  function _(move = {}) {
     let J = e.entry?.("tacklescreen");
     if (!J) return;
     let Ne = J.el,
-      Xe = { scroll: {}, ends: {}, top: Ne.querySelector(".gw-ts-rows")?.scrollTop || 0, focus: null };
-    for (let Ze of Ne.querySelectorAll(".gw-ts-row"))
-      (Xe.scroll[Ze.dataset.row] = Ze.querySelector(".gw-ts-strip")?.scrollLeft || 0),
-        (Xe.ends[Ze.dataset.row] = fh(parseFloat(Ze.querySelector(".gw-ts-end")?.style.width), 0));
-    let lt = typeof document < "u" ? document.activeElement : null;
-    lt && Ne.contains(lt) && lt.dataset?.key && (Xe.focus = `${lt.dataset.slot}|${lt.dataset.key}`),
-      (J.state.keep = Xe),
+      lt = typeof document < "u" ? document.activeElement : null,
+      hadFocus = !!lt && Ne.contains(lt);
+    (J.state.keep = {
+      top: Ne.querySelector(".gw-ts-rows")?.scrollTop || 0,
+      trayTop: move.into || move.outOf ? 0 : Ne.querySelector(".gw-rig-opts")?.scrollTop || 0,
+      focus: hadFocus ? focusSig(lt) : null,
+      hadFocus,
+      ...move,
+    }),
       J.render();
+  }
+  // Opens a part's tray (part) or closes it (null).
+  function rigTrayOpen(part) {
+    let J = e.entry?.("tacklescreen");
+    if (!J) return;
+    let was = J.state.tray || null;
+    (J.state.tray = part || null), _(part ? { into: part } : was ? { outOf: was } : {});
+  }
+  // An owned option pressed in a tray: fitted as the rows' chips were (Mhe), then the tray closes so the picture
+  // shows it. The fitted one only closes the tray.
+  function rigFit(node, item) {
+    let act = Mhe(item);
+    if (!act) return void rigTrayOpen(null);
+    let r = t(...act);
+    if (r?.ok !== !0) {
+      l("denied", { volume: 0.35 }), _();
+      return;
+    }
+    r.changed && (l("ui_click", { volume: 0.5, pitch: 0.74 }), r.reeled && (z = !0)),
+      rigTrayOpen(null),
+      y(!0);
+  }
+  // Something on Murk's shelf bought in a tray at Murk's, through the shop's own buy. The tray stays open, the
+  // bought option now among those owned (a leader or hook is fitted at once, as at the shelf).
+  function rigBuy(id) {
+    let r = t("buy", id);
+    if (r?.ok !== !0) {
+      l("denied", { volume: 0.35 });
+      return;
+    }
+    l("ui_click", { volume: 0.5, pitch: 0.74 }), _(), y(!0);
   }
   function W(J) {
     let Ne = Mhe(J);
@@ -162532,7 +163308,10 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     Xe.changed && (l("ui_click", { volume: 0.5, pitch: 0.74 }), Xe.reeled && (z = !0)), _(), y(!0);
   }
   function C(J) {
-    if (J === "KeyB") return le(), !0;
+    let Xe = e.entry?.("tacklescreen")?.el,
+      trayEl = Xe?.querySelector(".gw-rig-tray");
+    // B closes an open tray first, then the screen.
+    if (J === "KeyB") return trayEl ? rigTrayOpen(null) : le(), !0;
     let Ne = {
       ArrowLeft: [0, -1],
       ArrowRight: [0, 1],
@@ -162544,17 +163323,25 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       KeyS: [1, 0],
     }[J];
     if (!Ne) return !1;
-    let Xe = e.entry?.("tacklescreen")?.el;
     if (!Xe) return !1;
-    let lt = [
-      ...[...Xe.querySelectorAll(".gw-ts-strip")].map((_e) => [..._e.querySelectorAll(".gw-ts-chip")]),
-      [...Xe.querySelectorAll(".gw-ts-foot button")],
-    ].filter((_e) => _e.length);
+    // The stick moves between the picture's parts (one to a row) and the foot; in a tray, between its options.
+    let lt = (
+      trayEl
+        ? [
+            [...trayEl.querySelectorAll(".gw-rig-back")],
+            ...[...trayEl.querySelectorAll("button.gw-rig-opt")].map((b) => [b]),
+          ]
+        : [
+            ...[...Xe.querySelectorAll(".gw-rig-node")].map((b) => [b]),
+            [...Xe.querySelectorAll(".gw-ts-foot button")],
+          ]
+    ).filter((_e) => _e.length);
     if (!lt.length) return !0;
     let Ze = document.activeElement,
       xe = lt.findIndex((_e) => _e.includes(Ze)),
       N = null;
-    if (xe < 0) N = lt[0].find((_e) => _e.getAttribute("aria-pressed") === "true") || lt[0][0];
+    if (xe < 0)
+      N = trayEl ? lt.find((r) => r[0].getAttribute("aria-pressed") === "true")?.[0] || lt[0][0] : lt[0][0];
     else if (Ne[1]) {
       let _e = lt[xe].indexOf(Ze);
       N = lt[xe][Math.max(0, Math.min(lt[xe].length - 1, _e + Ne[1]))];
@@ -162573,9 +163360,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     }
     if (N && N !== Ze) {
       try {
-        N.focus({ preventScroll: !0 });
-        let _e = N.closest(".gw-ts-strip");
-        _e && se(_e, N), N.scrollIntoView({ block: "nearest", inline: "nearest" });
+        N.focus({ preventScroll: !0 }), N.scrollIntoView({ block: "nearest", inline: "nearest" });
       } catch {}
       l("ui_hover", { volume: 0.3 });
     }
@@ -162693,15 +163478,17 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
           return J
             ? {
                 from: J.state?.from ?? null,
-                rows: Object.fromEntries(
-                  [...J.el.querySelectorAll(".gw-ts-row")].map((Ne) => [
-                    Ne.dataset.row,
-                    [...Ne.querySelectorAll(".gw-ts-chip")].map((Xe) => ({
-                      key: Xe.dataset.key,
-                      on: Xe.getAttribute("aria-pressed") === "true",
-                    })),
-                  ]),
-                ),
+                // The rig picture: each part's node and what is fitted, and the open tray's options.
+                nodes: [...J.el.querySelectorAll(".gw-rig-node")].map((Ne) => ({
+                  part: Ne.dataset.part,
+                  key: Ne.dataset.key,
+                })),
+                tray: J.state?.tray ?? null,
+                options: [...J.el.querySelectorAll(".gw-rig-tray .gw-rig-opt")].map((Xe) => ({
+                  key: Xe.dataset.key ?? null,
+                  buy: Xe.dataset.buy ?? null,
+                  on: Xe.getAttribute("aria-pressed") === "true",
+                })),
               }
             : null;
         } catch {

@@ -655,23 +655,78 @@ const tackleShelf = (session) =>
       .map((c) => `${c.id}:${c.name}`),
   );
 
-// The Depth row of the tackle screen: { chips: [{ key, on }], note, lines } or null when there is none.
-async function depthRow(session) {
+// A part's tray on the rig picture (the tackle screen, opened from the rack): its owned options [{ key, on }], the
+// fitted option's lines, the tray's notes, what Murk's shelf adds (`more`, shelf ids) and each option's text; or
+// null when the picture has no such part.
+async function rigTray(session, part) {
   await session.eval(() => window.__gw.ui.loop.tackle.openScreen({ from: "rack" }));
   await session.pause(800);
-  const row = await session.eval(() => {
-    const el = document.querySelector('.gw-ts-row[data-row="depth"]');
-    return el
-      ? {
-          chips: [...el.querySelectorAll(".gw-ts-chip")].map((c) => ({
-            key: c.dataset.key,
-            on: c.getAttribute("aria-pressed") === "true",
-          })),
-          lines: [...el.querySelectorAll(".gw-ts-note")].map((n) => n.textContent.trim()),
-        }
-      : null;
+  const opened = await session.eval((p) => {
+    const node = document.querySelector(`.gw-rig-node[data-part="${p}"]`);
+    node?.click();
+    return !!node;
+  }, part);
+  if (!opened) return null;
+  await session.pause(800);
+  return session.eval((p) => {
+    const tray = document.querySelector(`.gw-rig-tray[data-part="${p}"]`);
+    if (!tray) return null;
+    const opts = [...tray.querySelectorAll(".gw-rig-opt[data-owned=true]")];
+    const on = opts.find((o) => o.getAttribute("aria-pressed") === "true");
+    return {
+      chips: opts.map((c) => ({ key: c.dataset.key, on: c.getAttribute("aria-pressed") === "true" })),
+      lines: on
+        ? [...on.querySelectorAll(".gw-rig-line:not(.gw-rig-log)")].map((n) => n.textContent.trim())
+        : [],
+      notes: [...tray.querySelectorAll(".gw-rig-note")].map((n) => n.textContent.trim()),
+      more: [...tray.querySelectorAll(".gw-rig-shop")].map((c) => c.dataset.buy),
+      text: Object.fromEntries(opts.map((c) => [c.dataset.key, c.textContent.replace(/\s+/g, " ").trim()])),
+    };
+  }, part);
+}
+// The Depth part's tray: { chips: [{ key, on }], lines } or null when the picture has no Depth part.
+const depthRow = (session) => rigTray(session, "depth");
+
+// The rig picture on the tackle screen (opened from the rack): its parts, what is drawn, the limit line and the
+// "Here, now" strip; whether a tray is open, and whether any two part labels overlap. Leaves the screen open.
+const GRAZERS = ["rustfin_sucker", "weeping_carp"];
+async function rigScreen(session) {
+  await session.eval(() => window.__gw.ui.loop.tackle.openScreen({ from: "rack" }));
+  await session.pause(800);
+  return session.eval(() => {
+    const card = document.querySelector(".gw-rig"),
+      has = (sel) => !!card?.querySelector(sel),
+      limit = document.querySelector(".gw-rig-limit"),
+      boxes = [...document.querySelectorAll(".gw-rig-node")].map((b) => {
+        const r = b.getBoundingClientRect();
+        return [Math.round(r.top), Math.round(r.bottom)];
+      });
+    return {
+      nodes: [...document.querySelectorAll(".gw-rig-node")].map((b) => ({
+        part: b.dataset.part,
+        key: b.dataset.key,
+        name: b.querySelector(".gw-rig-name")?.textContent ?? "",
+      })),
+      depth: card?.dataset.depth ?? null,
+      drawn: {
+        cork: has(".gw-rig-cork"),
+        lead: has(".gw-rig-lead"),
+        bell: has(".gw-rig-brass"),
+        wire: has(".gw-rig-wire"),
+        gut: has(".gw-rig-gut"),
+        knot: has(".gw-rig-knot"),
+        worm: has(".gw-rig-worm"),
+        lure: has(".gw-rig-lure"),
+        hook: card?.querySelectorAll(".gw-rig-hook").length ?? 0,
+      },
+      limit: limit ? { by: limit.dataset.by, cls: limit.dataset.cls, text: limit.textContent } : null,
+      here: [...document.querySelectorAll(".gw-rig-fishname")].map((li) => li.dataset.species),
+      unmetText: document.querySelector(".gw-rig-unmet")?.textContent ?? null,
+      trayOpen: !!document.querySelector(".gw-rig-tray"),
+      boxes,
+      overlap: boxes.some((b, i) => i > 0 && b[0] < boxes[i - 1][1] - 1),
+    };
   });
-  return row;
 }
 const closeTackle = (session) => session.eval(() => window.__gw.ui.loop.tackle.closeScreen());
 
@@ -1150,23 +1205,8 @@ async function loseSmallFish(session, speciesId) {
   throw new Error(`the ${speciesId} did not get away; ${JSON.stringify(await session.state())}`);
 }
 
-// A tackle screen row ("leader", "hook"): { chips: [{ key, on }], lines } or null when there is none.
-async function partRow(session, kind) {
-  await session.eval(() => window.__gw.ui.loop.tackle.openScreen({ from: "rack" }));
-  await session.pause(800);
-  return session.eval((kind) => {
-    const el = document.querySelector(`.gw-ts-row[data-row="${kind}"]`);
-    return el
-      ? {
-          chips: [...el.querySelectorAll(".gw-ts-chip")].map((c) => ({
-            key: c.dataset.key,
-            on: c.getAttribute("aria-pressed") === "true",
-          })),
-          lines: [...el.querySelectorAll(".gw-ts-note")].map((n) => n.textContent.trim()),
-        }
-      : null;
-  }, kind);
-}
+// A part's tray ("leader", "hook") on the rig picture: { chips: [{ key, on }], lines } or null when there is none.
+const partRow = (session, kind) => rigTray(session, kind);
 
 // ---- the line-up and the bite marks (mossmere-hunt-2.md section 3, sketch 3) ---------------------------------
 
@@ -1281,15 +1321,15 @@ const SCENARIOS = [
         !(await oddsFoot(session)).includes(LEAD_ODDS),
         "the Odds page gives the lead's numbers on the float",
       );
-      // Fitted the way a player does it: the Sounding Lead's chip in the tackle screen's Depth row.
+      // Fitted the way a player does it: the Sounding Lead in the Depth part's tray on the rig picture.
       await depthRow(session);
-      await session.eval(() => document.querySelector('.gw-ts-chip[data-key="sounding_lead"]').click());
-      await session.pause(800);
-      const row = await session.eval(() =>
-        [...document.querySelectorAll('.gw-ts-row[data-row="depth"] .gw-ts-note')].map((n) =>
-          n.textContent.trim(),
-        ),
+      await session.eval(() =>
+        document
+          .querySelector('.gw-rig-tray[data-part="depth"] .gw-rig-opt[data-key="sounding_lead"]')
+          .click(),
       );
+      await session.pause(800);
+      const row = (await depthRow(session))?.lines ?? [];
       await closeTackle(session);
       check((await leadRecord(session)).depth === "lead", "the Depth chip did not fit the lead");
       check(
@@ -1846,23 +1886,20 @@ const SCENARIOS = [
         check(!(r.live.dusk_minnow > 0), `${light}: a Dusk Minnow bites a Live Minnow`);
       }
       check(wormGrazers > 0, "no grazer bites worms here, so the test proves nothing");
-      // Fitted on the hook: the tackle screen lists it with its count and its two lines.
-      const row = await session.eval(async () => {
+      // Fitted on the hook: the bait's tray on the rig picture lists it with its count and its two lines.
+      const fitted = await session.eval(() => {
         const loop = window.__gw.progression.loop;
         window.__gw.state.run.bait.live_minnow = 2;
         const fit = loop.changeHook({ bait: "live_minnow" });
-        await window.__gw.ui.loop.tackle.openScreen({ from: "rack" });
-        await new Promise((r) => setTimeout(r, 800));
-        const el = document.querySelector('.gw-ts-row[data-row="bait"]');
-        const chip = el?.querySelector('.gw-ts-chip[data-key="live_minnow"]');
-        return {
-          fit: fit?.ok === true,
-          chip: chip ? chip.textContent.replace(/\s+/g, " ").trim() : null,
-          on: chip?.getAttribute("aria-pressed") === "true",
-          lines: [...(el?.querySelectorAll(".gw-ts-note") || [])].map((n) => n.textContent.trim()),
-          item: window.__gw.data.CATCH_V3?.items?.live_minnow ?? null,
-        };
+        return { fit: fit?.ok === true, item: window.__gw.data.CATCH_V3?.items?.live_minnow ?? null };
       });
+      const tray = await rigTray(session, "bait");
+      const row = {
+        ...fitted,
+        chip: tray?.text.live_minnow ?? null,
+        on: !!tray?.chips.find((c) => c.key === "live_minnow")?.on,
+        lines: tray?.lines ?? [],
+      };
       await closeTackle(session);
       check(
         row.fit && row.on && /Live Minnow/.test(row.chip) && /2/.test(row.chip),
@@ -2030,20 +2067,17 @@ const SCENARIOS = [
         );
       }
       check(wormSmall > 0, "neither small fish bites worms here, so the test proves nothing");
-      const row = await session.eval(async (id) => {
-        const loop = window.__gw.progression.loop;
-        const fit = loop.changeHook({ bait: id });
-        await window.__gw.ui.loop.tackle.openScreen({ from: "rack" });
-        await new Promise((r) => setTimeout(r, 800));
-        const el = document.querySelector('.gw-ts-row[data-row="bait"]');
-        const chip = el?.querySelector(`.gw-ts-chip[data-key="${id}"]`);
-        return {
-          fit: fit?.ok === true,
-          chip: chip ? chip.textContent.replace(/\s+/g, " ").trim() : null,
-          on: chip?.getAttribute("aria-pressed") === "true",
-          lines: [...(el?.querySelectorAll(".gw-ts-note") || [])].map((n) => n.textContent.trim()),
-        };
-      }, BUNCH);
+      const fit = await session.eval(
+        (id) => window.__gw.progression.loop.changeHook({ bait: id })?.ok === true,
+        BUNCH,
+      );
+      const tray = await rigTray(session, "bait");
+      const row = {
+        fit,
+        chip: tray?.text[BUNCH] ?? null,
+        on: !!tray?.chips.find((c) => c.key === BUNCH)?.on,
+        lines: tray?.lines ?? [],
+      };
       await closeTackle(session);
       check(row.fit && row.on && /Worm Bunch/.test(row.chip), `chip: ${JSON.stringify(row)}`);
       check(JSON.stringify(row.lines) === JSON.stringify([BUNCH_GOOD, BUNCH_COST]), `lines: ${row.lines}`);
@@ -4083,7 +4117,7 @@ const SCENARIOS = [
       check((await partRow(session, "leader")) === null, "a Leader row with only the Plain Knot");
       // Pressing the Mere Hook fits it.
       await session.eval(() =>
-        document.querySelector('.gw-ts-row[data-row="hook"] .gw-ts-chip[data-key="mere_hook"]').click(),
+        document.querySelector('.gw-rig-tray[data-part="hook"] .gw-rig-opt[data-key="mere_hook"]').click(),
       );
       await session.pause(800);
       const after = await session.eval(() => window.__gw.progression.loop.state().fitted.hook);
@@ -4093,13 +4127,14 @@ const SCENARIOS = [
         `after pressing the Mere Hook: ${after} ${JSON.stringify(row2)}`,
       );
       await closeTackle(session);
-      // With a lure on, the row says the lure carries its own hook.
+      // With a lure on, the Hook merges into the lure: no Hook part, and the lure's tray says why.
       await session.eval(() => window.__gw.progression.loop.changeHook({ lure: "feather_fly" }));
-      const lureRow = await partRow(session, "hook");
+      const hookUnderLure = await partRow(session, "hook");
+      const lureRow = await rigTray(session, "lure");
       await closeTackle(session);
       check(
-        lureRow?.chips.length === 0 && lureRow.lines[0] === "Lures carry their own hooks.",
-        `with a lure: ${JSON.stringify(lureRow)}`,
+        hookUnderLure === null && lureRow?.notes.includes("Lures carry their own hooks."),
+        `with a lure: ${JSON.stringify({ hookUnderLure, lureRow })}`,
       );
       return "no rows with one option; the Hook row with both, its lines, a press fits; one line under a lure";
     },
@@ -4871,6 +4906,366 @@ const SCENARIOS = [
       check(r.cutsBeat === 0 && r.cutsMarks.cuts === 5, `the cuts: ${JSON.stringify(r)}`);
       check(r.sporeNoted === null && r.sporeMarks.ring === 0, `Sporewood: ${JSON.stringify(r)}`);
       return `the ring noted the hook's beat; Murk says "${HOOK_HUNT_LINE}"`;
+    },
+  },
+  // ---- the rig picture (mossmere-gear.md "The rig picture" and B6; mossmere-gear-deeper.md) ---------------
+
+  {
+    name: "rig picture: it draws the fitted rig, the float or the lead, the bait or the lure, and the leader and hook only when there is a choice",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      const plain = await rigScreen(session);
+      await closeTackle(session);
+      check(
+        JSON.stringify(plain.nodes.map((n) => n.part)) === '["rod","reel","line","bait"]' &&
+          plain.nodes[3].key === "mireworm" &&
+          plain.depth === "float" &&
+          plain.drawn.cork &&
+          !plain.drawn.lead &&
+          plain.drawn.worm &&
+          !plain.drawn.wire &&
+          !plain.drawn.gut &&
+          !plain.drawn.knot &&
+          plain.drawn.hook === 1,
+        `the starting rig: ${JSON.stringify(plain)}`,
+      );
+      // The lead, a second leader and a second hook owned: Depth, Leader and Hook become parts, drawn as fitted.
+      await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          s = loop.state();
+        for (const id of ["sounding_lead", "pike_wire", "turnback_hook"])
+          s.parts.includes(id) || s.parts.push(id);
+        loop.fitDepth("lead"), loop.fitPart("leader", "pike_wire"), loop.fitPart("hook", "turnback_hook");
+      });
+      const full = await rigScreen(session);
+      await closeTackle(session);
+      check(
+        JSON.stringify(full.nodes.map((n) => `${n.part}:${n.key}`).slice(3)) ===
+          '["depth:sounding_lead","leader:pike_wire","hook:turnback_hook","bait:mireworm"]' &&
+          full.depth === "lead" &&
+          full.drawn.lead &&
+          full.drawn.bell &&
+          !full.drawn.cork &&
+          full.drawn.wire &&
+          full.drawn.hook === 1,
+        `the full rig: ${JSON.stringify(full)}`,
+      );
+      // A lure: the Depth and the Hook merge into it; the leader stays.
+      await session.eval(() => window.__gw.progression.loop.changeHook({ lure: "bent_spoon" }));
+      const lure = await rigScreen(session);
+      await closeTackle(session);
+      check(
+        JSON.stringify(lure.nodes.map((n) => `${n.part}:${n.key}`).slice(3)) ===
+          '["leader:pike_wire","lure:bent_spoon"]' &&
+          lure.depth === "lure" &&
+          lure.drawn.lure &&
+          !lure.drawn.cork &&
+          !lure.drawn.lead &&
+          !lure.drawn.worm &&
+          lure.drawn.hook === 0,
+        `the lure rig: ${JSON.stringify(lure)}`,
+      );
+      // The labels do not overlap one another.
+      check(!plain.overlap && !full.overlap, `labels overlap: ${JSON.stringify([plain.boxes, full.boxes])}`);
+      return `${plain.nodes.length}, ${full.nodes.length} and ${lure.nodes.length} parts`;
+    },
+  },
+
+  {
+    name: "rig picture: a part's tray shows its options and lines; an owned one fits and the picture follows; Murk's are priced, bought only at Murk's",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 420_000,
+    editSave: (save) => {
+      withParts(["sounding_lead", "pike_wire"])(save);
+      save.meta.loop.arrivals = { ...(save.meta.loop.arrivals || {}), shelved: ["pike_wire", "chafe_gut"] };
+    },
+    async run(session) {
+      await session.toHome();
+      // Depth: both options with their two lines; the float fitted. Pressing the lead fits it and closes the tray.
+      const depth = await rigTray(session, "depth");
+      const allLines = await session.eval(() =>
+        [...document.querySelectorAll(".gw-rig-tray .gw-rig-opt")].map(
+          (o) => o.querySelectorAll(".gw-rig-line").length,
+        ),
+      );
+      check(
+        JSON.stringify(depth?.chips) ===
+          '[{"key":"cork_float","on":true},{"key":"sounding_lead","on":false}]' &&
+          JSON.stringify(allLines) === "[2,2]" &&
+          depth.lines[0] === "Every fish bites, and you see each nibble on the float.",
+        `the Depth tray: ${JSON.stringify({ depth, allLines })}`,
+      );
+      await session.eval(() =>
+        document.querySelector('.gw-rig-tray .gw-rig-opt[data-key="sounding_lead"]').click(),
+      );
+      await session.pause(800);
+      const after = await rigScreen(session);
+      const fitted = await session.eval(() => window.__gw.progression.loop.state().fitted.depth);
+      check(
+        fitted === "lead" &&
+          !after.trayOpen &&
+          after.depth === "lead" &&
+          after.nodes.find((n) => n.part === "depth")?.key === "sounding_lead",
+        `after pressing the lead: ${fitted} ${JSON.stringify(after)}`,
+      );
+      // Leader: Chafe Gut is on Murk's shelf, not owned. It is priced under "More at Murk's" and cannot be fitted.
+      const leader = await rigTray(session, "leader");
+      const shop = await session.eval(() => {
+        const el = document.querySelector('.gw-rig-tray .gw-rig-shop[data-buy="part:chafe_gut"]');
+        return {
+          head: [...document.querySelectorAll(".gw-rig-tray .gw-rig-more")].map((h) => h.textContent.trim()),
+          tag: el?.tagName ?? null,
+          price: el?.querySelector(".gw-rig-price")?.textContent.trim() ?? null,
+          lines: el ? [...el.querySelectorAll(".gw-rig-line")].map((n) => n.textContent.trim()) : [],
+          pressed: el?.hasAttribute("aria-pressed") ?? null,
+        };
+      });
+      check(
+        JSON.stringify(leader?.chips.map((c) => c.key).sort()) === '["pike_wire","plain_knot"]' &&
+          JSON.stringify(leader.more) === '["part:chafe_gut"]' &&
+          shop.head[0] === "More at Murk's" &&
+          shop.price === "60" &&
+          shop.lines[0] === "Fish with rough mouths, such as carp, bass and sturgeon, land more often." &&
+          shop.pressed === false,
+        `the Leader tray: ${JSON.stringify({ leader, shop })}`,
+      );
+      // At Murk's (home) it is a button that buys: refused with too few clams, then bought and fitted.
+      const buys = await session.eval(async () => {
+        const loop = window.__gw.progression.loop,
+          s = loop.state(),
+          press = async () => {
+            document.querySelector('.gw-rig-tray .gw-rig-shop[data-buy="part:chafe_gut"]')?.click();
+            await new Promise((r) => setTimeout(r, 600));
+          };
+        s.clams = 10;
+        await press();
+        const poor = { owned: s.parts.includes("chafe_gut"), fitted: s.fitted.leader, clams: s.clams };
+        window.__gw.debug.loop.giveClams(500);
+        await press();
+        return {
+          poor,
+          owned: s.parts.includes("chafe_gut"),
+          fitted: s.fitted.leader,
+          trayOpen: !!document.querySelector('.gw-rig-tray[data-part="leader"]'),
+          pressed: document
+            .querySelector('.gw-rig-tray .gw-rig-opt[data-key="chafe_gut"]')
+            ?.getAttribute("aria-pressed"),
+        };
+      });
+      await closeTackle(session);
+      check(
+        !buys.poor.owned && buys.poor.fitted !== "chafe_gut" && buys.poor.clams === 10,
+        `bought without the clams: ${JSON.stringify(buys)}`,
+      );
+      check(
+        buys.owned && buys.fitted === "chafe_gut" && buys.trayOpen && buys.pressed === "true",
+        `buying in the tray: ${JSON.stringify(buys)}`,
+      );
+      // The keyboard: the arrows move between the parts, Enter opens a tray, B closes it again.
+      await session.eval(() => window.__gw.ui.loop.tackle.openScreen({ from: "rack" }));
+      await session.pause(800);
+      await session.page.keyboard.press("ArrowDown");
+      await session.page.keyboard.press("ArrowDown");
+      const focused = await session.eval(() => document.activeElement?.dataset?.part ?? null);
+      await session.page.keyboard.press("Enter");
+      await session.pause(800);
+      const keyTray = await session.eval(() => document.querySelector(".gw-rig-tray")?.dataset.part ?? null);
+      await session.page.keyboard.press("KeyB");
+      await session.pause(800);
+      const keyBack = await session.eval(() => ({
+        tray: !!document.querySelector(".gw-rig-tray"),
+        screen: !!document.querySelector(".gw-rig"),
+        focus: document.activeElement?.dataset?.part ?? null,
+      }));
+      check(
+        focused === "reel" &&
+          keyTray === "reel" &&
+          !keyBack.tray &&
+          keyBack.screen &&
+          keyBack.focus === "reel",
+        `the keys: ${JSON.stringify({ focused, keyTray, keyBack })}`,
+      );
+      await closeTackle(session);
+      // Out on the water Murk's lures are shown and priced in the bait's tray, but cannot be bought there.
+      await session.sail();
+      const raft = await rigTray(session, "bait");
+      const raftShop = await session.eval(async () => {
+        const loop = window.__gw.progression.loop,
+          el = document.querySelector('.gw-rig-tray .gw-rig-shop[data-buy="lure:glimmer_spoon"]'),
+          clams = loop.state().clams;
+        el?.click();
+        await new Promise((r) => setTimeout(r, 400));
+        return {
+          tag: el?.tagName ?? null,
+          price: !!el?.querySelector(".gw-rig-price"),
+          owned: loop.state().lures.includes("glimmer_spoon"),
+          clamsKept: loop.state().clams === clams,
+        };
+      });
+      await closeTackle(session);
+      check(
+        raft?.more.includes("lure:glimmer_spoon") &&
+          raftShop.tag === "DIV" &&
+          raftShop.price &&
+          !raftShop.owned &&
+          raftShop.clamsKept,
+        `on the water: ${JSON.stringify({ raft, raftShop })}`,
+      );
+      return "lead fitted from its tray; Chafe Gut priced, refused, then bought at Murk's; shown but not sold on the water";
+    },
+  },
+
+  {
+    name: "rig picture: the limit line names the class and the part that sets it",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      const limitWith = async (fit) => {
+        await session.eval((f) => {
+          const loop = window.__gw.progression.loop;
+          loop.state().bait.mossmere.cut_strip = 3;
+          loop.changeHook(f);
+        }, fit);
+        const r = await rigScreen(session);
+        await closeTackle(session);
+        return r.limit;
+      };
+      const worms = await limitWith({ bait: "mireworm" });
+      const bare = await limitWith({ bait: null, lure: null });
+      const spoon = await limitWith({ lure: "bent_spoon" });
+      await buyAtHome(session, ["line:1"]);
+      const wormsGut = await limitWith({ bait: "mireworm" });
+      const strip = await limitWith({ bait: "cut_strip" });
+      const got = { worms, bare, spoon, wormsGut, strip };
+      const want = {
+        worms: "Lands up to Prize: the line is the limit.",
+        bare: "Lands up to Keeper: the bare hook is the limit.",
+        spoon: "Lands up to Keeper: the lure is the limit.",
+        wormsGut: "Lands up to Trophy: the line is the limit.",
+        strip: "Lands up to Prize: the bait is the limit.",
+      };
+      for (const [k, text] of Object.entries(want))
+        check(got[k]?.text === text, `${k}: "${got[k]?.text}", expected "${text}"`);
+      return Object.values(want).length + " rigs";
+    },
+  },
+
+  {
+    name: "rig picture: Here, now lists at most five caught fish that bite this rig here, as the Odds engine says, with the lead and the leader; never her",
+    fixture: "legend-sold",
+    debug: true,
+    editSave: withParts(["sounding_lead", "chafe_gut"]),
+    async run(session) {
+      await session.toHome();
+      const r = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          s = loop.state(),
+          journal = window.__gw.state.meta?.journal ?? {},
+          caught = (id) => Number(journal[id]?.caught) > 0,
+          here = (rig, live = null) => loop.rigHereNow(live, null, rig),
+          shares = (h) => Object.fromEntries(h.fish.map((f) => [f.id, f.share])),
+          // The Odds page's rows for the same rig, place and light: caught kinds only, likeliest first.
+          odds = (view = {}) =>
+            (loop.sheet(view)?.odds?.rows || [])
+              .filter((row) => !row.legend && caught(row.id) && row.share > 0)
+              .map((row) => row.id),
+          out = {};
+        loop.changeHook({ bait: "mireworm" });
+        const worms = here({ bait: "mireworm" });
+        out.worms = worms.fish.map((f) => f.id);
+        out.wormsOdds = odds().slice(0, 5);
+        out.wormsAll = odds().length;
+        out.unmet = worms.unmet;
+        out.allCaught = worms.fish.every((f) => caught(f.id));
+        s.bait.mossmere.live_minnow = 2;
+        loop.changeHook({ bait: "live_minnow" });
+        out.live = here({ bait: "live_minnow" }).fish.map((f) => f.id);
+        loop.changeHook({ bait: "mireworm" });
+        // The lead: a bottom feeder comes more often. Chafe Gut: a Dusk Minnow comes less often.
+        out.floatShares = shares(here({ bait: "mireworm" }));
+        loop.fitDepth("lead");
+        out.leadShares = shares(here({ bait: "mireworm" }));
+        loop.fitDepth("float");
+        loop.fitPart("leader", "chafe_gut");
+        out.gutShares = shares(here({ bait: "mireworm" }));
+        loop.fitPart("leader", "plain_knot");
+        // Her water at night on her rig: the Odds page has her, the strip never does.
+        loop.markLifted("bell_pool");
+        loop.fitDepth("lead");
+        loop.changeHook({ bait: "live_minnow" });
+        const pool = here({ bait: "live_minnow" }, { place: "bell_pool", light: "night" });
+        out.pool = pool.fish.map((f) => f.id);
+        out.poolPlace = pool.place;
+        out.herOdds = (loop.sheet({ place: "bell_pool", light: "night" })?.odds?.rows || []).some(
+          (row) => row.id === "belled_matriarch" && row.share > 0,
+        );
+        loop.fitDepth("float");
+        loop.changeHook({ bait: "mireworm" });
+        return out;
+      });
+      check(r.allCaught && r.worms.length <= 5, `named: ${JSON.stringify(r.worms)}`);
+      check(
+        JSON.stringify(r.worms) === JSON.stringify(r.wormsOdds) && r.worms.length === Math.min(5, r.wormsAll),
+        `not the Odds page's fish: ${JSON.stringify(r)}`,
+      );
+      check(
+        r.worms.some((id) => GRAZERS.includes(id)) && !r.live.some((id) => GRAZERS.includes(id)),
+        `the bait does not change the strip: worms ${r.worms}, live ${r.live}`,
+      );
+      check(
+        r.leadShares.rustfin_sucker > r.floatShares.rustfin_sucker,
+        `the lead does not bring the sucker more often: ${JSON.stringify([r.floatShares, r.leadShares])}`,
+      );
+      check(
+        r.gutShares.dusk_minnow < r.floatShares.dusk_minnow,
+        `Chafe Gut does not put the minnow off: ${JSON.stringify([r.floatShares, r.gutShares])}`,
+      );
+      check(
+        r.poolPlace === "bell_pool" && r.herOdds && !r.pool.includes("belled_matriarch"),
+        `her water: ${JSON.stringify(r)}`,
+      );
+      // On the screen: the same names, and the count of kinds not caught.
+      const screen = await rigScreen(session);
+      await closeTackle(session);
+      check(
+        JSON.stringify(screen.here) === JSON.stringify(r.worms) &&
+          (r.unmet > 0 ? screen.unmetText != null : screen.unmetText == null),
+        `the strip on screen: ${JSON.stringify(screen)} vs ${JSON.stringify(r)}`,
+      );
+      return `worms: ${r.worms.join(", ")}; live: ${r.live.join(", ")}; ${screen.unmetText ?? "none uncaught"}`;
+    },
+  },
+
+  {
+    name: "rig picture: Sporewood's tackle screen still works, with no Depth, Leader or Hook",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: (save) => {
+      withLead(true)(save);
+      withParts(["pike_wire", "turnback_hook"], { leader: "pike_wire", hook: "turnback_hook" })(save);
+    },
+    async run(session) {
+      await session.toHome();
+      const r = await rigScreen(session);
+      const bait = await rigTray(session, "bait");
+      await closeTackle(session);
+      check(
+        JSON.stringify(r.nodes.map((n) => n.part)) === '["rod","reel","line","bait"]' &&
+          r.nodes[3].key === "spore_cake" &&
+          r.drawn.cork &&
+          !r.drawn.lead &&
+          r.limit?.by === "line",
+        `Sporewood's picture: ${JSON.stringify(r)}`,
+      );
+      check(
+        bait?.chips.some((c) => c.key === "spore_cake" && c.on),
+        `Sporewood's bait tray: ${JSON.stringify(bait)}`,
+      );
+      return `${r.limit.text}`;
     },
   },
 ];
