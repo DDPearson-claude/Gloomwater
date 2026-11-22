@@ -30550,6 +30550,8 @@ Ic(vg, {
   nice: () => CP,
   nightCurve: () => Y7,
   noteArrivalBeat: () => noteArrivalBeat,
+  // The hunt's own rules, for the scenario tests (her water's find, Murk's tally beat, the bite marks).
+  findHerWater: () => findHerWater,
   catchMarkRoll: () => catchMarkRoll,
   catchMarkFor: () => catchMarkFor,
   noteHuntCatch: () => noteHuntCatch,
@@ -47530,7 +47532,8 @@ Ca.arrivals = {
     pike_wire: "Pike teeth cut line. Pike Wire is on the shelf now.",
     leaders: "Hob gave you his old line end? Leaders are on the shelf now.",
     gutOnly: "Hob gave you his old line end? Chafe Gut is on the shelf now.",
-    // The Turnback Hook once the ring of scrapes has been seen (mossmere-review-addendum.md section 2, "Hunt").
+    // The Turnback Hook brought by the theft that found her water, or once the ring of scrapes has been seen
+    // (mossmere-review-addendum.md section 2, "Hunt").
     hookHunt: "Something out there grabs and runs. There's a new hook on the shelf.",
   },
 };
@@ -47577,6 +47580,8 @@ Ca.hunt = {
     sail: "Sail out there before dark, and wait for the bell.",
     boils: "Watch for boils after the bell, and fish right under them.",
     found: "Right off your line? I've marked the spot on your chart.",
+    // Stuck on sketch 4 (section 4): after one evening with her water found, and again after two.
+    spot: "Fish the marked spot after the bell, and watch your rig.",
     // At the first tally after Hob's map is drawn, with sketch 3 (section 3).
     lineup: "I can think of five fish here big enough to pull a rod in. Catch them and see.",
   },
@@ -47620,6 +47625,10 @@ Ca.hunt = {
       bell: "Both times it was just after the old bell struck midnight. I'm sure of that much.",
       // Only once sketch 2 is drawn.
       taken: "Right off your line? Then that's it. That's what had me.",
+      // Only once sketch 4 is drawn.
+      swirl: "Big, wasn't it? I felt it go under my boat once.",
+      // Only once your worn end is drawn in sketch 5 (a loss to the leader).
+      worn: "Worn rough, like mine? Then it's the same one, all right.",
     },
     greeting: "Any luck out there? Stay warm.",
     next: "Next",
@@ -47644,6 +47653,10 @@ Ca.hunt = {
       midnight: "Be in Hob's part when the old bell strikes midnight.",
       boils: "After the bell, watch Hob's part for boils, and fish where they rise.",
       spot: "Fish the marked spot after the bell, and watch your rig.",
+      // After sketch 4; after a loss to a part, while a part that held her is not yet yours; then once it is.
+      swirl: "Look again at the swirl in your notepad.",
+      sells: "Your notepad shows what broke. Murk sells what holds.",
+      fix: "Fix what broke, then fish the marked spot after the bell.",
     },
     map: "Hob lost it somewhere in this shaded part, between the Gatehouse and the Sisters.",
     end: "This is Hob's old line end. It is worn rough, not cut.",
@@ -47656,7 +47669,32 @@ Ca.hunt = {
       end: "An old line end taped to the page, its end worn rough",
       taken:
         "A pencil close-up of Hob's shaded part, with an X where the float went under and the toll-tower far off",
+      swirl:
+        "A slice through the water: your rig, a dark swirl under it, and an arrow down to a small fish on the bottom",
+      hook: "A bare hook",
+      leader: "Two line ends side by side, yours and Hob's, worn the same way",
+      line: "A rod tip with the line snapped just below it",
+      held: "Your hook, your leader and your line drawn whole, beside Hob's old line end",
     },
+    // Sketch 4, The swirl (section 2): its words for the rig she refused. "left": a bait she won't take, on the
+    // float or the lead ({bait} is "the worms" for worms); "float": a live fish under the float; "lure"; "bunch":
+    // the Worm Bunch on the lead.
+    swirl: {
+      left: "It left {bait}. It wants something alive, down on the bottom.",
+      float: "It took the live fish, but let go when the float pulled. It feeds down on the bottom.",
+      lure: "It turned away from the lure. It wants something real, down on the bottom.",
+      bunch: "It mouthed the Worm Bunch and let it go. It wants something alive.",
+    },
+    // Sketch 5, What came back: one sentence for each part that broke, or the page drawn whole ("What held").
+    back: {
+      hook: "The hook pulled out of a soft mouth and came back bare.",
+      leader: "The end came back worn rough, just like Hob's.",
+      line: "The line snapped by the rod, so it is too heavy for this line.",
+      held: "Your hook, your leader and your line all held.",
+      mine: "mine",
+      hobs: "Hob's",
+    },
+    heldTitle: "What held",
     // Sketch 3, the line-up (section 3): its head line, each fish's name and the words written when it is
     // crossed out, the empty frame's line before and after all five are crossed out, and the marks strip, whose
     // line for a mark changes once the fish that leaves it is caught ("match").
@@ -47704,6 +47742,25 @@ Ca.hunt = {
       },
     },
     close: "Got it",
+  },
+};
+// Her refusals in her water (mossmere-hunt-2.md B6): a swirl under the rig and one of these lines, once a night
+// for each part. {bait} names the bait (the worm words for worms), {them} what it is left as.
+Ca.hunt.refusal = {
+  lure: "Something huge swirls behind the lure, and sinks back down.",
+  floatLive: "Something huge takes the minnow, feels the float pull, and lets go.",
+  float: "Something huge rises under the float, looks at {bait}, and sinks back down.",
+  bait: "Something heavy noses {your} on the bottom, and leaves {them}.",
+  bunch: "Something mouths the Worm Bunch, and lets it go.",
+  wire: "Something mouths {bait}, feels the wire, and lets it go.",
+  lesson: "Something mouths {bait}, and lets it go. It remembers the {part}.",
+  parts: { hook: "hook", leader: "leader", line: "line" },
+  // Her first refusal draws sketch 4.
+  drawn: "Something huge turns under your rig, then sinks back down. You draw what you saw.",
+  // How each bait is named in these lines. Any other bait is "the" or "your" and its name, left as "it".
+  baits: {
+    mireworm: { the: "the worms", your: "your worms", them: "them" },
+    live_minnow: { the: "the minnow", your: "your minnow", them: "it" },
   },
 };
 // The Worm Bunch's two lines on the tackle screen, as the Live Minnow has (mossmere-gear.md, "Worm Bunch").
@@ -47768,12 +47825,17 @@ Ca.gate = {
     bait: "It wants a better bait.",
   },
 };
-// Why a legend got away, shown where the gear-limit escape line appears: "line" when her line was too
-// weak to land her, "fight" for a lost fight on the right line. Legends not listed here say nothing.
+// Why a legend got away, shown where the gear-limit escape line appears: for Mossmere's thief the one part that
+// broke ("hook", "leader" or "line", in fight order; mossmere-hunt-2.md B6), or "fight" for a lost fight on a
+// fully right rig, with "weaker" added while that loss still wounds her (mossmere-review-addendum.md section 4).
+// Legends not listed here say nothing.
 Ca.legendAway = {
   belled_matriarch: {
-    line: "That one got away! Your {line} snaps by the rod. Only Waxed Silk will hold it.",
+    hook: "That one got away! Your hook comes back bare. You draw it in your notepad.",
+    leader: "That one got away! Your line comes back worn at the end. You draw it beside Hob's old end.",
+    line: "That one got away! Your line snaps by the rod. You draw it in your notepad.",
     fight: "It shook free right under the raft. Everything held.",
+    weaker: "It will be a little weaker next time.",
   },
 };
 // What Mossmere's monster is called until she is first landed (mossmere-hunt-2.md, section 3).
@@ -105076,6 +105138,8 @@ const MIDNIGHT = Object.freeze({
   strokes: 12,
   strokeGap: 2.2,
   herTime: 180,
+  // Her tries a night (H5): casts in her found water, in her time, on a rig that could bring her.
+  tries: 3,
   pitch: 0.7,
   volume: 0.75,
   // A stroke more than this late (a save loaded past it) is skipped silently rather than rung late.
@@ -105098,6 +105162,9 @@ function midnightFlags(run) {
   let m = run.midnight;
   if (!m || typeof m != "object" || Array.isArray(m))
     m = run.midnight = { struck: 0, said: !1, stillSaid: !1, holdFullSaid: !1, hooked: !1, birdsSaid: !1 };
+  // Her tries used tonight and the refusal lines said tonight (one each, by part).
+  Number.isFinite(m.tries) || (m.tries = 0);
+  (m.refusalSaid && typeof m.refusalSaid == "object") || (m.refusalSaid = {});
   return m;
 }
 // Seconds since dark fell, or null while it is still day or dusk.
@@ -105105,9 +105172,10 @@ function nightClock(run) {
   return run?.phase === "gloomtide" ? Math.max(0, Number(run.phaseTime) || 0) : null;
 }
 // Her time: from the first stroke of midnight for herTime seconds, closed early for the night once she has
-// been hooked. Outside it she never takes.
+// been hooked or her tries are used up. Outside it she never takes.
 function herTimeOpen(run) {
   if (!midnightEvening(run) || run.midnight?.hooked === !0) return !1;
+  if ((Number(run.midnight?.tries) || 0) >= MIDNIGHT.tries) return !1;
   let t = nightClock(run);
   return t != null && t >= MIDNIGHT.at && t <= MIDNIGHT.at + MIDNIGHT.herTime;
 }
@@ -105341,6 +105409,9 @@ function findHerWater(loop, run, { x = NaN, z = NaN, onLead = !1 } = {}) {
   Array.isArray(loop.places.revealed) || (loop.places.revealed = []);
   loop.places.revealed.includes(HER_WATER.place) || loop.places.revealed.push(HER_WATER.place);
   h7(loop, HER_WATER.place);
+  // The theft is also the Turnback Hook's beat (wo.arrivals), with Murk's own line for it at the tally.
+  herPartOffered(loop, "turnback_hook") ||
+    (noteArrivalBeat(loop, "turnback_hook") && (record.hookByTheft = !0));
   return !0;
 }
 // An older save that owns the Bell Pool counts as found (B4): sketches 1 and 2 are drawn (to draw in when the
@@ -105353,6 +105424,65 @@ function foundByChart(loop) {
   record.sketches.map || drawHuntSketch(record, "map", evening);
   record.sketches.taken || drawHuntSketch(record, "taken", evening);
   return !0;
+}
+// ---- Her tries, refusals and losses (mossmere-hunt-2.md section 2 and B3, mossmere-hunt.md A2) ---------------
+// The parts that hold her, in fight order: the hook breaks free early in the fight, the leader about halfway, the
+// line at the end. `at` is the share of the planned fight at which she gets away, `cause` how the loss looks.
+const HER_RIG = Object.freeze({
+  order: ["hook", "leader", "line"],
+  right: { hook: "turnback_hook", leader: "chafe_gut" },
+  at: { hook: 0.15, leader: 0.5 },
+  cause: { hook: "spat", leader: "thrown", line: "snapped" },
+  // Her first take waits until both are on Murk's shelf or owned (mossmere-review-addendum.md, "Her gate").
+  takeNeeds: ["turnback_hook", "chafe_gut"],
+});
+// Whether a rig part is on Murk's shelf or owned (the arrivals record).
+function herPartOffered(loop, id) {
+  return Sr(loop?.parts).includes(id) || Sr(loop?.arrivals?.shelved).includes(id);
+}
+// Whether her first take may come: the Turnback Hook and Chafe Gut both shelved or owned.
+function herTakeAllowed(loop) {
+  return HER_RIG.takeNeeds.every((id) => herPartOffered(loop, id));
+}
+// Whether a part that broke her free is matched by one the player owns: the Turnback Hook, Chafe Gut, or a line
+// strong enough to land her (Waxed Silk or better, on Murk's line shelf in the barge's water).
+function herPartOwned(data, loop, part) {
+  if (HER_RIG.right[part]) return Sr(loop?.parts).includes(HER_RIG.right[part]);
+  if (part !== "line") return !1;
+  let lines = jr(data, al(data, loop), "line"),
+    need = ka(Wi.legend.minLineHold?.[MIDNIGHT.legend], 5);
+  return lines.some((line, tier) => tier <= ha(loop?.tackle?.line) && ka(line?.hold, 0) >= need);
+}
+// A part that broke her free once ("hook", "leader", "line"): taught for good, drawn into sketch 5 in fight
+// order. A loss on a fully right rig ("fight") draws sketch 5 whole, as "What held", if it is still blank. No
+// part is drawn twice.
+function noteHerLoss(record, reason, evening) {
+  if (!Ln(record)) return;
+  if (HER_RIG.order.includes(reason)) {
+    Ln(record.lessons) || (record.lessons = { hook: !1, leader: !1, line: !1 });
+    (record.lessons[reason] = !0), reason === "line" && (record.lineLesson = !0);
+    Array.isArray(record.back) || (record.back = []);
+    if (record.back.includes(reason)) return;
+    record.back.push(reason);
+    record.back.sort((a, b) => HER_RIG.order.indexOf(a) - HER_RIG.order.indexOf(b));
+    drawHuntSketch(record, "back", evening);
+  } else reason === "fight" && !record.sketches.back && drawHuntSketch(record, "back", evening);
+}
+// Landed with no loss: sketch 5 is drawn whole at the landing ("What held").
+function noteHerLanded(record, evening) {
+  Ln(record) && !record.sketches.back && drawHuntSketch(record, "back", evening);
+}
+// An older save's line lesson (set before the notepad) carries over: taught, and drawn into sketch 5.
+function carryHerLineLesson(loop) {
+  let record = huntRecordOf(loop);
+  if (!record || record.lineLesson !== !0 || record.lessons.line) return;
+  noteHerLoss(record, "line", Math.max(1, Math.trunc(Number(loop.evenings) || 0)));
+}
+// The words that name a bait in her refusal lines: the worms, the minnow, or "the" and its name.
+function herBaitWords(baitId) {
+  let words = Ca.hunt.refusal.baits[baitId],
+    name = Ca.gearItems[baitId] || "bait";
+  return words || { the: `the ${name}`, your: `your ${name}`, them: "it" };
 }
 // ---- The bird at midnight (mossmere-hunt-2.md section 1 and B2; decisions.md "The midnight cutscene") ---------
 // Once for the save, at the first midnight after the night her water was found: a short cutscene in which the
@@ -106460,6 +106590,14 @@ function yF(e) {
 function freshHuntRecord() {
   return {
     lineLesson: false,
+    // Her losses (section 2, B4): the parts she has taught (each broke her free once), the parts that came back
+    // broken in fight order (sketch 5), whether the theft brought the Turnback Hook, and what sketch 4 drew:
+    // swirlKind "left", "float", "lure" or "bunch", and the rig (its bait and whether it was on the lead).
+    lessons: { hook: false, leader: false, line: false },
+    back: [],
+    hookByTheft: false,
+    swirlKind: "",
+    swirlRig: { bait: "", lead: false },
     // The tale (mossmere-hunt-2.md section 1): the evening it was told at the tally, 0 until then.
     taleAt: 0,
     // The notepad's five sketches: the evening each was drawn, 0 while its place is blank.
@@ -106490,7 +106628,9 @@ function freshHuntRecord() {
     // The first evening the raft was in Hob's part in her time; the evenings Murk said each nudge; boost: the
     // evening from which the boils come twice as often. murkFound: Murk's word on the find was said.
     partAt: 0,
-    nudged: { midnight: 0, sail: 0, boils: 0, boost: 0 },
+    // swirl, swirlBoost: the sketch 4 nudges (the evening Murk first said it; the night its words show on every
+    // refusal).
+    nudged: { midnight: 0, sail: 0, boils: 0, boost: 0, swirl: 0, swirlBoost: 0 },
     murkFound: false,
     // The line-up (sketch 3, B4): the evening each of its five fish was crossed out, by fish id; and the evening
     // each bite mark was first seen (0 until then), which adds it to the strip at the foot of the page.
@@ -106631,8 +106771,21 @@ function mossmereTallyBeat(loop, trip, rule = wo.hunt, { quiet = !1, journal = n
       ? (drawHuntSketch(record, "map", evening), (record.mapBy = "murk"), (beat.murk = "mapPassed"))
       : missed >= 1 && !record.murkNudged && ((record.murkNudged = !0), (beat.murk = "findHob"));
   } else if (record.found) {
-    // Murk's word on the find, at the tally after it (an older save that bought the chart never hears it).
-    record.murkFound || ((record.murkFound = !0), (beat.murk = "found"));
+    // Murk's word on the find, at the tally after it (an older save that bought the chart never hears it). Then,
+    // while sketches 4 and 5 are both still blank, the sketch 4 nudge: after one evening, and after two, when its
+    // words also show on every refusal the next night.
+    let nudged = record.nudged,
+      stuck = evening - (ha(record.foundEvening) || evening);
+    !record.murkFound
+      ? ((record.murkFound = !0), (beat.murk = "found"))
+      : !record.sketches.swirl &&
+        !record.sketches.back &&
+        (!nudged.swirl && stuck >= 1
+          ? ((nudged.swirl = evening), (beat.murk = "spot"))
+          : nudged.swirl &&
+            !nudged.swirlBoost &&
+            stuck >= 2 &&
+            ((nudged.swirlBoost = evening + 1), (beat.murk = "spot")));
   } else {
     // The nudges of section 4. Not yet in Hob's part at midnight: after one evening with the map, then after
     // two. In it at midnight but nothing found: after that evening Murk speaks, and after a second evening the
@@ -106724,10 +106877,10 @@ function rigArrivalAtTally(loop, water, rule = wo.arrivals) {
   let parts = waiting(gift);
   arrivals.shelved.push(...parts);
   gift === "leaders" && parts.length === 1 && parts[0] === "chafe_gut" && (giftSay = "gutOnly");
-  // The hook after the ring of scrapes has been seen: Murk's hunt line for it.
+  // Brought by the theft that found her water, or after the ring of scrapes has been seen: Murk's hunt line.
   gift === "turnback_hook" &&
     giftSay === "beat" &&
-    ha(loop.hunt?.mossmere?.marks?.ring) > 0 &&
+    (loop.hunt?.mossmere?.hookByTheft === !0 || ha(loop.hunt?.mossmere?.marks?.ring) > 0) &&
     (giftSay = "hunt");
   return { gift, giftSay };
 }
@@ -106897,6 +107050,7 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
     normaliseHuntRecord(saved, record);
   }
   foundByChart(c);
+  carryHerLineLesson(c);
   for (let [g, p] of Object.entries(c.eveningsAt)) c.eveningsAt[g] = Math.max(0, ha(p));
   for (let [g, p] of Object.entries(t?.LOOP?.lostTackle || {}))
     p?.slot === "lure" && Zl(c, g) && !c.lures.includes(g) && c.lures.push(g);
@@ -108472,11 +108626,15 @@ function CF(e) {
       record.hobNight = evening;
       // His line about the theft waits until sketch 2 is drawn by a theft. ("Right off your line?" is not true
       // for an older save that found the spot by its chart, so, as with Murk's word, he never says it there.)
-      let line = Object.keys(n().TEXT_LOOP?.hunt?.hob?.nights || {}).find(
-        (k) =>
-          !record.hobLines.includes(k) &&
-          (k !== "taken" || (record.sketches.taken > 0 && record.foundBy === "theft")),
-      );
+      // His lines after sketches 4 and 5 wait for them: the swirl drawn, and your worn end drawn (a leader loss).
+      let waits = {
+          taken: () => record.sketches.taken > 0 && record.foundBy === "theft",
+          swirl: () => record.sketches.swirl > 0,
+          worn: () => record.back.includes("leader"),
+        },
+        line = Object.keys(n().TEXT_LOOP?.hunt?.hob?.nights || {}).find(
+          (k) => !record.hobLines.includes(k) && (!waits[k] || waits[k]()),
+        );
       line
         ? (record.hobLines.push(line), (talk = { line }))
         : ((record.hobGreeted = evening), (talk = { greeting: !0 }));
@@ -108494,8 +108652,16 @@ function CF(e) {
       due: record.padDue === !0,
       intro: record.padIntro !== !0,
       // What to try next: find Hob, be in his part at midnight, watch for the boils, then fish the marked spot.
+      // Once it is found: after a loss to a part, buy what holds (or, once every part that broke is matched by one
+      // you own, fix it and go back); after sketch 4, look at it again.
       next: huntWaterFound(p())
-        ? "spot"
+        ? record.back.length
+          ? record.back.every((part) => herPartOwned(n(), p(), part))
+            ? "fix"
+            : "sells"
+          : record.sketches.swirl
+            ? "swirl"
+            : "spot"
         : record.sketches.map
           ? record.partAt
             ? "boils"
@@ -108504,6 +108670,10 @@ function CF(e) {
       foundBy: record.foundBy,
       // Sketch 2's X: where the float went under (the centre of her hole for a save that bought the chart).
       foundAt: record.foundBy === "theft" ? herWaterCorkAt(p()) : null,
+      // Sketch 4's rig and words, and sketch 5's broken parts in fight order (none: "What held").
+      swirlKind: record.swirlKind,
+      swirlRig: { ...record.swirlRig },
+      back: record.back.slice(),
       // Sketch 3: the line-up fish crossed out and the bite marks seen (ids only).
       crossed: Sr(f().hunt?.lineup).filter((id) => ha(record.crossed?.[id]) > 0),
       marks: CATCH_MARKS.filter((k) => ha(record.marks?.[k]) > 0),
@@ -108560,6 +108730,10 @@ function CF(e) {
       H = p();
     if (!r(ze) || !H) return;
     noteFishArrivalBeats(H, ze.zone, speciesId);
+    // The thief landed with no loss: sketch 5 is drawn whole, as "What held".
+    speciesId === MIDNIGHT.legend &&
+      ze.zone === MIDNIGHT.water &&
+      noteHerLanded(huntRecordOf(H), Math.max(1, ha(ze.evening)));
     let noted = noteHuntCatch(H, ze, speciesId, fish);
     noted && (c(), d("hunt:noted", { ...noted }));
   }
@@ -110477,13 +110651,19 @@ function FF(e) {
     let k = Se(!0);
     return (k[ge] = Math.min(be(), (k[ge] | 0) + 1)), k[ge];
   }
-  // A legend's escape: a lost fight wounds her; a loss to a line too weak for her adds no wound and
-  // records the lesson in the lake's hunt record.
+  // A legend's escape: a lost fight wounds her; a loss to a wrong part (a line too weak for her, and for Mossmere's
+  // thief a wrong hook or leader) adds no wound and records the lesson in the lake's hunt record, where the thief's
+  // loss is also drawn into sketch 5.
   function noteLegendEscape(loss, speciesId) {
-    if (loss.legendLossReason !== "line") return ne(speciesId);
-    const hunt = u()?.hunt?.[loss.zone];
-    hunt && typeof hunt == "object" && !e.isReplay() && (hunt.lineLesson = true);
-    return 0;
+    const reason = loss.legendLossReason,
+      hunt = u()?.hunt?.[loss.zone];
+    if (hunt && typeof hunt == "object" && !e.isReplay()) {
+      reason === "line" && (hunt.lineLesson = true);
+      speciesId === MIDNIGHT.legend &&
+        loss.zone === MIDNIGHT.water &&
+        noteHerLoss(hunt, reason, Math.max(1, Math.trunc(Number(a()?.evening) || 0)));
+    }
+    return HER_RIG.order.includes(reason) ? 0 : ne(speciesId);
   }
   function he(ge) {
     if (!l() || e.isReplay()) return;
@@ -131016,6 +131196,10 @@ function Y0e(e) {
       i.tutorial ||
       run?.arrival?.cap ||
       run?.evening <= 1 ||
+      // Old Rivals never visit her water at night (mossmere-hunt.md A2, "Old Rivals guard").
+      (j() === "gloomtide" &&
+        ((cast.place?.id || null) === HER_WATER.place ||
+          Math.hypot(c.bob.x - HER_WATER.x, c.bob.z - HER_WATER.z) <= HER_WATER.theft)) ||
       e.state?.meta?.loop?.tutorial?.done === false ||
       i.forceSpecies ||
       i.forceFind ||
@@ -131091,10 +131275,13 @@ function Y0e(e) {
       return;
     }
     wake.t += dt;
+    // Her swirl is the same wake at twice the size (scale 2).
+    const scale = wake.scale || 1;
     if (!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
       const shade = rivalWakeShadow(),
-        offset = (wake.t / 0.28 - 3) * 0.69;
+        offset = (wake.t / 0.28 - 3) * 0.69 * scale;
       if (shade) {
+        shade.scale.set(scale, scale, 1);
         const x = wake.x + wake.sx * offset,
           z = wake.z + wake.sz * offset;
         shade.visible = true;
@@ -131104,10 +131291,10 @@ function Y0e(e) {
       }
     }
     if (wake.t >= wake.step * 0.28) {
-      const d = (wake.step - 3) * 0.69,
+      const d = (wake.step - 3) * 0.69 * scale,
         x = wake.x + wake.sx * d,
         z = wake.z + wake.sz * d;
-      e.water?.addRipple?.(x, z, 0.28 + Math.sin((wake.step * Math.PI) / 7) * 0.48);
+      e.water?.addRipple?.(x, z, (0.28 + Math.sin((wake.step * Math.PI) / 7) * 0.48) * scale);
       if (wake.step === 3)
         o.burst(x, 0.09, z, {
           color: 0xdde1c5,
@@ -131307,6 +131494,18 @@ function Y0e(e) {
         (i.floatT = 0.5);
     }
     prepareRivalVisit();
+    {
+      let herAnswer = null;
+      try {
+        herAnswer = answerHerCast();
+      } catch (err) {
+        y(err);
+      }
+      i.herRefusalDue =
+        herAnswer?.part && herAnswer.part !== "gate"
+          ? { answer: herAnswer, at: i.clock + 1.6 + Math.random() * 1.4 }
+          : null;
+    }
     (i.retrieve = null),
       Nr() && k() && !i.castBait
         ? ((i.species = null),
@@ -131558,6 +131757,129 @@ function Y0e(e) {
       (xe() ? $(bn) : Math.hypot(c.bob.x - bn.x, c.bob.z - bn.z) <= bn.r)
     );
   }
+  // Mossmere's thief answers a cast herself (answerHerCast); every other legend rolls in zt().
+  function herRuleFor(bn) {
+    return xe() && bn?.species?.id === MIDNIGHT.legend && h()?.zone === MIDNIGHT.water;
+  }
+  // Her answer to the cast just released (mossmere-hunt.md A2 steps 4 to 7, mossmere-hunt-2.md section 2). Only in
+  // her found water, in her time. A cast on a rig that could bring her (the lead, no lure, a bait she grades above
+  // 0, no Pike Wire, no part she has taught still wrong, and her first-take gate open) uses one of tonight's tries.
+  // Her roll comes first; then the rig in order: lure, depth, bait (the Worm Bunch fails on half her rolls), Pike
+  // Wire, a taught part still wrong, the gate. A wrong part is a refusal (part, key, text, and swirl when it draws
+  // sketch 4); the gate refuses as no bite at all. Sets i.herTake for zt(). Returns null when she is not there.
+  function answerHerCast() {
+    i.herTake = !1;
+    let bn = We(),
+      run = h(),
+      loop = e.state?.meta?.loop,
+      record = huntRecordOf(loop);
+    if (!herRuleFor(bn) || !record || i.tutorial || i.find || !huntWaterFound(loop)) return null;
+    // (No 20 s rebite wait for her: one hook-up a night closes her time; mossmere-hunt.md A2, "Rebite".)
+    if (!herTimeOpen(run) || !$(bn)) return null;
+    let bait = i.castBait || null,
+      lure = i.castVisualLure || k() || null;
+    if (!bait && !lure) return null;
+    let onLead = !lure && !!i.castLead,
+      grade = bait && !lure ? Number(Rl(bn.species.id, { bait, water: Yt() })) || 0 : 0,
+      leader = i.castLeader ?? null,
+      lineWeak =
+        p(
+          () =>
+            t().catchParts?.(bn.species, "legend", i.castLoadout || nn(), { lake: Yt() })
+              ?.landingBlockedBy === "line",
+        ) === !0,
+      wrongNow = {
+        hook: (i.castHook ?? null) !== HER_RIG.right.hook,
+        leader: leader !== HER_RIG.right.leader,
+        line: lineWeak,
+      },
+      taught = HER_RIG.order.find((part) => record.lessons?.[part] === !0 && wrongNow[part]) || null,
+      gateOpen = herTakeAllowed(loop),
+      tried = !lure && onLead && grade > 0 && leader !== "pike_wire" && !taught && gateOpen,
+      m = midnightFlags(run);
+    tried && (m.tries = (m.tries | 0) + 1);
+    let u = lt(),
+      answer = { take: !1, tried, part: null, bait, lead: onLead, tries: m.tries };
+    if (!(u < ka(t().LOOP?.legendGradeBite?.chance, 1 / 3))) return answer;
+    let part = lure
+      ? "lure"
+      : !onLead
+        ? "depth"
+        : grade <= 0
+          ? "bait"
+          : !(u < legendCastChance(bn, bait, onLead))
+            ? "bunch"
+            : leader === "pike_wire"
+              ? "wire"
+              : taught
+                ? "lesson"
+                : gateOpen
+                  ? null
+                  : "gate";
+    if (!part) return (i.herTake = !0), { ...answer, take: !0 };
+    let words = t().TEXT_LOOP?.hunt?.refusal || {},
+      named = herBaitWords(bait),
+      fill = (line) =>
+        String(line || "")
+          .replace("{bait}", named.the)
+          .replace("{your}", named.your)
+          .replace("{them}", named.them)
+          .replace("{part}", words.parts?.[taught] || taught || ""),
+      text =
+        part === "depth"
+          ? fill(bait === "live_minnow" ? words.floatLive : words.float)
+          : part === "gate"
+            ? ""
+            : fill(words[part]),
+      // Sketch 4 draws only the refusals of bait and depth (a lure, the float, a bait she won't take, the Worm
+      // Bunch): its words say what she wants. Wire and a taught part are told in their own lines.
+      swirl =
+        part === "lure"
+          ? "lure"
+          : part === "depth"
+            ? bait === "live_minnow"
+              ? "float"
+              : "left"
+            : part === "bait"
+              ? "left"
+              : part === "bunch"
+                ? "bunch"
+                : null;
+    return { ...answer, part, key: part === "lesson" ? `lesson:${taught}` : part, text, swirl };
+  }
+  // A refusal seen on the water: the big swirl under the rig (the rival's wake at twice the size), and its line once
+  // a night for each part (every time on the second evening of the sketch 4 nudge), or, the first time, sketch 4
+  // drawn with its own line. Returns the line shown, or null.
+  function showHerRefusal(answer) {
+    let run = h(),
+      record = huntRecordOf(e.state?.meta?.loop);
+    if (!answer?.part || answer.part === "gate" || !record || !run) return null;
+    let m = midnightFlags(run),
+      evening = Math.max(1, Math.trunc(Number(run.evening) || 0)),
+      boost = Number(record.nudged?.swirlBoost) || 0,
+      everyTime =
+        boost > 0 && evening === boost && (!record.sketches.swirl || record.sketches.swirl === evening),
+      said = null;
+    if (answer.swirl && !record.sketches.swirl)
+      (record.swirlKind = answer.swirl),
+        (record.swirlRig = { bait: answer.bait || "", lead: !!answer.lead }),
+        drawHuntSketch(record, "swirl", evening),
+        (said = t().TEXT_LOOP?.hunt?.refusal?.drawn || null);
+    else if (!m.refusalSaid[answer.key] || everyTime) (m.refusalSaid[answer.key] = !0), (said = answer.text);
+    let dx = c.bob.x - c.raft.x,
+      dz = c.bob.z - c.raft.z,
+      len = Math.hypot(dx, dz) || 1;
+    i.rivalWake = { t: 0, step: 0, x: c.bob.x, z: c.bob.z, sx: -dz / len, sz: dx / len, scale: 2 };
+    said && g("toast", { text: said, kind: "lore" });
+    g("hunt:refused", { part: answer.part, key: answer.key, said });
+    return said;
+  }
+  // A refusal waits a moment after the cast lands, then shows while the line is still out.
+  function updateHerRefusal() {
+    let due = i.herRefusalDue;
+    if (!due || i.clock < due.at) return;
+    (i.herRefusalDue = null), r === "waiting" && showHerRefusal(due.answer);
+  }
   function zt(nextFish = false) {
     let R = n("bite"),
       I = n("spots"),
@@ -131570,7 +131892,10 @@ function Y0e(e) {
       yn = le();
     (i.legendCast = !1), (i.taperRule = !1), (i.comeback = null);
     let bn = We(),
-      legendChance = legendCastChance(bn, At, i.castLead);
+      herRule = herRuleFor(bn),
+      legendChance = herRule ? 0 : legendCastChance(bn, At, i.castLead);
+    // Mossmere's thief answered this cast at its release (answerHerCast).
+    herRule && !nextFish && i.herTake === !0 && ((i.herTake = !1), (i.legendCast = !0));
     !nextFish &&
       legendChance > 0 &&
       legendMayTake(bn, At, Dt) &&
@@ -132474,6 +132799,22 @@ function Y0e(e) {
         y(Oi);
       }
     i.legendLineLoss && (i.p = 0);
+    // Mossmere's thief on the hook (mossmere-gear-deeper.md B5): the rig is checked in fight order and she breaks
+    // free at the first wrong part, whatever the roll: a hook that is not the Turnback, a leader that is not Chafe
+    // Gut, then a line too weak for her (the check above). herWounds: her wounds as she was hooked.
+    i.herLossPart = null;
+    if (At && vn && !i.find && Q.id === MIDNIGHT.legend && Yt() === MIDNIGHT.water) {
+      i.herLossPart =
+        (i.castHook ?? null) !== HER_RIG.right.hook
+          ? "hook"
+          : (i.castLeader ?? null) !== HER_RIG.right.leader
+            ? "leader"
+            : i.legendLineLoss
+              ? "line"
+              : null;
+      i.herLossPart && (i.p = 0);
+      i.herWounds = bn.wounds | 0;
+    }
     // The thief (mossmere-hunt-2.md B3): in her time, near her hole, she takes the first ordinary fish hooked on
     // the float or the lead, once, until her water is found. The fight is lost to "thief" whatever its roll:
     // no wound, no gear lost.
@@ -132512,13 +132853,15 @@ function Y0e(e) {
       let Oi = !!i.cast?.place?.foul || !!i.cast?.place?.rule?.foul,
         Aa = i.thiefAt
           ? "thief"
-          : i.overCap && !i.find
-            ? i.overCap.by === "line"
-              ? "snapped"
-              : "thrown"
-            : i.legendLineLoss
-              ? "snapped"
-              : null;
+          : i.herLossPart
+            ? HER_RIG.cause[i.herLossPart]
+            : i.overCap && !i.find
+              ? i.overCap.by === "line"
+                ? "snapped"
+                : "thrown"
+              : i.legendLineLoss
+                ? "snapped"
+                : null;
       (i.loss = CB(Ii, {
         style: xo,
         grade: R,
@@ -132529,6 +132872,14 @@ function Y0e(e) {
         cause: Aa || i.forceCause || null,
         A: Ke,
       })),
+        // She breaks free on the hook early in the fight and on the leader about halfway (HER_RIG.at).
+        i.herLossPart &&
+          HER_RIG.at[i.herLossPart] != null &&
+          (i.loss = {
+            ...i.loss,
+            at: wi(Ii.dur * HER_RIG.at[i.herLossPart]),
+            frac: HER_RIG.at[i.herLossPart],
+          }),
         (i.plan = L8(Ii, i.loss));
     } else i.plan = Ii;
     (i.playT = 0),
@@ -133105,12 +133456,21 @@ function Y0e(e) {
   // Why a legend got away ("line" or "fight") and, for a legend that has words for it, the line telling the
   // player why.
   function legendLossDetails(species) {
-    const legendLossReason = i.legendLineLoss ? "line" : "fight",
-      template = t().TEXT_LOOP?.legendAway?.[species.id]?.[legendLossReason];
-    return {
-      legendLossReason,
-      ...(template ? { legendLossText: Rc(template, { line: castLineName() || "line" }) } : {}),
-    };
+    const legendLossReason = i.herLossPart || (i.legendLineLoss ? "line" : "fight"),
+      words = t().TEXT_LOOP?.legendAway?.[species.id],
+      template = words?.[legendLossReason],
+      rules = t().CATCH_V3?.legend || {},
+      woundCap = Math.max(1, Math.round((rules.woundCap ?? 18) / (rules.woundPerEscape ?? 6)));
+    let legendLossText = template ? Rc(template, { line: castLineName() || "line" }) : null;
+    // A lost fight on the thief's fully right rig wounds her, up to the cap; while it does, one more sentence says
+    // so (mossmere-review-addendum.md section 4).
+    legendLossText &&
+      legendLossReason === "fight" &&
+      species.id === MIDNIGHT.legend &&
+      words.weaker &&
+      (i.herWounds | 0) < woundCap &&
+      (legendLossText += ` ${words.weaker}`);
+    return { legendLossReason, ...(legendLossText ? { legendLossText } : {}) };
   }
   // The display name of the line on this cast: a found line, or the bought line fitted.
   function castLineName() {
@@ -137888,6 +138248,43 @@ function Y0e(e) {
               (i.cast = At), (i.forcePlace = Dt);
             }
           },
+          // Her answer to a cast released now at `place` with `bait` on the fitted rig (answerHerCast), applied as on
+          // the water: the try counted, a refusal shown at once (its swirl, its line or sketch 4). `u` fixes her roll
+          // (0 to 1) for this cast. Returns the answer with the line shown (said), tonight's tries and whether her
+          // time is still open.
+          fishHerCast: ({ place: Q = "bell_pool", bait: Pe = null, u: U = null } = {}) => {
+            if (!xe()) return null;
+            let keep = {
+              cast: i.cast,
+              forcePlace: i.forcePlace,
+              castBait: i.castBait,
+              castLead: i.castLead,
+              castLeader: i.castLeader,
+              castHook: i.castHook,
+              castLoadout: i.castLoadout,
+              castVisualLure: i.castVisualLure,
+              rng: i.rng,
+            };
+            try {
+              i.forcePlace = Q || null;
+              let yn = P();
+              i.cast = Ht(yn.x, yn.z, ye(yn.x, yn.z), Pe, !1);
+              i.castBait = Pe;
+              i.castVisualLure = k();
+              i.castLead = !k() && p(() => N()?.leadFishes?.()) === !0;
+              i.castLeader = castLeaderNow();
+              i.castHook = castHookNow();
+              i.castLoadout = nn();
+              Number.isFinite(U) && (i.rng = () => U);
+              let answer = answerHerCast(),
+                said = answer?.part ? showHerRefusal(answer) : null;
+              return answer && { ...answer, said, tries: h()?.midnight?.tries | 0, open: herTimeOpen(h()) };
+            } catch (yn) {
+              return y(yn), null;
+            } finally {
+              Object.assign(i, keep), (i.herTake = !1);
+            }
+          },
           fishOdds: () => {
             let I = i.lastOdds;
             return I
@@ -137916,7 +138313,7 @@ function Y0e(e) {
         (r !== "idle" || gi.bobberPos) && Lt(!1), gi.spots.length && e.flow, i.flee && Ea(Q, I), gR();
         return;
       }
-      if ((R > 0 && ((i.clock += R), (i.stateT += R), showRivalWake(R)), i.show))
+      if ((R > 0 && ((i.clock += R), (i.stateT += R), showRivalWake(R), updateHerRefusal()), i.show))
         try {
           ss(Q, I);
         } catch (Pe) {
@@ -165117,6 +165514,233 @@ function padTakenAtMidnight(labels, X = -4, Z = -14) {
     ...tally,
   ];
 }
+// ---- Sketches 4 and 5 (the mock-up's sk4 and sk5). A crescent moon, a spiral swirl, and a small fish in pencil.
+function padCrescent(cx, cy, r) {
+  let a = [];
+  for (let i = 0; i <= 10; i++) {
+    let t = ((70 + (220 * i) / 10) * Math.PI) / 180;
+    a.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
+  }
+  for (let i = 10; i >= 0; i--) {
+    let t = ((70 + (220 * i) / 10) * Math.PI) / 180;
+    a.push([cx + r * 0.42 + r * 0.78 * Math.cos(t), cy + r * 0.86 * Math.sin(t)]);
+  }
+  return padPath(a);
+}
+function padSpiral(cx, cy, r0, sy, turns, ph, k = 0.8) {
+  let pts = [],
+    n = Math.round(turns * 30);
+  for (let i = 0; i <= n; i++) {
+    let t = i / n,
+      a = ph + t * turns * PAD_TAU,
+      r = r0 * (1 - t * k);
+    pts.push([cx + r * Math.cos(a), cy + r * sy * Math.sin(a)]);
+  }
+  return padPath(pts);
+}
+// A small fish with its nose at (x, y), facing left, `len` long: body, tail, gill and eye.
+function padSmallFish(x, y, len) {
+  let h = len * 0.3,
+    root = x + len * 0.78;
+  return [
+    `pM${padR1(x)} ${padR1(y)}Q${padR1(x + len * 0.36)} ${padR1(y - h * 1.5)} ${padR1(root)} ${padR1(y)}` +
+      `M${padR1(x)} ${padR1(y)}Q${padR1(x + len * 0.36)} ${padR1(y + h * 1.3)} ${padR1(root)} ${padR1(y)}`,
+    "p" +
+      padPath([
+        [root, y],
+        [x + len, y - h * 0.8],
+        [x + len * 0.96, y],
+        [x + len, y + h * 0.8],
+        [root, y],
+      ]),
+    `fM${padR1(x + len * 0.26)} ${padR1(y - h * 0.55)}Q${padR1(x + len * 0.2)} ${padR1(y)} ${padR1(x + len * 0.26)} ${padR1(y + h * 0.5)}`,
+    "p" + padEll(x + len * 0.12, y - h * 0.2, len * 0.03, len * 0.03),
+  ];
+}
+// The bait drawn on a hook at (x, y): worms, a live fish, or a small lump of anything else.
+function padBaitAt(bait, x, y) {
+  if (bait === "live_minnow") return padSmallFish(x - 9, y + 2, 16);
+  if (bait === "mireworm" || bait === "heartmoss")
+    return [
+      `bM${x - 2} ${y}Q${x - 6.4} ${y + 2.4} ${x - 4} ${y + 6}Q${x - 1.6} ${y + 9.4} ${x - 5.8} ${y + 12.4}`,
+      `bM${x + 1} ${y + 1.4}Q${x + 5.2} ${y + 4.8} ${x + 2.6} ${y + 8}Q${x} ${y + 11.4} ${x + 4} ${y + 14.8}`,
+      `bM${x - 0.6} ${y + 1.8}Q${x - 2} ${y + 6.8} ${x - 0.2} ${y + 10.8}`,
+    ];
+  let lump = padEllPts(x, y + 4, 4, 2.6, 0, 360, 14);
+  return ["p" + padPath(lump) + "Z", "_h40,1.2|" + padPtsStr(lump)];
+}
+// Sketch 4: a slice through the water at the spot at night. The rig as it was refused (rig: { bait, lead }, with
+// kind "lure" for a lure), a huge dark swirl turning under it with no shape inside, and an arrow curling from the
+// swirl down to a small fish lying on the bottom.
+function padSwirl(kind, rig = {}) {
+  let sw = padEllPts(80, 74, 44, 18),
+    cres = padEllPts(80, 74, 44, 18, -10, 190).concat(padEllPts(80, 69, 36, 10, 190, -10)),
+    bait = rig.bait || "mireworm",
+    rigStrokes;
+  if (kind === "lure")
+    rigStrokes = [
+      "pM34 0L54 43",
+      "p" + padEll(55.6, 47.6, 2.6, 4.8, 0, 360, -24),
+      "_h60,1.1|" + padPtsStr(padEllPts(55.6, 47.6, 2.6, 4.8, 0, 360, -24)),
+      "pM57.4 52L58.2 57.4Q58.6 60 56.4 60Q54.6 60 54.8 58.2",
+      "f" + padEll(50, 25, 6, 1.2, 0, 180),
+    ];
+  else if (rig.lead)
+    rigStrokes = [
+      "pM50 0L50 96",
+      "f" + padEll(50, 25, 6, 1.2, 0, 180),
+      "p" + padEll(50, 100.4, 2.6, 3.6),
+      "_h30,1|" + padPtsStr(padEllPts(50, 100.4, 2.6, 3.6)),
+      "pM52.4 102Q57 104.6 61 104.2",
+      "pM61 104.2L64.6 104.2Q67.4 104.2 67.4 101.6L67.4 100.6",
+      ...padBaitAt(bait, 66, 96),
+    ];
+  else
+    rigStrokes = [
+      "p" + padEll(50, 24.4, 3.2, 5.6),
+      "pM50 18.8L50 11.6",
+      "p" + padEll(50, 10.8, 0.9, 0.9),
+      "f" + padEll(50, 25, 8.5, 1.6, 0, 180) + padEll(50, 25, 13.5, 2.4, 12, 168),
+      "pM50 30L50 43",
+      "pM50 43L50 47.6Q50 51.6 46.6 51.6Q43.2 51.6 43.2 48.2L43.2 46.8L45.2 49",
+      ...padBaitAt(bait, 46, 49.6),
+    ];
+  return [
+    "p" + padWave(2, 24, 158, 0.9, 9),
+    "f" + padCrescent(144, 9, 4.6),
+    ...rigStrokes,
+    "_h-14,1.5|" + padPtsStr(cres),
+    "_h50,2.6|" + padPtsStr(sw),
+    "b" + padSpiral(80, 74, 43, 0.42, 1.6, 3.3, 0.82),
+    "p" + padSpiral(80, 74, 38, 0.42, 1.4, 0.2, 0.85),
+    "p" + padSpiral(80, 74, 28, 0.42, 1.1, 1.7, 0.8),
+    "fM26 63Q20 71 27 81M22 59Q13 71 22 85",
+    // the arrow: out of the swirl and down to the fish on the bottom
+    "pM112 62C130 54 150 60 150 76Q150 86 143.6 95",
+    "pM142.4 89.2L143.2 96L149 92.6",
+    ...padSmallFish(118, 100, 30),
+    "fM114.6 100.4Q113.2 102.4 114.6 104.4M111.6 99.6Q109.8 102.4 111.6 105.2",
+    "p" + padWave(2, 109, 158, 0.8, 13),
+    "f" + padEll(22, 111.6, 2.6, 1.3) + padEll(44, 111.2, 1.8, 1) + padEll(98, 111.8, 2.2, 1.1),
+    "fM10 109Q8 101 11 95M14 109Q16 103 14 98",
+  ];
+}
+// Sketch 5, one small drawing per part that came back broken: the bare hook; your end and Hob's taped end, worn the
+// same way; the top of the rod with the line snapped just below the tip. And "What held": your line, leader and hook
+// drawn whole beside Hob's old end.
+const padDown = (x) => (u, v) => [x + v, u];
+function padBack(part, labels = {}) {
+  if (part === "hook")
+    return [
+      "pM50 1L50 25",
+      "p" + padEll(50, 26.6, 2.3, 1.1) + padEll(50, 29, 2.3, 1.1) + padEll(50, 31.4, 2.3, 1.1),
+      "p" + padEll(50, 35.6, 2.4, 3.2),
+      "bM50 38.8L50 72Q50 88 36.4 88Q24 88 24 76L24 60",
+      "bM24 60L24 56.4",
+      "bM24 62.4L29.2 69.4",
+      "fM54.4 46L54.4 62",
+      "fM36 94L35 98M42 93.6L42.4 97.6M30 92.4L28.6 96",
+    ];
+  let hobsEnd = [
+    "T" +
+      padPath([
+        [61, 5],
+        [83, 3.8],
+        [83.6, 13],
+        [61.6, 14.2],
+      ]) +
+      "Z",
+    "bM72 1L72 34",
+    ...padWornEnd(padDown(72), 34, 74, 2.6, 77),
+    `t72,101.5,11|${labels.hobs || ""}`,
+  ];
+  if (part === "leader")
+    return [
+      "bM28 2L28 34",
+      ...padWornEnd(padDown(28), 34, 74, 2.6, 77),
+      `t28,101.5,11|${labels.mine || ""}`,
+      ...hobsEnd,
+    ];
+  if (part === "line") {
+    let gd = (t) => [2 + 58 * t, 102 - 82 * t],
+      g1 = gd(0.36),
+      g2 = gd(0.72);
+    return [
+      "bM0 98L59 16.6",
+      "pM6.6 103L61.4 18.4",
+      "p" + padEll(62.4, 15.2, 2.6, 2.6),
+      "p" +
+        padPath([
+          [g1[0] + 3.6, g1[1] + 2],
+          [g1[0] + 6.8, g1[1] + 5.2],
+        ]) +
+        padEll(g1[0] + 8.4, g1[1] + 6.8, 2.2, 2.2),
+      "p" +
+        padPath([
+          [g2[0] + 3, g2[1] + 1.6],
+          [g2[0] + 5.6, g2[1] + 4.2],
+        ]) +
+        padEll(g2[0] + 7, g2[1] + 5.6, 1.9, 1.9),
+      "f" +
+        padPath([
+          [14, 104],
+          [g1[0] + 8.4, g1[1] + 6.8],
+          [g2[0] + 7, g2[1] + 5.6],
+          [62.4, 15.2],
+        ]),
+      "bM64.6 16.8Q68 30 67 44",
+      "pM67 44Q66.6 49.6 70 50.4Q73.4 51 72.6 47.6Q71.8 45.2 68.8 46.6",
+      "fM63.4 50.4L60 54.4M67.6 53.6L67.2 58.4M74.6 53L77.6 56.8M76.8 47.6L81.4 48.4",
+    ];
+  }
+  // What held: your line, then the leader, then the hook, all whole.
+  return [
+    "pM28 1L28 30",
+    "p" + padEll(28, 31.6, 1.8, 1) + padEll(28, 33.6, 1.8, 1),
+    "bM28 35L28 52",
+    "p" + padEll(28, 55, 2.2, 2.8),
+    "bM28 57.8L28 76Q28 89 17 89Q7 89 7 79L7 68",
+    "bM7 68L7 64.6",
+    "bM7 70.2L11.6 76.4",
+    `t28,101.5,11|${labels.mine || ""}`,
+    ...hobsEnd,
+  ];
+}
+// The panels of sketches 4 and 5 (null for any other sketch).
+function padGearPanels(key, text, at, view = {}) {
+  let cap = (words, t) =>
+    `<p class="gw-pad-cap"${t == null ? "" : ` style="--d:${t.toFixed(2)}s"`}>${padEsc(words || "")}</p>`;
+  if (key === "swirl") {
+    let kind = view.swirlKind || "left",
+      rig = view.swirlRig || {},
+      sk = padSketchSvg("s4-0", [0, 0, 160, 116], padSwirl(kind, rig), {
+        sw: 1,
+        amp: 0.4,
+        label: text.art?.swirl || "",
+        at,
+      }),
+      words = (text.swirl?.[kind] || text.swirl?.left || "").replace(
+        "{bait}",
+        herBaitWords(rig.bait || "mireworm").the,
+      );
+    return `<div class="gw-pad-pnl"><div class="gw-pad-box">${sk.html}</div>${cap(words, at == null ? null : sk.end)}</div>`;
+  }
+  if (key !== "back") return null;
+  let parts = Array.isArray(view.back) && view.back.length ? view.back : ["held"],
+    t = at,
+    out = "";
+  for (let part of parts) {
+    let sk = padSketchSvg(`s5-${part}`, [0, 0, 100, 104], padBack(part, text.back || {}), {
+      sw: 1.1,
+      amp: 0.32,
+      label: text.art?.[part] || "",
+      at: t,
+    });
+    out += `<div class="gw-pad-pnl gw-pad-row"><div class="gw-pad-box">${sk.html}</div>${cap(text.back?.[part], t == null ? null : sk.end)}</div>`;
+    t != null && (t = sk.end + 0.4);
+  }
+  return out;
+}
 // ---- Sketch 3, the line-up (mossmere-notepad.md and its mock-up). One fish to a row: the fish on the left, and
 // once it is crossed out, a red line over it and the reason it could not be the thief drawn large on the right.
 // Then a frame holding only a "?", and the strip of bite marks found on catches, each on a small fish.
@@ -165267,17 +165891,6 @@ function padTeeth(x0, y0, x1, y1, n, h) {
       x = x0 + dx * t,
       y = y0 + dy * t;
     pts.push(i % 2 ? [x + nx, y + ny] : [x, y]);
-  }
-  return padPath(pts);
-}
-function padSpiral(cx, cy, r0, sy, turns, ph, k = 0.8) {
-  let pts = [],
-    n = Math.round(turns * 30);
-  for (let i = 0; i <= n; i++) {
-    let t = i / n,
-      a = ph + t * turns * PAD_TAU,
-      r = r0 * (1 - t * k);
-    pts.push([cx + r * Math.cos(a), cy + r * sy * Math.sin(a)]);
   }
   return padPath(pts);
 }
@@ -165509,7 +166122,7 @@ function padLineupPanel(text, view, at = null, fresh = []) {
   strip && (html += `<div class="gw-pad-marks">${strip}</div>`);
   return `<div class="gw-pad-pnl gw-pad-lu">${html}</div>`;
 }
-// The five places: their pages, and how a drawn one is made (sketches 4 and 5 come in later steps).
+// The five places: their pages, and how a drawn one is made.
 const PAD_PLACES = [
   { key: "map", n: 1, page: "where" },
   { key: "taken", n: 2, page: "where" },
@@ -165524,6 +166137,7 @@ const padPageOf = (key) =>
 // in now on a page already drawn.
 function padPanels(key, text, at, view = {}, fresh = []) {
   if (key === "lineup") return padLineupPanel(text, view, at, fresh);
+  if (key === "swirl" || key === "back") return padGearPanels(key, text, at, view);
   if (key === "taken") {
     let spot = view.foundAt || { x: -4, z: -14 },
       sk = padSketchSvg("s2-0", [-37, -52, 68, 49], padTakenAtMidnight(text.labels || {}, spot.x, spot.z), {
@@ -165578,7 +166192,9 @@ function notepadElement(h, text, view, { page = "where", animate = [], intro = !
         panels = drawn
           ? padPanels(place.key, text, animate.includes(place.key) ? 0.6 : null, view, animate)
           : null;
-      return `<figure class="gw-pad-fig${panels ? "" : " gw-pad-blank"}" data-sketch="${place.key}"${panels ? ' data-drawn="1"' : ""}><div class="gw-pad-fig-h"><span class="n">${place.n}</span>${padEsc(titles[place.key] || "")}</div><div class="gw-pad-panels">${panels || `<p class="gw-pad-none">${padEsc(text.blank || "")}</p>`}</div></figure>`;
+      // Sketch 5 drawn with nothing broken is titled "What held".
+      let title = place.key === "back" && drawn && !view.back?.length ? text.heldTitle : titles[place.key];
+      return `<figure class="gw-pad-fig${panels ? "" : " gw-pad-blank"}" data-sketch="${place.key}"${panels ? ' data-drawn="1"' : ""}><div class="gw-pad-fig-h"><span class="n">${place.n}</span>${padEsc(title || "")}</div><div class="gw-pad-panels">${panels || `<p class="gw-pad-none">${padEsc(text.blank || "")}</p>`}</div></figure>`;
     };
   el.dataset.loop = "notepad";
   el.innerHTML =
@@ -165664,6 +166280,9 @@ const NOTEPAD_CSS = `
 .gw-pad-end { margin-top: 10px; }
 .gw-pad-end .gw-pad-box { width: 80%; margin: 0 auto; transform: rotate(-2.5deg); }
 .gw-pad-end .gw-pad-cap { font-size: 17.5px; margin-top: 0; }
+.gw-pad-row { display: grid; grid-template-columns: 40% 1fr; align-items: center; gap: 0 12px; padding: 8px 0 6px; }
+.gw-pad-row + .gw-pad-row { border-top: 1px dashed rgba(38, 29, 44, .18); }
+.gw-pad-row .gw-pad-cap { text-align: left; margin: 0 4px 0 0; transform: rotate(-.6deg); }
 .gw-pad-sk { display: block; width: 100%; height: auto; overflow: visible; }
 .gw-pad-sk.gw-pad-clip { overflow: hidden; }
 .gw-pad-sk .pl { fill: none; stroke: rgb(48, 41, 56); stroke-linecap: round; stroke-linejoin: round; }
@@ -166648,7 +167267,8 @@ function WV(e) {
       giftText = f().depth || {},
       liveText = f().live || {},
       // A leader or the Turnback Hook put on Murk's shelf (wo.arrivals): its name and his line. "gutOnly" is the
-      // leaders' tally after Pike Wire came alone; "hookHunt" the hook's once the ring of scrapes has been seen.
+      // leaders' tally after Pike Wire came alone; "hookHunt" the hook's when the theft brought it or once the ring
+      // of scrapes has been seen.
       arrivalText = f().arrivals || {},
       gutOnly = gift === "leaders" && qt.tally?.giftSay === "gutOnly",
       arrivalKey = gutOnly

@@ -123,8 +123,28 @@ function playerFacingMatches(html, words = OLD_LEGEND_WORDS) {
 
 const LEGEND_ID = "belled_matriarch";
 const LANDING_CAP = 0.75;
-const LINE_LOSS_TEXT = "That one got away! Your Braided Gut snaps by the rod. Only Waxed Silk will hold it.";
-const FIGHT_LOSS_TEXT = "It shook free right under the raft. Everything held.";
+const LINE_LOSS_TEXT = "That one got away! Your line snaps by the rod. You draw it in your notepad.";
+const HOOK_LOSS_TEXT = "That one got away! Your hook comes back bare. You draw it in your notepad.";
+const LEADER_LOSS_TEXT =
+  "That one got away! Your line comes back worn at the end. You draw it beside Hob's old end.";
+// A lost fight on a fully right rig: the dice. While it still wounds her, one more sentence says so.
+const FIGHT_LOSS_TEXT =
+  "It shook free right under the raft. Everything held. It will be a little weaker next time.";
+
+// Gives the player the thief's hook and leader parts (and the Sounding Lead) and fits the hook and leader given:
+// by default the two that hold her, so only the line and the dice decide a fight.
+const fitHerParts = (session, { hook = "turnback_hook", leader = "chafe_gut", depth = null } = {}) =>
+  session.eval(
+    ([hook, leader, depth]) => {
+      const s = window.__gw.progression.loop.state();
+      for (const id of ["turnback_hook", "chafe_gut", "pike_wire", "sounding_lead"])
+        s.parts.includes(id) || s.parts.push(id);
+      (s.fitted.hook = hook), (s.fitted.leader = leader);
+      depth && (s.fitted.depth = depth);
+      return { ...s.fitted };
+    },
+    [hook, leader, depth],
+  );
 
 // At home: gives clams and buys the given shelf items (e.g. "line:1") in order; returns the tackle tiers.
 async function buyAtHome(session, ids) {
@@ -170,6 +190,7 @@ async function hookOnce(session, speciesId, outcome, lead = 0) {
         ok,
         state: g.fishing.state,
         p: g.debug.fishChance(),
+        loss: g.debug.fishPlay()?.loss ?? null,
         escaped: window.__hookLog.escaped.length,
         landed: window.__hookLog.landed.length,
       };
@@ -193,7 +214,8 @@ async function hookOnce(session, speciesId, outcome, lead = 0) {
         (b) => /Keep|Let go/.test(b.textContent) && b.getBoundingClientRect().width > 0,
       ),
     }));
-    if (now.escaped.length > hooked.escaped) return { p: hooked.p, escape: now.escaped.at(-1) };
+    if (now.escaped.length > hooked.escaped)
+      return { p: hooked.p, loss: hooked.loss, escape: now.escaped.at(-1) };
     if (hooked.p === 1 && now.card) return { find: true };
     if (now.landed.length > hooked.landed && now.card) return { p: hooked.p, landed: now.landed.at(-1) };
     await session.clickButton(/^Got it$/);
@@ -760,6 +782,41 @@ const MURK_MAP = "Hob always said it was between the Gatehouse and the Sisters. 
 
 // Setting out can take minutes when several sessions share the CPU.
 const SLOW_SAIL = { timeoutMs: 300_000 };
+
+// ---- her tries, refusals and losses ------------------------------------------------------------------------
+const DRAWN_SWIRL = "Something huge turns under your rig, then sinks back down. You draw what you saw.";
+const REFUSE_LURE = "Something huge swirls behind the lure, and sinks back down.";
+const REFUSE_FLOAT_LIVE = "Something huge takes the minnow, feels the float pull, and lets go.";
+const REFUSE_FLOAT_WORMS = "Something huge rises under the float, looks at the worms, and sinks back down.";
+const REFUSE_BAIT = "Something heavy noses your worms on the bottom, and leaves them.";
+const REFUSE_BUNCH = "Something mouths the Worm Bunch, and lets it go.";
+const REFUSE_WIRE = "Something mouths the minnow, feels the wire, and lets it go.";
+const REFUSE_LESSON = {
+  hook: "Something mouths the minnow, and lets it go. It remembers the hook.",
+  leader: "Something mouths the minnow, and lets it go. It remembers the leader.",
+  line: "Something mouths the minnow, and lets it go. It remembers the line.",
+};
+const SWIRL_LURE_WORDS = "It turned away from the lure. It wants something real, down on the bottom.";
+const BACK_WORDS = [
+  "The hook pulled out of a soft mouth and came back bare.",
+  "The end came back worn rough, just like Hob's.",
+  "The line snapped by the rod, so it is too heavy for this line.",
+];
+const HELD_WORDS = "Your hook, your leader and your line all held.";
+const NEXT_SWIRL = "Look again at the swirl in your notepad.";
+const NEXT_SELLS = "Your notepad shows what broke. Murk sells what holds.";
+const MURK_HOOK_HUNT = "Something out there grabs and runs. There's a new hook on the shelf.";
+
+// Her answer to a cast released now in her water (the debug hook fishHerCast), with her roll fixed at u.
+const herCast = (session, opts) => session.eval((o) => window.__gw.debug.fishHerCast(o), opts);
+// On the water: fits the given depth, leader and hook, and puts on (or takes off, null) a lure.
+const herRig = (session, rig) =>
+  session.eval((r) => {
+    const g = window.__gw,
+      fitted = g.progression.loop.state().fitted;
+    for (const slot of ["depth", "leader", "hook"]) r[slot] && (fitted[slot] = r[slot]);
+    "lure" in r && (g.state.run.lure = r.lure);
+  }, rig);
 
 const huntOf = (session) => session.eval(() => window.__gw.progression.loop.state().hunt.mossmere);
 
@@ -2174,6 +2231,8 @@ const SCENARIOS = [
       check(written.meta.loop.evenings === fixture.meta.loop.evenings, "the rest of the save was not kept");
       const tackle = await buyAtHome(session, ["line:1"]);
       check(tackle.line === 1, `the line is tier ${tackle.line}, expected Braided Gut (1)`);
+      // The hook and leader that hold her, so the line is the part that breaks.
+      await fitHerParts(session);
       await session.sail();
       // Forced to "land": a line too weak for her must still lose.
       const hooked = await hookAndPlayOut(session, LEGEND_ID, "land");
@@ -2261,6 +2320,7 @@ const SCENARIOS = [
     async run(session) {
       await session.toHome();
       await buyAtHome(session, ["line:1", "line:2"]);
+      await fitHerParts(session);
       await session.sail();
       const lost = await hookAndPlayOut(session, LEGEND_ID, "lose");
       check(lost.p > 0 && lost.p <= LANDING_CAP, `landing chance on Waxed Silk is ${lost.p}`);
@@ -2284,6 +2344,7 @@ const SCENARIOS = [
     async run(session) {
       await session.toHome();
       await buyAtHome(session, ["line:1", "line:2"]);
+      await fitHerParts(session);
       await session.sail();
       const landed = await hookAndPlayOut(session, LEGEND_ID, "land");
       check(landed.p > 0 && landed.p <= LANDING_CAP, `landing chance on Waxed Silk is ${landed.p}`);
@@ -2366,6 +2427,7 @@ const SCENARIOS = [
     async run(session) {
       await session.toHome();
       await buyAtHome(session, ["line:1", "line:2"]);
+      await fitHerParts(session);
       await session.sail();
       // The Sporewood seal built from her name reads as the thief too.
       const seal = await session.eval(() => {
@@ -2441,6 +2503,7 @@ const SCENARIOS = [
       await backToJetty(session);
       // Landed: the hook-up still says "Something ancient."; the catch card names her and shows her model.
       await buyAtHome(session, ["line:1", "line:2"]);
+      await fitHerParts(session);
       await session.sail();
       await listenOnWater(session);
       const landed = await hookAndPlayOut(session, LEGEND_ID, "land", { lead: 2 });
@@ -4081,6 +4144,367 @@ const SCENARIOS = [
       const lost = await loseSmallFish(session, "reedjaw_pike");
       check(lost?.partLossText === LOSS_TEETH && !lost.overCap, `the pike's loss: ${JSON.stringify(lost)}`);
       return "each once a night, only with the part on the shelf, never on the better part or a lure";
+    },
+  },
+  // ---- the thief's tries, refusals and losses (mossmere-hunt-2.md section 2, B3) -------------------------
+
+  {
+    name: "her tries: three a night, counted only on a rig that could bring her; her time then closes for the night",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      await buyAtHome(session, ["line:1", "line:2"]);
+      await fitHerParts(session, { depth: "lead" });
+      await session.sail();
+      await atNight(session, MIDNIGHT_AT + 5, { evening: 4 });
+      const miss = (bait) => herCast(session, { bait, u: 0.9 });
+      // Never a try: Pike Wire, the Cork Float, a bait she never takes, a lure.
+      const none = [];
+      await herRig(session, { leader: "pike_wire" });
+      none.push(await miss("live_minnow"));
+      await herRig(session, { leader: "chafe_gut", depth: "float" });
+      none.push(await miss("live_minnow"));
+      await herRig(session, { depth: "lead" });
+      none.push(await miss("mireworm"));
+      await herRig(session, { lure: "bent_spoon" });
+      none.push(await miss("live_minnow"));
+      await herRig(session, { lure: null });
+      check(
+        none.every((a) => a && a.tried === false && a.tries === 0 && a.open === true),
+        `a wrong rig used a try: ${JSON.stringify(none)}`,
+      );
+      // On the right rig every cast is a try, whether her roll comes or not, the Worm Bunch's too.
+      const t = [await miss("live_minnow"), await miss("heartmoss"), await miss("live_minnow")];
+      check(
+        t.map((a) => `${a?.tried}:${a?.tries}:${a?.open}`).join(" ") ===
+          "true:1:true true:2:true true:3:false",
+        `the three tries: ${JSON.stringify(t)}`,
+      );
+      // Then her time is closed for the night: no take, no refusal, nothing.
+      const after = await herCast(session, { bait: "live_minnow", u: 0 });
+      check(after === null, `a cast after her three tries: ${JSON.stringify(after)}`);
+      const roll = await session.eval(() =>
+        window.__gw.debug.fishLegendRoll({ place: "bell_pool", bait: "live_minnow", rolls: 50 }),
+      );
+      check(roll && roll.may === false && roll.takes === 0, `after her tries: ${JSON.stringify(roll)}`);
+      // A new night brings three more, and the first can bring her.
+      await atNight(session, MIDNIGHT_AT + 5, { evening: 5 });
+      const fresh = await herCast(session, { bait: "live_minnow", u: 0 });
+      check(fresh?.take === true && fresh.tries === 1, `the next night: ${JSON.stringify(fresh)}`);
+      return `wrong rigs used none; three tries then closed; the next night took on try 1`;
+    },
+  },
+
+  {
+    name: "her refusals: a lure, the Cork Float, a bait she won't take, the Worm Bunch's weak half and Pike Wire each swirl with their own line once a night and use no try; the first draws sketch 4",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      await buyAtHome(session, ["line:1", "line:2"]);
+      await fitHerParts(session, { depth: "lead" });
+      await session.sail();
+      await atNight(session, MIDNIGHT_AT + 5, { evening: 4 });
+      check((await huntOf(session)).sketches.swirl === 0, "sketch 4 is drawn before any refusal");
+      const said = [];
+      const cast = async (rig, bait, u, expect) => {
+        await herRig(session, rig);
+        const a = await herCast(session, { bait, u });
+        said.push(a?.said ?? null);
+        check(
+          a && a.part === expect.part && a.said === expect.said && a.take === false,
+          `${JSON.stringify(rig)} ${bait}: ${JSON.stringify(a)}, expected ${JSON.stringify(expect)}`,
+        );
+        return a;
+      };
+      // The first refusal draws sketch 4, with the lure's words.
+      await cast({ lure: "bent_spoon" }, "live_minnow", 0, { part: "lure", said: DRAWN_SWIRL });
+      const drawn = await huntOf(session);
+      check(
+        drawn.sketches.swirl === 4 && drawn.swirlKind === "lure" && drawn.padUnseen.includes("swirl"),
+        `sketch 4: ${JSON.stringify({ s: drawn.sketches, k: drawn.swirlKind, u: drawn.padUnseen })}`,
+      );
+      // Each part's own line, once a night.
+      await cast({ lure: "bent_spoon" }, "live_minnow", 0, { part: "lure", said: REFUSE_LURE });
+      await cast({ lure: "bent_spoon" }, "live_minnow", 0, { part: "lure", said: null });
+      await cast({ lure: null, depth: "float" }, "live_minnow", 0, {
+        part: "depth",
+        said: REFUSE_FLOAT_LIVE,
+      });
+      await cast({ depth: "lead" }, "mireworm", 0, { part: "bait", said: REFUSE_BAIT });
+      const bunch = await cast({}, "heartmoss", 0.2, { part: "bunch", said: REFUSE_BUNCH });
+      await cast({ leader: "pike_wire" }, "live_minnow", 0, { part: "wire", said: REFUSE_WIRE });
+      await cast({}, "live_minnow", 0, { part: "wire", said: null });
+      const tries = await session.eval(() => window.__gw.state.run.midnight.tries);
+      check(
+        bunch.tried === true && tries === 1,
+        `tries after the refusals: ${tries} (only the Worm Bunch's)`,
+      );
+      // On the second evening of the sketch 4 nudge the line shows on every refusal.
+      await session.eval(() => (window.__gw.progression.loop.state().hunt.mossmere.nudged.swirlBoost = 4));
+      await cast({ leader: "chafe_gut", lure: "bent_spoon" }, "live_minnow", 0, {
+        part: "lure",
+        said: REFUSE_LURE,
+      });
+      // A new night: the float line again, for worms this time.
+      await atNight(session, MIDNIGHT_AT + 5, { evening: 5 });
+      await cast({ lure: null, depth: "float" }, "mireworm", 0, { part: "depth", said: REFUSE_FLOAT_WORMS });
+      const lines = said.filter(Boolean).join(" / ");
+      check(!HER_WORDS.test(lines) && !/slate|credit/i.test(lines), `a refusal line names her: ${lines}`);
+      // The notepad: sketch 4 with the lure's words, and the foot points back to it.
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "notepad" }));
+      await session.waitFor(
+        "the notepad tab",
+        10_000,
+        () => !!document.querySelector(".gw-journal-pad .gw-pad"),
+      );
+      const pad = await notepadShown(session, ".gw-journal-pad .gw-pad");
+      await session.eval(() => window.__gw.ui.closeAll());
+      check(
+        pad?.drawn.includes("swirl") && pad.words.includes(SWIRL_LURE_WORDS) && pad.next === NEXT_SWIRL,
+        `the notepad: ${JSON.stringify(pad)}`,
+      );
+      return `${said.filter(Boolean).length} lines, one try (the Worm Bunch); sketch 4 "${SWIRL_LURE_WORDS}"`;
+    },
+  },
+
+  {
+    name: "her first take waits until the Turnback Hook and Chafe Gut are both shelved or owned; until then a right rig is no bite and no try",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      await buyAtHome(session, ["line:1", "line:2"]);
+      // The lead only: neither part on the shelf.
+      await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        s.parts.includes("sounding_lead") || s.parts.push("sounding_lead");
+        s.fitted.depth = "lead";
+        s.arrivals.shelved = [];
+      });
+      await session.sail();
+      await atNight(session, MIDNIGHT_AT + 5, { evening: 4 });
+      const take = () => herCast(session, { bait: "live_minnow", u: 0 });
+      const none = await take();
+      const shelve = (id) =>
+        session.eval((x) => window.__gw.progression.loop.state().arrivals.shelved.push(x), id);
+      await shelve("turnback_hook");
+      const hookOnly = await take();
+      await shelve("chafe_gut");
+      const both = await take();
+      check(
+        none?.part === "gate" && !none.take && none.said == null && !none.tried && none.tries === 0,
+        `nothing shelved: ${JSON.stringify(none)}`,
+      );
+      check(hookOnly?.part === "gate" && !hookOnly.take, `the hook alone: ${JSON.stringify(hookOnly)}`);
+      check(both?.take === true && both.tries === 1, `both shelved: ${JSON.stringify(both)}`);
+      // The theft that finds her water is the Turnback Hook's beat, with Murk's line for it at the tally.
+      const r = await session.eval(() => {
+        const d = window.__gw.data,
+          loop = () => ({
+            parts: ["cork_float", "plain_knot", "mere_hook", "sounding_lead", "minnow_tin"],
+            arrivals: { seq: 0, beats: { turnback_hook: 0, pike_wire: 0, leaders: 0 }, shelved: [] },
+            maps: { lakes: ["mossmere"], places: [] },
+            places: { revealed: [] },
+            evenings: 4,
+            hunt: {
+              mossmere: { sketches: { map: 3, taken: 0 }, padUnseen: [], found: false, hookByTheft: false },
+            },
+          });
+        const l = loop();
+        d.findHerWater(l, null, { x: -4, z: -14 });
+        const shelvedFirst = loop();
+        shelvedFirst.arrivals.shelved.push("turnback_hook");
+        d.findHerWater(shelvedFirst, null, { x: -4, z: -14 });
+        return {
+          beat: l.arrivals.beats.turnback_hook,
+          byTheft: l.hunt.mossmere.hookByTheft,
+          tally: d.rigArrivalAtTally(l, "mossmere"),
+          shelvedFirst: [shelvedFirst.arrivals.beats.turnback_hook, shelvedFirst.hunt.mossmere.hookByTheft],
+          line: d.TEXT_LOOP.arrivals.lines.hookHunt,
+        };
+      });
+      check(r.beat > 0 && r.byTheft === true, `the theft's beat: ${JSON.stringify(r)}`);
+      check(
+        r.tally?.gift === "turnback_hook" && r.tally.giftSay === "hunt" && r.line === MURK_HOOK_HUNT,
+        `the tally: ${JSON.stringify(r)}`,
+      );
+      check(JSON.stringify(r.shelvedFirst) === "[0,false]", `already shelved: ${JSON.stringify(r)}`);
+      return `no bite until both; the theft brings the hook with "${r.line}"`;
+    },
+  },
+
+  {
+    name: "her losses: the Mere Hook early, a leader not Chafe Gut halfway, a weak line at the end; each named, taught, drawn into sketch 5, no wound; then she turns away at the bite",
+    fixture: "legend-sold",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session) {
+      await session.toHome();
+      await buyAtHome(session, ["line:1"]);
+      await fitHerParts(session, { hook: "mere_hook", leader: "plain_knot", depth: "lead" });
+      await session.sail();
+      const steps = [
+        { rig: { hook: "mere_hook", leader: "plain_knot" }, part: "hook", frac: 0.15, text: HOOK_LOSS_TEXT },
+        {
+          rig: { hook: "turnback_hook", leader: "plain_knot" },
+          part: "leader",
+          frac: 0.5,
+          text: LEADER_LOSS_TEXT,
+        },
+        {
+          rig: { hook: "turnback_hook", leader: "chafe_gut" },
+          part: "line",
+          frac: null,
+          text: LINE_LOSS_TEXT,
+        },
+      ];
+      const done = [];
+      let evening = 3;
+      for (const step of steps) {
+        await herRig(session, step.rig);
+        // Forced to "land": the wrong part must still lose.
+        const hooked = await hookAndPlayOut(session, LEGEND_ID, "land");
+        check(
+          hooked.p === 0 && hooked.escape?.legendLossReason === step.part,
+          `${step.part}: ${JSON.stringify({ p: hooked.p, escape: hooked.escape, loss: hooked.loss })}`,
+        );
+        check(
+          step.frac == null ? hooked.loss?.frac > 0.5 : Math.abs(hooked.loss?.frac - step.frac) < 0.001,
+          `${step.part}: she got away at ${hooked.loss?.frac} of the fight`,
+        );
+        const shown = await escapeLine(session);
+        check(shown === step.text, `${step.part}: the line "${shown}", expected "${step.text}"`);
+        done.push(step.part);
+        const rec = await legendRecord(session);
+        const h = rec.hunt.mossmere;
+        check(rec.wounds === 0, `${step.part}: a wound (${rec.wounds})`);
+        check(
+          h.lessons[step.part] === true &&
+            JSON.stringify(h.back) === JSON.stringify(done) &&
+            h.sketches.back > 0,
+          `${step.part}: ${JSON.stringify({ lessons: h.lessons, back: h.back, s: h.sketches })}`,
+        );
+        // Another night, the same part still wrong: she turns away at the bite. No try, no fight.
+        await session.closeGuides(3000);
+        await atNight(session, MIDNIGHT_AT + 5, { evening: ++evening });
+        const again = await herCast(session, { bait: "live_minnow", u: 0 });
+        check(
+          again?.part === "lesson" && !again.take && !again.tried && again.said === REFUSE_LESSON[step.part],
+          `${step.part} after its loss: ${JSON.stringify(again)}`,
+        );
+        await atNight(session, 10, { evening: ++evening });
+      }
+      const saved = JSON.parse(await session.saved()).meta.loop.hunt.mossmere;
+      check(
+        JSON.stringify(saved.back) === '["hook","leader","line"]' && saved.lessons.line && saved.lineLesson,
+        `the written save: ${JSON.stringify({ back: saved.back, lessons: saved.lessons })}`,
+      );
+      // Hob's line about the worn end waits for it, and comes now.
+      const hob = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          h = loop.state().hunt.mossmere;
+        (h.hobMet = 1), (h.hobNight = 0), (h.hobLines = ["rod", "bell", "taken"]);
+        return loop.hobTalk();
+      });
+      check(hob?.line === "worn", `Hob's line: ${JSON.stringify(hob)}`);
+      // The notepad: the three parts in fight order, each with its sentence; the foot sends you to Murk.
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "notepad" }));
+      await session.waitFor(
+        "the notepad tab",
+        10_000,
+        () => !!document.querySelector(".gw-journal-pad .gw-pad"),
+      );
+      const pad = await notepadShown(session, ".gw-journal-pad .gw-pad");
+      await session.eval(() => window.__gw.ui.closeAll());
+      const order = BACK_WORDS.map((w) => pad?.words.indexOf(w));
+      check(
+        order.every((i, k) => i >= 0 && (k === 0 || i > order[k - 1])) && pad.next === NEXT_SELLS,
+        `the notepad: ${JSON.stringify(pad)}`,
+      );
+      return `lost to ${done.join(", ")}; taught; no wound; turned away after each; notepad in order`;
+    },
+  },
+
+  {
+    name: "her right rig: a lost fight says everything held and wounds her; landed with no loss, sketch 5 reads What held",
+    fixture: "legend-sold",
+    debug: true,
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.toHome();
+      await buyAtHome(session, ["line:1", "line:2"]);
+      await fitHerParts(session, { depth: "lead" });
+      await session.sail();
+      const lost = await hookAndPlayOut(session, LEGEND_ID, "lose");
+      check(lost.p > 0 && lost.escape?.legendLossReason === "fight", `the dice: ${JSON.stringify(lost)}`);
+      const shown = await escapeLine(session);
+      check(shown === FIGHT_LOSS_TEXT, `the line "${shown}"`);
+      let rec = await legendRecord(session);
+      let h = rec.hunt.mossmere;
+      check(rec.wounds === 1, `wounds ${rec.wounds}, expected 1`);
+      check(
+        h.back.length === 0 && Object.values(h.lessons).every((v) => v === false),
+        `the dice taught a part: ${JSON.stringify({ back: h.back, lessons: h.lessons })}`,
+      );
+      // Landed with no loss behind it: the page is drawn at the landing as "What held".
+      await session.eval(() => {
+        const h = window.__gw.progression.loop.state().hunt.mossmere;
+        (h.sketches.back = 0), (h.padUnseen = h.padUnseen.filter((k) => k !== "back"));
+      });
+      await session.closeGuides(3000);
+      const landed = await hookAndPlayOut(session, LEGEND_ID, "land");
+      check(landed.landed === LEGEND_ID, `she was not landed: ${JSON.stringify(landed)}`);
+      h = await huntOf(session);
+      check(
+        h.sketches.back > 0 && h.back.length === 0 && h.padUnseen.includes("back"),
+        JSON.stringify(h.sketches),
+      );
+      await session.clickButton(/^\d?(Keep|Let go)\b/);
+      await session.pause(800);
+      await session.closeGuides(5000);
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "notepad" }));
+      await session.waitFor(
+        "the notepad tab",
+        10_000,
+        () => !!document.querySelector(".gw-journal-pad .gw-pad"),
+      );
+      const pad = await session.eval(() => ({
+        title:
+          document.querySelector('.gw-journal-pad [data-sketch="back"] .gw-pad-fig-h')?.textContent ?? null,
+        words: [...document.querySelectorAll('.gw-journal-pad [data-sketch="back"] .gw-pad-cap')].map(
+          (c) => c.textContent,
+        ),
+      }));
+      await session.eval(() => window.__gw.ui.closeAll());
+      check(
+        pad.title === "5What held" && JSON.stringify(pad.words) === JSON.stringify([HELD_WORDS]),
+        `sketch 5: ${JSON.stringify(pad)}`,
+      );
+      return `"${shown}", wounds 1; landed; sketch 5 "${HELD_WORDS}"`;
+    },
+  },
+
+  {
+    name: "her lessons in an old save: a line lesson from before the notepad carries over, taught and drawn into sketch 5",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave(save) {
+      save.meta.loop.hunt = { mossmere: { lineLesson: true, taleAt: 2 } };
+    },
+    async run(session) {
+      await session.toHome();
+      const h = await huntOf(session);
+      check(
+        h.lessons?.line === true &&
+          h.lessons.hook === false &&
+          JSON.stringify(h.back) === '["line"]' &&
+          h.sketches.back > 0 &&
+          h.lineLesson === true,
+        `the loaded record: ${JSON.stringify({ lessons: h.lessons, back: h.back, s: h.sketches })}`,
+      );
+      return `lessons ${JSON.stringify(h.lessons)}, back ${JSON.stringify(h.back)}`;
     },
   },
   {
