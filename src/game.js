@@ -47073,6 +47073,13 @@ var pP = {
   },
   Ca = {
     holdFull: "Hold's full.",
+    // Mossmere's midnight bell and the thief's feeding time (mossmere-hunt-2.md, B6).
+    midnight: {
+      strikes: "Far off, the old bell on the toll-tower strikes midnight.",
+      missing: "This is when things go missing.",
+      still: "The water goes still again.",
+      holdFull: "Your hold is full. You can still fish and let them go. The old bell strikes midnight soon.",
+    },
     home: "Home",
     keep: "Keep",
     letGo: "Let go",
@@ -54498,6 +54505,24 @@ var kc = {
               d: s[i],
               peak: r[i] * 0.3 * (l ? 0.7 : 1),
             });
+      },
+    },
+    // One stroke of the dusk bell, for the midnight bell's twelve: no loudness or pitch jitter, so every
+    // stroke sounds the same, and enough voices for the long tails to overlap.
+    midnight_toll: {
+      gain: 0.55,
+      gap: 1,
+      max: 4,
+      pri: 2,
+      wet: 0.75,
+      vj: 0,
+      pj: 0,
+      fn(e, t, n, o) {
+        let a = [0.5, 1, 1.19, 1.5, 2, 2.66],
+          s = [6, 4.5, 3.5, 2.5, 3, 1.8],
+          r = [0.5, 0.55, 0.42, 0.25, 0.32, 0.18];
+        for (let i = 0; i < a.length; i++)
+          e.tone(t, { type: "sine", f: 196 * o * a[i], t: n, a: 0.004, d: s[i], peak: r[i] * 0.3 });
       },
     },
     heal: {
@@ -79908,6 +79933,8 @@ function pN(
     f.add(frame, clapper);
     harbour = { frame, clapper, index: v.get("bell_pool"), contact: bellPoolContact(Te.area) };
   }
+  // The toll-tower's top-window halo, kept so the midnight bell can flare it with each stroke.
+  let tollTowerHalo = null;
   let Ye = null,
     ee = null,
     pe = [];
@@ -80096,8 +80123,24 @@ function pN(
         Ye.rotation.set(0.05, Ee, -0.11),
         (Ye.name = "tollTower"),
         Ws(Ye, { cast: !1 }),
-        f.add(Ye),
-        n?.halos?.add(ke + Math.sin(Ee) * 3.4, 24, Ce + Math.cos(Ee) * 3.4, ko(Xo(b), 0.55), 4.5, 1.7);
+        f.add(Ye);
+      let towerHaloColor = ko(Xo(b), 0.55),
+        towerHaloIndex = n?.halos?.add?.(
+          ke + Math.sin(Ee) * 3.4,
+          24,
+          Ce + Math.cos(Ee) * 3.4,
+          towerHaloColor,
+          4.5,
+          1.7,
+        );
+      Number.isInteger(towerHaloIndex) &&
+        towerHaloIndex >= 0 &&
+        (tollTowerHalo = {
+          halos: n.halos,
+          index: towerHaloIndex,
+          color: [towerHaloColor[0], towerHaloColor[1], towerHaloColor[2]],
+          k: 0,
+        });
     }
     {
       let Ee = Jn(Jn(Xo(525850), Jn(Xo(1579566), Xo(3159130), 0.45), 0.62), D.stone, 0.3),
@@ -80925,6 +80968,19 @@ uniform float uK; uniform vec3 uGlowCol; varying float vGlowW;`,
     stats: en,
     forceBack: On,
     dispose: Sn,
+    // k 0 (the window as built) to 1 (a full flare, four times as bright). Returns false with no tower.
+    flareTollTower(k = 0) {
+      if (!tollTowerHalo) return !1;
+      let flare = Math.max(0, Math.min(1, Number(k) || 0));
+      if (Math.abs(flare - tollTowerHalo.k) < 0.01) return !0;
+      tollTowerHalo.k = flare;
+      let [r, g, b] = tollTowerHalo.color,
+        gain = 1 + 3 * flare;
+      tollTowerHalo.halos.setColor(tollTowerHalo.index, r * gain, g * gain, b * gain);
+      tollTowerHalo.halos.touchColors?.();
+      return !0;
+    },
+    tollTowerFlare: () => (tollTowerHalo ? tollTowerHalo.k : null),
     lamps: () => {
       let ht = dt ? dt.userData.u.uK.value : 0;
       for (let Ht of _t) Ht.k = ht;
@@ -82058,6 +82114,8 @@ function qie(e) {
           h ? h.setPlaces(m) : !1
         );
       },
+      flareTollTower: (re) => (h?.flareTollTower ? h.flareTollTower(re) : !1),
+      tollTowerFlare: () => (h?.tollTowerFlare ? h.tollTowerFlare() : null),
       liftMist(re, De = 3) {
         let We = h ? h.liftMist(re, De) : !1;
         return We && !m.lifted.includes(re) && m.lifted.push(re), We;
@@ -104381,6 +104439,110 @@ var Mle = (e, t) => ({
     let a = e?.catchParts?.(t, n, o, { strike: "struck" });
     return a ? a.p : null;
   };
+// Mossmere's midnight bell and the thief's feeding time (mossmere-hunt-2.md, section 1 and B2). From evening 2,
+// midnight strikes `at` seconds into the night phase's own clock: twelve strokes of the dusk bell, rung
+// lower, with the toll-tower's top window flaring on each. Her time runs `herTime` seconds from the first
+// stroke, and the legend takes only inside it. The evening's flags live on the run (run.midnight).
+const MIDNIGHT = Object.freeze({
+  water: "mossmere",
+  legend: "belled_matriarch",
+  fromEvening: 2,
+  at: 60,
+  strokes: 12,
+  strokeGap: 2.2,
+  herTime: 180,
+  pitch: 0.7,
+  volume: 0.75,
+  // A stroke more than this late (a save loaded past it) is skipped silently rather than rung late.
+  late: 1.5,
+});
+// True on a trip on Mossmere from evening 2: the evenings the bell strikes.
+function midnightEvening(run) {
+  return (
+    !!run &&
+    run.outing === "trip" &&
+    run.zone === MIDNIGHT.water &&
+    Math.trunc(Number(run.evening) || 0) >= MIDNIGHT.fromEvening
+  );
+}
+function midnightFlags(run) {
+  let m = run.midnight;
+  if (!m || typeof m != "object" || Array.isArray(m))
+    m = run.midnight = { struck: 0, said: !1, stillSaid: !1, holdFullSaid: !1, hooked: !1 };
+  return m;
+}
+// Seconds since dark fell, or null while it is still day or dusk.
+function nightClock(run) {
+  return run?.phase === "gloomtide" ? Math.max(0, Number(run.phaseTime) || 0) : null;
+}
+// Her time: from the first stroke of midnight for herTime seconds, closed early for the night once she has
+// been hooked. Outside it she never takes.
+function herTimeOpen(run) {
+  if (!midnightEvening(run) || run.midnight?.hooked === !0) return !1;
+  let t = nightClock(run);
+  return t != null && t >= MIDNIGHT.at && t <= MIDNIGHT.at + MIDNIGHT.herTime;
+}
+function noteHerHookup(run) {
+  midnightEvening(run) && (midnightFlags(run).hooked = !0);
+}
+// Called every frame from the phase clock with the run. Rings the strokes, flares the tower, and shows the
+// midnight, still-water and full-hold lines once an evening each.
+function updateMidnightBell(game, run) {
+  if (!midnightEvening(run)) return;
+  let m = midnightFlags(run),
+    say = (text) => text && game.bus?.emit?.("toast", { text, kind: "lore" }),
+    words = Ca.midnight,
+    t = nightClock(run);
+  if (!m.holdFullSaid && (t == null || t < MIDNIGHT.at)) {
+    let full = !1;
+    try {
+      full = game.progression?.loop?.holdFull?.() === !0;
+    } catch {}
+    full && ((m.holdFullSaid = !0), say(words.holdFull));
+  }
+  if (t == null || t < MIDNIGHT.at) return;
+  let ringing = m.struck < MIDNIGHT.strokes;
+  for (; m.struck < MIDNIGHT.strokes; ) {
+    let due = MIDNIGHT.at + m.struck * MIDNIGHT.strokeGap;
+    if (t < due) break;
+    let onTime = t - due <= MIDNIGHT.late;
+    if (onTime) {
+      try {
+        game.audio?.play?.("midnight_toll", { volume: MIDNIGHT.volume, pitch: MIDNIGHT.pitch });
+      } catch {}
+      if (m.struck === 0 && !m.said) {
+        m.said = !0;
+        say(words.strikes);
+        bellPoolFoundFor(game) || say(words.missing);
+      }
+    }
+    m.struck++;
+  }
+  // The window flares at each stroke and dies away over about a second.
+  if (ringing || t < MIDNIGHT.at + MIDNIGHT.strokes * MIDNIGHT.strokeGap + 2) {
+    let sinceStroke = t - (MIDNIGHT.at + Math.max(0, m.struck - 1) * MIDNIGHT.strokeGap),
+      flare = m.struck > 0 && sinceStroke >= 0 ? Math.exp(-sinceStroke / 0.45) : 0;
+    try {
+      game.world?.flareTollTower?.(flare);
+    } catch {}
+  }
+  if (!m.stillSaid && t > MIDNIGHT.at + MIDNIGHT.herTime) {
+    m.stillSaid = !0;
+    say(words.still);
+  }
+}
+// Her water counts as found once the Bell Pool is owned and its mist lifted: the same test the cast makes.
+function bellPoolFoundFor(game) {
+  try {
+    let loop = game.progression?.loop,
+      state = loop?.state?.(),
+      owned = Array.isArray(state?.maps?.places) ? state.maps.places : [],
+      lifted = loop?.lifted?.() ?? state?.lifted;
+    return owned.includes("bell_pool") && Array.isArray(lifted) && lifted.includes("bell_pool");
+  } catch {
+    return !1;
+  }
+}
 function rollLegendBite(bait, rng) {
   const chance = bait?.legendBiteChance ?? 1;
   return chance >= 1 || rng() < chance;
@@ -113877,6 +114039,11 @@ function rce(e) {
     for (; et.phaseTime >= un && ze++ < 8; ) {
       if (((et.phaseTime -= un), F(et), h.dead || e.state.run !== et)) return;
       un = Ze(et.phase, et.day, et);
+    }
+    try {
+      updateMidnightBell(e, et);
+    } catch (midnightError) {
+      console.warn("[midnight]", midnightError);
     }
     if (z(et)) {
       gn(Ie, et, kt, It);
@@ -129888,6 +130055,20 @@ function Y0e(e) {
       At = Math.pow(Math.random(), Bt(Q.weightSkew, 1.6) / (1 + Se(I, "weightBias")));
     return Math.round((Pe + (Ke - Pe) * At) * 100) / 100;
   }
+  // Whether the lake's legend can take this cast (bait, hour, cooldown, place), before her own roll.
+  function legendMayTake(bn, At, Dt) {
+    return (
+      !!bn &&
+      !!At &&
+      At === bn.baitId &&
+      // Mossmere's legend takes only in her time after the midnight bell; every other legend keeps its hours.
+      (xe() && bn.species?.id === MIDNIGHT.legend && h()?.zone === MIDNIGHT.water
+        ? herTimeOpen(h())
+        : C(bn.species, Dt)) &&
+      i.clock >= i.legendDimUntil &&
+      (xe() ? $(bn) : Math.hypot(c.bob.x - bn.x, c.bob.z - bn.z) <= bn.r)
+    );
+  }
   function zt(nextFish = false) {
     let R = n("bite"),
       I = n("spots"),
@@ -129900,14 +130081,7 @@ function Y0e(e) {
       yn = le();
     (i.legendCast = !1), (i.taperRule = !1), (i.comeback = null);
     let bn = We();
-    !nextFish &&
-      bn &&
-      At &&
-      At === bn.baitId &&
-      C(bn.species, Dt) &&
-      i.clock >= i.legendDimUntil &&
-      (xe() ? $(bn) : Math.hypot(c.bob.x - bn.x, c.bob.z - bn.z) <= bn.r) &&
-      (i.legendCast = rollLegendBite(D(At), lt));
+    !nextFish && legendMayTake(bn, At, Dt) && (i.legendCast = rollLegendBite(D(At), lt));
     let vn,
       qn = Lc() && !nextFish ? i.signHit?.rule : null;
     if (i.forceSpecies)
@@ -130733,6 +130907,8 @@ function Y0e(e) {
       bn = At ? Kt(Q.id) : { wounds: 0, landings: 0 },
       vn = xe(),
       qn = !1;
+    // One hook-up a night: her time closes for the evening once she is on the line.
+    vn && At && Q.id === MIDNIGHT.legend && noteHerHookup(h());
     if (vn && Q.giant && !At)
       try {
         qn = N()?.takeGiantMark?.(Q.id) === !0;
@@ -133478,7 +133654,12 @@ function Y0e(e) {
     let Ke = h(),
       At = !!Pe.baitId && Bt(Ke?.bait?.[Pe.baitId], 0) > 0,
       Dt = i.clock < i.legendDimUntil,
-      tn = At && C(Pe.species, j()) && !Dt;
+      // The pool's glimmer follows her time after the midnight bell, as her bite does.
+      herHours =
+        xe() && Pe.species?.id === MIDNIGHT.legend && Ke?.zone === MIDNIGHT.water
+          ? herTimeOpen(Ke)
+          : C(Pe.species, j()),
+      tn = At && herHours && !Dt;
     tn &&
       i.legendToastDay !== (Ke?.day ?? 0) &&
       !xe() &&
@@ -136061,6 +136242,28 @@ function Y0e(e) {
               return y(yn), null;
             } finally {
               (i.cast = At), (i.forcePlace = Dt), (i.taperRule = tn), (i.castLead = castLead);
+            }
+          },
+          // How a cast released now at `place` with `bait` would fare with the lake's legend: whether she may
+          // take (legendMayTake), and how many of `rolls` of her own bite roll would then bring her.
+          fishLegendRoll: ({ place: Q = null, bait: Pe = null, rolls: Ke = 0 } = {}) => {
+            if (!xe()) return null;
+            let At = i.cast,
+              Dt = i.forcePlace;
+            try {
+              i.forcePlace = Q || null;
+              let yn = P();
+              i.cast = Ht(yn.x, yn.z, ye(yn.x, yn.z), Pe, !1);
+              let bn = We(),
+                may = legendMayTake(bn, Pe, j()),
+                takes = 0;
+              if (may)
+                for (let roll = 0; roll < Math.max(0, Ke | 0); roll++) rollLegendBite(D(Pe), lt) && takes++;
+              return { place: i.cast.place?.id ?? null, mist: i.cast.mist || null, may, takes };
+            } catch (yn) {
+              return y(yn), null;
+            } finally {
+              (i.cast = At), (i.forcePlace = Dt);
             }
           },
           fishOdds: () => {
@@ -166436,11 +166639,13 @@ function YV(e) {
   function rt(K, we = !1) {
     if (K.hint && !we) return K.hint;
     let te = [];
-    K.time === "gloom"
-      ? te.push("rises only in the Gloomtide")
-      : K.time === "calm"
-        ? te.push("feeds while the water is calm")
-        : te.push("bites at any hour");
+    K.id === MIDNIGHT.legend
+      ? te.push("feeds just after the old bell strikes midnight")
+      : K.time === "gloom"
+        ? te.push("rises only in the Gloomtide")
+        : K.time === "calm"
+          ? te.push("feeds while the water is calm")
+          : te.push("bites at any hour");
     let [ke, Ce] = i(K.depth).length ? K.depth : [0, 1];
     return (
       te.push(

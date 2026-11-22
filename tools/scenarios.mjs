@@ -497,6 +497,45 @@ const heardOnWater = (session) =>
     return { lines, models, landedAt };
   });
 
+// ---- the midnight bell and her time ---------------------------------------------------------------------
+
+const MIDNIGHT_AT = 60;
+const MIDNIGHT_LINE = "Far off, the old bell on the toll-tower strikes midnight.";
+const MISSING_LINE = "This is when things go missing.";
+const STILL_LINE = "The water goes still again.";
+const HOLD_FULL_LINE =
+  "Your hold is full. You can still fish and let them go. The old bell strikes midnight soon.";
+
+// Records every toast's text from now on; read it back with toastsSeen.
+const listenForToasts = (session) =>
+  session.eval(() => {
+    window.__toasts = [];
+    window.__gw.bus.on("toast", (e) => window.__toasts.push(String(e?.text ?? "")));
+  });
+const toastsSeen = (session) => session.eval(() => window.__toasts.slice());
+
+// Puts the trip at `t` seconds after dark (with `evening`, a new evening: the run's evening flags cleared),
+// lets the game run two frames, and returns the run's midnight flags and the tower window's flare.
+const atNight = (session, t, { evening = null } = {}) =>
+  session.eval(
+    async ([t, evening]) => {
+      const g = window.__gw;
+      const run = g.state.run;
+      if (evening != null) {
+        run.evening = evening;
+        delete run.midnight;
+      }
+      if (run.phase !== "gloomtide") g.debug.setPhase("gloomtide");
+      run.phaseTime = t;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      return {
+        midnight: run.midnight ? { ...run.midnight } : null,
+        flare: g.world.tollTowerFlare?.() ?? null,
+      };
+    },
+    [t, evening],
+  );
+
 // ---- the Sounding Lead (Mossmere gear, first step) -------------------------------------------------------
 
 const LEAD = "sounding_lead";
@@ -1770,6 +1809,152 @@ const SCENARIOS = [
         `her new lore appears ${copies} times, expected 3 (species, live record, field guide)`,
       );
       return `new lore in ${copies} copies`;
+    },
+  },
+
+  {
+    name: "midnight: from evening 2 the bell strikes twelve times 60 s after dark, once an evening, with both lines while her water is unfound; never on evening 1",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session, { fixture }) {
+      check(!fixture.meta.loop.maps.places.includes("bell_pool"), "the fixture owns the Bell Pool");
+      await session.sail();
+      await listenForToasts(session);
+      // Evening 1: dark falls and a minute passes, and nothing strikes.
+      const first = await atNight(session, MIDNIGHT_AT + 1, { evening: 1 });
+      check(first.midnight === null, `the bell struck on evening 1: ${JSON.stringify(first.midnight)}`);
+      // Evening 2: just before midnight, nothing; then the twelve strokes, 2.2 s apart.
+      await atNight(session, MIDNIGHT_AT - 1, { evening: 2 });
+      let toasts = await toastsSeen(session);
+      check(!toasts.includes(MIDNIGHT_LINE), "the midnight line showed before midnight");
+      const struck = [];
+      let flared = 0;
+      for (let k = 0; k < 12; k++) {
+        const now = await atNight(session, MIDNIGHT_AT + k * 2.2 + 0.05);
+        struck.push(now.midnight?.struck ?? 0);
+        if (now.flare > 0.3) flared++;
+      }
+      check(
+        JSON.stringify(struck) === JSON.stringify([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+        `strokes counted at each due time: ${struck}`,
+      );
+      check(flared === 12, `the tower window flared on ${flared} of 12 strokes`);
+      toasts = await toastsSeen(session);
+      check(
+        toasts.filter((t) => t === MIDNIGHT_LINE).length === 1 &&
+          toasts.filter((t) => t === MISSING_LINE).length === 1,
+        `the lines at the first stroke: ${JSON.stringify(toasts)}`,
+      );
+      check(
+        toasts.indexOf(MIDNIGHT_LINE) < toasts.indexOf(MISSING_LINE),
+        `the lines are out of order: ${JSON.stringify(toasts)}`,
+      );
+      // Once an evening: back before the strokes and through them again, nothing more.
+      await atNight(session, MIDNIGHT_AT + 0.05);
+      const again = await atNight(session, MIDNIGHT_AT + 5);
+      toasts = await toastsSeen(session);
+      check(
+        again.midnight.struck === 12 && toasts.filter((t) => t === MIDNIGHT_LINE).length === 1,
+        `the bell struck again: ${JSON.stringify({ again, toasts })}`,
+      );
+      return `no bell on evening 1; 12 strokes and flares on evening 2, the two lines once`;
+    },
+  },
+
+  {
+    name: "midnight: she can take only in her time (from the first stroke for three minutes, until she is hooked); the still-water line shows once; her Journal page says she feeds after the bell",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session) {
+      // Her Journal page (she is landed in this save): the feeding line agrees with her lore.
+      await session.toHome();
+      await session.eval((id) => window.__gw.ui.openJournal({ sel: id }), LEGEND_ID);
+      await session.waitFor("her journal page", 10_000, () => !!document.querySelector(".gw-jr-where"));
+      const where = await visibleText(session, ".gw-jr-where");
+      await session.eval(() => window.__gw.ui.closeAll());
+      check(
+        where.includes("Feeds just after the old bell strikes midnight") && !/calm/i.test(where),
+        `her Journal page's feeding line: "${where}"`,
+      );
+      await session.sail();
+      await listenForToasts(session);
+      const roll = () =>
+        session.eval(
+          () =>
+            window.__gw.debug.fishLegendRoll({ place: "bell_pool", bait: "heartmoss", rolls: 400 }) ?? {
+              none: true,
+            },
+        );
+      const seen = {};
+      // By day she no longer takes (today's "calm" rule is gone), nor at dusk, nor in the first minute of dark.
+      await session.eval(() => window.__gw.debug.setPhase("calm"));
+      seen.day = await roll();
+      check(
+        seen.day.place === "bell_pool" && !seen.day.mist,
+        `the cast is not on the Bell Pool: ${JSON.stringify(seen.day)}`,
+      );
+      await session.eval(() => window.__gw.debug.setPhase("dusk"));
+      seen.dusk = await roll();
+      await atNight(session, MIDNIGHT_AT - 2);
+      seen.beforeBell = await roll();
+      // Her time: at the first stroke and near its end she takes at her own odds.
+      await atNight(session, MIDNIGHT_AT + 0.5);
+      seen.firstStroke = await roll();
+      await atNight(session, MIDNIGHT_AT + 179);
+      seen.lateInHerTime = await roll();
+      let toasts = await toastsSeen(session);
+      check(!toasts.includes(STILL_LINE), "the still-water line showed inside her time");
+      // After the three minutes: closed, and the still-water line shows once.
+      await atNight(session, MIDNIGHT_AT + 181);
+      seen.after = await roll();
+      await atNight(session, MIDNIGHT_AT + 200);
+      toasts = await toastsSeen(session);
+      check(
+        toasts.filter((t) => t === STILL_LINE).length === 1,
+        `the still-water line: ${JSON.stringify(toasts)}`,
+      );
+      // A new evening on evening 1: no time for her at all.
+      await atNight(session, MIDNIGHT_AT + 1, { evening: 1 });
+      seen.eveningOne = await roll();
+      // Hooked tonight: her time closes for the evening.
+      await atNight(session, MIDNIGHT_AT + 1, { evening: 3 });
+      seen.openAgain = await roll();
+      await session.eval(() => (window.__gw.state.run.midnight.hooked = true));
+      seen.hooked = await roll();
+      for (const key of ["day", "dusk", "beforeBell", "after", "eveningOne", "hooked"])
+        check(
+          seen[key].may === false && seen[key].takes === 0,
+          `${key}: she may take ${JSON.stringify(seen[key])}`,
+        );
+      for (const key of ["firstStroke", "lateInHerTime", "openAgain"]) {
+        const takes = seen[key].takes;
+        // Her own roll is unchanged: Heartmoss at 0.12 a cast, so about 48 of 400.
+        check(seen[key].may === true && takes >= 20 && takes <= 85, `${key}: ${JSON.stringify(seen[key])}`);
+      }
+      return `closed by day, dusk, before the bell, after 3 min, on evening 1 and once hooked; open in her time (${seen.firstStroke.takes}/400, ${seen.lateInHerTime.takes}/400); still line once; Journal "${where}"`;
+    },
+  },
+
+  {
+    name: "midnight: a hold that fills before midnight from evening 2 shows the full-hold line once",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session) {
+      await session.sail();
+      await listenForToasts(session);
+      await session.eval(() => (window.__gw.state.run.evening = 2));
+      for (let i = 0; i < 9 && !(await session.eval(() => window.__gw.progression.loop.holdFull())); i++)
+        await session.catchFish("mossback_perch");
+      check(await session.eval(() => window.__gw.progression.loop.holdFull()), "the hold did not fill");
+      await session.pause(1500);
+      const toasts = await toastsSeen(session);
+      check(
+        toasts.filter((t) => t === HOLD_FULL_LINE).length === 1,
+        `the full-hold line: ${JSON.stringify(toasts)}`,
+      );
+      const flags = await session.eval(() => window.__gw.state.run.midnight);
+      check(flags?.holdFullSaid === true, `the run's flag: ${JSON.stringify(flags)}`);
+      return "the line showed once when the hold filled";
     },
   },
 ];
