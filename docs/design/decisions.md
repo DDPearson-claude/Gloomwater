@@ -40,11 +40,11 @@ The designer's direction for her story and her hiding place. The details are in 
 - **The notepad's three headings are Where, Suspects and Gear.** ("Suspects" replaces "Which fish it isn't", by the designer's ruling.)
 - **Five sketches in total.** The notepad holds five sketches for the whole hunt, not one per small clue. Each is a picture worth studying.
 - **Three questions.** The hunt is about three things: **where she is**, **which fish it isn't**, and **what gear will catch her**. The five sketches, approved in outline:
-  1. *Hob's map* (where). Talk to Hob. He draws the lake and shades the part where he lost her.
-  2. *The bell* (where). Stay out after dark in that part of the lake. A bell rings under the water and the player draws where the ripples start. That marks her spot.
-  3. *The line-up* (which fish it isn't). The lake's big fish, drawn side by side. Each one caught is crossed out, with the reason it could not be her.
-  4. *The swirl* (gear). Fishing her spot with worms under a float, something big turns below and leaves them. She wants a live fish, on the bottom.
-  5. *What came back* (gear). Hook her and lose her. The broken end is drawn beside Hob's old one. It shows the hook, leader and line that will hold her.
+  1. _Hob's map_ (where). Talk to Hob. He draws the lake and shades the part where he lost her.
+  2. _The bell_ (where). Stay out after dark in that part of the lake. A bell rings under the water and the player draws where the ripples start. That marks her spot.
+  3. _The line-up_ (which fish it isn't). The lake's big fish, drawn side by side. Each one caught is crossed out, with the reason it could not be her.
+  4. _The swirl_ (gear). Fishing her spot with worms under a float, something big turns below and leaves them. She wants a live fish, on the bottom.
+  5. _What came back_ (gear). Hook her and lose her. The broken end is drawn beside Hob's old one. It shows the hook, leader and line that will hold her.
 - **She stays unknown.** While the player rules fish out one by one, nothing shows or says what she is. Her kind, name and picture stay hidden until she is caught.
 - **Bite marks.** Fish the player catches sometimes carry a mark from whatever hunts them. The marks point to the kind of predator out there and help rule suspects out.
 - **Clue ideas to draw on.** The designer's list of River Monsters clue types (wounds and scars, signs in the field, what witnesses say, local tales and history, red herrings) is the pool for this and later lakes. Not all of it is for Mossmere.
@@ -100,4 +100,16 @@ Details are in `mossmere-review-addendum.md`.
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.
 - The designer's approval of the Mossbell Isle rock artwork.
-- A timed playtest of the whole hunt, start to finish, has not been done yet. Earnings have been measured (see the rulings above).
+- **What the game says while the player saves for the Waxed Silk**, and **practice orders for a player with no Order Board**. Both are with the designer (see the play-through below).
+- A play-through by people, told nothing about the case, has not been done yet.
+
+## Timed play-through by script, 22 November 2026
+
+`tools/playthrough.mjs` plays from New Game, evening after evening, and prints one line an evening. It lands fish with the debug calls, but only kinds the game's own bite roll gives at that spot, hour, bait and depth, and it never hands out clams or parts. One run of 13 evenings was made. It did not reach the landing: it stopped while saving for the Waxed Silk.
+
+- **Measured.** Every clue was in by evening 8 (the first hook-up, lost to the line, which draws sketch 5). Tallies averaged about 24 clams an evening for a player who fishes the set-out spot, keeps a hold of 3 ordinary fish and buys only the hunt's parts. Braided Gut did not raise that. No game errors.
+- **Projected, not measured.** The Waxed Silk about evening 34 and the landing about evening 36. That is later than the "about evening 24" given for a casual player in the ruling above. A player who keeps bigger fish, fills orders or buys a creel earns more; that was not measured.
+- **From evening 9 nothing new points forward.** Murk has no new line, Hob only greets, and the notepad's foot does not change.
+- **No practice order was posted.** A practice order needs the Order Board, and nothing in the hunt points a new player to it.
+- **The opening went faster than designed.** The script knows where to go: Hob's map, the bell and the theft all came on evening 2. A person will be slower.
+- **Not checked by this run:** the bird scene's line after the find (the script skips scenes), and the real length of an evening (the test browser runs slow).
