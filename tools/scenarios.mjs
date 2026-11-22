@@ -846,6 +846,139 @@ async function passHobAgain(session, waitMs) {
   return hearHob(session, waitMs);
 }
 
+// ---- her water: hidden until the theft, found by the boils, and remembered (mossmere-hunt-2.md section 4) -----
+const TAKEN_FLOAT =
+  "Taken! Something grabs your fish and pulls it under, float and all. Your line comes back empty.";
+const SPARE_FLOAT = "You tie on a spare float.";
+const CORK_LINE = "You drop a marker cork on the spot.";
+const BELL_LINE = "An old harbour bell stands over the spot, cracked and silent.";
+const BOIL_LINE =
+  /^(Something big boils up on the water, (ahead of you|behind you|to your left|to your right)\.|Something huge boils up, right beside you\.)$/;
+const TAKEN_WORDS =
+  "Something took a fish off the line, right here. It happened just after the bell struck midnight.";
+const TAKEN_SELF = "You found this spot yourself.";
+const NEXT_BOILS = "After the bell, watch Hob's part for boils, and fish where they rise.";
+const NEXT_SPOT = "Fish the marked spot after the bell, and watch your rig.";
+const MURK_MIDNIGHT = "Be out in Hob's part when the old bell strikes midnight.";
+const MURK_BOILS = "Watch for boils after the bell, and fish right under them.";
+const MURK_FOUND = "Right off your line? I've marked the spot on your chart.";
+
+// mid-mossmere (four evenings played) with the tale told at evening 2 and Hob's map drawn on evening 3; her
+// water not found. The float is fitted, with worms.
+const withMap = (save) => {
+  withLead(false)(save);
+  save.meta.loop.hunt = {
+    mossmere: {
+      lineLesson: false,
+      taleAt: 2,
+      hobMet: 3,
+      hobNight: 3,
+      mapBy: "hob",
+      sketches: { map: 3, taken: 0, lineup: 0, swirl: 0, back: 0 },
+    },
+  };
+};
+
+// What marks her water on the water now, with the raft put at (x, z): the mist bank, the harbour frame, the
+// marker cork, the dark tone over her hole, and what a cast there is (its place and any mist).
+const herWaterMarks = (session, at = HER_CENTRE) =>
+  session.eval(async (at) => {
+    const g = window.__gw;
+    g.player.teleport(at, 0);
+    for (let i = 0; i < 4; i++) await new Promise((r) => requestAnimationFrame(r));
+    const scene = g.render?.scene;
+    let rim = null;
+    scene?.traverse((o) => {
+      const u = o.material?.uniforms?.uWcRim;
+      if (u && rim === null) rim = u.value;
+    });
+    const banks = g.debug.loop.places()?.banks?.banks ?? [];
+    const cast = g.debug.fishPoolRoll(3) ?? {};
+    return {
+      bank: banks.find((b) => b.id === "bell_pool") ?? null,
+      frame: scene?.getObjectByName("Bell Pool oak frame")?.visible ?? null,
+      cork: scene?.getObjectByName("Marker cork")?.visible ?? null,
+      rim,
+      castPlace: cast.place ?? null,
+      castMist: cast.mist ?? null,
+    };
+  }, at);
+
+// At home: the places the chart marks (its tap areas' data-place), then back to the barge.
+// (A chart opened in the first moment can come up without its tap areas, a known fault: it is reopened.)
+async function chartPlaces(session) {
+  for (let tries = 0; ; tries++) {
+    await session.waitFor("the Chart button", 10_000, () =>
+      [...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "Chart"),
+    );
+    await session.clickButton(/^Chart$/);
+    try {
+      await session.waitFor("the chart", 5_000, () => !!document.querySelector(".gw-chart-hit"));
+      break;
+    } catch (err) {
+      if (tries >= 2) throw err;
+      await backToJetty(session);
+    }
+  }
+  await session.pause(600);
+  const places = await session.eval(() => [
+    ...new Set([...document.querySelectorAll(".gw-chart-hit[data-place]")].map((b) => b.dataset.place)),
+  ]);
+  await backToJetty(session);
+  return places;
+}
+
+// Hooks an ordinary fish through the debug hooks and plays the fight out (as hookOnce), with the raft put so the
+// debug cast's float lands close to `spot`. A calibration hook first (from `spot`, forced to get away, before
+// `then` runs) measures where the debug cast lands from the raft; `then` (for example: into her time) runs
+// before each real hook. A find on the hook (the cast's own snag roll) is let go and the hook tried again.
+// Returns hookOnce's result and where the thief took it (null if it did not).
+async function hookNear(session, speciesId, spot, outcome, then = async () => {}) {
+  const settle = () => session.pause(1500);
+  // Plays the fight on the hook to its end, letting go of anything that comes up on a card.
+  const playOut = async () => {
+    await session.eval(() => window.__gw.debug.fishPlayTo(0.995));
+    for (const end = Date.now() + 90_000; ; ) {
+      check(Date.now() < end, `the fight did not end; ${JSON.stringify(await session.state())}`);
+      if (await session.clickButton(/^\d?Let go\b/)) await session.pause(800);
+      const idle = await session.eval(
+        () => window.__gw.fishing.state === "idle" && !window.__gw.ui.isBlocking?.(),
+      );
+      if (idle) break;
+      await session.closeGuides(1000);
+      await session.pause(500);
+    }
+  };
+  await session.eval((s) => window.__gw.player.teleport(s, 0), spot);
+  await settle();
+  const offset = await session.eval((id) => {
+    const g = window.__gw;
+    g.debug.fishOutcome("lose");
+    if (!g.debug.fishHook(id)) return null;
+    const f = g.debug.fishing(),
+      raft = g.player.position;
+    return { dx: f.bob.x - raft.x, dz: f.bob.z - raft.z };
+  }, speciesId);
+  check(offset, `the calibration hook of ${speciesId} failed`);
+  await playOut();
+  await session.eval(
+    ([s, o]) => window.__gw.player.teleport({ x: s.x - o.dx, z: s.z - o.dz }, 0),
+    [spot, offset],
+  );
+  await settle();
+  for (let tries = 0; tries < 4; tries++) {
+    await then();
+    const result = await hookOnce(session, speciesId, outcome);
+    if (result.find) {
+      await playOut();
+      continue;
+    }
+    const thiefAt = await session.eval(() => window.__gw.debug.fishing().thiefAt);
+    return { ...result, thiefAt, offset };
+  }
+  throw new Error(`a find came up on every hook of ${speciesId}`);
+}
+
 const SCENARIOS = [
   {
     name: "gear: on the water with the lead: no float, the line slants in, the Tip Bell on every rod, the depth word, the tip answers, a real press strikes and lands",
@@ -1798,8 +1931,11 @@ const SCENARIOS = [
       // The old save (made before the hunt record existed) loads and gains it, the rest kept.
       check(fixture.meta.loop.hunt === undefined, "the fixture already has a hunt record");
       const loaded = await legendRecord(session);
+      // (The record has grown with the hunt: here only its first field and the unfound water matter.)
       check(
-        loaded.hunt?.mossmere?.lineLesson === false && loaded.hunt.mossmere.sketches?.map === 0,
+        loaded.hunt?.mossmere?.lineLesson === false &&
+          loaded.hunt.mossmere.sketches?.map === 0 &&
+          loaded.hunt.mossmere.found === false,
         `the loaded save's hunt record: ${JSON.stringify(loaded.hunt)}`,
       );
       await session.toHome();
@@ -1944,12 +2080,12 @@ const SCENARIOS = [
   })),
 
   {
-    name: "the thief stays hidden: an old save that has seen and lost her, with the Bell Pool on Murk's shelf",
+    name: "the thief stays hidden: an old save that has seen and lost her, with the two cheaper charts owned",
     fixture: "mid-mossmere",
     debug: true,
     timeoutMs: 420_000,
-    // An older game marked her seen and lost; the two cheaper charts are owned, so the Bell Pool's map card
-    // is the one Murk offers.
+    // An older game marked her seen and lost; the two cheaper charts are owned. (Murk once offered the Bell
+    // Pool's map card next; it is never sold now, so her water is given by the debug hook below.)
     editSave(save) {
       save.meta.journal[LEGEND_ID] = { caught: 0, biggest: 0, seen: true, gotAway: [{ zone: "mossmere" }] };
       save.meta.loop.maps.places.push("under_the_span", "buoy_lights");
@@ -1964,7 +2100,7 @@ const SCENARIOS = [
       const card = await session.eval(() =>
         window.__gw.progression.loop.mapCards().find((c) => c.placeId === "bell_pool"),
       );
-      check(card && card.fish === null, `the Bell Pool's map card: ${JSON.stringify(card)}`);
+      check(!card, `Murk offers the Bell Pool's map card: ${JSON.stringify(card)}`);
       // Her own journal page does not open.
       await session.eval((id) => window.__gw.ui.openJournal({ sel: id }), LEGEND_ID);
       await session.pause(800);
@@ -1974,11 +2110,11 @@ const SCENARIOS = [
       );
       await expectHidden(session, "the journal opened at her page", seen);
       await backToJetty(session);
-      // With the Bell Pool bought and the Worm Bunch on the lead she can bite, but the Odds sheet has no row
+      // With the Bell Pool owned and the Worm Bunch on the lead she can bite, but the Odds sheet has no row
       // for her: she counts as a kind not met.
       check(
-        await session.eval(() => window.__gw.progression.loop.buy("place:bell_pool")?.ok === true),
-        "Murk would not sell the Bell Pool",
+        await session.eval(() => window.__gw.debug.loop.own("bell_pool")?.includes("bell_pool") === true),
+        "the debug hook did not give the Bell Pool",
       );
       const odds = await bellPoolOdds(session);
       check(odds.unmet >= 1, `the Odds sheet counts ${odds.unmet} kinds not met`);
@@ -1992,7 +2128,7 @@ const SCENARIOS = [
       await clickAll(session, '[data-hour="day"]', 0);
       await session.pause(500);
       await expectHidden(session, "odds sheet, bell_pool day, Worm Bunch on the lead", seen);
-      return `${seen.length} screens; Bell Pool card plain; odds: ${odds.unmet} not met, no row`;
+      return `${seen.length} screens; no Bell Pool card; odds: ${odds.unmet} not met, no row`;
     },
   },
 
@@ -2134,7 +2270,8 @@ const SCENARIOS = [
       );
       check(guide.options.includes(NEW_LEGEND_NAME), "the field guide's picker does not name her");
       await session.eval(() => window.__gw.ui.closeAll());
-      await buyAtHome(session, ["place:under_the_span", "place:buoy_lights", "place:bell_pool"]);
+      await buyAtHome(session, ["place:under_the_span", "place:buoy_lights"]);
+      await session.eval(() => window.__gw.debug.loop.own("bell_pool"));
       const odds = await bellPoolOdds(session);
       check(odds.row?.legend === true && odds.row.share > 0, `her Odds row: ${JSON.stringify(odds)}`);
       return `hidden before; "${HIDDEN_BANNER}" on the hook; named on the catch card; shown after (odds share ${odds.row.share})`;
@@ -2701,6 +2838,309 @@ const SCENARIOS = [
         [...document.querySelectorAll(".gw-chart-hit")].map((h) => h.dataset.id),
       );
       return `the list (${before.list} rows) while the art loaded, then ${ids.length} tap areas: ${ids.join(" ")}`;
+    },
+  },
+
+  {
+    name: "her water: unfound, nothing marks it on the water or the chart, and Murk never sells the Bell Pool",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave(save) {
+      withMap(save);
+      save.meta.loop.maps.places.push("under_the_span", "buoy_lights");
+    },
+    async run(session) {
+      await session.toHome();
+      const shelf = await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        window.__gw.debug.loop.giveClams(5000);
+        return {
+          card: loop.mapCards().find((c) => c.placeId === "bell_pool") ?? null,
+          bought: loop.buy("place:bell_pool")?.ok === true,
+          owned: loop.state().maps.places.includes("bell_pool"),
+        };
+      });
+      check(!shelf.card && !shelf.bought && !shelf.owned, `Murk's shelf: ${JSON.stringify(shelf)}`);
+      const chart = await chartPlaces(session);
+      check(
+        chart.includes("lily_maze") && !chart.includes("bell_pool"),
+        `the chart marks ${chart.join(", ")}`,
+      );
+      await session.sail();
+      // Over her hole by day and in her time: plain water.
+      for (const when of ["day", "her time"]) {
+        if (when === "her time") await atNight(session, MIDNIGHT_AT + 20, { evening: 5 });
+        const marks = await herWaterMarks(session);
+        check(
+          marks.bank && marks.bank.op === 0 && marks.bank.target === 0,
+          `${when}: the mist bank shows: ${JSON.stringify(marks.bank)}`,
+        );
+        check(marks.frame === false && marks.cork === false, `${when}: ${JSON.stringify(marks)}`);
+        check(marks.rim === 0, `${when}: the water is shaded over her hole (uWcRim ${marks.rim})`);
+        check(
+          marks.castPlace === null && marks.castMist === null,
+          `${when}: a cast there is not plain water: ${JSON.stringify(marks)}`,
+        );
+      }
+      return "no shelf card or sale, no chart mark; no mist bank, frame, cork, dark tone or mist on a cast";
+    },
+  },
+
+  {
+    name: "her water: boils rise only with Hob's map and in her time, every 20 to 30 s within 6 m of her centre, with a word only within 25 m; twice as often and from 40 m on the nudge night",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withMap,
+    async run(session) {
+      await session.sail();
+      await listenForToasts(session);
+      await session.eval(() => {
+        window.__boils = [];
+        window.__gw.bus.on("hunt:boil", (b) => window.__boils.push(b));
+      });
+      const boilsNow = () => session.eval(() => window.__boils.length);
+      // Steps to the next boil: the night clock put just past the run's next boil time.
+      const nextBoil = async (raft) => {
+        await session.eval((at) => window.__gw.player.teleport(at, 0), raft);
+        const due = await session.eval(() => window.__gw.state.run.midnight?.boilAt ?? null);
+        check(due != null, "no boil is due in her time");
+        const before = await boilsNow();
+        await atNight(session, due + 0.05);
+        check((await boilsNow()) === before + 1, `no boil rose at ${due}`);
+        return session.eval(() => ({
+          boil: window.__boils.at(-1),
+          toasts: window.__toasts.slice(),
+          nextDue: window.__gw.state.run.midnight.boilAt,
+        }));
+      };
+      // No map: nothing in her time.
+      await session.eval(() => (window.__gw.state.meta.loop.hunt.mossmere.sketches.map = 0));
+      await atNight(session, MIDNIGHT_AT + 1, { evening: 5 });
+      await atNight(session, MIDNIGHT_AT + 60);
+      check((await boilsNow()) === 0, "a boil rose before Hob's map was drawn");
+      await session.eval(() => (window.__gw.state.meta.loop.hunt.mossmere.sketches.map = 3));
+      // Before midnight and after her time: nothing.
+      await atNight(session, MIDNIGHT_AT - 5, { evening: 5 });
+      await atNight(session, MIDNIGHT_AT - 1);
+      check((await boilsNow()) === 0, "a boil rose before midnight");
+      // In her time: the next boil is 20 to 30 s off; far away, no word; 12 m off, a direction word.
+      await atNight(session, MIDNIGHT_AT + 1);
+      const far = await nextBoil({ x: 40, z: 30 });
+      const near = await nextBoil({ x: HER_CENTRE.x, z: HER_CENTRE.z + 12 });
+      // (Each gap is the next boil's time less the time this one rose.)
+      const gaps = [far.nextDue - far.boil.t, near.nextDue - near.boil.t];
+      for (const b of [far.boil, near.boil])
+        check(
+          Math.hypot(b.x - HER_CENTRE.x, b.z - HER_CENTRE.z) <= 6.01,
+          `a boil 6 m off: ${JSON.stringify(b)}`,
+        );
+      check(
+        gaps.every((g) => g >= 20 && g <= 30),
+        `boil gaps ${gaps}`,
+      );
+      check(far.boil.word === null, `a word for a boil 50 m off: ${JSON.stringify(far.boil)}`);
+      const boilToasts = (list) => list.filter((t) => BOIL_LINE.test(t));
+      check(boilToasts(far.toasts).length === 0, `a boil line far off: ${JSON.stringify(far.toasts)}`);
+      check(
+        ["ahead", "behind", "left", "right"].includes(near.boil.word) && boilToasts(near.toasts).length === 1,
+        `the near boil: ${JSON.stringify(near)}`,
+      );
+      // After her time: none.
+      await atNight(session, MIDNIGHT_AT + 181);
+      const after = await boilsNow();
+      await atNight(session, MIDNIGHT_AT + 240);
+      check((await boilsNow()) === after, "a boil rose after her time");
+      // The nudge night: every 10 to 15 s, and a word from 32 m off.
+      await session.eval(() => (window.__gw.state.meta.loop.hunt.mossmere.nudged.boost = 6));
+      await atNight(session, MIDNIGHT_AT + 1, { evening: 6 });
+      const nudged = await nextBoil({ x: HER_CENTRE.x, z: HER_CENTRE.z + 34 });
+      const nudgedGap = nudged.nextDue - nudged.boil.t;
+      check(nudgedGap >= 10 && nudgedGap <= 15, `the nudge night's gap ${nudgedGap}`);
+      check(
+        nudged.boil.word !== null,
+        `no word 28 to 40 m off on the nudge night: ${JSON.stringify(nudged.boil)}`,
+      );
+      return `gaps ${gaps.map((g) => g.toFixed(1))}; far: none; near: "${near.boil.word}"; nudge night every ${nudgedGap.toFixed(1)} s`;
+    },
+  },
+
+  {
+    name: "her water: the theft takes the first fish hooked on the float within 8 m in her time, once; it draws sketch 2, finds her water and lifts it; frame, cork and chart ring then survive a reload",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 900_000,
+    editSave: withMap,
+    async run(session, { page, browser }) {
+      await session.sail(SLOW_SAIL);
+      await listenForToasts(session);
+      await session.eval(() => {
+        window.__lifts = [];
+        window.__gw.bus.on("place:lift", (e) => window.__lifts.push(`${e.placeId}:${e.phase}:${e.name}`));
+      });
+      const before = await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        return JSON.stringify({ tackle: s.tackle, parts: s.parts, fitted: s.fitted, lures: s.lures });
+      });
+      // Outside her time near her hole: no theft (the calibration hook is one such).
+      const lost = await hookNear(session, "mossback_perch", HER_CENTRE, null, () =>
+        atNight(session, MIDNIGHT_AT + 20, { evening: 5 }),
+      );
+      check(lost.thiefAt, `the hook was not taken: ${JSON.stringify(lost)}`);
+      check(
+        Math.hypot(lost.thiefAt.x - HER_CENTRE.x, lost.thiefAt.z - HER_CENTRE.z) <= 8,
+        `taken ${JSON.stringify(lost.thiefAt)} more than 8 m from her centre`,
+      );
+      check(
+        lost.escape?.reason === "thief" && lost.escape.onLead === false,
+        `the escape: ${JSON.stringify(lost.escape)}`,
+      );
+      check(
+        !lost.escape.overCap && !lost.escape.oldRivalId && !lost.escape.markedFish,
+        JSON.stringify(lost.escape),
+      );
+      const found = await session.eval(() => {
+        const g = window.__gw;
+        const s = g.progression.loop.state();
+        return {
+          hunt: JSON.parse(JSON.stringify(s.hunt.mossmere)),
+          owned: s.maps.places.includes("bell_pool"),
+          revealed: s.places.revealed.includes("bell_pool"),
+          took: g.state.run.midnight.thiefTook === true,
+          wounds: g.state.meta.legendWounds?.belled_matriarch ?? 0,
+          gear: JSON.stringify({ tackle: s.tackle, parts: s.parts, fitted: s.fitted, lures: s.lures }),
+        };
+      });
+      const h = found.hunt;
+      check(
+        h.found === true && h.foundBy === "theft" && h.foundEvening === 5 && h.sketches.taken === 5,
+        `the record: ${JSON.stringify(h)}`,
+      );
+      check(h.padUnseen.includes("taken") && h.takenOn === "float", `the record: ${JSON.stringify(h)}`);
+      check(found.owned && found.revealed && found.took, `the find: ${JSON.stringify(found)}`);
+      check(found.wounds === 0 && found.gear === before, `a wound or gear lost: ${JSON.stringify(found)}`);
+      // The lines, then the lift with its title, then the cork and the bell.
+      await session.waitFor("the lift of her water", 120_000, () =>
+        window.__gw.progression.loop.lifted().includes("bell_pool"),
+      );
+      await session.pause(1500);
+      const lifts = await session.eval(() => window.__lifts.slice());
+      check(lifts.includes("bell_pool:title:The Bell Pool"), `the lift: ${JSON.stringify(lifts)}`);
+      const toasts = await toastsSeen(session);
+      const order = [TAKEN_FLOAT, SPARE_FLOAT, DRAWN, CORK_LINE, BELL_LINE].map((t) => toasts.indexOf(t));
+      check(
+        order.every((i, k) => i >= 0 && (k === 0 || i > order[k - 1])),
+        `the lines: ${JSON.stringify(toasts)}`,
+      );
+      // Never again: the next fish there is not taken, tonight or another night.
+      await session.closeGuides(3000);
+      const again = await hookNear(session, "mossback_perch", HER_CENTRE, "lose", () =>
+        atNight(session, MIDNIGHT_AT + 60, { evening: 6 }),
+      );
+      check(!again.thiefAt && again.escape?.reason !== "thief", `taken again: ${JSON.stringify(again)}`);
+      // Found: the frame, the cork and the dark tone show, and a cast there fishes the Bell Pool.
+      const marks = await herWaterMarks(session);
+      check(
+        marks.frame && marks.cork && marks.rim === 1 && marks.castPlace === "bell_pool" && !marks.castMist,
+        `after the find: ${JSON.stringify(marks)}`,
+      );
+      // Reloaded (the trip goes on): still found, with the frame and cork on the water. At the tally Murk
+      // speaks of the find and the notepad opens on sketch 2; the chart then marks it (Murk's ring is drawn
+      // with that mark).
+      const saved = await session.saved();
+      const next = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await next.boot();
+        await next.sail(SLOW_SAIL);
+        const kept = await huntOf(next);
+        check(kept.found === true && kept.sketches.taken === 5, `after a reload: ${JSON.stringify(kept)}`);
+        const after = await herWaterMarks(next);
+        check(
+          after.frame && after.cork && after.castPlace === "bell_pool",
+          `after a reload: ${JSON.stringify(after)}`,
+        );
+        const { hunt, pad } = await tallyAndPad(next);
+        check(hunt === MURK_FOUND, `the tally: "${hunt}"`);
+        check(
+          pad && pad.page === "where" && pad.drawn.includes("taken") && pad.words.includes(TAKEN_WORDS),
+          `the notepad at the tally: ${JSON.stringify(pad)}`,
+        );
+        check(pad.next === NEXT_SPOT, `the notepad's foot: ${pad.next}`);
+        const chart = await chartPlaces(next);
+        check(chart.includes("bell_pool"), `the chart after a reload marks ${chart.join(", ")}`);
+        await next.collectGameErrors();
+        check(!next.errors.length, `errors after reloading: ${next.errors.join("; ")}`);
+      } finally {
+        await next.close();
+      }
+      return `taken ${Math.hypot(lost.thiefAt.x - HER_CENTRE.x, lost.thiefAt.z - HER_CENTRE.z).toFixed(1)} m off; found, lifted, lines in order; not again; kept after a reload`;
+    },
+  },
+
+  {
+    name: "her water: an old save that owns the Bell Pool loads as found, with sketches 1 and 2 drawn and sketch 2 saying it found the spot itself",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      const h = await huntOf(session);
+      check(
+        h.found === true &&
+          h.foundBy === "chart" &&
+          h.sketches.map > 0 &&
+          h.sketches.taken > 0 &&
+          h.murkFound,
+        `the record: ${JSON.stringify(h)}`,
+      );
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "notepad" }));
+      await session.waitFor(
+        "the notepad tab",
+        10_000,
+        () => !!document.querySelector(".gw-journal-pad .gw-pad"),
+      );
+      const pad = await notepadShown(session, ".gw-journal-pad .gw-pad");
+      await session.eval(() => window.__gw.ui.closeAll());
+      check(
+        JSON.stringify(pad?.drawn) === '["map","taken"]' && pad.words.includes(TAKEN_SELF),
+        `the notepad: ${JSON.stringify(pad)}`,
+      );
+      check(
+        !pad.words.includes(TAKEN_WORDS) && pad.next === NEXT_SPOT,
+        `the notepad: ${JSON.stringify(pad)}`,
+      );
+      const chart = await chartPlaces(session);
+      check(chart.includes("bell_pool"), `the chart marks ${chart.join(", ")}`);
+      return `found by its chart; sketches ${pad.drawn.join(", ")}; "${TAKEN_SELF}"`;
+    },
+  },
+
+  {
+    name: "her water: the nudges: with the map but not in Hob's part at midnight, Murk says to be there; in it with no find, he says to watch for boils; the notepad's foot moves on with them",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 720_000,
+    editSave: withMap,
+    async run(session) {
+      // Evening 5: away from Hob's part all night.
+      await session.sail(SLOW_SAIL);
+      await session.eval(() => window.__gw.player.teleport({ x: 30, z: 30 }, 0));
+      await atNight(session, MIDNIGHT_AT + 30);
+      const one = await tallyAndPad(session);
+      check(one.hunt === MURK_MIDNIGHT, `after an evening away: "${one.hunt}"`);
+      let view = await session.eval(() => window.__gw.progression.loop.notepad());
+      check(view?.next === "midnight", `the notepad's foot: ${JSON.stringify(view)}`);
+      // Evening 6: in Hob's part in her time, and nothing found.
+      await session.sail(SLOW_SAIL);
+      await session.eval((c) => window.__gw.player.teleport({ x: c.x - 10, z: c.z - 4 }, 0), HER_CENTRE);
+      await atNight(session, MIDNIGHT_AT + 30);
+      const partAt = (await huntOf(session)).partAt;
+      check(partAt === 6, `in Hob's part at midnight: partAt ${partAt}`);
+      const two = await tallyAndPad(session);
+      check(two.hunt === MURK_BOILS, `after an evening there: "${two.hunt}"`);
+      view = await session.eval(() => window.__gw.progression.loop.notepad());
+      check(view?.next === "boils", `the notepad's foot: ${JSON.stringify(view)}`);
+      const record = await huntOf(session);
+      check(record.nudged.midnight === 5 && record.nudged.boils === 6, JSON.stringify(record.nudged));
+      return "Murk's midnight line at evening 5, his boils line at evening 6";
     },
   },
 ];

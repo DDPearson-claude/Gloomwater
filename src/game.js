@@ -44159,6 +44159,8 @@ var pP = {
         spat: [0.88, 0.95],
         spooled: [0.5, 0.8],
         fouled: [0.5, 0.8],
+        // The thief of the mere takes the fish (mossmere-hunt-2.md B3), soon after it is hooked.
+        thief: [0.5, 0.6],
       },
       byStyle: {
         leaper: { thrown: 0.6, snapped: 0.25, spooled: 0.15 },
@@ -46924,10 +46926,15 @@ var pP = {
         giant: "hullkiss_lamprey",
       },
       // No card fish: the Bell Pool's map card is plain water, so it never shows the thief's picture or name.
+      // Her water (mossmere-hunt-2.md section 4): never sold (secret, no price) and unmarked, so nothing shows
+      // it on the water or the chart until the player finds it (huntWaterFound): no mist bank, no mist on a
+      // cast, no dark tone. Finding it gives it to the player the way buying a chart did.
       bell_pool: {
         water: "mossmere",
         kind: "crown",
-        price: 500,
+        price: 0,
+        secret: !0,
+        unmarked: !0,
         legend: "belled_matriarch",
       },
     },
@@ -47116,7 +47123,6 @@ var pP = {
       lily_maze: "Koi glow under the pads like lanterns.",
       under_the_span: "The bridge kept its chain. Something kept it.",
       buoy_lights: "The harbour lights went under, still lit.",
-      bell_pool: "The moon looks in on the old bell.",
     },
     murk: {
       empty: "Nothing? It happens. Go again.",
@@ -47348,8 +47354,26 @@ Ca.hunt = {
     tale: "It's always just after the old bell strikes midnight. Hob on Mossbell Isle says it's a fish. Go and ask him.",
     findHob: "Hob's lamp is lit on Mossbell Isle. Sail close and say hello.",
     mapPassed: "Hob always said it was between the Gatehouse and the Sisters. I've drawn it for you.",
+    // Nudges while her water is not found (section 4): not yet in Hob's part at midnight, after one evening
+    // and after two; in it at midnight but no find, after one evening. Then his word once it is found.
+    midnight: "Be out in Hob's part when the old bell strikes midnight.",
+    sail: "Sail out there before dark, and wait for the bell.",
+    boils: "Watch for boils after the bell, and fish right under them.",
+    found: "Right off your line? I've marked the spot on your chart.",
   },
   drawn: "You draw it in your notepad.",
+  // Her water (section 4 and B6): the boils in her time, the theft that finds it, and what marks it after.
+  water: {
+    boil: "Something big boils up on the water, {where}.",
+    where: { ahead: "ahead of you", behind: "behind you", left: "to your left", right: "to your right" },
+    boilClose: "Something huge boils up, right beside you.",
+    takenFloat:
+      "Taken! Something grabs your fish and pulls it under, float and all. Your line comes back empty.",
+    takenLead: "Taken! Something grabs your fish and pulls it under. Your line comes back empty.",
+    spareFloat: "You tie on a spare float.",
+    cork: "You drop a marker cork on the spot.",
+    bell: "An old harbour bell stands over the spot, cracked and silent.",
+  },
   hob: {
     tag: "Hob",
     // His first talk, four boxes. The last two go with his map, so a player Murk gave the map to hears two.
@@ -47363,6 +47387,8 @@ Ca.hunt = {
     nights: {
       rod: "Another night it took my whole rod. It pulled it right over the side.",
       bell: "Both times it was just after the old bell struck midnight. I'm sure of that much.",
+      // Only once sketch 2 is drawn.
+      taken: "Right off your line? Then that's it. That's what had me.",
     },
     greeting: "Any luck out there? Stay warm.",
     next: "Next",
@@ -47385,13 +47411,20 @@ Ca.hunt = {
     next: {
       hob: "Hob's lamp is lit on Mossbell Isle. Sail close to talk to him.",
       midnight: "Be in Hob's part when the old bell strikes midnight.",
+      boils: "After the bell, watch Hob's part for boils, and fish where they rise.",
+      spot: "Fish the marked spot after the bell, and watch your rig.",
     },
     map: "Hob lost it somewhere in this shaded part, between the Gatehouse and the Sisters.",
     end: "This is Hob's old line end. It is worn rough, not cut.",
+    taken: "Something took a fish off the line, right here. It happened just after the bell struck midnight.",
+    // Sketch 2's words for an older save that bought the Bell Pool's chart before the hunt (B4).
+    takenSelf: "You found this spot yourself.",
     labels: { gatehouse: "Gatehouse", sisters: "Sisters", isle: "Mossbell Isle", home: "home" },
     art: {
       map: "A pencil map of Mossmere with a shaded part between the Gatehouse and the Sisters",
       end: "An old line end taped to the page, its end worn rough",
+      taken:
+        "A pencil close-up of Hob's shaded part, with an X where the float went under and the toll-tower far off",
     },
     close: "Got it",
   },
@@ -70993,6 +71026,7 @@ uniform float uGlowtide;      // v3 night sparkle 0..1 (water.setGlowtide; the t
 uniform float uWc;            // 1 on the Mossmere under the loop (the face and the water-white Glowtide), else 0
 uniform vec4 uLane;           // the wind lane (watercraft.laneFor(evening)): centre x, z, heading (rad), strength (day and dusk 1, night 0)
 uniform vec4 uCut;            // the cut behind the Veil (LOST-TACKLE \xA75.1): its bearing (cos, sin), its mouth's radius, on
+uniform float uWcRim;         // 1 once her water is found: the Bell Pool's dark tone over her hole; 0 hides it (mossmere-hunt-2.md \xA74)
 // <<< WC-3
 #endif
 #ifdef GW_LUSH
@@ -71392,7 +71426,7 @@ void main() {
     float rd = length(xz - vec2(-4.0, -14.0)) + (wNoise(xz * 0.55 + 1.3) - 0.5) * 1.5;
     // (Lake 1 polish: the pale lip round the rim is gone (from outside it read as a ring round a target); only the tone falls, on a
     // wide feather)
-    wcRim = 1.0 - smoothstep(5.4, 9.0, rd);
+    wcRim = (1.0 - smoothstep(5.4, 9.0, rd)) * uWcRim;
     shallow = shallow * (1.0 - 0.92 * wcRim);
   }
   // <<< WC-3
@@ -72180,7 +72214,12 @@ function $ae(e) {
         uBandN: { value: new He(1, 0, 0) },
         ...(f ? { uGlowtide: { value: 0 } } : {}),
         ...(u
-          ? { uWc: { value: 0 }, uLane: { value: new Ko(0, 0, 0, 0) }, uCut: { value: new Ko(1, 0, 0, 0) } }
+          ? {
+              uWc: { value: 0 },
+              uLane: { value: new Ko(0, 0, 0, 0) },
+              uCut: { value: new Ko(1, 0, 0, 0) },
+              uWcRim: { value: 0 },
+            }
           : {}),
       },
     ]),
@@ -73320,6 +73359,8 @@ function $ae(e) {
       g.uLane.value.w = 0;
       return;
     }
+    // The dark tone over her hole shows only once her water is found.
+    g.uWcRim.value = huntWaterFound(e.state?.meta?.loop) ? 1 : 0;
     let Kt = null;
     try {
       Kt = e.survival && !e.survival.isStub ? (e.survival.getPhaseInfo?.()?.phase ?? null) : null;
@@ -75324,6 +75365,41 @@ function a3(e, t) {
 // Hob's lamp (mossmere-hunt-2.md section 5): a storm lantern on a short pole beside him on his rock, lit on
 // Mossmere evenings from evening 2. Dark and unlit before then. Its glow is a sprite, not a light, so it adds
 // nothing to the lake's shaders.
+// The marker cork the player drops on her water once it is found (mossmere-hunt-2.md section 4): a red and
+// white cork with a short stick, and a tiny lamp on top that is lit after dark. The glow is a sprite.
+function makeMarkerCork() {
+  let group = new fo();
+  group.name = "Marker cork";
+  let red = sa({ color: 0xb8443a, rim: 0.25 }),
+    white = sa({ color: 0xe8dcc4, rim: 0.25 }),
+    iron = sa({ color: 0x2c2830, rim: 0.3 }),
+    glass = Jl(0xffc36a, 1.6),
+    litColor = glass.color.clone(),
+    darkColor = new Vt(0x3a3026),
+    body = new An(new Xn(0.17, 0.2, 0.16, 10), red);
+  body.position.y = 0.02;
+  let top = new An(new Xn(0.12, 0.17, 0.08, 10), white);
+  top.position.y = 0.14;
+  let stick = new An(new Xn(0.018, 0.018, 0.5, 5), iron);
+  stick.position.y = 0.42;
+  let lamp = new An(new Xn(0.045, 0.045, 0.09, 6), glass);
+  lamp.position.y = 0.71;
+  let glow = Js({ color: 0xffb35c, size: 1.4, opacity: 0.5 });
+  glow.position.y = 0.71;
+  group.add(body, top, stick, lamp, glow);
+  let t = 0;
+  return {
+    group,
+    // Bobs on the water at (x, surface, z); the lamp is lit when `lit`.
+    update(dt, x, surface, z, lit) {
+      t += dt;
+      group.position.set(x, surface + 0.03 * Math.sin(t * 1.7), z);
+      group.rotation.set(0.05 * Math.sin(t * 1.3), 0, 0.05 * Math.sin(t * 1.1 + 1));
+      glass.color.copy(lit ? litColor : darkColor), (glow.visible = !!lit);
+      lit && (glow.material.opacity = 0.45 + 0.06 * Math.sin(t * 6.1));
+    },
+  };
+}
 function makeHobLamp() {
   let group = new fo();
   group.name = "Hob's lamp";
@@ -80074,6 +80150,10 @@ function pN(
     frame.visible = clapper.visible = false;
     f.add(frame, clapper);
     harbour = { frame, clapper, index: v.get("bell_pool"), contact: bellPoolContact(Te.area) };
+    // The marker cork on the spot where her water was found, shown with the frame.
+    harbour.cork = makeMarkerCork();
+    harbour.cork.group.visible = false;
+    f.add(harbour.cork.group);
   }
   // The toll-tower's top-window halo, kept so the midnight bell can flare it with each stroke.
   let tollTowerHalo = null;
@@ -80861,7 +80941,10 @@ uniform float uK; uniform vec3 uGlowCol; varying float vGlowW;`,
         (De.op = De.lift.from * (1 - cN(0, 1, We))),
           (De.glow = Math.max(De.glow, cN(0.2, 1, We))),
           We >= 1 && ((De.lift = null), (De.lifted = !0), (De.op = 0), (De.glow = 1));
-      } else
+      } else if (placeUnmarked(e, De.id))
+        // Her water has no mist bank until it is found (mossmere-hunt-2.md section 4).
+        (De.target = 0), (De.op = 0), (De.glow = 0);
+      else
         (De.target = Lie({ lifted: De.lifted, inside: De.inside, insideK: x })),
           (De.op = rA(De.op, De.target, ht, M)),
           (De.glow = De.lifted ? Math.min(1, De.glow + ht / 0.6) : 0);
@@ -80872,6 +80955,22 @@ uniform float uK; uniform vec3 uGlowCol; varying float vGlowW;`,
     if (harbour) {
       const bank = T[harbour.index];
       harbour.frame.visible = harbour.clapper.visible = !!(bank.lifted || bank.lift);
+      if (harbour.cork) {
+        let loop = e.state?.meta?.loop,
+          show = harbour.frame.visible && huntWaterFound(loop);
+        harbour.cork.group.visible = show;
+        if (show) {
+          let at = herWaterCorkAt(loop),
+            surface = e.water?.getHeight?.(at.x, at.z);
+          harbour.cork.update(
+            Math.min(0.1, Math.max(0, ht)),
+            at.x,
+            Number.isFinite(surface) ? surface : 0,
+            at.z,
+            it > 0.35,
+          );
+        }
+      }
       if (harbour.clapper.visible) {
         const pt = harbour.contact,
           surface = e.water?.getHeight?.(pt.x, pt.z);
@@ -104695,6 +104794,181 @@ function bellPoolFoundFor(game) {
     return !1;
   }
 }
+// ---- Her water (mossmere-hunt-2.md section 4 and B3) ----------------------------------------------------------
+// Her hole is centred at (x, z). Nothing marks it until it is found. Once Hob's map is drawn, in her time, boils
+// rise over it and the first ordinary fish hooked close by is taken, which finds it. Distances are metres.
+const HER_WATER = Object.freeze({
+  place: "bell_pool",
+  x: -4,
+  z: -14,
+  theft: 8,
+  boilSpread: 6,
+  boilEvery: [20, 30],
+  boilSeen: 25,
+  // The second evening of the "Finding the spot" nudge: boils twice as often, seen from further off.
+  nudgedEvery: [10, 15],
+  nudgedSeen: 40,
+  // A boil closer than this to the raft is "right beside you".
+  boilClose: 5,
+  // Where an older save's marker cork floats (it found the spot by its chart, with no theft): off the frame.
+  corkOffset: [2.2, 2.6],
+});
+function huntRecordOf(loop) {
+  let record = loop?.hunt?.mossmere;
+  return record && typeof record == "object" && !Array.isArray(record) ? record : null;
+}
+// Found by the theft, or by owning the Bell Pool (an older save that bought its chart, B4).
+function huntWaterFound(loop) {
+  return (
+    huntRecordOf(loop)?.found === !0 ||
+    (Array.isArray(loop?.maps?.places) && loop.maps.places.includes(HER_WATER.place))
+  );
+}
+// A place nothing may mark yet: an unmarked place (her water) on the loop's lake while it is not found.
+function placeUnmarked(game, placeId) {
+  return (
+    game?.data?.LOOP_ENABLED === !0 &&
+    game.data.LOOP?.places?.[placeId]?.unmarked === !0 &&
+    !huntWaterFound(game.state?.meta?.loop)
+  );
+}
+// Where the marker cork floats once her water is found: where the float went under, or beside the frame.
+function herWaterCorkAt(loop) {
+  let at = huntRecordOf(loop)?.foundAt;
+  return at && (at.x || at.z)
+    ? { x: at.x, z: at.z }
+    : { x: HER_WATER.x + HER_WATER.corkOffset[0], z: HER_WATER.z + HER_WATER.corkOffset[1] };
+}
+// Hob's part of the lake (the shaded patch on his map, in lake units).
+function inHobsPart(x, z) {
+  let pts = PAD_HOB_PART,
+    inside = !1;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    let [xi, zi] = pts[i],
+      [xj, zj] = pts[j];
+    zi > z != zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi && (inside = !inside);
+  }
+  return inside;
+}
+// Whether the boils come twice as often tonight: the second evening of the "Finding the spot" nudge.
+function herBoilsNudged(record, run) {
+  let from = Number(record?.nudged?.boost) || 0;
+  return from > 0 && Math.trunc(Number(run?.evening) || 0) >= from;
+}
+// Which way a point lies from the raft, against the camera's bearing: "ahead" within 45 degrees of where
+// the camera looks, "behind", "left" or "right".
+function bearingWord(game, raft, x, z) {
+  let m = game.render?.camera?.matrixWorld?.elements,
+    fx = m ? raft.x - m[12] : 0,
+    fz = m ? raft.z - m[14] : -1;
+  Math.hypot(fx, fz) < 0.01 && ((fx = 0), (fz = -1));
+  let dx = x - raft.x,
+    dz = z - raft.z,
+    ahead = dx * fx + dz * fz,
+    // The camera's right, (-fz, fx), for x east and z toward the viewer.
+    right = -dx * fz + dz * fx;
+  return Math.abs(right) <= ahead
+    ? "ahead"
+    : Math.abs(right) <= -ahead
+      ? "behind"
+      : right > 0
+        ? "right"
+        : "left";
+}
+// Called every frame from the phase clock with the run, after the midnight bell. In her time, once Hob's map
+// is drawn: notes being in Hob's part (for the nudges), and raises a boil over her water every 20 to 30 s,
+// with a word when the raft is near enough to see it.
+function updateHerWater(game, run) {
+  if (!herTimeOpen(run)) return;
+  let loop = game.state?.meta?.loop,
+    record = huntRecordOf(loop);
+  if (!record || !(record.sketches?.map > 0)) return;
+  let m = midnightFlags(run),
+    t = nightClock(run),
+    pos = game.player?.position,
+    raft = pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) ? pos : null,
+    evening = Math.max(1, Math.trunc(Number(run.evening) || 0));
+  raft && !record.partAt && inHobsPart(raft.x, raft.z) && (record.partAt = evening);
+  let nudged = !huntWaterFound(loop) && herBoilsNudged(record, run),
+    [lo, hi] = nudged ? HER_WATER.nudgedEvery : HER_WATER.boilEvery,
+    gap = () => lo + Math.random() * (hi - lo);
+  if (!(Number(m.boilAt) > 0)) m.boilAt = t + gap();
+  if (t < m.boilAt) return;
+  m.boilAt = t + gap();
+  let a = Math.random() * Math.PI * 2,
+    r = HER_WATER.boilSpread * Math.sqrt(Math.random()),
+    x = HER_WATER.x + Math.cos(a) * r,
+    z = HER_WATER.z + Math.sin(a) * r;
+  try {
+    game.water?.addRipple?.(x, z, 1.2);
+    game.water?.addRipple?.(x + 0.6, z - 0.3, 1.2);
+    game.water?.addRipple?.(x - 0.4, z + 0.5, 1.2);
+    game.water?.splash?.(x, z, { size: 1.1, count: 18 });
+  } catch {}
+  let words = Ca.hunt.water,
+    dist = raft ? Math.hypot(x - raft.x, z - raft.z) : 1 / 0,
+    word = null;
+  if (dist <= (nudged ? HER_WATER.nudgedSeen : HER_WATER.boilSeen))
+    word = dist < HER_WATER.boilClose ? "close" : bearingWord(game, raft, x, z);
+  m.boils = (m.boils | 0) + 1;
+  m.lastBoil = { x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, t, word };
+  word &&
+    game.bus?.emit?.("toast", {
+      text: word === "close" ? words.boilClose : words.boil.replace("{where}", words.where[word]),
+      kind: "lore",
+    });
+  game.bus?.emit?.("hunt:boil", { ...m.lastBoil });
+}
+// The theft (B3): in her time, once Hob's map is drawn and while her water is not found, once a night, a fish
+// hooked within `theft` metres of her centre is taken. The caller checks that it is an ordinary fish on bait.
+function thiefTakes(game, run, x, z) {
+  if (!herTimeOpen(run) || !Number.isFinite(x) || !Number.isFinite(z)) return !1;
+  let loop = game.state?.meta?.loop,
+    record = huntRecordOf(loop);
+  return (
+    !!record &&
+    record.sketches?.map > 0 &&
+    !huntWaterFound(loop) &&
+    midnightFlags(run).thiefTook !== !0 &&
+    Math.hypot(x - HER_WATER.x, z - HER_WATER.z) <= HER_WATER.theft
+  );
+}
+// The theft found her water: sketch 2 is drawn and the Bell Pool becomes the player's, as owning its chart
+// made it (maps.places, places.revealed), so it lifts and is fished as a found place. Returns true the once.
+function findHerWater(loop, run, { x = NaN, z = NaN, onLead = !1 } = {}) {
+  let record = huntRecordOf(loop);
+  if (!record || record.found === !0) return !1;
+  let evening = Math.max(
+    1,
+    Math.trunc(Number(run?.evening) || 0) || Math.trunc(Number(loop.evenings) || 0) + 1,
+  );
+  run && midnightEvening(run) && (midnightFlags(run).thiefTook = !0);
+  (record.found = !0),
+    (record.foundEvening = evening),
+    (record.foundBy = "theft"),
+    (record.takenOn = onLead ? "lead" : "float");
+  Number.isFinite(x) &&
+    Number.isFinite(z) &&
+    (record.foundAt = { x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100 });
+  drawHuntSketch(record, "taken", evening);
+  (loop.places && typeof loop.places == "object" && !Array.isArray(loop.places)) ||
+    (loop.places = { revealed: [] });
+  Array.isArray(loop.places.revealed) || (loop.places.revealed = []);
+  loop.places.revealed.includes(HER_WATER.place) || loop.places.revealed.push(HER_WATER.place);
+  h7(loop, HER_WATER.place);
+  return !0;
+}
+// An older save that owns the Bell Pool counts as found (B4): sketches 1 and 2 are drawn (to draw in when the
+// notepad next opens), sketch 2 with the words "You found this spot yourself."
+function foundByChart(loop) {
+  let record = huntRecordOf(loop);
+  if (!record || record.found === !0 || !loop.maps?.places?.includes?.(HER_WATER.place)) return !1;
+  let evening = Math.max(1, Math.trunc(Number(loop.evenings) || 0));
+  (record.found = !0), (record.foundEvening = evening), (record.foundBy = "chart"), (record.murkFound = !0);
+  record.sketches.map || drawHuntSketch(record, "map", evening);
+  record.sketches.taken || drawHuntSketch(record, "taken", evening);
+  return !0;
+}
 // One roll of a legend's bite for a cast, at its chance per cast (legendBaitChance). 1 or more always bites.
 function rollLegendBite(chance, rng) {
   return chance >= 1 || rng() < chance;
@@ -105657,6 +105931,18 @@ function freshHuntRecord() {
     hobLines: [],
     hobNight: 0,
     hobGreeted: 0,
+    // Her water (section 4, B4): found by the theft ("theft") or by an older save's chart ("chart"), the
+    // evening, where the float went under (the marker cork's spot; 0, 0 for none) and what it was on.
+    found: false,
+    foundEvening: 0,
+    foundBy: "",
+    foundAt: { x: 0, z: 0 },
+    takenOn: "",
+    // The first evening the raft was in Hob's part in her time; the evenings Murk said each nudge; boost: the
+    // evening from which the boils come twice as often. murkFound: Murk's word on the find was said.
+    partAt: 0,
+    nudged: { midnight: 0, sail: 0, boils: 0, boost: 0 },
+    murkFound: false,
   };
 }
 // Back-fills one lake's hunt record from a fresh one: a missing or wrongly typed field takes its default, one
@@ -105698,6 +105984,25 @@ function mossmereTallyBeat(loop, trip, rule = wo.hunt, { quiet = !1 } = {}) {
     missed >= 2
       ? (drawHuntSketch(record, "map", evening), (record.mapBy = "murk"), (beat.murk = "mapPassed"))
       : missed >= 1 && !record.murkNudged && ((record.murkNudged = !0), (beat.murk = "findHob"));
+  } else if (record.found) {
+    // Murk's word on the find, at the tally after it (an older save that bought the chart never hears it).
+    record.murkFound || ((record.murkFound = !0), (beat.murk = "found"));
+  } else {
+    // The nudges of section 4. Not yet in Hob's part at midnight: after one evening with the map, then after
+    // two. In it at midnight but nothing found: after that evening Murk speaks, and after a second evening the
+    // boils come twice as often from the next night (no words).
+    let nudged = record.nudged;
+    if (!record.partAt) {
+      let missed = evening - record.sketches.map;
+      !nudged.midnight && missed >= 1
+        ? ((nudged.midnight = evening), (beat.murk = "midnight"))
+        : nudged.midnight && !nudged.sail && missed >= 2 && ((nudged.sail = evening), (beat.murk = "sail"));
+    } else {
+      let stuck = evening - record.partAt + 1;
+      !nudged.boils && stuck >= 1
+        ? ((nudged.boils = evening), (beat.murk = "boils"))
+        : nudged.boils && !nudged.boost && stuck >= 2 && (nudged.boost = evening + 1);
+    }
   }
   (beat.tale || record.padUnseen.length) && (record.padDue = !0);
   return beat.tale || beat.murk ? beat : null;
@@ -105829,6 +106134,7 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
     let saved = Ln(c.hunt[lake]) ? c.hunt[lake] : (c.hunt[lake] = record);
     normaliseHuntRecord(saved, record);
   }
+  foundByChart(c);
   for (let [g, p] of Object.entries(c.eveningsAt)) c.eveningsAt[g] = Math.max(0, ha(p));
   for (let [g, p] of Object.entries(t?.LOOP?.lostTackle || {}))
     p?.slot === "lure" && Zl(c, g) && !c.lures.includes(g) && c.lures.push(g);
@@ -106740,6 +107046,16 @@ function CF(e) {
     let H = a(),
       Ee = D;
     if (((D = !1), !r(H))) return !1;
+    // The thief took it (mossmere-hunt-2.md B3): no gear lost and no comeback; the theft finds her water.
+    if (ze.reason === "thief") {
+      let loop = p();
+      return (
+        loop &&
+          findHerWater(loop, H, { x: Number(ze.x), z: Number(ze.zPos), onLead: ze.onLead === !0 }) &&
+          (c(), d("hunt:found", { onLead: ze.onLead === !0, x: Number(ze.x), z: Number(ze.zPos) })),
+        !1
+      );
+    }
     Ln(ze.overCap) && (x(H).capLost = !0);
     let je = m(ze.speciesId);
     if (
@@ -107377,8 +107693,12 @@ function CF(e) {
             (talk = { first: 4, drew: "map" }));
     else if (record.hobNight !== evening) {
       record.hobNight = evening;
+      // His line about the theft waits until sketch 2 is drawn by a theft. ("Right off your line?" is not true
+      // for an older save that found the spot by its chart, so, as with Murk's word, he never says it there.)
       let line = Object.keys(n().TEXT_LOOP?.hunt?.hob?.nights || {}).find(
-        (k) => !record.hobLines.includes(k),
+        (k) =>
+          !record.hobLines.includes(k) &&
+          (k !== "taken" || (record.sketches.taken > 0 && record.foundBy === "theft")),
       );
       line
         ? (record.hobLines.push(line), (talk = { line }))
@@ -107396,7 +107716,17 @@ function CF(e) {
       unseen: record.padUnseen.slice(),
       due: record.padDue === !0,
       intro: record.padIntro !== !0,
-      next: record.sketches.map ? "midnight" : "hob",
+      // What to try next: find Hob, be in his part at midnight, watch for the boils, then fish the marked spot.
+      next: huntWaterFound(p())
+        ? "spot"
+        : record.sketches.map
+          ? record.partAt
+            ? "boils"
+            : "midnight"
+          : "hob",
+      foundBy: record.foundBy,
+      // Sketch 2's X: where the float went under (the centre of her hole for a save that bought the chart).
+      foundAt: record.foundBy === "theft" ? herWaterCorkAt(p()) : null,
     };
   }
   // The notepad opened by itself and was closed: what it drew in has been seen.
@@ -114352,6 +114682,7 @@ function rce(e) {
     }
     try {
       updateMidnightBell(e, et);
+      updateHerWater(e, et);
     } catch (midnightError) {
       console.warn("[midnight]", midnightError);
     }
@@ -129123,6 +129454,11 @@ function Y0e(e) {
       let Dt = (Pe || []).find((tn) => tn.id === i.forcePlace) || t().PLACE_V3_BY_ID?.[i.forcePlace];
       if (Dt) return Dt;
     }
+    // Her water is plain open water until it is found: a cast there is no place, so no mist and no place pool.
+    xe() &&
+      Array.isArray(Pe) &&
+      Pe.some((Dt) => placeUnmarked(e, Dt?.id)) &&
+      (Pe = Pe.filter((Dt) => !placeUnmarked(e, Dt?.id)));
     if (!Array.isArray(Pe) || !Pe.length) return null;
     try {
       let Dt = t().placeAtV3?.(Q.id, R, I);
@@ -131286,9 +131622,23 @@ function Y0e(e) {
         y(Oi);
       }
     i.legendLineLoss && (i.p = 0);
+    // The thief (mossmere-hunt-2.md B3): in her time, near her hole, she takes the first ordinary fish hooked on
+    // the float or the lead, once, until her water is found. The fight is lost to "thief" whatever its roll:
+    // no wound, no gear lost.
+    i.thiefAt = null;
+    vn &&
+      !At &&
+      !i.find &&
+      !Q.giant &&
+      !i.rivalFight &&
+      !i.tutorial &&
+      !i.castVisualLure &&
+      Yt() === MIDNIGHT.water &&
+      p(() => thiefTakes(e, h(), c.bob.x, c.bob.z)) === !0 &&
+      ((i.thiefAt = { x: c.bob.x, z: c.bob.z, onLead: !!i.castLead }), (i.p = 0));
     let _o = zB(lt);
     i.draws = _o;
-    let va = i.forceOutcome === "land" ? 0 : i.forceOutcome === "lose" ? 1 : _o.u;
+    let va = i.thiefAt ? 1 : i.forceOutcome === "land" ? 0 : i.forceOutcome === "lose" ? 1 : _o.u;
     i.outcome = i.find || va < i.p ? "land" : "lose";
     let xo = At ? Pe.CATCH_V3?.legend?.style?.[Q.id] || "steady" : Q.style || "steady",
       Ii = i.find
@@ -131308,8 +131658,9 @@ function Y0e(e) {
           });
     if (((i.plan0 = Ii), (i.loss = null), i.outcome === "lose")) {
       let Oi = !!i.cast?.place?.foul || !!i.cast?.place?.rule?.foul,
-        Aa =
-          i.overCap && !i.find
+        Aa = i.thiefAt
+          ? "thief"
+          : i.overCap && !i.find
             ? i.overCap.by === "line"
               ? "snapped"
               : "thrown"
@@ -131798,20 +132149,25 @@ function Y0e(e) {
           size: 0.05,
           life: 0.6,
         }))
-      : I.cause === "thrown"
-        ? (o.burst(c.mouth.x, Math.max(0.3, c.mouth.y + 0.3), c.mouth.z, {
-            color: 16773583,
-            color2: 15327951,
-            count: 7,
-            spread: 1.4,
-            up: 2.2,
-            gravity: 5,
-            size: 0.06,
-            life: 0.5,
-          }),
-          p(() => e.water?.splash?.(Q, Pe, { size: 0.4 + Ke * 0.3, count: 8 })))
-        : (p(() => e.water?.addRipple?.(Q, Pe, 0.7 + 0.2 * Math.min(Ke, 3))),
-          p(() => e.water?.splash?.(Q, Pe, { size: 0.3, count: 6 }))),
+      : I.cause === "thief"
+        ? // Something big takes it under: a boil where the fish was.
+          (p(() => e.water?.splash?.(Q, Pe, { size: 1.1 + Ke * 0.3, count: 22 })),
+          p(() => e.water?.addRipple?.(Q, Pe, 1.2)),
+          p(() => e.water?.addRipple?.(Q + 0.5, Pe - 0.4, 1.2)))
+        : I.cause === "thrown"
+          ? (o.burst(c.mouth.x, Math.max(0.3, c.mouth.y + 0.3), c.mouth.z, {
+              color: 16773583,
+              color2: 15327951,
+              count: 7,
+              spread: 1.4,
+              up: 2.2,
+              gravity: 5,
+              size: 0.06,
+              life: 0.5,
+            }),
+            p(() => e.water?.splash?.(Q, Pe, { size: 0.4 + Ke * 0.3, count: 8 })))
+          : (p(() => e.water?.addRipple?.(Q, Pe, 0.7 + 0.2 * Math.min(Ke, 3))),
+            p(() => e.water?.splash?.(Q, Pe, { size: 0.3, count: 6 }))),
       wn(J().strike?.haptic?.loss),
       Oe() && (i.legendDimUntil = i.clock + Bt(n("legend").rebiteDelay, 20)),
       (i.lostInfo = {
@@ -131828,7 +132184,12 @@ function Y0e(e) {
     let At = Bt(J().loss?.quietBeat, 0.6),
       Dt = Bt(n("cast").reelInTime, 0.6);
     (i.lostDur = i.lostInfo.dur + At + Dt),
-      (i.lostLine = I.cause !== "snapped" && I.cause !== "staggered" && I.cause !== "fouled"),
+      // The thief takes the float with the fish, so only a lead's line comes back.
+      (i.lostLine =
+        I.cause !== "snapped" &&
+        I.cause !== "staggered" &&
+        I.cause !== "fouled" &&
+        !(I.cause === "thief" && !i.castLead)),
       c.bob.set(Q, 0, Pe),
       (s.play = null),
       (s.strike = null),
@@ -131926,7 +132287,9 @@ function Y0e(e) {
     Dt = Math.max(tn, Math.round(Dt / tn) * tn);
     let yn = i.cast?.place?.id || null,
       bn = Q.markedFrom || { openWater: "elder", place: "trophy" },
-      vn = !Pe && ((!!R.giant && xe()) || yd(i.sizeClass) >= yd(yn ? bn.place : bn.openWater));
+      // A fish the thief took is gone for good: never "still out there", never a rival, no gear advice.
+      taken = I.cause === "thief" && !!i.thiefAt,
+      vn = !Pe && !taken && ((!!R.giant && xe()) || yd(i.sizeClass) >= yd(yn ? bn.place : bn.openWater));
     const loss = {
       speciesId: R.id,
       sizeClass: Pe ? null : i.sizeClass,
@@ -131942,7 +132305,15 @@ function Y0e(e) {
       legendary: Pe,
       zone: Yt(),
       ...(Pe ? legendLossDetails(R) : {}),
-      ...(i.overCap && !Pe
+      // Where the thief took it: where the float (or the lead) went under, and on which.
+      ...(taken
+        ? {
+            onLead: !!i.thiefAt.onLead,
+            x: Math.round(i.thiefAt.x * 100) / 100,
+            zPos: Math.round(i.thiefAt.z * 100) / 100,
+          }
+        : {}),
+      ...(i.overCap && !Pe && !taken
         ? {
             overCap: {
               by: i.overCap.by,
@@ -131971,7 +132342,12 @@ function Y0e(e) {
         "It took " + (items.join(" with ") || "a bare hook") + (hour ? " " + hour : "") + " here.";
     }
     const rival =
-      xe() && !i.tutorial && !i.find && Yt() === "mossmere" && e.state?.meta?.loop?.tutorial?.done !== false
+      xe() &&
+      !taken &&
+      !i.tutorial &&
+      !i.find &&
+      Yt() === "mossmere" &&
+      e.state?.meta?.loop?.tutorial?.done !== false
         ? loseOldRival(e.state?.meta, t(), h(), loss, i.rivalFight, i.overCap?.rig, lt)
         : null;
     if (rival) {
@@ -136397,6 +136773,8 @@ function Y0e(e) {
           fishing: () => ({
             state: r,
             species: i.species?.id || null,
+            bob: { x: Math.round(c.bob.x * 100) / 100, z: Math.round(c.bob.z * 100) / 100 },
+            thiefAt: i.thiefAt ? { ...i.thiefAt } : null,
             weight: i.weight,
             depth: i.depth,
             wait: i.waitDur,
@@ -138559,7 +138937,7 @@ var MW = Object.freeze({
     volume: 0.7,
     hum: { type: "triangle", f: 58, ft: "lowpass", ff: 260, q: 0.8, level: 0.03, vib: 0.6 },
   },
-  bell_pool: { sfx: "moss_toll", every: [18, 32], volume: 0.9 },
+  // (The Bell Pool has no toll: its harbour bell never rings, and stands silent once her water is found.)
   veilback_brook: { sfx: "moss_lily", every: [4, 8], volume: 0.6 },
 });
 function TW(e) {
@@ -155472,6 +155850,26 @@ function pfe(e, t, n, o, a, s, r, l) {
         e.stroke();
     e.restore();
   }
+  if (n.p.ringed) {
+    // Murk's ring, in pencil: one loose loop drawn twice, a little apart, round the mark. Drawing only.
+    e.save(), (e.strokeStyle = "rgba(58, 50, 66, .62)"), (e.lineCap = "round");
+    for (let [k, w, a0] of [
+      [1, 1.1, 0.35],
+      [1.07, 0.7, 0.2],
+    ]) {
+      e.lineWidth = w;
+      e.beginPath();
+      for (let q = 0; q <= 40; q++) {
+        let ang = a0 + (q / 40) * Math.PI * 2.12,
+          r = d * 0.78 * k * (1 + 0.05 * Math.sin(ang * 3 + k * 5));
+        let px = i + Math.cos(ang) * r * 1.12,
+          py = c + Math.sin(ang) * r * 0.9;
+        q ? e.lineTo(px, py) : e.moveTo(px, py);
+      }
+      e.stroke();
+    }
+    e.restore();
+  }
   if (!n.label) return;
   let m = n.label,
     g = m.px || 13;
@@ -162723,6 +163121,8 @@ function Uhe(e, t, n, { tutorial: o = !1 } = {}) {
         best: g,
         giantLanded: b,
         marked: p && !L ? Yo(Number(a.giants?.[p]?.marked), 0) > 0 : !1,
+        // Murk's pencilled ring round her water once it is found (mossmere-hunt-2.md section 4).
+        ringed: d === HER_WATER.place && u && huntWaterFound(a),
         wounds: w && !L ? Math.max(0, Math.min(c, Math.floor(Yo(Number(e?.legendWounds?.[w]), 0)))) : 0,
       };
     });
@@ -163392,7 +163792,12 @@ const padEsc = (s) =>
 // Draws one sketch as SVG markup. With `at` (seconds), every stroke also gets its moment to draw in, from
 // that time on, about as fast as a pencil; `end` is when the last stroke is done.
 const PAD_WIDTH = { p: 1, b: 1.65, f: 0.85, d: 1, h: 0.7 };
-function padSketchSvg(id, vb, list, { sw = 1.1, amp = 0.42, label = "", at = null, speed = 1 } = {}) {
+function padSketchSvg(
+  id,
+  vb,
+  list,
+  { sw = 1.1, amp = 0.42, label = "", at = null, speed = 1, clip = !1 } = {},
+) {
   let R = padRng(padHash(id)),
     pxPerUnit = 360 / vb[2],
     back = [],
@@ -163446,7 +163851,7 @@ function padSketchSvg(id, vb, list, { sw = 1.1, amp = 0.42, label = "", at = nul
     }
   }
   return {
-    html: `<svg class="gw-pad-sk" viewBox="${vb.join(" ")}" role="img" aria-label="${padEsc(label)}"><g filter="url(#gw-pad-pencil)">${back.reverse().join("")}${front.join("")}</g></svg>`,
+    html: `<svg class="gw-pad-sk${clip ? " gw-pad-clip" : ""}" viewBox="${vb.join(" ")}" role="img" aria-label="${padEsc(label)}"><g filter="url(#gw-pad-pencil)">${back.reverse().join("")}${front.join("")}</g></svg>`,
     end: time,
   };
 }
@@ -163564,7 +163969,122 @@ function padLineEnd() {
     ...padWornEnd((u, v) => [u, 15 + v], 112, 172, 2.2, 31),
   ];
 }
-// The five places: their pages, and how a drawn one is made (sketches 2 to 5 come in later steps).
+// A wavy pencil line along y, from x0 to x1 (a far shore).
+function padWave(x0, y, x1, amp, per) {
+  let pts = [];
+  for (let x = x0; x <= x1 + 0.01; x += per / 4)
+    pts.push([x, y + amp * Math.sin(((x - x0) / per) * PAD_TAU)]);
+  return padPath(pts);
+}
+// Sketch 2: Taken at midnight (the mock-up's sk2). A close-up of the corner of Hob's map: the X where the float
+// went under (at x, z in lake units) in the broken rings of a boil, and far off at the top the leaning
+// toll-tower on the old city wall with the twelve strokes of midnight. The labels are Hob's map's own.
+function padTakenAtMidnight(labels, X = -4, Z = -14) {
+  // The tower leans to the right as it rises.
+  let T = (pts) => padPath(pts.map(([x, z]) => [x - 5 + (-40.5 - z) * 0.13, z])),
+    tally = [];
+  for (let g = 0; g < 2; g++) {
+    let x0 = -13 + g * 5.6,
+      d = "";
+    for (let i = 0; i < 4; i++)
+      d += padPath([
+        [x0 + i * 1.05, -49.4],
+        [x0 + i * 1.05 + 0.15, -44.4],
+      ]);
+    tally.push(
+      "p" +
+        d +
+        padPath([
+          [x0 - 0.8, -45],
+          [x0 + 3.9, -48.8],
+        ]),
+    );
+  }
+  tally.push("pM-1.4 -49.4L-1.25 -44.4M-.3 -49.4L-.15 -44.4");
+  let ring = (r, gaps, seed) => {
+      let R = padRng(seed),
+        d = "",
+        a = R() * 40;
+      for (; a < 360; ) {
+        let l = 70 + R() * 60;
+        (d += padEll(X, Z, r, r, a, Math.min(360, a + l))), (a += l + gaps);
+      }
+      return d;
+    },
+    flick = (dx0, dz0, dx1, dz1) =>
+      padPath([
+        [X + dx0, Z + dz0],
+        [X + dx1, Z + dz1],
+      ]);
+  return [
+    "f" + padPath(PAD_HOB_PART.concat([PAD_HOB_PART[0]])),
+    "_h34,1.5|" + padPtsStr(PAD_HOB_PART),
+    ...padIsle("gate"),
+    padGatehouse(22, -12.4, 0.9),
+    ...padIsle("elder"),
+    ...padIsle("younger"),
+    `t21.5,-3.2,3.4,f|${labels.gatehouse}`,
+    `t-30,-13.6,3.4,f|${labels.sisters}`,
+    // the boil: broken rings round the spot, and splashes
+    "w" + padPath(padEllPts(X, Z, 10.8, 10.8)) + "Z",
+    "p" + ring(4.6, 22, 3),
+    "p" + ring(7.4, 30, 4),
+    "f" + ring(10, 44, 5),
+    "f" +
+      flick(-1.2, -5.6, -1.7, -7.6) +
+      flick(2.6, -5.2, 3.6, -7) +
+      flick(-5.2, -2.6, -7.2, -3.6) +
+      flick(5.6, -2, 7.6, -2.8) +
+      flick(4.8, 3.4, 6.4, 4.8) +
+      flick(-4.6, 3.6, -6, 5.2),
+    // the X
+    "b" + flick(-2.6, -2.6, 2.6, 2.6),
+    "b" + flick(2.6, -2.6, -2.6, 2.6),
+    // the city wall far off at the top, and its leaning toll-tower: two lit windows, a pointed cap, no bell
+    "f" + padWave(-37, -40.6, 31, 0.5, 7),
+    "pM3 -40.5L29 -40.5",
+    "pM5 -40.5L5 -42.1L7 -42.1L7 -40.5M25 -40.5L25 -42.1L27 -42.1L27 -40.5",
+    "fM4 -39.3L28 -39.3",
+    "p" +
+      T([
+        [19.2, -40.5],
+        [19.5, -48],
+      ]) +
+      T([
+        [22.8, -40.5],
+        [22.5, -48],
+      ]),
+    "p" +
+      T([
+        [18.6, -48],
+        [21, -51.6],
+        [23.4, -48],
+        [18.6, -48],
+      ]),
+    "p" +
+      T([
+        [20.4, -46.6],
+        [21.6, -46.6],
+        [21.6, -45],
+        [20.4, -45],
+        [20.4, -46.6],
+      ]) +
+      T([
+        [20.4, -43.4],
+        [21.6, -43.4],
+        [21.6, -41.8],
+        [20.4, -41.8],
+        [20.4, -43.4],
+      ]),
+    "f" +
+      T([
+        [22.2, -41],
+        [22.2, -46],
+      ]),
+    ...tally,
+  ];
+}
+// The five places: their pages, and how a drawn one is made (sketches 3 to 5 come in later steps).
 const PAD_PLACES = [
   { key: "map", n: 1, page: "where" },
   { key: "taken", n: 2, page: "where" },
@@ -163573,7 +164093,20 @@ const PAD_PLACES = [
   { key: "back", n: 5, page: "gear" },
 ];
 const padPageOf = (key) => PAD_PLACES.find((p) => p.key === key)?.page || "where";
-function padPanels(key, text, at) {
+function padPanels(key, text, at, view = {}) {
+  if (key === "taken") {
+    let spot = view.foundAt || { x: -4, z: -14 },
+      sk = padSketchSvg("s2-0", [-37, -52, 68, 49], padTakenAtMidnight(text.labels || {}, spot.x, spot.z), {
+        sw: 0.3,
+        amp: 0.2,
+        label: text.art?.taken || "",
+        at,
+        clip: !0,
+      }),
+      // An older save that bought the chart found it with no theft: its own words (B4).
+      words = view.foundBy === "chart" ? text.takenSelf : text.taken;
+    return `<div class="gw-pad-pnl"><div class="gw-pad-box">${sk.html}</div><p class="gw-pad-cap"${at == null ? "" : ` style="--d:${sk.end.toFixed(2)}s"`}>${padEsc(words || "")}</p></div>`;
+  }
   if (key !== "map") return null;
   let map = padSketchSvg("s1-0", [-68, -67, 136, 135], padHobMap(text.labels || {}), {
       sw: 0.5,
@@ -163612,7 +164145,7 @@ function notepadElement(h, text, view, { page = "where", animate = [], intro = !
     pages = text.pages || {},
     fig = (place) => {
       let drawn = view.sketches?.[place.key] > 0,
-        panels = drawn ? padPanels(place.key, text, animate.includes(place.key) ? 0.6 : null) : null;
+        panels = drawn ? padPanels(place.key, text, animate.includes(place.key) ? 0.6 : null, view) : null;
       return `<figure class="gw-pad-fig${panels ? "" : " gw-pad-blank"}" data-sketch="${place.key}"${panels ? ' data-drawn="1"' : ""}><div class="gw-pad-fig-h"><span class="n">${place.n}</span>${padEsc(titles[place.key] || "")}</div><div class="gw-pad-panels">${panels || `<p class="gw-pad-none">${padEsc(text.blank || "")}</p>`}</div></figure>`;
     };
   el.dataset.loop = "notepad";
@@ -163699,6 +164232,7 @@ const NOTEPAD_CSS = `
 .gw-pad-end .gw-pad-box { width: 80%; margin: 0 auto; transform: rotate(-2.5deg); }
 .gw-pad-end .gw-pad-cap { font-size: 17.5px; margin-top: 0; }
 .gw-pad-sk { display: block; width: 100%; height: auto; overflow: visible; }
+.gw-pad-sk.gw-pad-clip { overflow: hidden; }
 .gw-pad-sk .pl { fill: none; stroke: rgb(48, 41, 56); stroke-linecap: round; stroke-linejoin: round; }
 .gw-pad-sk .pl.g { opacity: .3; }
 .gw-pad-sk .pl.f { opacity: .55; }
@@ -163756,7 +164290,35 @@ function huntView(K) {
       }
     },
     // armed: the raft has been away from Hob since he last spoke; padWait: time at home with nothing open.
-    state = { armed: !0, padWait: 0, talks: 0 };
+    // liftDue: her water was found and its lift waits for a free moment; corkDue: its last two lines wait for
+    // the lift's end.
+    state = { armed: !0, padWait: 0, talks: 0, liftDue: !1, corkDue: !1 },
+    say = (words) => {
+      try {
+        words && t.bus?.emit?.("toast", { text: words, kind: "lore" });
+      } catch (err) {
+        report("say", err);
+      }
+    };
+  // Her water found on the water (mossmere-hunt-2.md B6): the Taken! line, the spare float (a lead has none to
+  // lose) and the sketch line at once; the lift camera and title once nothing is on screen; then the marker
+  // cork and the silent bell when the lift ends.
+  try {
+    t.bus?.on?.("hunt:found", (found = {}) => {
+      let words = text().water || {};
+      say(found.onLead ? words.takenLead : words.takenFloat);
+      found.onLead || say(words.spareFloat);
+      say(text().drawn);
+      (state.liftDue = !0), (state.corkDue = !0);
+    });
+    t.bus?.on?.("place:lift", (lift = {}) => {
+      if (lift.placeId !== HER_WATER.place || lift.phase !== "end" || !state.corkDue) return;
+      let words = text().water || {};
+      (state.corkDue = !1), say(words.cork), say(words.bell);
+    });
+  } catch (err) {
+    report("listen", err);
+  }
   if (typeof document < "u" && !document.getElementById("gw-notepad-css")) {
     let style = document.createElement("style");
     (style.id = "gw-notepad-css"), (style.textContent = NOTEPAD_CSS), document.head.appendChild(style);
@@ -163877,6 +164439,16 @@ function huntView(K) {
           call("hobLampLit") === !0 &&
           ((state.armed = !1), (talk = call("hobTalk")), talk && openHob(talk));
     } else t.flow !== "playing" && (state.armed = !0);
+    // Her water's lift, when nothing holds the screen. Off the water it waits for the next trip's own lifts.
+    if (state.liftDue)
+      if (t.flow !== "playing") state.liftDue = !1;
+      else if (free() && !t.game?.lifting?.()) {
+        state.liftDue = !1;
+        let lifted = call("lifted");
+        Array.isArray(lifted) && lifted.includes(HER_WATER.place)
+          ? (state.corkDue = !1)
+          : t.game?.beginLifts?.([HER_WATER.place]);
+      }
     // At home after a tally, once the jetty is up and nothing else is: the notepad opens by itself.
     if (t.flow === "home" && K.top?.()?.id === "jetty" && !K.has?.("tally")) {
       if ((state.padWait += Math.max(0, Math.min(0.25, Number(dt) || 0))) > 0.8) {
@@ -163902,6 +164474,8 @@ function huntView(K) {
     debug: () => ({
       armed: state.armed,
       talks: state.talks,
+      liftDue: state.liftDue,
+      corkDue: state.corkDue,
       hob: K.has?.("hob") === !0,
       pad: K.has?.("notepad") === !0,
     }),
@@ -172751,8 +173325,9 @@ function ej(e) {
   f("fishing:cast", () => {
     d.casts++;
   }),
-    f("fish:escaped", () => {
-      d.away = !0;
+    // (A fish the thief took is not one that got away: the guide's box about gear does not fit it.)
+    f("fish:escaped", (E) => {
+      E?.reason !== "thief" && (d.away = !0);
     }),
     f("loop:tow", (E = {}) => {
       d.towPhase = (E.opening === !0 && E.phase) || null;
@@ -175775,6 +176350,8 @@ Object.assign(Ba, {
   loopFresh: () => ms && JP($t.state.meta, Ba.hasSavedRun()),
   homeGlide: () => (li ? li.gliding() : null),
   lifting: () => (li ? li.lifting() : null),
+  // Lifts the given places now, with the lift camera and title (her water, once it is found on the water).
+  beginLifts: (e) => (li ? li.beginLifts(e) : !1),
 });
 var qC = () => !!li && $t.flow === "playing" && li.lifting() !== null;
 function dm() {

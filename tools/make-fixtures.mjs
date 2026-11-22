@@ -81,8 +81,13 @@ const FIXTURES = [
     from: "mid-mossmere",
     async play(session) {
       await giveClams(session, 2000);
-      for (const id of ["place:under_the_span", "place:buoy_lights", "place:bell_pool"])
+      for (const id of ["place:under_the_span", "place:buoy_lights"])
         log(`  buy ${id}: ${await buy(session, id)}`);
+      // The Bell Pool is never sold now (her water is found on the water); the fixture is an older save that
+      // bought it, so the debug hook gives it.
+      log(
+        `  own bell_pool: ${await session.eval(() => window.__gw.debug.loop.own("bell_pool")?.join(", "))}`,
+      );
       // At the Bell Pool with the Worm Bunch (id heartmoss) on, the legend is landed, kept and sold at the tally.
       await evening(session, ["belled_matriarch"], {
         before: async () => {
