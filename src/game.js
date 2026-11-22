@@ -31588,6 +31588,8 @@ var Ph = [
     "bell_spinner",
     "bent_spoon",
     "guard_button",
+    // Appended last so every earlier position keeps its meaning (mossmere-gear.md B2).
+    "live_minnow",
   ],
   W5 = ["feather_fly", "glimmer_spoon", "bone_jig", "bell_spinner", "bent_spoon", "guard_button"],
   WQ = ["mireworm", "lumen_moss", "cut_strip"],
@@ -31606,29 +31608,31 @@ var Ph = [
     reedjaw_pike: [0.8, 3, 2, 1.5, 1.5, 0.4, 0.4, 0.5, 0.5, 1.2],
   },
   MS = (e) => Object.fromEntries(hg.map((t, n) => [t, e[n]])),
+  // One grade per bait or lure in Ph's order. The last column is the Live Minnow (the "Live" column of
+  // mossmere-gear.md B3); her row stays all null, as her own rules decide what she takes.
   UQ = {
-    dusk_minnow: [1, 3, 2, 0, 2, 0, 0, 0, 0, 2],
-    mossback_perch: [1, 3, 0, 2, 1, 2, 3, 2, 2, 2],
-    gutter_crayfish: [1, 3, 1, 3, 0, 0, 0, 0, 0, 2],
-    likely_chub: [1, 2, 2, 2, 3, 1, 1, 2, 1, 2],
-    overbold_bass: [1, 2, 0, 2, 2, 2, 3, 2, 2, 2],
-    rustfin_sucker: [1, 3, 1, 0, 0, 0, 0, 0, 0, 2],
-    lampsipper: [1, 1, 2, 0, 3, 0, 0, 0, 0, 2],
-    weeping_carp: [0, 2, 3, 0, 0, 0, 0, 0, 0, 2],
-    candlefin_koi: [0, 1, 3, 0, 1, 0, 0, 0, 0, 2],
-    milkeye_perch: [0, 1, 0, 3, 0, 2, 3, 1, 1, 2],
-    kissmark_trout: [0, 1, 0, 2, 2, 3, 2, 2, 1, 2],
-    reedjaw_pike: [0, 0, 0, 3, 0, 3, 2, 3, 0, 2],
-    bridgechain_sturgeon: [0, 3, 0, 3, 0, 0, 0, 0, 0, 2],
-    thousandcast_pike: [0, 0, 0, 0, 0, 2, 2, 3, 0, 0],
-    hullkiss_lamprey: [0, 0, 0, 0, 0, 1, 0, 3, 0, 0],
-    gloam_eel: [null, 0, 3, 0, 0, 0, 0, 0, 0, 0],
-    belled_matriarch: [null, null, null, null, null, null, null, null, null, null],
+    dusk_minnow: [1, 3, 2, 0, 2, 0, 0, 0, 0, 2, 0],
+    mossback_perch: [1, 3, 0, 2, 1, 2, 3, 2, 2, 2, 3],
+    gutter_crayfish: [1, 3, 1, 3, 0, 0, 0, 0, 0, 2, 1],
+    likely_chub: [1, 2, 2, 2, 3, 1, 1, 2, 1, 2, 2],
+    overbold_bass: [1, 2, 0, 2, 2, 2, 3, 2, 2, 2, 3],
+    rustfin_sucker: [1, 3, 1, 0, 0, 0, 0, 0, 0, 2, 0],
+    lampsipper: [1, 1, 2, 0, 3, 0, 0, 0, 0, 2, 0],
+    weeping_carp: [0, 2, 3, 0, 0, 0, 0, 0, 0, 2, 0],
+    candlefin_koi: [0, 1, 3, 0, 1, 0, 0, 0, 0, 2, 0],
+    milkeye_perch: [0, 1, 0, 3, 0, 2, 3, 1, 1, 2, 3],
+    kissmark_trout: [0, 1, 0, 2, 2, 3, 2, 2, 1, 2, 3],
+    reedjaw_pike: [0, 0, 0, 3, 0, 3, 2, 3, 0, 2, 3],
+    bridgechain_sturgeon: [0, 3, 0, 3, 0, 0, 0, 0, 0, 2, 1],
+    thousandcast_pike: [0, 0, 0, 0, 0, 2, 2, 3, 0, 0, 2],
+    hullkiss_lamprey: [0, 0, 0, 0, 0, 1, 0, 3, 0, 0, 0],
+    gloam_eel: [null, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0],
+    belled_matriarch: [null, null, null, null, null, null, null, null, null, null, null],
   },
   E7 = {
-    rosefleck_trout: [0, 1, 0, 2, 3, 2, 1, 1, 1, 2],
-    rainglass_darter: [0, 1, 0, 0, 3, 0, 0, 0, 0, 2],
-    nightbloom_carp: [0, 2, 3, 0, 0, 0, 1, 0, 0, 2],
+    rosefleck_trout: [0, 1, 0, 2, 3, 2, 1, 1, 1, 2, 1],
+    rainglass_darter: [0, 1, 0, 0, 3, 0, 0, 0, 0, 2, 0],
+    nightbloom_carp: [0, 2, 3, 0, 0, 0, 1, 0, 0, 2, 0],
   },
   fge = Object.freeze(Object.keys(E7)),
   k7 = (e) => Object.fromEntries(Ph.map((t, n) => [t, e[n]])),
@@ -43751,6 +43755,8 @@ var pP = {
       shimmerfly: { kind: "bait", hold: 2, all: !0 },
       wick_worm: { kind: "bait", hold: 4, attract: !0 },
       cut_strip: { kind: "bait", hold: 4, family: "predator" },
+      // A bait the player catches (mossmere-gear.md B2): it grips hunters as Cut Strip does.
+      live_minnow: { kind: "bait", hold: 4, family: "predator" },
       feather_fly: { kind: "lure", hold: 5, family: "insect" },
       glimmer_spoon: { kind: "lure", hold: 6, family: "predator" },
       bone_jig: { kind: "lure", hold: 6, family: "bottom" },
@@ -47199,6 +47205,17 @@ wo.lures = {
 wo.baitRule = { grade: 1.5, favour: 0.3, tin: 10 };
 wo.tins = { mossmere: ["mireworm", "lumen_moss"] };
 wo.cut = { strips: 3, classes: ["small", "keeper"], hold: 0.6 };
+// The Live Minnow (mossmere-gear.md B2, G4): a small or keeper Dusk Minnow goes "Into the tin", one bait each.
+// The tin holds three and empties at the tally; it is Murk's gift (wo.rig.parts.minnow_tin).
+wo.live = {
+  bait: "live_minnow",
+  from: ["dusk_minnow"],
+  classes: ["small", "keeper"],
+  per: 1,
+  cap: 3,
+  // Landing one of these on the trip before the tin's tally makes Murk say his perch line (Ca.live.gift.hunter).
+  hunters: ["mossback_perch", "overbold_bass", "milkeye_perch", "kissmark_trout", "reedjaw_pike"],
+};
 wo.raft = {
   oars: { prices: [60, 300], with: [1, 1], speed: 1.5 },
   keel: { prices: [100, 600, 3e3], with: [1, 1, 4], favour: 0.1 },
@@ -47247,6 +47264,7 @@ Ca.gearItems = {
   mireworm: "Mire Worms",
   lumen_moss: "Lumen Moss",
   cut_strip: "Cut Strip",
+  live_minnow: "Live Minnow",
   bent_spoon: "Bent Spoon",
 };
 Ca.tackle = {
@@ -47263,6 +47281,9 @@ wo.rig = {
   parts: {
     cork_float: { slot: "depth", fit: "float", start: !0, water: null },
     sounding_lead: { slot: "depth", fit: "lead", depth: "bottom", gift: "firstSale", price: 30, water: null },
+    // Not fitted like the others: owning it lets a Dusk Minnow go "Into the tin". Murk gives it at the tally
+    // after the lead's.
+    minnow_tin: { slot: "tin", gift: "afterLead", water: null },
   },
 };
 wo.depthMult = { lead: { bottom: 2, high: 0.5, any: 1 }, float: 1, floor: 0.5 };
@@ -47283,6 +47304,18 @@ Ca.depth = {
   gift: "Not every fish looks up. A lead takes your worm down to the ones that don't.",
   strike: "The rod tip pulls round. Press now.",
   odds: "On the Sounding Lead: bottom feeders \xD72, higher feeders \xD70.5.",
+};
+// The Live Minnow and Murk's tin. The gift line depends on whether a perch-like hunter was landed on the trip.
+Ca.live = {
+  tin: "Minnow Tin",
+  gift: {
+    hunter:
+      "Perch eat little fish. Here's a tin for live ones. Press \u201CInto the tin\u201D on a small Dusk Minnow.",
+    plain: "Here's a tin for live bait. Press \u201CInto the tin\u201D on a small Dusk Minnow.",
+  },
+  button: "Into the tin ({n} left)",
+  good: "Good for: hunters such as perch, pike and bass.",
+  cost: "Costs you: you must catch it first, and grazers ignore it.",
 };
 var VS = 2;
 function SP(e = globalThis) {
@@ -49457,6 +49490,20 @@ if (Su) {
         price: 0,
         count: wo.cut.strips,
         zoneMin: 0,
+        unlock: null,
+        legend: !1,
+        icon: "strip",
+        bonus: {},
+      });
+    // The Live Minnow is never sold: it comes only from the minnow tin's button on a Dusk Minnow's card.
+    x0.some((c) => c.id === "live_minnow") ||
+      x0.push({
+        id: "live_minnow",
+        name: "Live Minnow",
+        price: 0,
+        count: 0,
+        zoneMin: 0,
+        zone: "mossmere",
         unlock: null,
         legend: !1,
         icon: "strip",
@@ -101766,10 +101813,12 @@ function qre(e) {
       lead = false,
       depth = 0,
       dip = 0,
+      live = false,
     } = {}) {
       let Qe = b.bob;
       Qe.retrieving = retrieving;
       Qe.lead = !!lead;
+      Qe.live = !!live;
       Qe.depth = Number.isFinite(depth) ? depth : 0;
       Qe.dip = Number.isFinite(dip) ? dip : 0;
       Me && l.lures.select(lureId);
@@ -102048,6 +102097,12 @@ function qre(e) {
           ($ = Math.sin(ve * 1.3) * 0.08),
           (de = Math.cos(ve * 1.1) * 0.06);
     }
+    // A live minnow tows the float in slow, small loops while it waits (drawn only: the bite spot stays put).
+    oe.live &&
+      (oe.state === "floating" || oe.state === "nibble") &&
+      ((ge += Math.sin(ve * 0.9) * 0.16 + Math.sin(ve * 2.3) * 0.05),
+      (k += Math.cos(ve * 0.7) * 0.16),
+      (de += Math.sin(ve * 1.7) * 0.08));
     if ((Qe.position.set(ge, q, k), l.lures.active || oe.state === "hooked" || oe.state === "bite")) {
       a.getRodTip(O);
       let yt = Math.atan2(O.x - ge, O.z - k);
@@ -104405,7 +104460,7 @@ function hF(
     y = qi(c.lures).filter(
       (re) => typeof re == "string" && tp(t?.LOOP?.lures?.[re]) && $c(t, re, (f && n.zone) || d),
     ),
-    b = [...qi(t?.LOOP?.tins?.[d]), "cut_strip", U3(t, d)]
+    b = [...qi(t?.LOOP?.tins?.[d]), "cut_strip", "live_minnow", U3(t, d)]
       .filter(Boolean)
       .map((re) => ({ id: re, count: Math.max(0, ki(w[re])) }))
       .filter((re) => re.count > 0 || re.id === p),
@@ -105440,6 +105495,8 @@ function xF(e, t, n, o = {}) {
       n?.zone &&
         (Ln(e.bait) || (e.bait = {}),
         (e.bait[n.zone] = Ln(n.bait) ? { ...n.bait } : {}),
+        // Live Minnows last one evening: the tin empties at the tally (mossmere-gear.md B4).
+        delete e.bait[n.zone].live_minnow,
         Ln(e.eveningsAt) || (e.eveningsAt = {}),
         (e.eveningsAt[n.zone] = Math.max(0, ha(e.eveningsAt[n.zone])) + 1));
   }
@@ -106469,7 +106526,26 @@ function CF(e) {
       (K.length > 0 || H.said?.firstSale === !0)
         ? "sounding_lead"
         : null;
+    // Murk's minnow tin: at the first tally after the lead's (never the same one: one new thing a tally), in a
+    // water that fishes by depth. Old saves that already own the lead get it at their next tally.
+    let giftSay = null;
+    if (
+      !gift &&
+      !!bs[ze.zone]?.depth &&
+      Sle(H.parts).includes("sounding_lead") &&
+      !Sle(H.parts).includes("minnow_tin")
+    ) {
+      gift = "minnow_tin";
+      let hunters = Sle(f().live?.hunters);
+      giftSay = Sle(x(ze).landedKinds).some((id) => hunters.includes(id)) ? "hunter" : "plain";
+    }
     gift && (Array.isArray(H.parts) || (H.parts = ["cork_float"]), H.parts.push(gift));
+    // A Live Minnow left on the hook is gone with the tin's last minnows: the hook goes back to the first bait
+    // still in stock, so the next evening does not start on a bare hook.
+    if (H.fitted?.bait === "live_minnow" && !(ha(H.bait?.[ze.zone]?.live_minnow) > 0)) {
+      let stock = H.bait?.[ze.zone] || {};
+      H.fitted.bait = [...Sle(f().tins?.[ze.zone]), "cut_strip"].find((id) => ha(stock[id]) > 0) ?? null;
+    }
     if (
       (typeof H.fitted?.bait == "string" &&
         !(ha(H.bait?.[ze.zone]?.[H.fitted.bait]) > 0) &&
@@ -106483,6 +106559,7 @@ function CF(e) {
         seen: !1,
         ...(x(ze).capLost ? { away: !0 } : {}),
         ...(gift ? { gift } : {}),
+        ...(giftSay ? { giftSay } : {}),
       }),
       je)
     ) {
@@ -106684,7 +106761,7 @@ function CF(e) {
     let je = a(),
       K = r(je);
     if (H != null) {
-      let ke = typeof H == "string" && (XA(n(), H) != null || H === "cut_strip");
+      let ke = typeof H == "string" && (XA(n(), H) != null || H === "cut_strip" || H === "live_minnow");
       if (typeof H != "string" || (!ve(H) && !ke) || oe(H, Ee) <= 0) return { ok: !1 };
     }
     let we = H ?? null,
@@ -106778,6 +106855,38 @@ function CF(e) {
       d("fish:action", { action: "release", cut: !0, fish: ze, gained: we }), i(), { ok: !0, gained: we }
     );
   }
+  // Room left in the minnow tin for this fish, or null when its card offers no "Into the tin": the tin is not
+  // owned, the water does not fish by depth, the fish is not a small or keeper Dusk Minnow, or it is already kept.
+  function tinRoom(ze) {
+    let H = a(),
+      Ee = p(),
+      je = f().live || {};
+    if (!r(H) || !Ee || !Ln(ze) || !Sle(Ee.parts).includes("minnow_tin") || !bs[H.zone]?.depth) return null;
+    if (!Sle(je.from).includes(ze.speciesId) || !Sle(je.classes).includes(ze.sizeClass)) return null;
+    if (ze.giant === !0 || ze.legendary === !0 || (H.creel || []).some((K) => K?.uid === ze.uid)) return null;
+    let K = Math.max(0, ha(je.cap, 3)) - Math.max(0, ha(H.bait?.[je.bait || "live_minnow"]));
+    return K > 0 ? K : null;
+  }
+  // "Into the tin": the fish becomes one Live Minnow and is used up (not kept, not sold, not let go).
+  function intoTin(ze) {
+    let room = tinRoom(ze),
+      H = a(),
+      je = f().live || {},
+      id = je.bait || "live_minnow";
+    if (room == null) return { ok: !1, gained: { live: 0 } };
+    let K = Math.min(room, Math.max(1, ha(je.per, 1)));
+    Ln(H.bait) || (H.bait = {}),
+      (H.bait[id] = Math.max(0, ha(H.bait[id])) + K),
+      ze.uid && e.gone?.add?.(ze.uid),
+      e.pending?.delete?.(ze.uid),
+      e.syncPending?.();
+    let we = { live: K };
+    return (
+      d("fish:action", { action: "release", tin: !0, fish: ze, gained: we }),
+      i(),
+      { ok: !0, gained: we, count: H.bait[id] }
+    );
+  }
   function q() {
     let ze = t.fishing,
       H = null;
@@ -106861,7 +106970,8 @@ function CF(e) {
       (qe != null && st != null && (ze !== void 0 && H === void 0 ? (st = null) : (qe = null)),
       qe != null &&
         qe !== ke &&
-        (typeof qe == "string" && (!!ve(qe) || XA(n(), qe) != null || qe === "cut_strip")
+        (typeof qe == "string" &&
+        (!!ve(qe) || XA(n(), qe) != null || qe === "cut_strip" || qe === "live_minnow")
           ? oe(qe, Ee) + (te === qe && !ve(te) ? 1 : 0)
           : 0) <= 0)
     )
@@ -107413,6 +107523,8 @@ function CF(e) {
     wipeOrder: Rt,
     orderFor: Wt,
     cutBait: F,
+    tinRoom,
+    intoTin,
     sayOrders: Et,
     canChangeHook: de,
     changeHook: Be,
@@ -110720,6 +110832,9 @@ function Kle(e) {
       (ft.stats = ft.stats || _e()),
         (ft.stats.fishCaught = (ft.stats.fishCaught || 0) + 1),
         (Vn.landed = (Vn.landed | 0) + 1);
+      // Which kinds were landed this trip, kept or not: Murk's tin line asks whether a perch was among them.
+      Array.isArray(Vn.landedKinds) || (Vn.landedKinds = []);
+      Vn.landedKinds.includes(me.id) || Vn.landedKinds.push(me.id);
       {
         let fe = ft.stats.biggest;
         (!fe || t().fishWeight(me, ce) > t().fishWeight(m(fe.speciesId), fe)) &&
@@ -128098,6 +128213,8 @@ function Y0e(e) {
         (b.lureId = i.castVisualLure),
         (b.retrieving = !!i.retrieve || (r === "bite" && i.spinContact)),
         (b.lead = !!i.castLead),
+        // A Live Minnow under the Cork Float swims, so the float wanders a little.
+        (b.live = !i.castLead && i.castBait === "live_minnow"),
         (b.depth = Bt(i.depth, 0)),
         // How far below the water the float would sit: on the lead the rod tip shows it instead.
         (b.dip = I ? x(I.x, I.z) - Bt(I.y, 0) : 0);
@@ -155947,6 +156064,7 @@ var c4 = (e) => !!e && typeof e == "object" && !Array.isArray(e),
     mireworm: "worm",
     lumen_moss: "moss",
     cut_strip: "fish",
+    live_minnow: "fish",
     feather_fly: "feather",
     glimmer_spoon: "spoon",
     bone_jig: "bone",
@@ -155968,7 +156086,7 @@ function Tfe(e, t, n = "mossmere") {
   let o = c4(t) ? t : {},
     a = c4(o.bait?.[n]) ? o.bait[n] : {},
     s = o.fitted?.bait ?? null;
-  return [e?.LOOP?.legendBait?.[n]?.id, ...Sb(e?.LOOP?.tins?.[n]), "cut_strip"]
+  return [e?.LOOP?.legendBait?.[n]?.id, ...Sb(e?.LOOP?.tins?.[n]), "cut_strip", "live_minnow"]
     .filter((l) => typeof l == "string")
     .filter((l, i, c) => c.indexOf(l) === i && (Math.max(0, Math.floor(Tb(a[l]))) > 0 || l === s))
     .map((l) => ({ id: l, count: Math.max(0, Math.floor(Tb(a[l]))), glyph: su[l] || "worm" }));
@@ -156000,6 +156118,7 @@ var Efe = `
 .gw-loop-on .gw-chalk-tick svg { width: 22px; height: 16px; fill: none; stroke: #ebe6da; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
   filter: drop-shadow(0 0 3px rgba(235, 230, 218, .35)); }
 .gw-loop-on .gw-cc-letgo { position: relative; overflow: hidden; }
+.gw-loop-on .gw-cc-tin { grid-column: 1 / -1; }
 .gw-loop-on .gw-cc-letgo .gw-cut-knife { display: none; margin-right: 6px; vertical-align: middle; }
 .gw-loop-on .gw-cc-letgo .gw-cut-knife svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .gw-loop-on .gw-cc-letgo.gw-cutting .gw-cut-knife { display: inline-flex; }
@@ -156231,9 +156350,27 @@ function QU({
   state: s = {},
   close: r = () => {},
   report: l = () => {},
+  makeButton = null,
 }) {
   let i = e?.progression?.loop;
   if (!(!i || typeof i != "object" || !t)) {
+    // "Into the tin": on a small or keeper Dusk Minnow while Murk's tin has room. It shows the room left.
+    try {
+      let room = typeof i.tinRoom == "function" ? i.tinRoom(t) : null;
+      if (room != null && a?.parentNode && typeof makeButton == "function") {
+        let label = String(e.data?.TEXT_LOOP?.live?.button || "Into the tin ({n} left)").replace("{n}", room),
+          tinBtn = makeButton(label, {
+            action: "tin",
+            cls: "gw-cc-act gw-cc-tin",
+            onClick: () => {
+              s.locked || (i.intoTin(t)?.ok === !0 && ((s.locked = !0), r()));
+            },
+          });
+        a.after(tinBtn);
+      }
+    } catch (c) {
+      l("gear.tin", c);
+    }
     try {
       o &&
         typeof i.orderFor == "function" &&
@@ -158986,7 +159123,7 @@ function cV(e, { run: t = null, metaLoop: n = null, line: o = null } = {}) {
           ? a.equippedBait
           : null,
     d = typeof a.lure == "string" ? a.lure : null,
-    f = [e?.LOOP?.legendBait?.[l]?.id, ...Ed(e?.LOOP?.tins?.[l]), "cut_strip"].filter(
+    f = [e?.LOOP?.legendBait?.[l]?.id, ...Ed(e?.LOOP?.tins?.[l]), "cut_strip", "live_minnow"].filter(
       (p, w, y) => typeof p == "string" && y.indexOf(p) === w,
     );
   c && !f.includes(c) && f.push(c);
@@ -159138,7 +159275,7 @@ function khe(e, { metaLoop: t = null, run: n = null, line: o = null, canChange: 
       log: z === x ? [w(m.item?.[z])].filter(Boolean) : [],
     }));
   b.push({ kind: "lure", head: r.lure, items: A });
-  let S = [e?.LOOP?.legendBait?.[c]?.id, ...Ed(e?.LOOP?.tins?.[c]), "cut_strip"].filter(
+  let S = [e?.LOOP?.legendBait?.[c]?.id, ...Ed(e?.LOOP?.tins?.[c]), "cut_strip", "live_minnow"].filter(
     (z, Z, D) => typeof z == "string" && D.indexOf(z) === Z,
   );
   M && !S.includes(M) && S.push(M);
@@ -159149,7 +159286,8 @@ function khe(e, { metaLoop: t = null, run: n = null, line: o = null, canChange: 
       name: f4(e, z),
       count: am(L[z]),
       on: z === M,
-      art: hV(e, "bait", z),
+      // The Live Minnow is drawn in the plain line style (dV), like the bare hook.
+      ...(z === "live_minnow" ? { plain: z } : { art: hV(e, "bait", z) }),
       log: z === M ? [w(m.item?.[z])].filter(Boolean) : [],
     })),
     B = M == null && x == null;
@@ -159162,7 +159300,15 @@ function khe(e, { metaLoop: t = null, run: n = null, line: o = null, canChange: 
     plain: "bare",
     log: B ? [w(m.item?.bare)].filter(Boolean) : [],
   }),
-    b.push({ kind: "bait", head: r.bait, items: P });
+    b.push({
+      kind: "bait",
+      head: r.bait,
+      items: P,
+      // With a Live Minnow on, a line each on what it is good for and what it costs you, as the Depth row shows.
+      ...(M === "live_minnow"
+        ? { lines: [e?.TEXT_LOOP?.live?.good, e?.TEXT_LOOP?.live?.cost].filter(Boolean) }
+        : {}),
+    });
   // The Depth part, once a second option (the Sounding Lead) is owned, in a water that fishes by depth. With a
   // lure on, the row says lures swim at their own depth instead of offering a choice.
   let depthText = i0(e?.TEXT_LOOP?.depth) ? e.TEXT_LOOP.depth : {},
@@ -159228,6 +159374,11 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
       '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V30" stroke-width="2.4"/><path d="M100 30V44" stroke-width="4"/><path d="M100 44C114 44 124 58 124 74C124 92 112 104 100 104C88 104 76 92 76 74C76 58 86 44 100 44Z" stroke-width="5"/><path d="M79 70H121" stroke-width="3" stroke-opacity=".6"/><path d="M100 104V122C100 131 93 134 88 129" stroke-width="3.2"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     sounding_lead:
       '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M92 4V22" stroke-width="2.4"/><circle cx="92" cy="27" r="5" stroke-width="3"/><path d="M92 32V40" stroke-width="3"/><path d="M92 40C100 40 104 52 108 66C114 86 108 104 92 104C76 104 70 86 76 66C80 52 84 40 92 40Z" stroke-width="5"/><path d="M146 40V48" stroke-width="2.4"/><path d="M133 76C133 59 139 48 146 48C153 48 159 59 159 76Z" stroke-width="3.6"/><circle cx="146" cy="82" r="3.2" stroke-width="2.6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    // The Live Minnow (a small fish hooked through the lip) and Murk's minnow tin, in the same style.
+    live_minnow:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M66 6V62C66 72 58 77 51 71L47 65" stroke-width="3.2"/><path d="M56 78C68 62 98 58 126 68L150 56V100L126 88C98 98 68 94 56 78Z" stroke-width="5"/><circle cx="73" cy="74" r="3.4" stroke-width="2.6"/><path d="M96 66C100 72 100 84 96 90" stroke-width="2.4" stroke-opacity=".6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    minnow_tin:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M84 48C84 32 116 32 116 48" stroke-width="3.2"/><path d="M44 48H156V62H44Z" stroke-width="4"/><path d="M50 62H150V116C150 123 146 128 139 128H61C54 128 50 123 50 116Z" stroke-width="5"/><path d="M76 96C86 84 106 82 120 90L134 81V111L120 102C106 110 86 108 76 96Z" stroke-width="3.2"/><circle cx="68" cy="55" r="1.8" stroke-width="2"/><circle cx="100" cy="55" r="1.8" stroke-width="2"/><circle cx="132" cy="55" r="1.8" stroke-width="2"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     bare: '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M112 14V88C112 112 98 124 82 124C66 124 56 112 56 98V90L70 104" stroke-width="5"/><path d="M106 14H118" stroke-width="4"/><circle cx="112" cy="10" r="5" stroke-width="3.4"/><path d="M70 104L62 108" stroke-width="3.4"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     none: '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V44" stroke-width="3"/><path d="M100 44C90 44 85 51 85 60V100C85 110 91 117 100 117C109 117 115 110 115 100V74" stroke-width="5"/><path d="M115 74C109 72 104 76 104 81" stroke-width="3.6" stroke-opacity=".7"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
   },
@@ -163090,16 +163241,21 @@ function WV(e) {
       (Tt.innerHTML = `<div class="gw-tally${Le.empty ? " gw-tally--empty" : ""}">${Qhe()}
       ${Le.empty ? '<p class="gw-murk-line gw-in"></p>' : '<ol class="gw-tally-rows"></ol><div class="gw-tally-total"><span class="gw-tally-plus"></span></div>'}</div>`),
       Le.empty && (Tt.querySelector(".gw-murk-line").textContent = Le.line || "");
-    // Murk's gift at this tally (the Sounding Lead): its name, his line, and where to fit it.
+    // Murk's gift at this tally (the Sounding Lead or the minnow tin): its name, his line, and where to fit it.
     let gift = qt.tally?.gift,
-      giftText = f().depth || {};
-    if (gift && giftText.gift) {
+      giftText = f().depth || {},
+      liveText = f().live || {},
+      giftShown =
+        gift === "minnow_tin"
+          ? { name: liveText.tin, line: liveText.gift?.[qt.tally?.giftSay] || liveText.gift?.plain, fit: "" }
+          : { name: giftText.names?.[gift], line: giftText.gift, fit: giftText.fit };
+    if (gift && giftShown.line) {
       let g = n("div", `gw-tally-gift${Le.empty ? " gw-in" : ""}`),
         art = dV[gift] || "";
-      g.innerHTML = `<span class="gw-tally-gift-art" aria-hidden="true">${art}</span><b class="gw-tally-gift-name"></b><p class="gw-murk-line gw-in"></p><p class="gw-tally-gift-fit"></p>`;
-      (g.querySelector(".gw-tally-gift-name").textContent = giftText.names?.[gift] || ""),
-        (g.querySelector(".gw-murk-line").textContent = giftText.gift),
-        (g.querySelector(".gw-tally-gift-fit").textContent = giftText.fit || ""),
+      g.innerHTML = `<span class="gw-tally-gift-art" aria-hidden="true">${art}</span><b class="gw-tally-gift-name"></b><p class="gw-murk-line gw-in"></p>${giftShown.fit ? '<p class="gw-tally-gift-fit"></p>' : ""}`;
+      (g.querySelector(".gw-tally-gift-name").textContent = giftShown.name || ""),
+        (g.querySelector(".gw-murk-line").textContent = giftShown.line),
+        giftShown.fit && (g.querySelector(".gw-tally-gift-fit").textContent = giftShown.fit),
         Tt.querySelector(".gw-tally")?.appendChild(g);
     }
     let Ct = Tt.querySelector(".gw-tally-rows");
@@ -167419,6 +167575,7 @@ function YV(e) {
               state: zt,
               close: () => e.closeModal("catch"),
               report: (wn, $n) => e.report?.(wn, $n),
+              makeButton: (label, opts) => b(o(label), { ...ft, ...opts }),
             });
         } else
           nn.appendChild(

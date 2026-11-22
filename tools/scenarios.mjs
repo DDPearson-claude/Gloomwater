@@ -604,6 +604,46 @@ const rollBoth = (session, opts) =>
     return { float, lead };
   }, opts);
 
+// ---- the Live Minnow and Murk's tin (Mossmere gear, step 3) ------------------------------------------------
+
+const TIN = "minnow_tin";
+const TIN_LINE_HUNTER =
+  "Perch eat little fish. Here's a tin for live ones. Press \u201cInto the tin\u201d on a small Dusk Minnow.";
+const TIN_LINE_PLAIN = "Here's a tin for live bait. Press \u201cInto the tin\u201d on a small Dusk Minnow.";
+const LIVE_GOOD = "Good for: hunters such as perch, pike and bass.";
+const LIVE_COST = "Costs you: you must catch it first, and grazers ignore it.";
+
+// Gives a save the lead and the tin, as Murk's two gifts would, the float fitted.
+const withTin = (save) => {
+  withLead(false)(save);
+  save.meta.loop.parts.push(TIN);
+};
+
+const liveInRun = (session) => session.eval(() => window.__gw.state.run?.bait?.live_minnow ?? 0);
+
+// Lands a fish (z sets its size) and waits for its catch card. Returns the card's "Into the tin" text or null,
+// the fish's size class and the creel's length, and leaves the card open.
+async function catchCard(session, speciesId, z) {
+  const ok = await session.eval(([id, z]) => window.__gw.debug.instantCatch(id, { z }), [speciesId, z]);
+  if (!ok) throw new Error(`instantCatch(${speciesId}) refused; ${JSON.stringify(await session.state())}`);
+  const end = Date.now() + 30_000;
+  while (Date.now() < end) {
+    await session.pause(400);
+    if (await session.clickButton(/^Got it$/)) continue;
+    const card = await session.eval(() => {
+      const keep = document.querySelector(".gw-cc-keep");
+      if (!keep || keep.getBoundingClientRect().width === 0) return null;
+      const tin = document.querySelector(".gw-cc-tin");
+      return {
+        tin: tin ? tin.textContent.replace(/\s+/g, " ").trim() : null,
+        creel: window.__gw.state.run?.creel?.length ?? 0,
+      };
+    });
+    if (card) return card;
+  }
+  throw new Error(`no catch card for ${speciesId}; ${JSON.stringify(await session.state())}`);
+}
+
 // ---- the scenarios --------------------------------------------------------------------------------------
 
 const FIXTURE_NAMES = ["fresh-first-evening", "mid-mossmere", "legend-sold", "sporewood-crossed"];
@@ -1028,6 +1068,240 @@ const SCENARIOS = [
       const leadFishes = await session.eval(() => window.__gw.progression.loop.leadFishes());
       check(leadFishes === false, "the lead fishes in Sporewood");
       return "no Depth row, odds unchanged";
+    },
+  },
+  {
+    name: "live minnow: Murk gives the tin at the tally after the lead's, never with it, with his perch line, and it survives a reload",
+    fixture: "fresh-first-evening",
+    debug: true,
+    timeoutMs: 720_000,
+    async run(session, { page, browser }) {
+      await session.sail();
+      await session.catchFish("mossback_perch");
+      const first = await tallyAndGift(session);
+      const atLead = await leadRecord(session);
+      check(
+        atLead.gift === LEAD && !atLead.parts.includes(TIN) && !first?.text.includes("Minnow Tin"),
+        `the lead's tally: ${JSON.stringify({ atLead, first })}`,
+      );
+      await session.sail();
+      await session.catchFish("mossback_perch", { keep: false });
+      const second = await tallyAndGift(session);
+      const atTin = await leadRecord(session);
+      check(
+        second?.shown && second.text.includes(TIN_LINE_HUNTER) && second.text.includes("Minnow Tin"),
+        `the tin's tally: ${JSON.stringify(second)}`,
+      );
+      check(
+        atTin.gift === TIN && atTin.parts.filter((id) => id === TIN).length === 1,
+        `after the tin's tally: ${JSON.stringify(atTin)}`,
+      );
+      const saved = await session.saved();
+      const again = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await again.boot();
+        await again.toHome();
+        const reloaded = await leadRecord(again);
+        check(
+          reloaded.parts.filter((id) => id === TIN).length === 1,
+          `after a reload: ${JSON.stringify(reloaded)}`,
+        );
+        await again.collectGameErrors();
+        check(!again.errors.length, `errors after reloading: ${again.errors.join("; ")}`);
+      } finally {
+        await again.close();
+      }
+      return "the lead first, the tin at the next tally with the perch line, kept after a reload";
+    },
+  },
+
+  {
+    name: "live minnow: an old save that owns the lead gets the tin at its next tally, with the plain line when no perch was landed",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withLead(false),
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.sail();
+      await session.catchFish("dusk_minnow");
+      const gift = await tallyAndGift(session);
+      const after = await leadRecord(session);
+      check(
+        gift?.text.includes(TIN_LINE_PLAIN) && !gift.text.includes("Perch eat") && after.gift === TIN,
+        `${JSON.stringify({ gift, after })}`,
+      );
+      return "given at the next tally with the plain line";
+    },
+  },
+
+  {
+    name: "live minnow: Into the tin shows only on a small or keeper Dusk Minnow with room, counts down, adds one and uses the fish up, and stops at three",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withTin,
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.sail();
+      const seen = [];
+      for (let k = 0; k < 3; k++) {
+        const card = await catchCard(session, "dusk_minnow", -1.5);
+        check(card.tin === `Into the tin (${3 - k} left)`, `minnow ${k + 1}: the button reads ${card.tin}`);
+        await session.clickButton(/^Into the tin/);
+        await session.pause(1200);
+        await session.closeGuides(4000);
+        const after = await session.eval(() => ({
+          live: window.__gw.state.run.bait.live_minnow,
+          creel: window.__gw.state.run.creel.length,
+        }));
+        check(
+          after.live === k + 1 && after.creel === card.creel,
+          `after minnow ${k + 1}: ${JSON.stringify({ card, after })}`,
+        );
+        seen.push(card.tin);
+      }
+      const full = await catchCard(session, "dusk_minnow", -1.5);
+      check(full.tin === null, `the tin is full, yet the card shows ${full.tin}`);
+      await session.clickButton(/^\d?Let go\b/);
+      await session.pause(1000);
+      check((await liveInRun(session)) === 3, "the tin holds more than three");
+      const perch = await catchCard(session, "mossback_perch", -1.5);
+      check(perch.tin === null, `a perch's card shows ${perch.tin}`);
+      await session.clickButton(/^\d?Let go\b/);
+      await session.pause(1000);
+      // The rule itself, for sizes and owners a card is slow to reach.
+      const rule = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          run = window.__gw.state.run,
+          fish = (sizeClass, speciesId = "dusk_minnow") => ({ uid: `t-${sizeClass}`, speciesId, sizeClass });
+        run.bait.live_minnow = 1;
+        const keeper = loop.tinRoom(fish("keeper")),
+          prize = loop.tinRoom(fish("prize")),
+          chub = loop.tinRoom(fish("small", "likely_chub"));
+        const parts = loop.state().parts;
+        parts.splice(parts.indexOf("minnow_tin"), 1);
+        const unowned = loop.tinRoom(fish("small"));
+        parts.push("minnow_tin");
+        return { keeper, prize, chub, unowned };
+      });
+      check(
+        rule.keeper === 2 && rule.prize === null && rule.chub === null && rule.unowned === null,
+        `tinRoom: ${JSON.stringify(rule)}`,
+      );
+      return `${seen.join(", ")}; none when full, none on a perch`;
+    },
+  },
+
+  {
+    name: "live minnow: with a Live Minnow fitted, who bites follows the Live column, and the tackle screen shows it with its two lines",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withTin,
+    async run(session) {
+      await session.sail();
+      const rolls = await session.eval(() => {
+        const d = window.__gw.debug,
+          out = {};
+        for (const light of ["calm", "gloomtide"]) {
+          d.setPhase(light);
+          out[light] = {
+            worm: d.fishPoolRoll(1, { bait: "mireworm" }).shares,
+            live: d.fishPoolRoll(1, { bait: "live_minnow" }).shares,
+          };
+        }
+        return out;
+      });
+      const grazers = ["rustfin_sucker", "weeping_carp"];
+      let wormGrazers = 0;
+      for (const [light, r] of Object.entries(rolls)) {
+        for (const id of grazers) {
+          wormGrazers += r.worm[id] > 0 ? 1 : 0;
+          check(!(r.live[id] > 0), `${light}: ${id} bites a Live Minnow (${r.live[id]})`);
+        }
+        check(r.live.mossback_perch > 0, `${light}: no Mossback Perch on a Live Minnow`);
+        check(
+          r.live.mossback_perch > r.worm.mossback_perch,
+          `${light}: a perch is no likelier on a Live Minnow (${r.worm.mossback_perch} -> ${r.live.mossback_perch})`,
+        );
+        check(!(r.live.dusk_minnow > 0), `${light}: a Dusk Minnow bites a Live Minnow`);
+      }
+      check(wormGrazers > 0, "no grazer bites worms here, so the test proves nothing");
+      // Fitted on the hook: the tackle screen lists it with its count and its two lines.
+      const row = await session.eval(async () => {
+        const loop = window.__gw.progression.loop;
+        window.__gw.state.run.bait.live_minnow = 2;
+        const fit = loop.changeHook({ bait: "live_minnow" });
+        await window.__gw.ui.loop.tackle.openScreen({ from: "rack" });
+        await new Promise((r) => setTimeout(r, 800));
+        const el = document.querySelector('.gw-ts-row[data-row="bait"]');
+        const chip = el?.querySelector('.gw-ts-chip[data-key="live_minnow"]');
+        return {
+          fit: fit?.ok === true,
+          chip: chip ? chip.textContent.replace(/\s+/g, " ").trim() : null,
+          on: chip?.getAttribute("aria-pressed") === "true",
+          lines: [...(el?.querySelectorAll(".gw-ts-note") || [])].map((n) => n.textContent.trim()),
+          item: window.__gw.data.CATCH_V3?.items?.live_minnow ?? null,
+        };
+      });
+      await closeTackle(session);
+      check(
+        row.fit && row.on && /Live Minnow/.test(row.chip) && /2/.test(row.chip),
+        `chip: ${JSON.stringify(row)}`,
+      );
+      check(JSON.stringify(row.lines) === JSON.stringify([LIVE_GOOD, LIVE_COST]), `lines: ${row.lines}`);
+      check(
+        row.item?.family === "predator" && row.item?.hold === 4,
+        `CATCH_V3 item: ${JSON.stringify(row.item)}`,
+      );
+      return `grazers 0, perch ${rolls.calm.worm.mossback_perch.toFixed(3)} -> ${rolls.calm.live.mossback_perch.toFixed(3)}; chip "${row.chip}"`;
+    },
+  },
+
+  {
+    name: "live minnow: the tin is empty after the tally, and the hook goes back to worms",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withTin,
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.sail();
+      await session.eval(() => {
+        window.__gw.state.run.bait.live_minnow = 2;
+        window.__gw.progression.loop.changeHook({ bait: "live_minnow" });
+      });
+      await session.catchFish("mossback_perch");
+      await tallyAndGift(session);
+      const after = await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        return { live: s.bait?.mossmere?.live_minnow ?? 0, fitted: s.fitted?.bait ?? null };
+      });
+      check(after.live === 0, `Live Minnows left after the tally: ${after.live}`);
+      check(after.fitted === "mireworm", `the hook after the tally: ${after.fitted}`);
+      await session.sail();
+      check((await liveInRun(session)) === 0, "the next evening starts with Live Minnows");
+      return "empty after the tally, worms fitted";
+    },
+  },
+
+  {
+    name: "live minnow: Sporewood has no tin, no button and no gift",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withLead(false),
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      const room = await session.eval(() =>
+        window.__gw.progression.loop.tinRoom({ uid: "t", speciesId: "dusk_minnow", sizeClass: "small" }),
+      );
+      check(room === null, `a tin in Sporewood: ${room}`);
+      await session.catchFish("netcloud_fry");
+      const gift = await tallyAndGift(session);
+      const after = await leadRecord(session);
+      check(
+        gift === null && !after.parts.includes(TIN),
+        `Sporewood's tally: ${JSON.stringify({ gift, after })}`,
+      );
+      return "no tin, no gift";
     },
   },
   ...FIXTURE_NAMES.map((name) => ({
