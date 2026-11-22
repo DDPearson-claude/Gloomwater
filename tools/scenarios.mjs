@@ -982,6 +982,54 @@ async function hookNear(session, speciesId, spot, outcome, then = async () => {}
   throw new Error(`a find came up on every hook of ${speciesId}`);
 }
 
+// ---- the bird at midnight (mossmere-hunt-2.md section 1; decisions.md "The midnight cutscene") --------------
+const BIRD_LINE = "A bird went under, and it didn't come back up. This is when it feeds.";
+
+// mid-mossmere with Hob's map drawn and her water found by the theft on `foundEvening` (the Bell Pool owned,
+// revealed and already lifted, so no lift waits at the set-out). The record has no birdCutsceneSeen: an older save.
+const withFound =
+  (foundEvening, extra = {}) =>
+  (save) => {
+    withMap(save);
+    const loop = save.meta.loop;
+    Object.assign(loop.hunt.mossmere, {
+      found: true,
+      foundEvening,
+      foundBy: "theft",
+      foundAt: { x: -2, z: -12 },
+      takenOn: "float",
+      ...extra,
+    });
+    loop.hunt.mossmere.sketches.taken = foundEvening;
+    for (const list of [loop.maps.places, loop.places.revealed, loop.lifted])
+      list.includes("bell_pool") || list.push("bell_pool");
+  };
+
+// Records the bird at midnight's phases and the later nights' mark from now on (and every toast).
+const listenForBirdScene = (session) =>
+  session.eval(() => {
+    window.__toasts = [];
+    window.__scene = [];
+    const g = window.__gw;
+    g.bus.on("toast", (e) => window.__toasts.push(String(e?.text ?? "")));
+    g.bus.on("hunt:birdScene", (e) => window.__scene.push(e.phase + (e.skipped ? ":skipped" : "")));
+    g.bus.on("hunt:herTimeMark", () => window.__scene.push("mark"));
+  });
+const birdSceneSeen = (session) =>
+  session.eval(() => ({
+    phases: window.__scene.slice(),
+    toasts: window.__toasts.slice(),
+    playing: window.__gw.game.birdScene(),
+    seen: window.__gw.progression.loop.state().hunt.mossmere.birdCutsceneSeen,
+  }));
+// Rings midnight on `evening` (its first stroke on time) and lets the night run to `until` s after dark.
+async function strikeMidnight(session, evening, until = MIDNIGHT_AT + 5) {
+  await atNight(session, MIDNIGHT_AT - 1, { evening });
+  await atNight(session, MIDNIGHT_AT + 0.05);
+  await atNight(session, until);
+  await session.pause(2000);
+}
+
 // ---- the Leader and the Hook for ordinary fish (mossmere-gear-deeper.md, gear step 3a) ---------------------
 
 const HOOK_LINE = "Carp grab and run. There's a hook on the shelf that sets itself.";
@@ -3253,6 +3301,236 @@ const SCENARIOS = [
         await next.close();
       }
       return `taken ${Math.hypot(lost.thiefAt.x - HER_CENTRE.x, lost.thiefAt.z - HER_CENTRE.z).toFixed(1)} m off; found, lifted, lines in order; not again; kept after a reload`;
+    },
+  },
+
+  {
+    name: "the bird at midnight: it plays once, at the first midnight after the night her water was found; never on the night of the find or for unfound water, and not again after a reload",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 900_000,
+    editSave: withFound(5),
+    async run(session, { page, browser }) {
+      await session.sail(SLOW_SAIL);
+      await listenForBirdScene(session);
+      check((await huntOf(session)).birdCutsceneSeen === false, "an older record was not given the flag");
+      // The night of the find (evening 5): the bell and her time, and no cutscene.
+      await strikeMidnight(session, 5, MIDNIGHT_AT + 20);
+      let seen = await birdSceneSeen(session);
+      check(
+        !seen.phases.length && !seen.playing && !seen.seen,
+        `the night of the find: ${JSON.stringify(seen)}`,
+      );
+      // Water that is not found: none, on a later night too.
+      await session.eval(() => (window.__gw.state.meta.loop.hunt.mossmere.found = false));
+      await strikeMidnight(session, 6, MIDNIGHT_AT + 20);
+      seen = await birdSceneSeen(session);
+      check(
+        !seen.phases.length && !seen.playing && !seen.seen,
+        `with her water unfound: ${JSON.stringify(seen)}`,
+      );
+      await session.eval(() => (window.__gw.state.meta.loop.hunt.mossmere.found = true));
+      // The first night after the find: it plays through by itself, and the line shows once at its end.
+      await strikeMidnight(session, 6);
+      await session.waitFor("the bird at midnight to play", 240_000, () => window.__scene.includes("end"));
+      seen = await birdSceneSeen(session);
+      check(
+        JSON.stringify(seen.phases) === JSON.stringify(["start", "take", "end"]) && seen.seen === true,
+        `the cutscene: ${JSON.stringify(seen)}`,
+      );
+      check(
+        seen.toasts.filter((t) => t === BIRD_LINE).length === 1 &&
+          seen.toasts.lastIndexOf(MIDNIGHT_LINE) < seen.toasts.indexOf(BIRD_LINE),
+        `the lines: ${JSON.stringify(seen.toasts)}`,
+      );
+      // Later in her time the same night: not again.
+      await atNight(session, MIDNIGHT_AT + 90);
+      await session.pause(2000);
+      check((await birdSceneSeen(session)).phases.length === 3, "it started again the same night");
+      // Reloaded, on a later night: the flag is kept and it does not play again.
+      const saved = await session.saved();
+      const next = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await next.boot();
+        await next.sail(SLOW_SAIL);
+        await listenForBirdScene(next);
+        await strikeMidnight(next, 7, MIDNIGHT_AT + 20);
+        const after = await birdSceneSeen(next);
+        check(
+          after.seen === true && !after.playing && !after.phases.includes("start"),
+          `after a reload: ${JSON.stringify(after)}`,
+        );
+        await next.collectGameErrors();
+        check(!next.errors.length, `errors after reloading: ${next.errors.join("; ")}`);
+      } finally {
+        await next.close();
+      }
+      return "not on the find night or for unfound water; once the next night with its line; not after a reload";
+    },
+  },
+
+  {
+    name: "the bird at midnight: it waits while a fish is on the line; while it plays the night clock stands still and the bird is on the water; one press skips it, the line shows once and play carries on",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 600_000,
+    editSave: withFound(3),
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      await listenForBirdScene(session);
+      await listenOnWater(session);
+      // A fish on the line through the first stroke: nothing plays until the fight is over.
+      await atNight(session, MIDNIGHT_AT - 1, { evening: 5 });
+      const hooked = await session.eval(() => {
+        const g = window.__gw;
+        g.debug.fishOutcome("lose");
+        return g.debug.fishHook("mossback_perch") && g.fishing.state;
+      });
+      check(hooked === "reeling", `could not hook a fish: ${hooked}`);
+      await atNight(session, MIDNIGHT_AT + 0.05);
+      await atNight(session, MIDNIGHT_AT + 4);
+      await session.pause(2000);
+      const waiting = await birdSceneSeen(session);
+      check(!waiting.phases.length && !waiting.playing, `it played over a fight: ${JSON.stringify(waiting)}`);
+      await session.eval(() => window.__gw.debug.fishPlayTo(0.995));
+      // The fight plays out (any guide card closed as a player would); then it starts by itself.
+      for (const end = Date.now() + 240_000; !(await session.eval(() => !!window.__gw.game.birdScene())); ) {
+        check(Date.now() < end, `it did not start after the fight: ${JSON.stringify(await session.state())}`);
+        await session.clickButton(/^Got it$/);
+        await session.pause(300);
+      }
+      const during = await session.eval(async () => {
+        const g = window.__gw;
+        const t0 = g.state.run.phaseTime;
+        await new Promise((r) => setTimeout(r, 1200));
+        return {
+          t0,
+          t1: g.state.run.phaseTime,
+          cinematic: g.cinematic,
+          camera: g.render.landmarkState?.().on ?? null,
+          bird: g.debug.wildlife?.()?.staged ?? null,
+          scene: g.game.birdScene(),
+          fishing: g.fishing.state,
+        };
+      });
+      check(during.t1 === during.t0, `the night clock moved: ${during.t0} to ${during.t1}`);
+      check(
+        during.cinematic && during.camera && during.bird?.shown && during.scene && during.fishing === "idle",
+        `while it plays: ${JSON.stringify(during)}`,
+      );
+      check(!(await birdSceneSeen(session)).toasts.includes(BIRD_LINE), "the line showed before the end");
+      // One press skips it.
+      await session.page.keyboard.press("Enter");
+      await session.pause(1000);
+      const after = await session.eval(() => {
+        const g = window.__gw;
+        return { cinematic: g.cinematic, fishing: g.fishing.state, t: g.state.run.phaseTime };
+      });
+      const seen = await birdSceneSeen(session);
+      check(
+        !seen.playing && !after.cinematic && seen.phases.at(-1) === "end:skipped",
+        `after the press: ${JSON.stringify({ ...seen, ...after })}`,
+      );
+      check(
+        seen.toasts.filter((t) => t === BIRD_LINE).length === 1,
+        `the line: ${JSON.stringify(seen.toasts)}`,
+      );
+      check(after.fishing === "idle", `the press cast the line: ${after.fishing}`);
+      // Play carries on: the night clock runs again (a first-play guide box may open in the free moment after
+      // the scene, and it holds the clock until it is closed).
+      await session.closeGuides(3000);
+      await session.pause(1500);
+      const later = await session.eval(() => window.__gw.state.run.phaseTime);
+      check(later > after.t, `the night clock stayed stopped at ${after.t}`);
+      // Nothing on the water said or showed what it is.
+      const { lines, models } = await heardOnWater(session);
+      const named = lines.filter((l) => HER_WORDS.test(l));
+      check(!named.length && !models.length, `named or shown: ${JSON.stringify({ named, models })}`);
+      return `waited out the fight; clock held at ${during.t0.toFixed(1)} s; skipped with one press; the line once`;
+    },
+  },
+
+  {
+    name: "the bird at midnight: on the nights after it was seen, a splash and a ripple mark her spot at the first stroke, with no cutscene and no line",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 420_000,
+    editSave: withFound(2, { birdCutsceneSeen: true }),
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      await listenForBirdScene(session);
+      await atNight(session, MIDNIGHT_AT - 1, { evening: 5 });
+      check(!(await birdSceneSeen(session)).phases.length, "a mark before midnight");
+      await strikeMidnight(session, 5, MIDNIGHT_AT + 30);
+      await atNight(session, MIDNIGHT_AT + 90);
+      await session.pause(1500);
+      const seen = await birdSceneSeen(session);
+      check(JSON.stringify(seen.phases) === JSON.stringify(["mark"]), `the marks: ${JSON.stringify(seen)}`);
+      check(
+        !seen.playing && !seen.toasts.includes(BIRD_LINE),
+        `a cutscene or its line: ${JSON.stringify(seen)}`,
+      );
+      return "one splash at the first stroke; no cutscene, no line";
+    },
+  },
+
+  {
+    name: "the theft's own words: a fish the thief takes shows no got-away toast, card or gear word and joins no got-away list; a fish that gets away still shows its gear word",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withMap,
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      // An escape as the fight sends it (fish:escaped), for a trophy fish the thief took and for one that threw
+      // the hook. What shows and what the save keeps after each.
+      const escape = (reason) =>
+        session.eval(async (reason) => {
+          const g = window.__gw;
+          const meta = g.state.meta;
+          const count = () => ({
+            journal: meta.journal?.mossback_perch?.gotAway?.length ?? 0,
+            run: g.state.run?.flags?.gotAway?.length ?? 0,
+            lastAway: JSON.stringify(meta.lastAway ?? null),
+          });
+          const before = count();
+          const word = "Worn through on its lips. Chafe Gut won't wear.";
+          g.bus.emit("fish:escaped", {
+            speciesId: "mossback_perch",
+            sizeClass: "trophy",
+            ancient: false,
+            z: 1.6,
+            approxLength: 40,
+            reason,
+            place: null,
+            x: -3,
+            zPos: -13,
+            markedFish: false,
+            legendary: false,
+            zone: "mossmere",
+            partLossText: word,
+            ...(reason === "thief" ? { onLead: false } : {}),
+          });
+          await new Promise((r) => setTimeout(r, 600));
+          const on = (sel) => !!document.querySelector(`${sel}.gw-on`);
+          return {
+            before,
+            after: count(),
+            toast: on(".gw-away"),
+            card: on(".gw-gotaway"),
+            word: on(".gw-strike") && document.querySelector(".gw-strike-w")?.textContent === word,
+          };
+        }, reason);
+      const taken = await escape("thief");
+      check(!taken.toast && !taken.card && !taken.word, `the theft showed: ${JSON.stringify(taken)}`);
+      check(
+        JSON.stringify(taken.after) === JSON.stringify(taken.before),
+        `the theft joined a got-away list: ${JSON.stringify(taken)}`,
+      );
+      // The same fish getting away the ordinary way still shows its gear word. (On a trip the game keeps no
+      // got-away list for ordinary fish either, so only the word tells them apart.)
+      const lost = await escape("thrown");
+      check(lost.word, `an ordinary escape: ${JSON.stringify(lost)}`);
+      return "theft: nothing shown or kept; an ordinary escape: its word shown";
     },
   },
 

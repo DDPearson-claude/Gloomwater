@@ -47188,6 +47188,8 @@ var pP = {
       missing: "This is when things go missing.",
       still: "The water goes still again.",
       birds: "The birds by the Gatehouse scatter across the water.",
+      // After the bird at midnight (the once-only cutscene on the first night after her water is found).
+      birdTaken: "A bird went under, and it didn't come back up. This is when it feeds.",
       // The Odds sheet's line under her row, once she is landed.
       odds: "The {name} bites only in the few minutes after the old bell strikes midnight.",
       holdFull: "Your hold is full. You can still fish and let them go. The old bell strikes midnight soon.",
@@ -51070,6 +51072,8 @@ function nI(e) {
     return xe && typeof xe == "object" && !xe.isStub ? xe : null;
   }
   let v = { glide: null, sailing: !1, lift: null },
+    // The bird at midnight on Mossmere: played, skipped and put away here beside the place lifts.
+    birdScene = birdSceneDirector(t, { report: o }),
     b = { thin: $l(m.lift?.thin, 3), title: $l(m.lift?.title, 1.2), back: $l(m.lift?.back, 0.6) },
     L =
       typeof e.reduced == "function"
@@ -51204,7 +51208,7 @@ function nI(e) {
       D(), Ze?.continued === !0 && Se();
     }),
     t.bus.on("home:enter", () => {
-      (v.lift = null), D();
+      (v.lift = null), birdScene.stop(), D();
     }),
     t.bus.on("loop:buy", () => D()));
   function be(Ze) {
@@ -51299,6 +51303,7 @@ function nI(e) {
     (v.lift = null), (t.cinematic = !1);
   }
   function X(Ze) {
+    birdScene.update(Ze);
     let xe = v.lift?.cur;
     if (xe) {
       if (t.flow !== "playing" || !t.state.run) {
@@ -51313,7 +51318,7 @@ function nI(e) {
     }
   }
   function _() {
-    return v.lift?.cur ? (ne(!0), !0) : !1;
+    return v.lift?.cur ? (ne(!0), !0) : birdScene.skip();
   }
   function W(Ze = "title", xe = null) {
     let N = S();
@@ -51686,6 +51691,8 @@ function nI(e) {
     placesNow: Z,
     beginLifts: (Ze) => Se(Ze),
     lifting: () => v.lift?.cur?.id ?? null,
+    birdScene: () => birdScene.state(),
+    beginBirdScene: () => birdScene.begin(),
     liftState: () =>
       v.lift?.cur
         ? {
@@ -60907,6 +60914,10 @@ function XI(e) {
     p = new He().setScalar(Math.max(0.5, Us(f?.scale, 1))),
     w = { fore: new Vt(), hind: new Vt(), zone: null },
     y = { t: 0, pick: 0, slots: [], next: [], keys: [], on: !1, wake: 0, doze: 0 },
+    // The bird at midnight's staged bird (stageBird), the trip a taken bird is gone for, and the zero scale.
+    staged = null,
+    goneRun = null,
+    noSize = new He(0, 0, 0),
     v = { key: "raft", kind: "raft", x: 0, y: -50, z: 0, k: 1 },
     b = new He(),
     L = new Lo(),
@@ -60979,12 +60990,24 @@ function XI(e) {
       ye = Se === "home",
       se = x(),
       ne = (se && se !== "mossmere" && t[se]) || null,
-      he = be !== "low" && (Ud(e.data, se) || !!ne) && (Se === "playing" || ye) && !e.cinematic && !D;
+      normal = be !== "low" && (Ud(e.data, se) || !!ne) && (Se === "playing" || ye) && !e.cinematic && !D,
+      // The bird at midnight's bird is drawn through its cutscene (cinematic) and at every quality.
+      sceneBird = !!staged && Se === "playing" && !ne,
+      he = normal || sceneBird;
+    // A bird the thief took stays under until the next trip, then is back with its flock.
+    if (goneRun && e.state?.run !== goneRun) {
+      goneRun = null;
+      for (let bird of d.birds)
+        if (bird.gone) {
+          let flock = d.groups[bird.g];
+          (bird.gone = !1), (bird.x = flock?.roost?.x ?? bird.x), (bird.z = flock?.roost?.z ?? bird.z);
+        }
+    }
     if (
-      ((y.on = he),
-      l && (l.mesh.visible = he),
+      ((y.on = normal),
+      l && (l.mesh.visible = normal),
       i && (i.mesh.visible = he && !ne),
-      h && (h.mesh.visible = he && se === "sporewood"),
+      h && (h.mesh.visible = normal && se === "sporewood"),
       l &&
         w.zone !== se &&
         ((w.zone = se),
@@ -61051,18 +61074,34 @@ function XI(e) {
     if (i && i.mesh.visible) {
       let le = Math.min(d.birds.length, S1(e.data, "lampbills", be));
       qI(d, { dt: X, raft: W, phase: Y, rng: c });
+      // Only the cutscene's bird while it plays; otherwise the flocks, with a staged bird added at low quality.
+      let drawn = normal ? d.birds.slice(0, le) : [];
+      if (staged) {
+        let bird = staged.bird,
+          under = staged.under;
+        (bird.x = staged.x), (bird.z = staged.z), (bird.yaw = staged.yaw), (bird.mode = "paddle");
+        (bird.dip = 0), (bird.tuck = 0), (bird.dive = under), (bird.wake = 0.35 * (1 - under));
+        under > 0 && (bird.dimple = 1);
+        drawn.includes(bird) || drawn.push(bird);
+      }
       let ie = i.g.attributes.iPose,
         Te = i.g.attributes.iMark;
+      le = drawn.length;
       for (let Ye = 0; Ye < le; Ye++) {
-        let ee = d.birds[Ye],
+        let ee = drawn[Ye],
           pe = 0;
         try {
           pe = e.water && !e.water.isStub ? Us(e.water.getHeight?.(ee.x, ee.z), 0) : 0;
         } catch {
           pe = 0;
         }
+        // A bird under for good (taken, or all the way under in the cutscene) is drawn at no size.
+        let hidden = ee.gone === !0 || (staged?.bird === ee && staged.under >= 1);
         E.setFromAxisAngle(T, ee.yaw),
-          i.mesh.setMatrixAt(Ye, L.compose(b.set(ee.x, pe + Math.sin(y.t * 1.7 + Ye) * 0.01, ee.z), E, O)),
+          i.mesh.setMatrixAt(
+            Ye,
+            L.compose(b.set(ee.x, pe + Math.sin(y.t * 1.7 + Ye) * 0.01, ee.z), E, hidden ? noSize : O),
+          ),
           ie.setXYZW(Ye, ee.dip, ee.tuck, ee.dive, ee.wake),
           Te.setX(Ye, ee.dimple);
       }
@@ -61081,12 +61120,34 @@ function XI(e) {
     if (!flock?.roost || !raft || !y.on || !i?.mesh.visible) return 0;
     if (Math.hypot(raft.x - flock.roost.x, raft.z - flock.roost.z) > near) return 0;
     let sent = 0;
-    for (let bird of d.birds) bird.g === groupIndex && ((bird.scatter = !0), sent++);
+    for (let bird of d.birds) bird.g === groupIndex && !bird.gone && ((bird.scatter = !0), sent++);
     return sent;
+  }
+  // The bird at midnight (birdSceneDirector): stageBird({ x, z, yaw, under, flock }) sets one grown bird of that
+  // flock on the water there, each frame; `under` (0 to 1) takes it under. stageBird(null, { gone: true }) ends
+  // it, and that bird stays under for the rest of the trip. Returns false when there is no bird to stage.
+  function stageBird(at, { gone = !1 } = {}) {
+    if (!at) {
+      staged && gone && ((staged.bird.gone = !0), (goneRun = e.state?.run || "none"));
+      staged = null;
+      return !0;
+    }
+    let bird =
+      staged?.bird || d.birds.find((b) => b.g === at.flock && !b.gone) || d.birds.find((b) => !b.gone);
+    if (!bird || !i || !Number.isFinite(at.x) || !Number.isFinite(at.z)) return !1;
+    staged = {
+      bird,
+      x: at.x,
+      z: at.z,
+      yaw: Number.isFinite(at.yaw) ? at.yaw : 0,
+      under: Math.max(0, Math.min(1, Number(at.under) || 0)),
+    };
+    return !0;
   }
   return {
     update: z,
     scatterRoost,
+    stageBird,
     state: () => ({
       on: y.on,
       moths: l
@@ -61097,8 +61158,10 @@ function XI(e) {
             lamps: y.slots.map((Z) => Z?.key ?? null),
           }
         : null,
+      staged: staged ? { x: staged.x, z: staged.z, under: staged.under, shown: !!i?.mesh.visible } : null,
       lampbills: d.birds.map((Z) => ({
         g: Z.g,
+        gone: Z.gone === !0,
         mode: Z.mode,
         x: +Z.x.toFixed(2),
         z: +Z.z.toFixed(2),
@@ -105086,6 +105149,7 @@ function updateMidnightBell(game, run) {
           scattered = game.waterBirds?.scatterRoost?.(MIDNIGHT.roostFlock, MIDNIGHT.roostNear) || 0;
         } catch {}
         scattered > 0 && !m.birdsSaid && ((m.birdsSaid = !0), say(words.birds));
+        markHerTimeStart(game, m);
       }
     }
     m.struck++;
@@ -105289,6 +105353,166 @@ function foundByChart(loop) {
   record.sketches.map || drawHuntSketch(record, "map", evening);
   record.sketches.taken || drawHuntSketch(record, "taken", evening);
   return !0;
+}
+// ---- The bird at midnight (mossmere-hunt-2.md section 1 and B2; decisions.md "The midnight cutscene") ---------
+// Once for the save, at the first midnight after the night her water was found: a short cutscene in which the
+// camera goes to her water, a grown water bird sits on it, a boil rises under it and it is gone. It shows a dark
+// shape on the water and a swirl, never her model. The evening's clock stops while it plays (ctx.cinematic), it
+// waits for a moment with nothing on the line and nothing open, and one press skips it. On every later night a
+// splash and a ripple at her spot mark the start of her time instead. Times are seconds from its start.
+const BIRD_SCENE = Object.freeze({
+  // It may start this long after the first stroke, so the bell and its line come first.
+  after: 1.5,
+  length: 5,
+  // The boil's dark back rises under the bird, then the bird is pulled under over `under` seconds.
+  boilAt: 1.9,
+  takeAt: 2.4,
+  under: 0.35,
+  // The camera holds on her water until `release`, then eases back over `back`.
+  release: 4.4,
+  back: 0.6,
+  // The bird sits this far from her centre on the raft's side, so the harbour frame stands behind it.
+  offset: 3,
+  // How the camera frames it: close, low, from the raft's side.
+  frame: { r: 1.5, dist: 7.5, elev: 16 },
+  // The boil sign's size (metres of fish it is painted for: only a size, never a shape or colour).
+  boilSize: 2.2,
+});
+// Whether the thief has ever been landed (an older save that sold her): the cutscene's line calls her "it".
+function thiefLanded(game) {
+  return Number(game?.state?.meta?.journal?.[MIDNIGHT.legend]?.caught) > 0;
+}
+// True while the bird at midnight is waiting to play tonight: in her time, after the first stroke, on a night
+// after the one her water was found, not yet seen, and never for a save that has not found her water.
+function birdSceneDue(game, run) {
+  if (!herTimeOpen(run)) return !1;
+  let t = nightClock(run),
+    record = huntRecordOf(game?.state?.meta?.loop);
+  return (
+    !!record &&
+    t >= MIDNIGHT.at + BIRD_SCENE.after &&
+    record.found === !0 &&
+    record.birdCutsceneSeen !== !0 &&
+    Math.trunc(Number(run.evening) || 0) > Math.trunc(Number(record.foundEvening) || 0) &&
+    !thiefLanded(game)
+  );
+}
+// At the first stroke, on the nights after the bird at midnight was seen: a splash and a ripple at her centre.
+function markHerTimeStart(game, m) {
+  let record = huntRecordOf(game.state?.meta?.loop);
+  if (!record || record.found !== !0 || record.birdCutsceneSeen !== !0 || m.herMarked) return;
+  m.herMarked = !0;
+  try {
+    game.water?.splash?.(HER_WATER.x, HER_WATER.z, { size: 1.3, count: 22 });
+    game.water?.addRipple?.(HER_WATER.x, HER_WATER.z, 1.4);
+    game.water?.addRipple?.(HER_WATER.x + 0.5, HER_WATER.z - 0.4, 1.2, 0.35);
+  } catch {}
+  game.bus?.emit?.("hunt:herTimeMark", { x: HER_WATER.x, z: HER_WATER.z });
+}
+// Plays the bird at midnight. The flow module owns one, updates it every frame, and skips it on a press.
+function birdSceneDirector(game, { report = () => {} } = {}) {
+  let scene = null;
+  const safe = (what, fn) => {
+      try {
+        return fn();
+      } catch (err) {
+        report(`birdScene.${what}`, err);
+      }
+    },
+    emit = (name, payload) => safe("emit", () => game.bus?.emit?.(name, payload)),
+    stage = (under) =>
+      safe("bird", () =>
+        game.waterBirds?.stageBird?.({
+          x: scene.x,
+          z: scene.z,
+          yaw: scene.yaw,
+          under,
+          flock: MIDNIGHT.roostFlock,
+        }),
+      );
+  function begin() {
+    let run = game.state?.run,
+      record = huntRecordOf(game.state?.meta?.loop);
+    if (scene || game.flow !== "playing" || game.cinematic === !0 || !birdSceneDue(game, run)) return !1;
+    let raft = game.player?.position,
+      dx = Number.isFinite(raft?.x) ? raft.x - HER_WATER.x : 0,
+      dz = Number.isFinite(raft?.z) ? raft.z - HER_WATER.z : 1,
+      len = Math.hypot(dx, dz) || 1;
+    (dx /= len), (dz /= len);
+    // Seen from the moment it starts, so it never plays again, even if it is skipped or cut short.
+    record.birdCutsceneSeen = !0;
+    safe("save", () => game.game?.save?.());
+    scene = {
+      t: 0,
+      x: HER_WATER.x + dx * BIRD_SCENE.offset,
+      z: HER_WATER.z + dz * BIRD_SCENE.offset,
+      // Side-on to the camera, which looks from the raft's side.
+      yaw: Math.atan2(dx, dz) + Math.PI / 2,
+      boiled: !1,
+      taken: !1,
+    };
+    game.cinematic = !0;
+    safe("frame", () =>
+      game.render?.frameLandmark?.(
+        { x: scene.x, y: 0, z: scene.z, ...BIRD_SCENE.frame },
+        { dur: BIRD_SCENE.release, back: BIRD_SCENE.back },
+      ),
+    );
+    stage(0);
+    emit("hunt:birdScene", { phase: "start", x: scene.x, z: scene.z });
+    return !0;
+  }
+  function update(dt) {
+    if (!scene) return;
+    if (game.flow !== "playing" || !game.state?.run) return void stop();
+    if (game.paused || !(dt > 0)) return;
+    scene.t += Math.min(dt, 0.25);
+    let { x, z } = scene;
+    if (!scene.boiled && scene.t >= BIRD_SCENE.boilAt) {
+      scene.boiled = !0;
+      // The water's boil sign: a dark back turning under the surface and the swirl it leaves.
+      safe("boil", () => game.water?.addRipple?.(x, z, 1, { kind: "boil", size: BIRD_SCENE.boilSize }));
+    }
+    if (!scene.taken && scene.t >= BIRD_SCENE.takeAt) {
+      scene.taken = !0;
+      safe("take", () => {
+        game.water?.splash?.(x, z, { size: 1.2, count: 24 });
+        game.water?.addRipple?.(x, z, 1.4);
+        game.water?.addRipple?.(x - 0.4, z + 0.5, 1.2, 0.3);
+        game.audio?.play?.("splash_small", { volume: 0.9, pitch: 0.7 });
+      });
+      emit("hunt:birdScene", { phase: "take", x, z });
+    }
+    stage(Math.max(0, Math.min(1, (scene.t - BIRD_SCENE.takeAt) / BIRD_SCENE.under)));
+    scene.t >= BIRD_SCENE.length && finish(!1);
+  }
+  // Ends it (played out or skipped): the bird stays under for the rest of the trip, the clock runs again and the
+  // line shows.
+  function finish(skipped) {
+    if (!scene) return !1;
+    scene = null;
+    skipped && safe("frame", () => game.render?.frameLandmark?.(null, { back: BIRD_SCENE.back }));
+    safe("bird", () => game.waterBirds?.stageBird?.(null, { gone: !0 }));
+    game.cinematic = !1;
+    emit("toast", { text: Ca.midnight.birdTaken, kind: "lore" });
+    emit("hunt:birdScene", { phase: "end", skipped });
+    return !0;
+  }
+  // Leaving the water mid-scene: everything is put back, with no line.
+  function stop() {
+    if (!scene) return;
+    scene = null;
+    safe("frame", () => game.render?.frameLandmark?.(null, { back: BIRD_SCENE.back }));
+    safe("bird", () => game.waterBirds?.stageBird?.(null, { gone: !0 }));
+    game.cinematic = !1;
+  }
+  return {
+    begin,
+    update,
+    skip: () => finish(!0),
+    stop,
+    state: () => (scene ? { t: Math.round(scene.t * 100) / 100, x: scene.x, z: scene.z } : null),
+  };
 }
 // One roll of a legend's bite for a cast, at its chance per cast (legendBaitChance). 1 or more always bites.
 function rollLegendBite(chance, rng) {
@@ -106272,6 +106496,9 @@ function freshHuntRecord() {
     // each bite mark was first seen (0 until then), which adds it to the strip at the foot of the page.
     crossed: {},
     marks: { cuts: 0, holes: 0, ring: 0 },
+    // The bird at midnight (B4): the once-only cutscene has played (or was skipped). From the next night a
+    // splash marks the start of her time instead.
+    birdCutsceneSeen: false,
   };
 }
 // Back-fills one lake's hunt record from a fresh one: a missing or wrongly typed field takes its default, one
@@ -110783,7 +111010,8 @@ function FF(e) {
     return F && F.rarity !== "legendary" ? K3(n(), F, k ?? xc("fish"), a()?.zone || F.zone) : null;
   }
   function oe(ge = {}, { comeback: k = !1 } = {}) {
-    if (!l() || e.isReplay()) return;
+    // A fish the thief took (mossmere-hunt-2.md B3) is gone for good: it joins no got-away list.
+    if (!l() || e.isReplay() || ge.reason === "thief") return;
     let F = e.species(ge.speciesId);
     if (!F) return;
     let q = a(),
@@ -132984,8 +133212,9 @@ function Y0e(e) {
         loss.overCap.advice += " " + rivalShoppingClue(t(), rival.needsPurchase);
     }
     // Once Murk has the part that would have kept it, an ordinary fish lost on a default part says why, once a
-    // night for each kind of loss. Words only: the odds behind the loss are unchanged.
-    if (xe() && !Pe && !loss.overCap) {
+    // night for each kind of loss. Words only: the odds behind the loss are unchanged. (Not for a theft: no part
+    // of the rig let it go.)
+    if (xe() && !Pe && !loss.overCap && !taken) {
       const partLossText = ordinaryLossWord(e.state?.meta?.loop, h(), R.id, {
         water: Yt(),
         leader: i.castLeader ?? null,
@@ -143421,7 +143650,11 @@ function _de(e) {
       To("fishing:landing", (fe) => H(fe)),
       To("fishing:reel", (fe) => It(fe)),
       To("fish:escaped", (fe) => {
-        (fe.legendary === !0 || fe.ancient === !0 || fe.sizeClass === "trophy" || fe.sizeClass === "elder") &&
+        fe.reason !== "thief" &&
+          (fe.legendary === !0 ||
+            fe.ancient === !0 ||
+            fe.sizeClass === "trophy" ||
+            fe.sizeClass === "elder") &&
           e.data?.V3_ENABLED === !0 &&
           (Ge(), (C.root = Le()), (C.why = fe.sizeClass || "legend"), q("gotaway", C));
       }),
@@ -151161,10 +151394,12 @@ function yU(e, t, n, o) {
     Pt("fishing:cast", () => {
       (V = !1), (Je = !1), Ee();
     }),
+    // A fish the thief took is not one that got away: only the theft's own lines show (no toast, card or word).
     Pt("fish:escaped", (te) => {
-      b()
-        ? (te.overCap || te.legendLossText || te.partLossText) && kt(te)
-        : $.push({ p: te, at: performance.now() });
+      te?.reason === "thief" ||
+        (b()
+          ? (te.overCap || te.legendLossText || te.partLossText) && kt(te)
+          : $.push({ p: te, at: performance.now() }));
     }),
     // The Turnback Hook set itself: its word replaces the strike word.
     Pt("fishing:setItself", () => setItselfWord()),
@@ -165667,6 +165902,14 @@ function huntView(K) {
           ? (state.corkDue = !1)
           : t.game?.beginLifts?.([HER_WATER.place]);
       }
+    // The bird at midnight, once it is due tonight: at a moment with nothing on the line, no card and no lift.
+    t.flow === "playing" &&
+      free() &&
+      !t.game?.lifting?.() &&
+      !t.game?.birdScene?.() &&
+      t.ui?.isCatchOpen?.() !== !0 &&
+      birdSceneDue(t, t.state?.run) &&
+      t.game?.beginBirdScene?.();
     // At home after a tally, once the jetty is up and nothing else is: the notepad opens by itself.
     if (t.flow === "home" && K.top?.()?.id === "jetty" && !K.has?.("tally")) {
       if ((state.padWait += Math.max(0, Math.min(0.25, Number(dt) || 0))) > 0.8) {
@@ -177582,8 +177825,12 @@ Object.assign(Ba, {
   lifting: () => (li ? li.lifting() : null),
   // Lifts the given places now, with the lift camera and title (her water, once it is found on the water).
   beginLifts: (e) => (li ? li.beginLifts(e) : !1),
+  // The bird at midnight: what is playing ({ t, x, z } or null), and starting it when it is due.
+  birdScene: () => (li ? li.birdScene() : null),
+  beginBirdScene: () => (li ? li.beginBirdScene() : !1),
 });
-var qC = () => !!li && $t.flow === "playing" && li.lifting() !== null;
+// A lift or the bird at midnight is playing: a press skips it.
+var qC = () => !!li && $t.flow === "playing" && (li.lifting() !== null || li.birdScene() !== null);
 function dm() {
   let e = $t.state.meta;
   return (
