@@ -31590,6 +31590,8 @@ var Ph = [
     "guard_button",
     // Appended last so every earlier position keeps its meaning (mossmere-gear.md B2).
     "live_minnow",
+    // The Worm Bunch (id heartmoss), appended after the Live Minnow for the same reason.
+    "heartmoss",
   ],
   W5 = ["feather_fly", "glimmer_spoon", "bone_jig", "bell_spinner", "bent_spoon", "guard_button"],
   WQ = ["mireworm", "lumen_moss", "cut_strip"],
@@ -31608,31 +31610,32 @@ var Ph = [
     reedjaw_pike: [0.8, 3, 2, 1.5, 1.5, 0.4, 0.4, 0.5, 0.5, 1.2],
   },
   MS = (e) => Object.fromEntries(hg.map((t, n) => [t, e[n]])),
-  // One grade per bait or lure in Ph's order. The last column is the Live Minnow (the "Live" column of
-  // mossmere-gear.md B3); her row stays all null, as her own rules decide what she takes.
+  // One grade per bait or lure in Ph's order. The last two columns are the Live Minnow and the Worm Bunch (the
+  // "Live" and "Bunch" columns of mossmere-gear.md B3). Her row is read only by her own bite rule
+  // (legendBaitChance): Live Minnow 3, Worm Bunch 1, everything else 0. Fd and Bd leave legends out.
   UQ = {
-    dusk_minnow: [1, 3, 2, 0, 2, 0, 0, 0, 0, 2, 0],
-    mossback_perch: [1, 3, 0, 2, 1, 2, 3, 2, 2, 2, 3],
-    gutter_crayfish: [1, 3, 1, 3, 0, 0, 0, 0, 0, 2, 1],
-    likely_chub: [1, 2, 2, 2, 3, 1, 1, 2, 1, 2, 2],
-    overbold_bass: [1, 2, 0, 2, 2, 2, 3, 2, 2, 2, 3],
-    rustfin_sucker: [1, 3, 1, 0, 0, 0, 0, 0, 0, 2, 0],
-    lampsipper: [1, 1, 2, 0, 3, 0, 0, 0, 0, 2, 0],
-    weeping_carp: [0, 2, 3, 0, 0, 0, 0, 0, 0, 2, 0],
-    candlefin_koi: [0, 1, 3, 0, 1, 0, 0, 0, 0, 2, 0],
-    milkeye_perch: [0, 1, 0, 3, 0, 2, 3, 1, 1, 2, 3],
-    kissmark_trout: [0, 1, 0, 2, 2, 3, 2, 2, 1, 2, 3],
-    reedjaw_pike: [0, 0, 0, 3, 0, 3, 2, 3, 0, 2, 3],
-    bridgechain_sturgeon: [0, 3, 0, 3, 0, 0, 0, 0, 0, 2, 1],
-    thousandcast_pike: [0, 0, 0, 0, 0, 2, 2, 3, 0, 0, 2],
-    hullkiss_lamprey: [0, 0, 0, 0, 0, 1, 0, 3, 0, 0, 0],
-    gloam_eel: [null, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0],
-    belled_matriarch: [null, null, null, null, null, null, null, null, null, null, null],
+    dusk_minnow: [1, 3, 2, 0, 2, 0, 0, 0, 0, 2, 0, 0],
+    mossback_perch: [1, 3, 0, 2, 1, 2, 3, 2, 2, 2, 3, 1],
+    gutter_crayfish: [1, 3, 1, 3, 0, 0, 0, 0, 0, 2, 1, 2],
+    likely_chub: [1, 2, 2, 2, 3, 1, 1, 2, 1, 2, 2, 1],
+    overbold_bass: [1, 2, 0, 2, 2, 2, 3, 2, 2, 2, 3, 1],
+    rustfin_sucker: [1, 3, 1, 0, 0, 0, 0, 0, 0, 2, 0, 2],
+    lampsipper: [1, 1, 2, 0, 3, 0, 0, 0, 0, 2, 0, 0],
+    weeping_carp: [0, 2, 3, 0, 0, 0, 0, 0, 0, 2, 0, 2],
+    candlefin_koi: [0, 1, 3, 0, 1, 0, 0, 0, 0, 2, 0, 1],
+    milkeye_perch: [0, 1, 0, 3, 0, 2, 3, 1, 1, 2, 3, 1],
+    kissmark_trout: [0, 1, 0, 2, 2, 3, 2, 2, 1, 2, 3, 1],
+    reedjaw_pike: [0, 0, 0, 3, 0, 3, 2, 3, 0, 2, 3, 0],
+    bridgechain_sturgeon: [0, 3, 0, 3, 0, 0, 0, 0, 0, 2, 1, 3],
+    thousandcast_pike: [0, 0, 0, 0, 0, 2, 2, 3, 0, 0, 2, 0],
+    hullkiss_lamprey: [0, 0, 0, 0, 0, 1, 0, 3, 0, 0, 0, 0],
+    gloam_eel: [null, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    belled_matriarch: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 1],
   },
   E7 = {
-    rosefleck_trout: [0, 1, 0, 2, 3, 2, 1, 1, 1, 2, 1],
-    rainglass_darter: [0, 1, 0, 0, 3, 0, 0, 0, 0, 2, 0],
-    nightbloom_carp: [0, 2, 3, 0, 0, 0, 1, 0, 0, 2, 0],
+    rosefleck_trout: [0, 1, 0, 2, 3, 2, 1, 1, 1, 2, 1, 1],
+    rainglass_darter: [0, 1, 0, 0, 3, 0, 0, 0, 0, 2, 0, 0],
+    nightbloom_carp: [0, 2, 3, 0, 0, 0, 1, 0, 0, 2, 0, 2],
   },
   fge = Object.freeze(Object.keys(E7)),
   k7 = (e) => Object.fromEntries(Ph.map((t, n) => [t, e[n]])),
@@ -32508,6 +32511,8 @@ function Rl(e, { lure: t = null, bait: n = null, water: o = null } = {}) {
   if (a) return t && t !== "bare" && Object.prototype.hasOwnProperty.call(a, t) ? a[t] : a[R7(a, n)];
 }
 var D5 = (e) => e !== 0;
+// Whether a species id is a lake's legend (Ms is the live species table).
+var isLegendSpecies = (id) => Sr(Ms).some((sp) => sp?.id === id && sp.rarity === "legendary");
 function _7(e, t, n) {
   let o = ka(e, 1);
   return t === 0
@@ -32528,6 +32533,8 @@ function Fd(e, t = null, n = null) {
     return t.LOOP.lures[e].giants.slice();
   let s = (o === y0 ? W5 : Sr(qQ[n])).includes(e) ? { lure: e, water: n } : { bait: e, water: n };
   return Object.keys(o.hook.table).filter((r) => {
+    // A legend's row is for her own bite rule only, never for the lists of who takes a bait or lure.
+    if (isLegendSpecies(r)) return !1;
     let l = Rl(r, s);
     return l === 2 || l === 3;
   });
@@ -33045,7 +33052,8 @@ function Bd(
   } = {},
 ) {
   let i = e?.LOOP?.gearCap;
-  if (!i) return null;
+  // Gear limits are for ordinary fish: a legend's line rule is her own (Tt skips legends too).
+  if (!i || isLegendSpecies(t)) return null;
   let c = Rl(t, { lure: n, bait: o, water: l });
   if (c == null) return null;
   let d = z7(t, l),
@@ -34881,18 +34889,18 @@ var Ms = [
       bonus: { shimmer: 0.12, rarityBonus: 0.04, attract: [] },
     },
     {
+      // Once the Heartmoss Ball, her own bait; now the Worm Bunch, an ordinary Mossmere tin (mossmere-gear.md B2).
+      // The id stays, so stock a save holds carries over ball for ball.
       id: "heartmoss",
-      name: "Heartmoss Ball",
+      name: "Worm Bunch",
       price: 10,
       count: 10,
-      consumeOnCast: true,
-      legendBiteChance: 0.12,
       zoneMin: 0,
       zone: "mossmere",
       unlock: null,
-      legend: !0,
+      legend: !1,
       icon: "heart",
-      desc: "Moss rolled around a warm stone. Old fishers say it beats if you hold it long enough.",
+      desc: "A fistful of worms on a big hook. Too much for little mouths.",
       bonus: {},
     },
     {
@@ -46931,7 +46939,8 @@ var pP = {
       favour: { base: 0.15, window: { day: 0.4, old: 0.4, night: 0.3, crown: 0.2 } },
     },
     giant: { share: { inHour: 0.06, offHour: 0.025 }, favour: 0.3, minZ: -0.25, markedHold: 6 },
-    legendBait: { mossmere: { id: "heartmoss", price: 10 } },
+    // Mossmere's legend has no bait of her own any more: the Worm Bunch is an ordinary tin (wo.tins).
+    legendBait: {},
     lift: { thin: 3, title: 1.2, back: 0.6 },
     giantBack: { every: [25, 45], dur: 3, phases: ["gloomtide"], places: ["under_the_span", "buoy_lights"] },
     mist: { inside: 0.35, ease: 0.8 },
@@ -47098,7 +47107,7 @@ var pP = {
       rod: "Grips every fish better. Casts farther.",
       line: "Lands bigger fish.",
       reel: "More line for the big ones.",
-      heartmoss: "Ten Heartmoss Balls. Fish the Bell Pool by day or dusk. Other fish take them too.",
+      heartmoss: "A fistful of worms on a big hook. Too much for little mouths.",
     },
     maps: {
       lily_maze: "Koi glow under the pads like lanterns.",
@@ -47210,7 +47219,8 @@ wo.lures = {
   },
 };
 wo.baitRule = { grade: 1.5, favour: 0.3, tin: 10 };
-wo.tins = { mossmere: ["mireworm", "lumen_moss"] };
+// The Worm Bunch (id heartmoss) is the last Mossmere tin: same price and pack as the others (mossmere-gear.md B2).
+wo.tins = { mossmere: ["mireworm", "lumen_moss", "heartmoss"] };
 wo.cut = { strips: 3, classes: ["small", "keeper"], hold: 0.6 };
 // The Live Minnow (mossmere-gear.md B2, G4): a small or keeper Dusk Minnow goes "Into the tin", one bait each.
 // The tin holds three and empties at the tally; it is Murk's gift (wo.rig.parts.minnow_tin).
@@ -47272,6 +47282,7 @@ Ca.gearItems = {
   lumen_moss: "Lumen Moss",
   cut_strip: "Cut Strip",
   live_minnow: "Live Minnow",
+  heartmoss: "Worm Bunch",
   bent_spoon: "Bent Spoon",
 };
 Ca.tackle = {
@@ -47382,6 +47393,15 @@ Ca.hunt = {
     close: "Got it",
   },
 };
+// The Worm Bunch's two lines on the tackle screen, as the Live Minnow has (mossmere-gear.md, "Worm Bunch").
+Ca.bunch = {
+  good: "Good for: carp, suckers, crayfish and sturgeon.",
+  cost: "Costs you: small fish mostly leave it.",
+};
+// The legends whose bait rule reads their row of the bait table (legendBaitChance): the chance per cast once
+// everything else is right, times the share for her grade of the bait, 0 to 3 (mossmere-hunt.md A2, step 5).
+// With the Live Minnow (grade 3) that is 1 in 3, with the Worm Bunch (grade 1) 1 in 6.
+wo.legendGradeBite = { chance: 1 / 3, mult: [0, 0.5, 0.75, 1] };
 var VS = 2;
 function SP(e = globalThis) {
   let t = Number(e?.GW_LOOP_COST);
@@ -104645,9 +104665,28 @@ function bellPoolFoundFor(game) {
     return !1;
   }
 }
-function rollLegendBite(bait, rng) {
-  const chance = bait?.legendBiteChance ?? 1;
+// One roll of a legend's bite for a cast, at its chance per cast (legendBaitChance). 1 or more always bites.
+function rollLegendBite(chance, rng) {
   return chance >= 1 || rng() < chance;
+}
+// The bait part of a legend's bite check: her chance per cast on this rig once her place and hour are right, or 0
+// when this rig never brings her. A legend graded in her water's bait table (Mossmere's thief) takes only a bait
+// she grades above 0, laid on the bottom by the Sounding Lead, with no lure (mossmere-hunt.md A2, steps 5 to 7):
+// wo.legendGradeBite.chance times its mult for her grade. Any other legend (Sporewood's) takes only its own bait,
+// at that bait's legendBiteChance, as before. baitRecord is the cast bait's BAITS entry.
+function legendBaitChance(
+  species,
+  { bait = null, lure = null, onLead = false, water = null, baitRecord = null } = {},
+) {
+  if (!species?.id || !bait || bait === "bare") return 0;
+  const row = z7(species.id, water);
+  if (row && Object.values(row).some((grade) => grade != null)) {
+    if (lure || !onLead) return 0;
+    const rule = wo.legendGradeBite || {},
+      grade = Rl(species.id, { bait, water });
+    return ka(rule.chance, 0) * ka(Sr(rule.mult)[grade], 0);
+  }
+  return bait === species.bait ? ka(baitRecord?.legendBiteChance, 1) : 0;
 }
 function G3(
   e,
@@ -105040,12 +105079,20 @@ function hF(
     Pt = U3(t, d),
     ht =
       !!_t &&
-      p === Pt &&
       (() => {
         let re = W3(t, _t);
         return (typeof t?.loopHours == "function" ? t.loopHours(re) : QA).includes(Se);
       })(),
-    legendShare = ht ? (V3(t, p)?.legendBiteChance ?? 1) : 0,
+    // Her chance per cast on this rig, by the same rule as the bite check (legendBaitChance).
+    legendShare = ht
+      ? legendBaitChance(W3(t, _t), {
+          bait: p,
+          lure: g,
+          onLead: sheetDepth === "lead",
+          water: d,
+          baitRecord: V3(t, p),
+        })
+      : 0,
     Ht =
       legendShare === 1
         ? {}
@@ -130279,12 +130326,24 @@ function Y0e(e) {
       At = Math.pow(Math.random(), Bt(Q.weightSkew, 1.6) / (1 + Se(I, "weightBias")));
     return Math.round((Pe + (Ke - Pe) * At) * 100) / 100;
   }
-  // Whether the lake's legend can take this cast (bait, hour, cooldown, place), before her own roll.
+  // The bait part of the legend's bite check for this cast (legendBaitChance): 0 when this rig never brings her.
+  function legendCastChance(legend, bait, onLead) {
+    return legend && bait
+      ? legendBaitChance(legend.species, {
+          bait,
+          lure: k(),
+          onLead: !!onLead,
+          water: Yt(),
+          baitRecord: D(bait),
+        })
+      : 0;
+  }
+  // Whether the lake's legend can take this cast by hour, cooldown and place. Her bait is checked apart
+  // (legendCastChance), and then her own roll.
   function legendMayTake(bn, At, Dt) {
     return (
       !!bn &&
       !!At &&
-      At === bn.baitId &&
       // Mossmere's legend takes only in her time after the midnight bell; every other legend keeps its hours.
       (xe() && bn.species?.id === MIDNIGHT.legend && h()?.zone === MIDNIGHT.water
         ? herTimeOpen(h())
@@ -130304,8 +130363,12 @@ function Y0e(e) {
       tn = Dt === "gloomtide",
       yn = le();
     (i.legendCast = !1), (i.taperRule = !1), (i.comeback = null);
-    let bn = We();
-    !nextFish && legendMayTake(bn, At, Dt) && (i.legendCast = rollLegendBite(D(At), lt));
+    let bn = We(),
+      legendChance = legendCastChance(bn, At, i.castLead);
+    !nextFish &&
+      legendChance > 0 &&
+      legendMayTake(bn, At, Dt) &&
+      (i.legendCast = rollLegendBite(legendChance, lt));
     let vn,
       qn = Lc() && !nextFish ? i.signHit?.rule : null;
     if (i.forceSpecies)
@@ -136425,6 +136488,17 @@ function Y0e(e) {
                 }
               : null,
           fishLinger: () => null,
+          // The bait part of the legend's bite check for a cast of this bait released now (on the Sounding Lead
+          // if it fishes), and n rolls of it on the fishing rng (fishSeed): { species, chance, onLead, hits }.
+          legendBite: ({ bait: Pe = null, n: I = 0 } = {}) => {
+            let bn = We();
+            if (!bn) return null;
+            let onLead = xe() && !k() && p(() => N()?.leadFishes?.()) === !0,
+              chance = legendCastChance(bn, Pe, onLead),
+              hits = 0;
+            for (let roll = 0; roll < Math.max(0, I | 0); roll++) rollLegendBite(chance, lt) && hits++;
+            return { species: bn.species.id, chance, onLead, hits };
+          },
           // With preroll { speciesId, base }: the odds as a cast on a sign or a sighted fish of that kind would roll.
           fishPoolRoll: (
             I = 1e3,
@@ -136469,7 +136543,7 @@ function Y0e(e) {
             }
           },
           // How a cast released now at `place` with `bait` would fare with the lake's legend: whether she may
-          // take (legendMayTake), and how many of `rolls` of her own bite roll would then bring her.
+          // take (her bait on this rig, then legendMayTake), and how many of `rolls` of her own roll bring her.
           fishLegendRoll: ({ place: Q = null, bait: Pe = null, rolls: Ke = 0 } = {}) => {
             if (!xe()) return null;
             let At = i.cast,
@@ -136479,11 +136553,13 @@ function Y0e(e) {
               let yn = P();
               i.cast = Ht(yn.x, yn.z, ye(yn.x, yn.z), Pe, !1);
               let bn = We(),
-                may = legendMayTake(bn, Pe, j()),
+                onLead = !k() && p(() => N()?.leadFishes?.()) === !0,
+                chance = legendCastChance(bn, Pe, onLead),
+                may = chance > 0 && legendMayTake(bn, Pe, j()),
                 takes = 0;
               if (may)
-                for (let roll = 0; roll < Math.max(0, Ke | 0); roll++) rollLegendBite(D(Pe), lt) && takes++;
-              return { place: i.cast.place?.id ?? null, mist: i.cast.mist || null, may, takes };
+                for (let roll = 0; roll < Math.max(0, Ke | 0); roll++) rollLegendBite(chance, lt) && takes++;
+              return { place: i.cast.place?.id ?? null, mist: i.cast.mist || null, may, takes, chance };
             } catch (yn) {
               return y(yn), null;
             } finally {
@@ -159735,10 +159811,13 @@ function khe(e, { metaLoop: t = null, run: n = null, line: o = null, canChange: 
       kind: "bait",
       head: r.bait,
       items: P,
-      // With a Live Minnow on, a line each on what it is good for and what it costs you, as the Depth row shows.
+      // With a Live Minnow or a Worm Bunch on, a line each on what it is good for and what it costs you, as the
+      // Depth row shows.
       ...(M === "live_minnow"
         ? { lines: [e?.TEXT_LOOP?.live?.good, e?.TEXT_LOOP?.live?.cost].filter(Boolean) }
-        : {}),
+        : M === "heartmoss"
+          ? { lines: [e?.TEXT_LOOP?.bunch?.good, e?.TEXT_LOOP?.bunch?.cost].filter(Boolean) }
+          : {}),
     });
   // The Depth part, once a second option (the Sounding Lead) is owned, in a water that fishes by depth. With a
   // lure on, the row says lures swim at their own depth instead of offering a choice.

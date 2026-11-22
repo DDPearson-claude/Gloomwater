@@ -435,12 +435,15 @@ function expectGuideHidden(guide) {
 }
 
 // Her odds row on the Odds sheet at home, for the Bell Pool (owned, its mist lifted) by day with the
-// Heartmoss Ball fitted: the place, light and bait she bites on today. Also the count of kinds not met.
+// Worm Bunch on the Sounding Lead (the lead given if the save has none): a place, light and rig she bites on
+// today. Also the count of kinds not met.
 async function bellPoolOdds(session) {
   const odds = await session.eval((id) => {
-    const loop = window.__gw.progression.loop;
+    const loop = window.__gw.progression.loop,
+      s = loop.state();
     loop.markLifted("bell_pool");
-    const fitted = loop.fit("bait", "heartmoss")?.ok === true;
+    s.parts.includes("sounding_lead") || s.parts.push("sounding_lead");
+    const fitted = loop.fit("bait", "heartmoss")?.ok === true && loop.fitDepth("lead")?.ok === true;
     const sheet = loop.sheet({ place: "bell_pool", light: "day" });
     return {
       fitted,
@@ -451,7 +454,7 @@ async function bellPoolOdds(session) {
   }, LEGEND_ID);
   check(
     odds.fitted && odds.place === "bell_pool",
-    `the Odds sheet is not on the Bell Pool with Heartmoss: ${JSON.stringify(odds)}`,
+    `the Odds sheet is not on the Bell Pool with the Worm Bunch on the lead: ${JSON.stringify(odds)}`,
   );
   return odds;
 }
@@ -682,6 +685,20 @@ async function catchCard(session, speciesId, z) {
   }
   throw new Error(`no catch card for ${speciesId}; ${JSON.stringify(await session.state())}`);
 }
+
+// ---- the Worm Bunch and what the thief takes (Mossmere gear, step 4) --------------------------------------
+
+const BUNCH = "heartmoss"; // the Worm Bunch keeps Heartmoss's id
+const BUNCH_LINE = "A fistful of worms on a big hook. Too much for little mouths.";
+const BUNCH_GOOD = "Good for: carp, suckers, crayfish and sturgeon.";
+const BUNCH_COST = "Costs you: small fish mostly leave it.";
+
+// The bait part of her bite check for a cast of `bait` released now, and `n` seeded rolls of it.
+const legendBite = (session, bait, n = 0) =>
+  session.eval(
+    ([bait, n]) => (window.__gw.debug.fishSeed(20261122), window.__gw.debug.legendBite({ bait, n })),
+    [bait, n],
+  );
 
 // ---- the scenarios --------------------------------------------------------------------------------------
 
@@ -1456,6 +1473,220 @@ const SCENARIOS = [
       return "no tin, no gift";
     },
   },
+  {
+    name: "worm bunch: Murk sells it at 20 clams for 10 with its new name and line, an old save's Heartmoss is the same count of Worm Bunch, and a cast spends one like any bait",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session, { fixture }) {
+      const held = fixture.meta.loop.bait.mossmere[BUNCH];
+      check(held > 0, "the fixture holds no Heartmoss, so the test proves nothing");
+      await session.toHome();
+      const shelf = await session.eval((id) => {
+        const loop = window.__gw.progression.loop,
+          tabs = loop.shelf().tabs,
+          card = tabs.flatMap((t) => t.items || []).filter((c) => c.baitId === id);
+        return {
+          cards: card.map((c) => ({ id: c.id, tab: c.tab, name: c.name, line: c.line, price: c.price })),
+          count: loop.state().bait.mossmere[id],
+          baitTab: (tabs.find((t) => t.id === "bait")?.items || []).map((c) => c.id),
+        };
+      }, BUNCH);
+      check(shelf.count === held, `the save holds ${shelf.count} Worm Bunch, the fixture ${held} Heartmoss`);
+      const [card] = shelf.cards;
+      check(shelf.cards.length === 1 && card.tab === "bait", `shelf cards: ${JSON.stringify(shelf)}`);
+      check(
+        card.name === "Worm Bunch" && card.line === BUNCH_LINE && card.price === 20,
+        `the shelf card: ${JSON.stringify(card)}`,
+      );
+      const bought = await session.eval((cardId) => {
+        const loop = window.__gw.progression.loop;
+        window.__gw.debug.loop.giveClams(100);
+        const before = loop.state().clams,
+          ok = loop.buy(cardId)?.ok === true;
+        return { ok, paid: before - loop.state().clams, count: loop.state().bait.mossmere.heartmoss };
+      }, card.id);
+      check(
+        bought.ok && bought.paid === 20 && bought.count === held + 10,
+        `buying a Worm Bunch: ${JSON.stringify(bought)}`,
+      );
+      // On the water: a cast spends one, as with Mire Worms, and an early reel-in gives it back.
+      await session.sail();
+      const cast = await session.eval((id) => {
+        const g = window.__gw,
+          run = g.state.run;
+        g.progression.loop.changeHook({ bait: id });
+        const before = run.bait[id],
+          spent = g.progression.consumeBait(),
+          after = run.bait[id],
+          refunded = g.progression.refundBait(id) === true;
+        return {
+          before,
+          spent,
+          after,
+          refunded,
+          back: run.bait[id],
+          legend: g.data.BAITS.find((b) => b.id === id),
+        };
+      }, BUNCH);
+      check(
+        cast.spent === BUNCH && cast.after === cast.before - 1,
+        `a cast did not spend one: ${JSON.stringify(cast)}`,
+      );
+      check(cast.refunded && cast.back === cast.before, `no refund: ${JSON.stringify(cast)}`);
+      check(
+        cast.legend.legend === false &&
+          !("consumeOnCast" in cast.legend) &&
+          !("legendBiteChance" in cast.legend) &&
+          cast.legend.name === "Worm Bunch",
+        `its record: ${JSON.stringify(cast.legend)}`,
+      );
+      return `${held} Heartmoss -> ${shelf.count} Worm Bunch; "${card.name}" at ${card.price}; ${cast.before} -> ${cast.after} on a cast, refunded`;
+    },
+  },
+
+  {
+    name: "worm bunch: who bites follows the Bunch column (no Dusk Minnow or Reedjaw Pike, carp and sturgeon yes), and the tackle screen shows its two lines",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session) {
+      await session.sail();
+      const rolls = await session.eval((id) => {
+        const d = window.__gw.debug,
+          out = {};
+        for (const light of ["calm", "gloomtide"]) {
+          d.setPhase(light);
+          out[light] = {
+            worm: d.fishPoolRoll(1, { bait: "mireworm" }).shares,
+            bunch: d.fishPoolRoll(1, { bait: id }).shares,
+            spanWorm: d.fishPoolRoll(1, { place: "under_the_span", bait: "mireworm" }).shares,
+            spanBunch: d.fishPoolRoll(1, { place: "under_the_span", bait: id }).shares,
+          };
+        }
+        return out;
+      }, BUNCH);
+      let wormSmall = 0;
+      for (const [light, r] of Object.entries(rolls)) {
+        for (const fish of ["dusk_minnow", "reedjaw_pike"]) {
+          wormSmall += r.worm[fish] > 0 ? 1 : 0;
+          check(!(r.bunch[fish] > 0), `${light}: ${fish} bites a Worm Bunch (${r.bunch[fish]})`);
+        }
+        check(r.bunch.weeping_carp > 0, `${light}: no Weeping Carp on a Worm Bunch`);
+        check(r.spanBunch.bridgechain_sturgeon > 0, `${light}: no Bridgechain Sturgeon on a Worm Bunch`);
+        check(
+          r.spanBunch.bridgechain_sturgeon > r.spanWorm.bridgechain_sturgeon,
+          `${light}: a sturgeon (grade 3) is no likelier on a Worm Bunch than on worms`,
+        );
+      }
+      check(wormSmall > 0, "neither small fish bites worms here, so the test proves nothing");
+      const row = await session.eval(async (id) => {
+        const loop = window.__gw.progression.loop;
+        const fit = loop.changeHook({ bait: id });
+        await window.__gw.ui.loop.tackle.openScreen({ from: "rack" });
+        await new Promise((r) => setTimeout(r, 800));
+        const el = document.querySelector('.gw-ts-row[data-row="bait"]');
+        const chip = el?.querySelector(`.gw-ts-chip[data-key="${id}"]`);
+        return {
+          fit: fit?.ok === true,
+          chip: chip ? chip.textContent.replace(/\s+/g, " ").trim() : null,
+          on: chip?.getAttribute("aria-pressed") === "true",
+          lines: [...(el?.querySelectorAll(".gw-ts-note") || [])].map((n) => n.textContent.trim()),
+        };
+      }, BUNCH);
+      await closeTackle(session);
+      check(row.fit && row.on && /Worm Bunch/.test(row.chip), `chip: ${JSON.stringify(row)}`);
+      check(JSON.stringify(row.lines) === JSON.stringify([BUNCH_GOOD, BUNCH_COST]), `lines: ${row.lines}`);
+      return `carp ${rolls.calm.bunch.weeping_carp.toFixed(3)}, sturgeon ${rolls.calm.spanWorm.bridgechain_sturgeon.toFixed(3)} -> ${rolls.calm.spanBunch.bridgechain_sturgeon.toFixed(3)}; no minnow or pike; chip "${row.chip}"`;
+    },
+  },
+
+  {
+    name: "the thief's bait: on the lead a Live Minnow gives her 1 in 3 and a Worm Bunch 1 in 6; never on the Cork Float, under a lure or on any other bait; the Odds sheet agrees",
+    fixture: "legend-sold",
+    debug: true,
+    editSave: withLead(true),
+    async run(session) {
+      await session.sail();
+      const N = 6000;
+      await session.eval(() => (window.__gw.state.run.bait.live_minnow = 2));
+      const live = await legendBite(session, "live_minnow", N),
+        bunch = await legendBite(session, BUNCH, N);
+      check(
+        live.species === LEGEND_ID && live.onLead,
+        `not her, or not on the lead: ${JSON.stringify(live)}`,
+      );
+      check(near(live.chance, 1 / 3, 1e-12), `Live Minnow on the lead: ${live.chance}`);
+      check(near(bunch.chance, 1 / 6, 1e-12), `Worm Bunch on the lead: ${bunch.chance}`);
+      // The seeded rolls land near their chance (about five standard deviations).
+      check(Math.abs(live.hits - N / 3) < 5 * Math.sqrt((N * 2) / 9), `live hits ${live.hits} of ${N}`);
+      check(Math.abs(bunch.hits - N / 6) < 5 * Math.sqrt((N * 5) / 36), `bunch hits ${bunch.hits} of ${N}`);
+      for (const bait of ["mireworm", "lumen_moss", "cut_strip", "bare", null]) {
+        const r = await legendBite(session, bait, 200);
+        check(r.chance === 0 && r.hits === 0, `${bait} on the lead: ${JSON.stringify(r)}`);
+      }
+      // On the Cork Float, and under a lure with the lead still fitted.
+      await session.eval(() => window.__gw.progression.loop.fitDepth("float"));
+      for (const bait of ["live_minnow", BUNCH]) {
+        const r = await legendBite(session, bait, 200);
+        check(!r.onLead && r.chance === 0 && r.hits === 0, `${bait} on the float: ${JSON.stringify(r)}`);
+      }
+      await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        loop.fitDepth("lead");
+        loop.state().lures.includes("feather_fly") || loop.state().lures.push("feather_fly");
+        loop.changeHook({ lure: "feather_fly" });
+      });
+      for (const bait of ["live_minnow", BUNCH]) {
+        const r = await legendBite(session, bait, 200);
+        check(r.chance === 0 && r.hits === 0, `${bait} under a lure: ${JSON.stringify(r)}`);
+      }
+      // The Odds sheet (she has been landed, so she has a row) reads the same rule: the Bell Pool by day.
+      const sheet = await session.eval((id) => {
+        const loop = window.__gw.progression.loop,
+          share = (bait, depth) => {
+            loop.changeHook({ lure: null, bait });
+            loop.fitDepth(depth);
+            return (
+              loop.sheet({ place: "bell_pool", light: "day" })?.odds?.rows?.find((r) => r.id === id)?.share ??
+              0
+            );
+          };
+        loop.markLifted("bell_pool");
+        return {
+          live: share("live_minnow", "lead"),
+          bunch: share("heartmoss", "lead"),
+          worm: share("mireworm", "lead"),
+          bunchFloat: share("heartmoss", "float"),
+        };
+      }, LEGEND_ID);
+      check(
+        near(sheet.live, 1 / 3, 1e-9) &&
+          near(sheet.bunch, 1 / 6, 1e-9) &&
+          sheet.worm === 0 &&
+          sheet.bunchFloat === 0,
+        `her Odds row: ${JSON.stringify(sheet)}`,
+      );
+      return `live ${live.hits}/${N}, bunch ${bunch.hits}/${N}; float, lure and other baits 0; Odds ${sheet.live.toFixed(4)} and ${sheet.bunch.toFixed(4)}`;
+    },
+  },
+
+  {
+    name: "the thief's bait: Sporewood's legend still takes only its Glowcap Bulb, every time, lead or not",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withLead(true),
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      const bulb = await legendBite(session, "glowcap_bulb", 50),
+        cake = await legendBite(session, "spore_cake", 50);
+      check(
+        bulb.species === "drifting_grove" && bulb.chance === 1 && bulb.hits === 50,
+        `the bulb: ${JSON.stringify(bulb)}`,
+      );
+      check(cake.chance === 0 && cake.hits === 0, `Spore Cake: ${JSON.stringify(cake)}`);
+      return `bulb ${bulb.hits}/50, cake 0`;
+    },
+  },
+
   ...FIXTURE_NAMES.map((name) => ({
     name: `${name} loads and reaches play without errors`,
     fixture: name,
@@ -1712,7 +1943,7 @@ const SCENARIOS = [
       );
       await expectHidden(session, "the journal opened at her page", seen);
       await backToJetty(session);
-      // With the Bell Pool bought and the Heartmoss Ball fitted she can bite, but the Odds sheet has no row
+      // With the Bell Pool bought and the Worm Bunch on the lead she can bite, but the Odds sheet has no row
       // for her: she counts as a kind not met.
       check(
         await session.eval(() => window.__gw.progression.loop.buy("place:bell_pool")?.ok === true),
@@ -1729,7 +1960,7 @@ const SCENARIOS = [
       await session.pause(300);
       await clickAll(session, '[data-hour="day"]', 0);
       await session.pause(500);
-      await expectHidden(session, "odds sheet, bell_pool day, Heartmoss Ball", seen);
+      await expectHidden(session, "odds sheet, bell_pool day, Worm Bunch on the lead", seen);
       return `${seen.length} screens; Bell Pool card plain; odds: ${odds.unmet} not met, no row`;
     },
   },
@@ -2049,6 +2280,15 @@ const SCENARIOS = [
         where.includes("Feeds just after the old bell strikes midnight") && !/calm/i.test(where),
         `her Journal page's feeding line: "${where}"`,
       );
+      // She takes only a bait laid on the bottom: the Worm Bunch on the Sounding Lead, at 1 in 6.
+      const rigged = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          s = loop.state();
+        s.parts.includes("sounding_lead") || s.parts.push("sounding_lead");
+        s.bait.mossmere.heartmoss = Math.max(5, s.bait.mossmere.heartmoss | 0);
+        return loop.fit("bait", "heartmoss")?.ok === true && loop.fitDepth("lead")?.ok === true;
+      });
+      check(rigged, "could not fit the Worm Bunch on the Sounding Lead");
       await session.sail();
       await listenForToasts(session);
       const roll = () =>
@@ -2101,8 +2341,8 @@ const SCENARIOS = [
         );
       for (const key of ["firstStroke", "lateInHerTime", "openAgain"]) {
         const takes = seen[key].takes;
-        // Her own roll is unchanged: Heartmoss at 0.12 a cast, so about 48 of 400.
-        check(seen[key].may === true && takes >= 20 && takes <= 85, `${key}: ${JSON.stringify(seen[key])}`);
+        // Her own roll: the Worm Bunch on the lead at 1 in 6, so about 67 of 400.
+        check(seen[key].may === true && takes >= 40 && takes <= 95, `${key}: ${JSON.stringify(seen[key])}`);
       }
       return `closed by day, dusk, before the bell, after 3 min, on evening 1 and once hooked; open in her time (${seen.firstStroke.takes}/400, ${seen.lateInHerTime.takes}/400); still line once; Journal "${where}"`;
     },

@@ -68,7 +68,7 @@ const FIXTURES = [
       await evening(session, ["milkeye_perch", "kissmark_trout", "rustfin_sucker", "reedjaw_pike"]);
       const { clams } = await session.loopSummary();
       if (clams < 160) await giveClams(session, 160 - clams);
-      for (const id of ["place:lily_maze", "bait:heartmoss", "tin:lumen_moss"])
+      for (const id of ["place:lily_maze", "tin:heartmoss", "tin:lumen_moss"])
         log(`  buy ${id}: ${await buy(session, id)}`);
       // The Lily Maze lifts out of the mist at this set-out.
       await evening(session, ["candlefin_koi", "dusk_minnow"], {
@@ -83,7 +83,7 @@ const FIXTURES = [
       await giveClams(session, 2000);
       for (const id of ["place:under_the_span", "place:buoy_lights", "place:bell_pool"])
         log(`  buy ${id}: ${await buy(session, id)}`);
-      // At the Bell Pool with the Heartmoss Ball on, the legend is landed, kept and sold at the tally.
+      // At the Bell Pool with the Worm Bunch (id heartmoss) on, the legend is landed, kept and sold at the tally.
       await evening(session, ["belled_matriarch"], {
         before: async () => {
           await session.eval(() => window.__gw.debug.loop.at("bell_pool"));
