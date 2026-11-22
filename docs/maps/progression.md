@@ -242,9 +242,9 @@ On every load:
 ### 6a. The title
 
 The loop branch is `if (B())` in the title builder (`B = () => d().LOOP_ENABLED === !0`, L165773). It removes the tagline, premise and meta lines.
-- **Fresh save** (`loopFresh()` = `JP(meta, hasSavedRun)`: no `loop.wick`, no `tutorial` and `evenings == 0`): buttons **"New Descent"** and **"Settings"** (`function OV(`, L161468).
+- **Fresh save** (`loopFresh()` = `JP(meta, hasSavedRun)`: no `loop.wick`, no `tutorial` and `evenings == 0`): buttons **"New Game"** and **"Settings"** (`function OV(`, L161468).
 - **Otherwise:** **"Continue"** (continues the saved trip, or goes `toHome`) and "Settings", plus "Prologue" when an intro replay is offered.
-- In loop mode **there is no New Descent on a used save**. The only restart is Settings → forget (`Ca.forget.row: "Clams, gear, the Journal. There is no undo."`) → `Ba.wipeAll()` (L168882, L173328).
+- In loop mode **there is no New Game on a used save**. The only restart is Settings → Erase everything (`Ca.forget.row: "This erases your clams, gear and Journal for good."`) → `Ba.wipeAll()` (L168882, L173328).
 - The legacy branch below it (Continue, New Descent, Journal, Shrine, Trials) does not run in loop mode. [read, ran: flow `title`, `fresh: true`]
 
 ### 6b. Character select

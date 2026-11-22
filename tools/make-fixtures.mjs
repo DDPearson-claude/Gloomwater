@@ -56,7 +56,7 @@ const FIXTURES = [
     name: "fresh-first-evening",
     from: null,
     async play(session) {
-      // New Descent as Tallow, the opening tow, then the first evening: two fish kept and sold.
+      // New Game as Tallow, the opening tow, then the first evening: two fish kept and sold.
       await evening(session, ["dusk_minnow", "mossback_perch"]);
     },
   },

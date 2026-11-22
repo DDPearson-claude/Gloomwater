@@ -145,12 +145,12 @@ export class GameSession {
   // (the call the Settings menu makes; it is not saved).
   async boot() {
     await this.waitFor(
-      'the title screen with "New Descent" or "Continue"',
+      'the title screen with "New Game" or "Continue"',
       90_000,
       () =>
         window.__gw?.flow === "title" &&
         [...document.querySelectorAll("button")].some((b) =>
-          /^(New Descent|Continue)$/.test(b.textContent.trim()),
+          /^(New Game|Continue)$/.test(b.textContent.trim()),
         ),
     );
     await this.eval(() => window.__gw.render.setQuality("low"));
@@ -169,7 +169,7 @@ export class GameSession {
   }
 
   // From the title (fresh or saved profile) or home, does what a player would on each screen until the
-  // raft is on the water: New Descent and a Wick on a fresh profile, Continue on a saved one, the intro
+  // raft is on the water: New Game and a Wick on a fresh profile, Continue on a saved one, the intro
   // skipped, the tow tapped through, the guide cards closed, the chart opened and Sail.
   // With `water`, that water's row is picked on the chart before Sail (a tow follows if the barge is elsewhere).
   async sail({ wick = "Tallow", water = null, timeoutMs = 90_000 } = {}) {
@@ -193,7 +193,7 @@ export class GameSession {
           if (card && button("Start")) return button("Start").click(), "start";
           if (g.flow === "title") {
             if (button("Continue")) return button("Continue").click(), "continue";
-            if (button("New Descent")) return button("New Descent").click(), "new descent";
+            if (button("New Game")) return button("New Game").click(), "new game";
             return "wait";
           }
           if (g.flow === "intro") {

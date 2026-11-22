@@ -47043,7 +47043,7 @@ var pP = {
       legendFirst: "Her. You brought me her. Sit down, I'll count it twice.",
       listComplete: "Every fish in this water. I'll write that down.",
     },
-    newDescent: "New Descent",
+    newDescent: "New Game",
     start: "Start",
     back: "Back",
     passives: {
@@ -47065,10 +47065,10 @@ var pP = {
     settings: {
       label: "Settings",
       ringFirst: "First evening",
-      hurry: "From your second evening, press anywhere to hurry a small fish in.",
+      hurry: "From your second evening, hold anywhere to hurry in the smaller fish.",
     },
     forget: {
-      row: "Clams, gear, the Journal. There is no undo.",
+      row: "This erases your clams, gear and Journal for good.",
       confirm: "Every clam, every piece of gear and every name in the Journal will be lost.",
     },
   };
@@ -161537,8 +161537,8 @@ function OV({ fresh: e = !1, replay: t = !1, D: n = null } = {}) {
   if (e)
     return {
       fresh: !0,
-      primary: o.newDescent || "New Descent",
-      words: [o.newDescent || "New Descent", a],
+      primary: o.newDescent || "New Game",
+      words: [o.newDescent || "New Game", a],
       prologue: !1,
     };
   let s = [o.continue || "Continue", a],
@@ -168921,27 +168921,27 @@ function YV(e) {
               "favourDetails",
               "Favour details",
               !1,
-              "Always list what the water favours beside the float, not only on a long press",
+              "Always show what helps your bites beside the float. When this is off, press the dots to see it.",
             ),
           ),
           we && c(() => e.loop?.guide?.settingsRows?.(st, te), null),
-          st.insertAdjacentHTML("beforeend", '<div class="gw-group">The Long Dark</div>');
+          st.insertAdjacentHTML("beforeend", '<div class="gw-group">Saved game</div>');
         let Ue = n("div", "gw-set-row");
         if (
-          ((Ue.innerHTML = `<span class="gw-set-label">Forget everything<small>${we ? o(we.forgetRow) : "Memories, relics, trials, the Journal. There is no undo."}</small></span>`),
+          ((Ue.innerHTML = `<span class="gw-set-label">Erase everything<small>${we ? o(we.forgetRow) : "Memories, relics, trials, the Journal. There is no undo."}</small></span>`),
           Ue.appendChild(
             b("Erase", {
               cls: "gw-btn--danger gw-btn--sm",
               onClick: () =>
-                Ne("Forget everything?", {
+                Ne("Erase everything?", {
                   sub: we
                     ? o(we.forgetConfirm)
                     : "Every Memory, relic, trial and name in the Journal will be lost.",
-                  yes: "Forget",
+                  yes: "Erase",
                   danger: !0,
                   onYes: () =>
-                    Ne("Truly?", {
-                      sub: "The water will not remember you.",
+                    Ne("Are you sure?", {
+                      sub: "Your game starts over.",
                       yes: "Erase it all",
                       danger: !0,
                       onYes: () => {

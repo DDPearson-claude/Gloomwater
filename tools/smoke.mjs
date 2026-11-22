@@ -4,7 +4,7 @@
 // It plays the opening of a fresh game the way a player would and fails on the first problem:
 //   1. boot from file:// to the title, with no console error and no uncaught page error;
 //   2. the game canvas is a live WebGL2 context and the title scene renders real pixels;
-//   3. "New Descent" opens the Wick picker with the five Wicks; pick one; "Start";
+//   3. "New Game" opens the Wick picker with the five Wicks; pick one; "Start";
 //   4. skip the intro, tap through the opening tow, close the guide cards, open the chart and "Sail";
 //   5. on the water: flow "playing", a trip is running, the save records the chosen Wick, the lake renders;
 //   6. one cast with the mouse (press on the water, hold, let go) until the float is in the water.
@@ -242,12 +242,12 @@ async function main() {
     await page.goto(pathToFileURL(PAGE).href, { waitUntil: "domcontentloaded", timeout: 30_000 });
     await waitFor(
       page,
-      'the title screen with "New Descent"',
+      'the title screen with "New Game"',
       60_000,
       () =>
         !!window.__gw &&
         window.__gw.flow === "title" &&
-        [...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "New Descent"),
+        [...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "New Game"),
     );
     await page.evaluate(IN_PAGE_HELPERS);
     const fresh = await page.evaluate(() => localStorage.getItem("gloomwater.save.v1"));
@@ -267,9 +267,9 @@ async function main() {
       );
   });
 
-  await step('"New Descent" opens the Wick picker', async () => {
-    if (!(await page.evaluate(() => window.__smoke.press(window.__smoke.button("New Descent")))))
-      fail('no "New Descent" button');
+  await step('"New Game" opens the Wick picker', async () => {
+    if (!(await page.evaluate(() => window.__smoke.press(window.__smoke.button("New Game")))))
+      fail('no "New Game" button');
     await waitFor(
       page,
       "the five Wick cards",
