@@ -588,7 +588,10 @@ const withLead =
 const leadRecord = (session) =>
   session.eval(() => {
     const s = window.__gw.progression.loop.state();
-    return { parts: [...(s.parts ?? [])], depth: s.fitted?.depth ?? null, gift: s.lastTrip?.gift ?? null };
+    // The Plain Knot and the Mere Hook are everyone's from the start (mossmere-gear-deeper.md B4): left out here,
+    // where the Depth scenarios read the parts that are given.
+    const given = (s.parts ?? []).filter((id) => id !== "plain_knot" && id !== "mere_hook");
+    return { parts: given, depth: s.fitted?.depth ?? null, gift: s.lastTrip?.gift ?? null };
   });
 
 // Goes home and reads Murk's tally once it has counted (the gift block's text, if any), then closes it.
@@ -977,6 +980,87 @@ async function hookNear(session, speciesId, spot, outcome, then = async () => {}
     return { ...result, thiefAt, offset };
   }
   throw new Error(`a find came up on every hook of ${speciesId}`);
+}
+
+// ---- the Leader and the Hook for ordinary fish (mossmere-gear-deeper.md, gear step 3a) ---------------------
+
+const HOOK_LINE = "Carp grab and run. There's a hook on the shelf that sets itself.";
+const LEADERS_LINE = "Hob gave you his old line end? Leaders are on the shelf now.";
+const WARY = ["likely_chub", "kissmark_trout", "rosefleck_trout", "milkeye_perch"];
+const DELICATE = ["dusk_minnow", "lampsipper", "rainglass_darter"];
+const LOSS_TEETH = "Bitten through. Pike Wire stops teeth.";
+const LOSS_LIPS = "Worn through on its lips. Chafe Gut won't wear.";
+const LOSS_RAN = "It ran before the hook was set. A Turnback Hook sets itself.";
+
+// Gives a save rig parts as if bought (on top of whatever the loader adds), the Feather Fly for lure casts, and
+// optionally fits parts.
+const withParts =
+  (parts, fitted = {}) =>
+  (save) => {
+    const loop = save.meta.loop;
+    loop.parts = [...new Set([...(loop.parts || ["cork_float"]), ...parts])];
+    loop.lures = [...new Set([...(loop.lures || []), "feather_fly"])];
+    loop.fitted = { ...loop.fitted, ...fitted };
+  };
+
+// One roll of the game's own odds for each leader in turn (fishPoolRoll), then the Plain Knot back on.
+const rollLeaders = (session, leaders, roll = {}) =>
+  session.eval(
+    ([leaders, roll]) => {
+      const loop = window.__gw.progression.loop,
+        d = window.__gw.debug,
+        out = {};
+      for (const id of leaders) {
+        loop.fitPart("leader", id);
+        out[id] = d.fishPoolRoll(1, roll);
+      }
+      loop.fitPart("leader", "plain_knot");
+      return out;
+    },
+    [leaders, roll],
+  );
+
+// Hooks a small fish of this kind (well inside the gear's limits) through the debug hooks, forces it to get away,
+// plays the fight out and returns the fish:escaped event.
+async function loseSmallFish(session, speciesId) {
+  const ok = await session.eval((id) => {
+    const g = window.__gw;
+    window.__lost = null;
+    window.__lostListen ||
+      ((window.__lostListen = true),
+      g.bus.on("fish:escaped", (e) => (window.__lost = JSON.parse(JSON.stringify(e)))));
+    g.debug.fishOutcome("lose");
+    const hooked = g.debug.fishHook(id, { z: -0.5 });
+    hooked && g.debug.fishPlayTo(0.995);
+    return hooked;
+  }, speciesId);
+  check(ok, `could not hook ${speciesId}: ${JSON.stringify(await session.state())}`);
+  const end = Date.now() + 150_000;
+  while (Date.now() < end) {
+    const lost = await session.eval(() => window.__lost);
+    if (lost) return await session.eval(() => (window.__gw.debug.fishOutcome(null), window.__lost));
+    await session.clickButton(/^Got it$/);
+    await session.pause(400);
+  }
+  throw new Error(`the ${speciesId} did not get away; ${JSON.stringify(await session.state())}`);
+}
+
+// A tackle screen row ("leader", "hook"): { chips: [{ key, on }], lines } or null when there is none.
+async function partRow(session, kind) {
+  await session.eval(() => window.__gw.ui.loop.tackle.openScreen({ from: "rack" }));
+  await session.pause(800);
+  return session.eval((kind) => {
+    const el = document.querySelector(`.gw-ts-row[data-row="${kind}"]`);
+    return el
+      ? {
+          chips: [...el.querySelectorAll(".gw-ts-chip")].map((c) => ({
+            key: c.dataset.key,
+            on: c.getAttribute("aria-pressed") === "true",
+          })),
+          lines: [...el.querySelectorAll(".gw-ts-note")].map((n) => n.textContent.trim()),
+        }
+      : null;
+  }, kind);
 }
 
 const SCENARIOS = [
@@ -3141,6 +3225,487 @@ const SCENARIOS = [
       const record = await huntOf(session);
       check(record.nudged.midnight === 5 && record.nudged.boils === 6, JSON.stringify(record.nudged));
       return "Murk's midnight line at evening 5, his boils line at evening 6";
+    },
+  },
+
+  {
+    name: "leader: Pike Wire and Chafe Gut shift bites by their tags in all three bite paths, on bait and on lures, never to zero, and add Grip to toothy and rough fish",
+    fixture: "legend-sold",
+    debug: true,
+    editSave: withParts(["sounding_lead", "pike_wire", "chafe_gut"]),
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      const ratioCheck = (rolls, leader, want, label) => {
+        const plain = rolls.plain_knot.shares,
+          on = rolls[leader].shares,
+          base = on.mossback_perch / plain.mossback_perch;
+        check(plain.mossback_perch > 0, `${label}: no Mossback Perch to compare against`);
+        let moved = 0;
+        for (const id of Object.keys(plain).filter((id) => plain[id] > 0)) {
+          check(on[id] > 0, `${label}: ${id} bites on the Plain Knot but not on ${leader}`);
+          const ratio = on[id] / plain[id] / base,
+            expect = want(id);
+          check(
+            near(ratio, expect, 1e-6),
+            `${label}: ${id} ${ratio.toFixed(4)} times as often, expected ${expect}`,
+          );
+          expect !== 1 && moved++;
+        }
+        check(moved > 0, `${label}: no tagged fish here, so this proves nothing`);
+        return moved;
+      };
+      // 1. Pool rows (l1), bait: wary fish x0.7 on Pike Wire, delicate x0.7 on Chafe Gut, the rest unchanged.
+      await session.eval(() => window.__gw.debug.setPhase("calm"));
+      const bait = await rollLeaders(session, ["plain_knot", "pike_wire", "chafe_gut"], { bait: "mireworm" });
+      check(
+        bait.pike_wire.leader === "pike_wire" && bait.plain_knot.leader === null,
+        "the leader did not fish",
+      );
+      const wary = ratioCheck(bait, "pike_wire", (id) => (WARY.includes(id) ? 0.7 : 1), "bait, Pike Wire");
+      const dainty = ratioCheck(
+        bait,
+        "chafe_gut",
+        (id) => (DELICATE.includes(id) ? 0.7 : 1),
+        "bait, Chafe Gut",
+      );
+      // On the Sounding Lead too: a Dusk Minnow (a high feeder, x0.5) on Chafe Gut (x0.7) is at the 0.35 floor.
+      const lead = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          d = window.__gw.debug;
+        loop.fitDepth("lead");
+        const roll = (id) => (loop.fitPart("leader", id), d.fishPoolRoll(1, { bait: "mireworm" }).shares);
+        const out = { plain: roll("plain_knot"), gut: roll("chafe_gut") };
+        loop.fitPart("leader", "plain_knot");
+        loop.fitDepth("float");
+        return out;
+      });
+      const leadRatio =
+        lead.gut.dusk_minnow / lead.plain.dusk_minnow / (lead.gut.mossback_perch / lead.plain.mossback_perch);
+      check(
+        near(leadRatio, 0.7, 1e-6) && lead.gut.dusk_minnow > 0,
+        `the lead and Chafe Gut on a Dusk Minnow: ${leadRatio}`,
+      );
+      // 2. Sign and sight takes (_7): a prerolled chub takes 0.7 times as surely on wire; on the lead with Chafe Gut a
+      // Dusk Minnow takes at 0.35 of its float chance, never 0.
+      const takes = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          d = window.__gw.debug,
+          take = (sp, base) =>
+            d.fishPoolRoll(1, { bait: "mireworm", preroll: { speciesId: sp, base } }).preroll;
+        const chubPlain = take("likely_chub", 0.45);
+        loop.fitPart("leader", "pike_wire");
+        const chubWire = take("likely_chub", 0.45);
+        const perchWire = take("mossback_perch", 0.45);
+        loop.fitPart("leader", "plain_knot");
+        const perchPlain = take("mossback_perch", 0.45);
+        const minnowFloat = take("dusk_minnow", 0.45);
+        loop.fitDepth("lead");
+        loop.fitPart("leader", "chafe_gut");
+        const minnowFloor = take("dusk_minnow", 0.45);
+        loop.fitPart("leader", "plain_knot");
+        loop.fitDepth("float");
+        return { chubPlain, chubWire, perchPlain, perchWire, minnowFloat, minnowFloor };
+      });
+      check(
+        near(takes.chubWire, takes.chubPlain * 0.7, 1e-9),
+        `chub take ${takes.chubPlain} -> ${takes.chubWire}`,
+      );
+      check(
+        takes.perchPlain > 0 && near(takes.perchWire, takes.perchPlain, 1e-9),
+        `an untagged perch's take moved: ${JSON.stringify(takes)}`,
+      );
+      check(
+        takes.minnowFloor > 0 && near(takes.minnowFloor, takes.minnowFloat * 0.35, 1e-9),
+        `minnow take on the lead and gut ${takes.minnowFloor}, float ${takes.minnowFloat}`,
+      );
+      // 3. Guests (P7): the Veil Notebook's Rosefleck Trout (wary) at the inflow by day bites 0.7 times as often.
+      await session.eval(() => {
+        window.__gw.progression.loop.state().finds.got.veil_notebook = 1;
+        window.__gw.player.teleport({ x: 54, z: 4 }, 0);
+      });
+      await session.pause(1500);
+      const guest = await rollLeaders(session, ["plain_knot", "pike_wire"], { bait: "mireworm" });
+      const odds = (p) => p / (1 - p),
+        g0 = guest.plain_knot.shares.rosefleck_trout,
+        g1 = guest.pike_wire.shares.rosefleck_trout;
+      check(g0 > 0, `no Rosefleck Trout guest at ${guest.plain_knot.area}`);
+      check(near(odds(g1), 0.7 * odds(g0), 1e-9), `guest share ${g0} -> ${g1}, expected odds x0.7`);
+      // 4. A lure cast: the leader still counts.
+      const lure = await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        window.__gw.player.teleport({ x: 0, z: 30 }, 0);
+        loop.changeHook({ lure: "feather_fly" });
+        return true;
+      });
+      await session.pause(1500);
+      const lureRolls = await rollLeaders(session, ["plain_knot", "pike_wire"], {});
+      await session.eval(() => window.__gw.progression.loop.changeHook({ lure: null, bait: "mireworm" }));
+      check(lure && lureRolls.pike_wire.leader === "pike_wire", "no leader on the lure cast");
+      const onLure = ratioCheck(
+        lureRolls,
+        "pike_wire",
+        (id) => (WARY.includes(id) ? 0.7 : 1),
+        "lure, Pike Wire",
+      );
+      // 5. Grip when landing: +4 for toothy fish on wire and rough mouths on gut, nothing else, never for her.
+      const grip = await session.eval(() => {
+        const parts = (id, leader) =>
+          window.__gw.data.catchParts(
+            id,
+            "keeper",
+            { hold: { rod: 5, line: 5, reel: 5 } },
+            { strike: "clean", lake: "mossmere", leader },
+          );
+        const gain = (id, leader) => parts(id, leader).hold - parts(id, null).hold;
+        const her = (leader) =>
+          window.__gw.data.catchParts(
+            "belled_matriarch",
+            "legend",
+            { hold: { rod: 5, line: 5, reel: 5 } },
+            { strike: "clean", leader },
+          ).hold;
+        return {
+          pikeWire: gain("reedjaw_pike", "pike_wire"),
+          milkeyeWire: gain("milkeye_perch", "pike_wire"),
+          carpGut: gain("weeping_carp", "chafe_gut"),
+          carpWire: gain("weeping_carp", "pike_wire"),
+          perchWire: gain("mossback_perch", "pike_wire"),
+          pikeP: [parts("reedjaw_pike", null).p, parts("reedjaw_pike", "pike_wire").p],
+          her: her("chafe_gut") - her(null),
+        };
+      });
+      check(
+        grip.pikeWire === 4 &&
+          grip.milkeyeWire === 4 &&
+          grip.carpGut === 4 &&
+          grip.carpWire === 0 &&
+          grip.perchWire === 0 &&
+          grip.her === 0,
+        `Grip: ${JSON.stringify(grip)}`,
+      );
+      check(grip.pikeP[1] > grip.pikeP[0], `a pike lands no more often on wire: ${grip.pikeP}`);
+      return `bait: ${wary} wary and ${dainty} dainty kinds x0.7; lead floor 0.35; takes ${takes.chubPlain} -> ${takes.chubWire}; guest odds x0.7; lure ${onLure} kinds; Grip +4`;
+    },
+  },
+
+  {
+    name: "hook: on the Turnback Hook a self-setter's struck strike is clean (a hard take too) and a quick nibbler's clean is struck, on bait only",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withParts(["turnback_hook"], { hook: "turnback_hook" }),
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      const grades = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          d = window.__gw.debug,
+          set = (grade, speciesId) => d.fishHookSet({ grade, speciesId });
+        const out = {
+          carpStruck: set("struck", "weeping_carp"),
+          pikeStruck: set("struck", "reedjaw_pike"),
+          carpClean: set("clean", "weeping_carp"),
+          carpEarly: set("early", "weeping_carp"),
+          chubClean: set("clean", "likely_chub"),
+          chubStruck: set("struck", "likely_chub"),
+          perchStruck: set("struck", "mossback_perch"),
+          perchClean: set("clean", "mossback_perch"),
+        };
+        loop.fitPart("hook", "mere_hook");
+        out.mereCarp = set("struck", "weeping_carp");
+        out.mereChub = set("clean", "likely_chub");
+        loop.fitPart("hook", "turnback_hook");
+        loop.changeHook({ lure: "feather_fly" });
+        out.lureCarp = set("struck", "weeping_carp");
+        out.lureChub = set("clean", "likely_chub");
+        loop.changeHook({ lure: null, bait: "mireworm" });
+        return out;
+      });
+      const want = {
+        carpStruck: ["clean", "turnback_hook"],
+        pikeStruck: ["clean", "turnback_hook"],
+        carpClean: ["clean", "turnback_hook"],
+        carpEarly: ["early", "turnback_hook"],
+        chubClean: ["struck", "turnback_hook"],
+        chubStruck: ["struck", "turnback_hook"],
+        perchStruck: ["struck", "turnback_hook"],
+        perchClean: ["clean", "turnback_hook"],
+        mereCarp: ["struck", null],
+        mereChub: ["clean", null],
+        lureCarp: ["struck", null],
+        lureChub: ["clean", null],
+      };
+      for (const [k, [grade, hook]] of Object.entries(want))
+        check(
+          grades[k]?.grade === grade && grades[k]?.hook === hook,
+          `${k}: ${JSON.stringify(grades[k])}, expected ${grade} on ${hook}`,
+        );
+      // At the real strike: the debug hook strikes "struck", as a hard take does (Nn("struck", null, true)). On the
+      // Turnback Hook a carp's strike becomes clean, with the word "Set itself".
+      await session.eval(() => {
+        window.__setItself = 0;
+        window.__gw.bus.on("fishing:setItself", () => window.__setItself++);
+      });
+      const carp = await loseSmallFish(session, "weeping_carp");
+      const seen = await session.eval(() => window.__setItself);
+      check(
+        carp?.grade === "clean" && seen === 1,
+        `the carp on the Turnback: ${JSON.stringify({ grade: carp?.grade, seen })}`,
+      );
+      return `struck -> clean for carp and pike, clean -> struck for chub, nothing on the Mere Hook or a lure; a real carp strike clean`;
+    },
+  },
+
+  {
+    name: "tackle arrival: one piece a tally, the hook after its beat or on a quiet tally after the tin, the leaders after Hob's map and never Chafe Gut sooner, Pike Wire alone after a first pike",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session) {
+      await session.boot();
+      const r = await session.eval(() => {
+        const g = window.__gw.data,
+          arrive = g.rigArrivalAtTally,
+          beat = g.noteArrivalBeat,
+          loop = (parts = ["cork_float", "plain_knot", "mere_hook"], map = 0) => ({
+            parts: [...parts],
+            arrivals: { seq: 0, beats: { turnback_hook: 0, pike_wire: 0, leaders: 0 }, shelved: [] },
+            hunt: { mossmere: { sketches: { map } } },
+          }),
+          tallies = (l, n, water = "mossmere") => Array.from({ length: n }, () => arrive(l, water));
+        const out = {};
+        // Nothing due and no tin yet: nothing. With the tin: the hook on the next quiet tally, then nothing.
+        out.noTin = tallies(loop(), 2);
+        let l = loop(["cork_float", "plain_knot", "mere_hook", "sounding_lead", "minnow_tin"]);
+        out.quiet = tallies(l, 2);
+        // A carp ran (the hook's beat) before Hob's map: the hook, then the leaders.
+        l = loop();
+        beat(l, "turnback_hook");
+        l.hunt.mossmere.sketches.map = 3;
+        out.hookThenLeaders = tallies(l, 3);
+        // The map first, then a pike: both leaders together, and no Pike Wire alone after.
+        l = loop();
+        l.hunt.mossmere.sketches.map = 2;
+        out.mapFirst = arrive(l, "mossmere");
+        beat(l, "pike_wire");
+        out.afterMap = arrive(l, "mossmere");
+        out.mapShelf = [...l.arrivals.shelved];
+        // A pike first: Pike Wire alone, and Chafe Gut only after the map, named alone.
+        l = loop();
+        beat(l, "pike_wire");
+        out.pikeAlone = tallies(l, 3);
+        out.gutWaits = l.arrivals.shelved.includes("chafe_gut");
+        l.hunt.mossmere.sketches.map = 5;
+        out.gutAfterMap = arrive(l, "mossmere");
+        // A tie goes to the hook.
+        l = loop();
+        l.arrivals.beats = { turnback_hook: 4, pike_wire: 4, leaders: 4 };
+        out.tie = tallies(l, 3);
+        // Sporewood: nothing.
+        l = loop(["cork_float", "plain_knot", "mere_hook", "minnow_tin"]);
+        beat(l, "turnback_hook");
+        out.sporewood = arrive(l, "sporewood");
+        return out;
+      });
+      const key = (a) => (a ? `${a.gift}:${a.giftSay}` : null);
+      const seq = (list) => JSON.stringify(list.map(key));
+      check(seq(r.noTin) === "[null,null]", `no tin: ${seq(r.noTin)}`);
+      check(seq(r.quiet) === '["turnback_hook:quiet",null]', `quiet: ${seq(r.quiet)}`);
+      check(
+        seq(r.hookThenLeaders) === '["turnback_hook:beat","leaders:beat",null]',
+        `hook beat then map: ${seq(r.hookThenLeaders)}`,
+      );
+      check(
+        key(r.mapFirst) === "leaders:beat" && r.afterMap === null,
+        `map first: ${key(r.mapFirst)}, then ${key(r.afterMap)}`,
+      );
+      check(
+        JSON.stringify(r.mapShelf) === '["pike_wire","chafe_gut"]',
+        `the shelf after the map: ${r.mapShelf}`,
+      );
+      check(
+        seq(r.pikeAlone) === '["pike_wire:beat",null,null]' && !r.gutWaits,
+        `pike first: ${seq(r.pikeAlone)}, gut ${r.gutWaits}`,
+      );
+      check(key(r.gutAfterMap) === "leaders:gutOnly", `the gut after the map: ${key(r.gutAfterMap)}`);
+      check(seq(r.tie) === '["turnback_hook:beat","pike_wire:beat","leaders:gutOnly"]', `tie: ${seq(r.tie)}`);
+      check(r.sporewood === null, `Sporewood: ${key(r.sporewood)}`);
+      return "one a tally in beat order, a tie to the hook, the quiet hook after the tin, Chafe Gut only after the map";
+    },
+  },
+
+  {
+    name: "tackle arrival at the tally: the Turnback Hook on a quiet tally after the tin with Murk's line, then the leaders after Hob's map, on the shelf at 40 and 60, and kept after a reload",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withTin,
+    timeoutMs: 720_000,
+    async run(session, { page, browser }) {
+      await session.sail(SLOW_SAIL);
+      const before = await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        return {
+          parts: [...s.parts],
+          fitted: { ...s.fitted },
+          arrivals: JSON.parse(JSON.stringify(s.arrivals)),
+        };
+      });
+      check(
+        before.parts.includes("plain_knot") &&
+          before.parts.includes("mere_hook") &&
+          before.fitted.leader === "plain_knot" &&
+          before.fitted.hook === "mere_hook",
+        `the old save did not gain the defaults: ${JSON.stringify(before)}`,
+      );
+      await session.catchFish("mossback_perch");
+      const first = await tallyAndGift(session);
+      check(
+        first?.text.includes(HOOK_LINE) && first.text.includes("Turnback Hook"),
+        `the first tally: ${JSON.stringify(first)}`,
+      );
+      // Hob's map is drawn (as his first talk does): at the next tally the leaders arrive.
+      await session.eval(() => {
+        const loop = window.__gw.progression.loop.state();
+        loop.hunt.mossmere.sketches.map = loop.evenings;
+        loop.hunt.mossmere.mapBy = "hob";
+      });
+      await session.sail(SLOW_SAIL);
+      await session.catchFish("mossback_perch");
+      const second = await tallyAndGift(session);
+      check(
+        second?.text.includes(LEADERS_LINE) && second.text.includes("Pike Wire and Chafe Gut"),
+        `the second tally: ${JSON.stringify(second)}`,
+      );
+      const shelf = (s) =>
+        s.eval(() =>
+          (window.__gw.progression.loop.shelf().tabs.find((t) => t.id === "tackle")?.items || [])
+            .filter((c) => c.id.startsWith("part:"))
+            .map((c) => `${c.id}:${c.price}:${c.bought}`),
+        );
+      const cards = await shelf(session);
+      check(
+        JSON.stringify(cards) ===
+          '["part:turnback_hook:40:false","part:pike_wire:60:false","part:chafe_gut:60:false"]',
+        `the shelf: ${JSON.stringify(cards)}`,
+      );
+      const saved = await session.saved();
+      const again = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await again.boot();
+        await again.toHome();
+        const kept = await shelf(again);
+        check(JSON.stringify(kept) === JSON.stringify(cards), `after a reload: ${JSON.stringify(kept)}`);
+        await again.collectGameErrors();
+        check(!again.errors.length, `errors after reloading: ${again.errors.join("; ")}`);
+      } finally {
+        await again.close();
+      }
+      return `"${HOOK_LINE}" then "${LEADERS_LINE}"; ${cards.length} parts on the shelf, kept after a reload`;
+    },
+  },
+
+  {
+    name: "tackle screen: the Leader and Hook rows show only once there is a choice, fitting works, a bought part is fitted, and a lure carries its own hook",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: (save) => {
+      withParts([])(save);
+      save.meta.loop.arrivals = { seq: 1, beats: { turnback_hook: 1 }, shelved: ["turnback_hook"] };
+    },
+    async run(session) {
+      await session.toHome();
+      check(
+        (await partRow(session, "leader")) === null && (await partRow(session, "hook")) === null,
+        "a row with no choice",
+      );
+      await closeTackle(session);
+      const bought = await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        window.__gw.debug.loop.giveClams(500);
+        const r = loop.buy("part:turnback_hook");
+        return { ok: r?.ok === true, fitted: loop.state().fitted.hook, parts: [...loop.state().parts] };
+      });
+      check(
+        bought.ok && bought.fitted === "turnback_hook" && bought.parts.includes("turnback_hook"),
+        `buying: ${JSON.stringify(bought)}`,
+      );
+      const row = await partRow(session, "hook");
+      check(
+        JSON.stringify(row?.chips) === '[{"key":"mere_hook","on":false},{"key":"turnback_hook","on":true}]' &&
+          JSON.stringify(row.lines) ===
+            JSON.stringify([
+              "Fish that grab and run, such as carp, bass and pike, are always hooked clean.",
+              "Quick nibblers, such as minnows and chub, are never hooked clean.",
+            ]),
+        `the Hook row: ${JSON.stringify(row)}`,
+      );
+      check((await partRow(session, "leader")) === null, "a Leader row with only the Plain Knot");
+      // Pressing the Mere Hook fits it.
+      await session.eval(() =>
+        document.querySelector('.gw-ts-row[data-row="hook"] .gw-ts-chip[data-key="mere_hook"]').click(),
+      );
+      await session.pause(800);
+      const after = await session.eval(() => window.__gw.progression.loop.state().fitted.hook);
+      const row2 = await partRow(session, "hook");
+      check(
+        after === "mere_hook" && row2?.chips[0]?.on === true,
+        `after pressing the Mere Hook: ${after} ${JSON.stringify(row2)}`,
+      );
+      await closeTackle(session);
+      // With a lure on, the row says the lure carries its own hook.
+      await session.eval(() => window.__gw.progression.loop.changeHook({ lure: "feather_fly" }));
+      const lureRow = await partRow(session, "hook");
+      await closeTackle(session);
+      check(
+        lureRow?.chips.length === 0 && lureRow.lines[0] === "Lures carry their own hooks.",
+        `with a lure: ${JSON.stringify(lureRow)}`,
+      );
+      return "no rows with one option; the Hook row with both, its lines, a press fits; one line under a lure";
+    },
+  },
+
+  {
+    name: "loss words: once the part is on the shelf, a pike bitten through, a rough mouth worn through and a hard take that ran each say why on the default part, once a night",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      const r = await session.eval(() => {
+        const g = window.__gw,
+          loop = g.progression.loop,
+          word = (speciesId, hardTake = false) => g.debug.fishLossWord({ speciesId, hardTake });
+        const out = { before: [word("reedjaw_pike"), word("weeping_carp"), word("weeping_carp", true)] };
+        loop.state().arrivals.shelved.push("pike_wire", "chafe_gut", "turnback_hook");
+        out.pike = [word("reedjaw_pike"), word("reedjaw_pike"), word("milkeye_perch")];
+        out.carp = [word("weeping_carp"), word("overbold_bass")];
+        out.perch = word("mossback_perch", true);
+        out.ran = [word("kissmark_trout", true), word("weeping_carp", true)];
+        (g.state.run.flags ||= {}).partWords = {};
+        loop.state().parts.push("pike_wire");
+        loop.fitPart("leader", "pike_wire");
+        out.onWire = [word("reedjaw_pike"), word("weeping_carp")];
+        loop.fitPart("leader", "plain_knot");
+        (g.state.run.flags ||= {}).partWords = {};
+        loop.state().lures.includes("feather_fly") || loop.state().lures.push("feather_fly");
+        loop.changeHook({ lure: "feather_fly" });
+        out.lureRan = word("kissmark_trout", true);
+        loop.changeHook({ lure: null, bait: "mireworm" });
+        (g.state.run.flags ||= {}).partWords = {};
+        return out;
+      });
+      check(JSON.stringify(r.before) === "[null,null,null]", `before the shelf: ${JSON.stringify(r.before)}`);
+      check(
+        r.pike[0] === LOSS_TEETH && r.pike[1] === null && r.pike[2] === null,
+        `pike: ${JSON.stringify(r.pike)}`,
+      );
+      check(r.carp[0] === LOSS_LIPS && r.carp[1] === null, `carp: ${JSON.stringify(r.carp)}`);
+      check(r.perch === null, `a perch said: ${r.perch}`);
+      check(r.ran[0] === LOSS_RAN && r.ran[1] === null, `ran: ${JSON.stringify(r.ran)}`);
+      check(r.onWire[0] === null && r.onWire[1] === null, `on Pike Wire: ${JSON.stringify(r.onWire)}`);
+      check(r.lureRan === null, `on a lure: ${r.lureRan}`);
+      // A real loss on the water: a pike lost on the Plain Knot carries the words and shows them by the float.
+      const lost = await loseSmallFish(session, "reedjaw_pike");
+      check(lost?.partLossText === LOSS_TEETH && !lost.overCap, `the pike's loss: ${JSON.stringify(lost)}`);
+      return "each once a night, only with the part on the shelf, never on the better part or a lure";
     },
   },
 ];

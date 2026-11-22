@@ -30549,6 +30549,7 @@ Ic(vg, {
   memoriesFor: () => gee,
   nice: () => CP,
   nightCurve: () => Y7,
+  noteArrivalBeat: () => noteArrivalBeat,
   obstacleRadius: () => PS,
   placeAt: () => Tee,
   placeAtV3: () => Ste,
@@ -30557,6 +30558,7 @@ Ic(vg, {
   presentLength: () => Hte,
   quietTerms: () => tte,
   reachOf: () => NP,
+  rigArrivalAtTally: () => rigArrivalAtTally,
   sailPlan: () => q5,
   sealsFor: () => Tte,
   shoreRFor: () => yee,
@@ -32103,6 +32105,79 @@ function depthBiteMult(speciesId, depth, water) {
 function depthTakeChance(p, mult) {
   return mult > 1 ? Math.max(p, Math.min(0.9, p * mult)) : p * mult;
 }
+// Mossmere's Leader and Hook parts for ordinary fish (mossmere-gear-deeper.md B2, B3). A fish has at most one tag
+// per leader; a fish missing here is neutral. "toothy" and "rough" land more often on that leader, "wary" and
+// "delicate" bite less often on it (wo.leaderFx). The Plain Knot has no tags, so it changes nothing.
+bs.mossmere.leader = {
+  likely_chub: { pike_wire: "wary" },
+  kissmark_trout: { pike_wire: "wary" },
+  rosefleck_trout: { pike_wire: "wary" },
+  milkeye_perch: { pike_wire: ["toothy", "wary"] },
+  reedjaw_pike: { pike_wire: "toothy" },
+  thousandcast_pike: { pike_wire: "toothy" },
+  overbold_bass: { chafe_gut: "rough" },
+  weeping_carp: { chafe_gut: "rough" },
+  candlefin_koi: { chafe_gut: "rough" },
+  nightbloom_carp: { chafe_gut: "rough" },
+  bridgechain_sturgeon: { chafe_gut: "rough" },
+  hullkiss_lamprey: { chafe_gut: "rough" },
+  dusk_minnow: { chafe_gut: "delicate" },
+  lampsipper: { chafe_gut: "delicate" },
+  rainglass_darter: { chafe_gut: "delicate" },
+};
+// How each fish takes a hook, read on the Turnback Hook only: "self" fish grab and run and set it themselves,
+// "quick" nibblers are struck at best. The Hullkiss Lamprey takes only lures, so it has no tag.
+bs.mossmere.hookSet = {
+  overbold_bass: "self",
+  weeping_carp: "self",
+  candlefin_koi: "self",
+  nightbloom_carp: "self",
+  kissmark_trout: "self",
+  reedjaw_pike: "self",
+  thousandcast_pike: "self",
+  bridgechain_sturgeon: "self",
+  gloam_eel: "self",
+  dusk_minnow: "quick",
+  likely_chub: "quick",
+  rustfin_sucker: "quick",
+  lampsipper: "quick",
+  rosefleck_trout: "quick",
+  rainglass_darter: "quick",
+};
+// The tags a fish carries on a leader, as a list (empty for the Plain Knot, an untagged fish or a water without
+// leaders). A null water is the home lake, as in Ih().
+function leaderTags(speciesId, leader, water) {
+  let tag = (water == null ? y0 : bs[water])?.leader?.[speciesId]?.[leader];
+  return tag == null ? [] : Array.isArray(tag) ? tag : [tag];
+}
+// How much more or less often a species bites on this rig: the Depth part's multiplier times the fitted leader's.
+// With a leader the product never falls below wo.rigBiteFloor (the lead's 0.5 times a leader's 0.7), so no part
+// stops a fish. With no leader (the Plain Knot) it is the Depth multiplier exactly, as before.
+function rigBiteMult(speciesId, depth, leader, water) {
+  let mult = depth ? depthBiteMult(speciesId, depth, water) : 1;
+  if (!leader) return mult;
+  for (let tag of leaderTags(speciesId, leader, water)) mult *= ka(wo?.leaderFx?.[tag]?.bite, 1);
+  return Math.max(ka(wo?.rigBiteFloor, 0.35), mult);
+}
+// The Grip a fitted leader adds when landing a fish it suits (a toothy fish on Pike Wire, a rough mouth on Chafe
+// Gut). The catch odds never call it for a legend: her leader is a gate, built with her hunt.
+function leaderGrip(speciesId, leader, water) {
+  let grip = 0;
+  for (let tag of leaderTags(speciesId, leader, water)) grip += ka(wo?.leaderFx?.[tag]?.hold, 0);
+  return grip;
+}
+// The strike grade on the hook a bait or bare cast fishes. On the Turnback Hook a fish that sets itself is hooked
+// clean where it would be struck (a hard take included), and a quick nibbler is struck where it would be clean.
+// Early, late and every other hook are left as they are.
+function turnbackStrike(grade, speciesId, hook, water) {
+  if (hook !== "turnback_hook") return grade;
+  let tag = (water == null ? y0 : bs[water])?.hookSet?.[speciesId];
+  return tag === "self" && grade === "struck"
+    ? "clean"
+    : tag === "quick" && grade === "clean"
+      ? "struck"
+      : grade;
+}
 bs.sporewood.geometry = {
   inflow: { x: 74.5, z: -24, r: 8 },
   outflow: { x: -66, z: 37, r0: 0, r1: 8 },
@@ -32551,6 +32626,7 @@ function l1(
     boost: l = null,
     water: i = null,
     depth = null,
+    leader = null,
   } = {},
 ) {
   let c = Ih(i).hook.mult;
@@ -32562,7 +32638,7 @@ function l1(
     (m *= !n && t ? ES(h, t, o, i) : C7(h, o, i)), l && h && l[h] > 0 && (m *= l[h]);
     let g = r ? Rl(h, { lure: a, bait: s, water: i }) : void 0;
     r && g != null && (m *= c[g]);
-    depth && (m *= depthBiteMult(h, depth, i));
+    (depth || leader) && (m *= rigBiteMult(h, depth, leader, i));
     return { sp: f, w: m, g };
   });
 }
@@ -32581,6 +32657,7 @@ function P7(
     guests: l = null,
     water: i = null,
     depth = null,
+    leader = null,
   } = {},
 ) {
   let c = Sr(e).map((m) => ({ ...m })),
@@ -32598,7 +32675,7 @@ function P7(
     } else y = Math.min(0.99, ka(t.share, 0) * p);
     let v = Rl(t.sp.id, { lure: n, bait: o, water: i }),
       b = y > 0 && y < 1 ? (f * y) / (1 - y) : 0;
-    v <= 1 && (b *= d.mult[v]), depth && (b *= depthBiteMult(t.sp.id, depth, i));
+    v <= 1 && (b *= d.mult[v]), (depth || leader) && (b *= rigBiteMult(t.sp.id, depth, leader, i));
     c.push({ sp: t.sp, w: b, g: v, giant: !0 });
   }
   for (let m of Sr(l)) {
@@ -32611,7 +32688,7 @@ function P7(
       w > 0 &&
       c.push({
         sp: m.sp,
-        w: ((w * p) / (1 - p)) * (depth ? depthBiteMult(m.sp.id, depth, i) : 1),
+        w: ((w * p) / (1 - p)) * (depth || leader ? rigBiteMult(m.sp.id, depth, leader, i) : 1),
         g,
         guest: !0,
       });
@@ -32672,12 +32749,23 @@ function G5(
     notes: u = null,
     water: h = null,
     depth = null,
+    leader = null,
   } = {},
 ) {
   let m = t?.place ?? null,
     g = e?.AUTOFISH?.signRule || { minSpecies: 2, maxShare: 0.8 },
     p = u ? I7(e, u, { area: n, place: m, phase: o }) : null,
-    w = l1(t?.list, { area: n, place: m, phase: o, lure: a, bait: s, boost: p?.boost, water: h, depth }),
+    w = l1(t?.list, {
+      area: n,
+      place: m,
+      phase: o,
+      lure: a,
+      bait: s,
+      boost: p?.boost,
+      water: h,
+      depth,
+      leader,
+    }),
     y = ka(l, 0);
   if (y)
     for (let S of w)
@@ -32718,6 +32806,7 @@ function G5(
     guests: p?.guests,
     water: h,
     depth,
+    leader,
   });
   let b = L7(w),
     L = !1;
@@ -32734,7 +32823,7 @@ function G5(
     if ((!S.bait || S.bait === s) && !(v && S.rarity === "common")) {
       let P = Rl(S.id, { lure: a, bait: s, water: h });
       let take = _7(ka(d.base, 1), P, h);
-      depth && (take = depthTakeChance(take, depthBiteMult(S.id, depth, h)));
+      (depth || leader) && (take = depthTakeChance(take, rigBiteMult(S.id, depth, leader, h)));
       E = { sp: S, p: take, from: "preroll", z: d.z, g: P };
     }
   }
@@ -47311,9 +47400,50 @@ wo.rig = {
     // Not fitted like the others: owning it lets a Dusk Minnow go "Into the tin". Murk gives it at the tally
     // after the lead's.
     minnow_tin: { slot: "tin", gift: "afterLead", water: null },
+    // The Leader and the Hook (mossmere-gear-deeper.md B2). The Plain Knot and the Mere Hook are everyone's from
+    // the start and change nothing. The others reach Murk's shelf with the story (wo.arrivals) and are bought
+    // there (prices before wo.cost.factor). Parts are never spent or lost.
+    plain_knot: { slot: "leader", start: !0, water: "mossmere" },
+    pike_wire: { slot: "leader", price: 30, water: "mossmere" },
+    chafe_gut: { slot: "leader", price: 30, water: "mossmere" },
+    mere_hook: { slot: "hook", start: !0, water: "mossmere" },
+    turnback_hook: { slot: "hook", price: 20, water: "mossmere" },
   },
 };
 wo.depthMult = { lead: { bottom: 2, high: 0.5, any: 1 }, float: 1, floor: 0.5 };
+// What a leader tag does to an ordinary fish (bs.mossmere.leader): Grip added when landing, or how often it bites.
+wo.leaderFx = { toothy: { hold: 4 }, rough: { hold: 4 }, wary: { bite: 0.7 }, delicate: { bite: 0.7 } };
+// The Depth and Leader bite multipliers together never fall below this (the lead's 0.5 times a leader's 0.7).
+wo.rigBiteFloor = 0.35;
+// When the leaders and the Turnback Hook reach Murk's shelf (mossmere-review-addendum.md section 2): one new
+// piece of tackle a tally at most, after the lead and the tin (Murk's gifts). Each arrival waits for its beat,
+// noted in the save as it happens (loop.arrivals.beats, numbered in order). When two are due, the one whose beat
+// came first arrives and a tie goes in `order` (the hook before a leader); the other waits a tally. The hook also
+// comes on a quiet tally (nothing due) after the tin's.
+//   turnback_hook: one of `runs` lost after it ran before the hook was set (struck, or a hard take). The hunt's
+//     other beats for it, the theft and the first ring of scrapes, are to call noteArrivalBeat(loop,
+//     "turnback_hook") when they are built, with their own line (Ca.arrivals.lines).
+//   pike_wire: the first Reedjaw Pike landed or lost. Pike Wire alone.
+//   leaders: Hob's map drawn (sketches.map, which carries his worn line end). Chafe Gut never comes sooner.
+wo.arrivals = {
+  order: ["turnback_hook", "pike_wire", "leaders"],
+  turnback_hook: {
+    parts: ["turnback_hook"],
+    runs: [
+      "weeping_carp",
+      "nightbloom_carp",
+      "candlefin_koi",
+      "overbold_bass",
+      "reedjaw_pike",
+      "thousandcast_pike",
+      "kissmark_trout",
+      "bridgechain_sturgeon",
+    ],
+    quiet: !0,
+  },
+  pike_wire: { parts: ["pike_wire"], fish: ["reedjaw_pike"] },
+  leaders: { parts: ["pike_wire", "chafe_gut"] },
+};
 Ca.depth = {
   head: "Depth",
   names: { cork_float: "Cork Float", sounding_lead: "Sounding Lead" },
@@ -47344,6 +47474,62 @@ Ca.live = {
   good: "Good for: hunters such as perch, pike and bass.",
   cost: "Costs you: you must catch it first, and grazers ignore it.",
 };
+// The Leader and the Hook (mossmere-gear-deeper.md): the tackle screen's rows, what the fitted part is good for
+// and what it costs you, the strike word on the Turnback Hook, the ordinary loss words (B2), Murk's tally lines
+// as each arrives (mossmere-review-addendum.md section 2) and the shelf lines.
+Ca.leader = {
+  head: "Leader",
+  names: { plain_knot: "Plain Knot", pike_wire: "Pike Wire", chafe_gut: "Chafe Gut" },
+  good: {
+    plain_knot: "It suits every fish, and none is put off.",
+    pike_wire: "Fish with sharp teeth, such as pike and Milkeye Perch, land more often.",
+    chafe_gut: "Fish with rough mouths, such as carp, bass and sturgeon, land more often.",
+  },
+  cost: {
+    plain_knot: "Sharp teeth and rough lips can still cut or wear it through.",
+    pike_wire: "Wary fish, such as chub and trout, bite less often.",
+    chafe_gut: "Small, dainty fish, such as Dusk Minnows, bite less often.",
+  },
+};
+Ca.hook = {
+  head: "Hook",
+  names: { mere_hook: "Mere Hook", turnback_hook: "Turnback Hook" },
+  good: {
+    mere_hook: "It suits every fish, as it always has.",
+    turnback_hook: "Fish that grab and run, such as carp, bass and pike, are always hooked clean.",
+  },
+  cost: {
+    mere_hook: "A fish that grabs and runs is not always hooked clean.",
+    turnback_hook: "Quick nibblers, such as minnows and chub, are never hooked clean.",
+  },
+  lure: "Lures carry their own hooks.",
+  setItself: "Set itself",
+};
+Ca.partLoss = {
+  toothy: "Bitten through. Pike Wire stops teeth.",
+  rough: "Worn through on its lips. Chafe Gut won't wear.",
+  self: "It ran before the hook was set. A Turnback Hook sets itself.",
+};
+// "gutOnly": the leaders arrive after Pike Wire came alone, so Murk names Chafe Gut only.
+Ca.arrivals = {
+  names: {
+    turnback_hook: "Turnback Hook",
+    pike_wire: "Pike Wire",
+    leaders: "Pike Wire and Chafe Gut",
+    gutOnly: "Chafe Gut",
+  },
+  lines: {
+    turnback_hook: "Carp grab and run. There's a hook on the shelf that sets itself.",
+    pike_wire: "Pike teeth cut line. Pike Wire is on the shelf now.",
+    leaders: "Hob gave you his old line end? Leaders are on the shelf now.",
+    gutOnly: "Hob gave you his old line end? Chafe Gut is on the shelf now.",
+  },
+};
+Object.assign(Ca.shelf, {
+  turnback_hook: "This hook sets itself in soft mouths that grab and run.",
+  pike_wire: "Sharp teeth cannot cut through wire.",
+  chafe_gut: "Thick gut won't wear through on rough lips.",
+});
 // The first part of the hunt (mossmere-hunt-2.md sections 1, 2 and 5, B6): the tale at a Mossmere tally from
 // evening 2, the fisherman's notepad, and Hob on Mossbell Isle with his map (sketch 1). Distances are metres
 // from the middle of Mossbell Isle. Sketches 2 to 5 come in later steps, so their places stay blank.
@@ -49337,7 +49523,9 @@ function GP(e, t, n = {}, o = {}) {
         : Math.min(a.buffs.cap, Math.max(0, +o.buffs || 0)),
     p = o.marked && !r ? a.markedFish : 0,
     w = r ? Math.min(a.legend.woundCap, (o.wounds | 0) * a.legend.woundPerEscape) : 0,
-    y = a.wick + d + h + m + g + p + w,
+    // A leader that suits this fish (Pike Wire on teeth, Chafe Gut on rough lips). Never for a legend.
+    leaderHold = r || !o.leader ? 0 : leaderGrip(s.id, o.leader, o.lake ?? BP(s)),
+    y = a.wick + d + h + m + g + p + w + leaderHold,
     v = o.lake ?? BP(s),
     b;
   r
@@ -49377,7 +49565,16 @@ function GP(e, t, n = {}, o = {}) {
     cap: L,
     lake: v,
     style: l,
-    terms: { wick: a.wick, tackle: d, item: h, strike: m, buffs: g, marked: p, wounds: w },
+    terms: {
+      wick: a.wick,
+      tackle: d,
+      item: h,
+      strike: m,
+      buffs: g,
+      marked: p,
+      wounds: w,
+      leader: leaderHold,
+    },
     landingBlockedBy,
   };
 }
@@ -103606,7 +103803,13 @@ function GH(e, t, n) {
   return (
     kl(t.fitted) || (t.fitted = { lure: null, bait: null }),
     (typeof t.fitted.lure == "string" && e?.LOOP?.lures?.[t.fitted.lure]?.found === !0) ||
-      (t.fitted = { lure: i.fit ? null : (i.lures[0] ?? null), bait: i.fit, depth: t.fitted.depth }),
+      (t.fitted = {
+        lure: i.fit ? null : (i.lures[0] ?? null),
+        bait: i.fit,
+        depth: t.fitted.depth,
+        leader: t.fitted.leader,
+        hook: t.fitted.hook,
+      }),
     kl(t.eveningsAt) || (t.eveningsAt = {}),
     (t.eveningsAt[n] = 0),
     { from: o, to: n, add: a, carry: lc(t) }
@@ -103750,6 +103953,28 @@ function $H(e, t, n = []) {
         price: Os(p.price, 0),
         bought: d.has(g),
       });
+  // Leader and Hook parts once they have reached the shelf (wo.arrivals), in the shop's water; owned ones stay as
+  // "Yours.", like a lure.
+  for (let g of Ts(a.arrivals?.shelved)) {
+    let p = o.rig?.parts?.[g];
+    !or(p) ||
+      !c.includes(p.water) ||
+      p.start === !0 ||
+      l.push({
+        id: `part:${g}`,
+        tab: "tackle",
+        slot: "part",
+        level: null,
+        partId: g,
+        water: p.water,
+        art: { turnback_hook: "hook", pike_wire: "line", chafe_gut: "gut" }[g] || "hook",
+        name: s.leader?.names?.[g] || s.hook?.names?.[g] || g,
+        goalName: s.leader?.names?.[g] || s.hook?.names?.[g] || g,
+        line: s.shelf?.[g] ?? "",
+        price: Os(p.price, 0),
+        bought: Ts(a.parts).includes(g),
+      });
+  }
   for (let g of c)
     for (let p of Ts(o.tins?.[g]))
       l.push({
@@ -103806,6 +104031,13 @@ function KH(e, t, n) {
   if (!or(t) || !or(n)) return !1;
   if (n.slot === "lure")
     return Array.isArray(t.lures) || (t.lures = []), t.lures.includes(n.lureId) || t.lures.push(n.lureId), !0;
+  // A Leader or Hook part: owned for good, and fitted to the rig at once (mossmere-gear-deeper.md, "Buying").
+  if (n.slot === "part") {
+    let slot = e?.LOOP?.rig?.parts?.[n.partId]?.slot;
+    if (slot !== "leader" && slot !== "hook") return !1;
+    Array.isArray(t.parts) || (t.parts = []), t.parts.includes(n.partId) || t.parts.push(n.partId);
+    return or(t.fitted) || (t.fitted = {}), (t.fitted[slot] = n.partId), !0;
+  }
   if (n.slot === "tin") {
     or(t.bait) || (t.bait = {});
     let o = or(t.bait[n.water]) ? t.bait[n.water] : (t.bait[n.water] = {});
@@ -105874,8 +106106,11 @@ function yF(e) {
     holdSlots: ha(e?.LOOP?.hold?.start, 3) || 3,
     tackle: { rod: 0, line: 0, reel: 0 },
     lures: t.lures,
-    fitted: { lure: null, bait: t.fit, depth: "float" },
-    parts: ["cork_float"],
+    fitted: { lure: null, bait: t.fit, depth: "float", leader: "plain_knot", hook: "mere_hook" },
+    parts: ["cork_float", "plain_knot", "mere_hook"],
+    // Rig parts reaching Murk's shelf with the story (wo.arrivals): each beat's number in the order they came
+    // (0 while it has not), the last number given, and the parts on the shelf.
+    arrivals: { seq: 0, beats: { turnback_hook: 0, pike_wire: 0, leaders: 0 }, shelved: [] },
     bait: t.bait,
     maps: { lakes: [il(e)], places: [] },
     raft: { oars: 0, keel: 0, lantern: 0 },
@@ -106019,6 +106254,96 @@ function soundingLeadFishes(loop, water, lure) {
     !!bs[water]?.depth
   );
 }
+// The leader or hook a rig fishes in a water (slot "leader" or "hook"), or null for the default part (the Plain
+// Knot, the Mere Hook) and in a water without that part (Sporewood). A hook is null under a lure, which carries
+// its own.
+function rigPartFishes(loop, slot, water, lure) {
+  let id = loop?.fitted?.[slot],
+    part = wo?.rig?.parts?.[id];
+  if (!part || part.slot !== slot || part.start || !Sr(loop.parts).includes(id)) return null;
+  if (typeof water != "string" || !bs[water]?.[slot === "hook" ? "hookSet" : "leader"]) return null;
+  return slot === "hook" && lure ? null : id;
+}
+// Notes that an arrival's beat has happened (wo.arrivals), numbering beats in the order they come. Only the first
+// time counts. Returns whether it was new.
+function noteArrivalBeat(loop, key) {
+  let arrivals = loop?.arrivals;
+  if (!Ln(arrivals) || !Ln(arrivals.beats) || ha(arrivals.beats[key]) > 0) return !1;
+  return (arrivals.seq = ha(arrivals.seq) + 1), (arrivals.beats[key] = arrivals.seq), !0;
+}
+// The beats an ordinary fish's landing or loss can bring (wo.arrivals): the first Reedjaw Pike either way, and a
+// fish that grabs and runs lost after it ran before the hook was set (struck, or a hard take, which is struck).
+// Only in a water with hooks and leaders, and only while the part is not on the shelf yet.
+function noteFishArrivalBeats(loop, water, speciesId, { lost = !1, grade = null } = {}) {
+  let rule = wo.arrivals,
+    shelved = (key) => rule[key].parts.every((id) => Sr(loop?.arrivals?.shelved).includes(id));
+  if (typeof water != "string" || !bs[water]?.hookSet || !speciesId) return;
+  Sr(rule.pike_wire.fish).includes(speciesId) && !shelved("pike_wire") && noteArrivalBeat(loop, "pike_wire");
+  lost &&
+    grade === "struck" &&
+    Sr(rule.turnback_hook.runs).includes(speciesId) &&
+    !shelved("turnback_hook") &&
+    noteArrivalBeat(loop, "turnback_hook");
+}
+// What reaches Murk's shelf at this tally (mossmere-review-addendum.md section 2), called only on a tally with no
+// gift from Murk: { gift, giftSay } with gift "turnback_hook", "pike_wire" or "leaders", or null. Puts the parts on
+// the shelf. Hob's map drawn before this tally is the leaders' beat; a map Murk passes on at this tally counts from
+// the next. With nothing due, a tally after the tin's brings the Turnback Hook anyway (a quiet tally).
+function rigArrivalAtTally(loop, water, rule = wo.arrivals) {
+  let arrivals = loop?.arrivals;
+  if (!Ln(arrivals) || !Array.isArray(arrivals.shelved) || typeof water != "string" || !bs[water]?.hookSet)
+    return null;
+  loop.hunt?.mossmere?.sketches?.map > 0 && noteArrivalBeat(loop, "leaders");
+  let waiting = (key) =>
+      Sr(rule[key]?.parts).filter((id) => !arrivals.shelved.includes(id) && !Sr(loop.parts).includes(id)),
+    order = Sr(rule.order),
+    due = order
+      .filter((key) => ha(arrivals.beats?.[key]) > 0 && waiting(key).length)
+      .sort((a, b) => ha(arrivals.beats[a]) - ha(arrivals.beats[b]) || order.indexOf(a) - order.indexOf(b)),
+    gift = due[0] ?? null,
+    giftSay = "beat";
+  !gift &&
+    rule.turnback_hook?.quiet &&
+    Sr(loop.parts).includes("minnow_tin") &&
+    waiting("turnback_hook").length &&
+    ((gift = "turnback_hook"), (giftSay = "quiet"));
+  if (!gift) return null;
+  let parts = waiting(gift);
+  arrivals.shelved.push(...parts);
+  gift === "leaders" && parts.length === 1 && parts[0] === "chafe_gut" && (giftSay = "gutOnly");
+  return { gift, giftSay };
+}
+// The line an ordinary fish lost on a default part says (mossmere-gear-deeper.md B2), once a night for each kind,
+// and only once Murk has the part that would have held it on his shelf (or it is owned): teeth on the Plain Knot
+// (Pike Wire), rough lips on the Plain Knot (Chafe Gut), and a fish that grabs and runs, lost after a hard take on
+// the Mere Hook of a bait cast (the Turnback Hook). Words only. Returns the line or null; notes it in run.flags.
+function ordinaryLossWord(
+  loop,
+  run,
+  speciesId,
+  { water = null, leader = null, hook = null, lure = !1, hardTake = !1 } = {},
+) {
+  let offered = (id) => Sr(loop?.parts).includes(id) || Sr(loop?.arrivals?.shelved).includes(id),
+    kind = null;
+  if (typeof water != "string" || !Ln(run)) return null;
+  !leader &&
+    (leaderTags(speciesId, "pike_wire", water).includes("toothy") && offered("pike_wire")
+      ? (kind = "toothy")
+      : leaderTags(speciesId, "chafe_gut", water).includes("rough") &&
+        offered("chafe_gut") &&
+        (kind = "rough"));
+  !kind &&
+    !hook &&
+    !lure &&
+    hardTake &&
+    bs[water]?.hookSet?.[speciesId] === "self" &&
+    offered("turnback_hook") &&
+    (kind = "self");
+  if (!kind) return null;
+  let flags = Ln(run.flags) ? run.flags : (run.flags = {}),
+    said = Ln(flags.partWords) ? flags.partWords : (flags.partWords = {});
+  return said[kind] ? null : ((said[kind] = !0), Ca.partLoss?.[kind] || null);
+}
 function a8(e, t, { hasTrip: n = !1 } = {}) {
   if (!Ln(e)) return e;
   let o = yF(t),
@@ -106130,6 +106455,25 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
   c.parts = c.parts.filter((g, p, w) => typeof t?.LOOP?.rig?.parts?.[g] == "object" && w.indexOf(g) === p);
   c.parts.includes("cork_float") || c.parts.unshift("cork_float");
   (c.fitted.depth === "lead" && c.parts.includes("sounding_lead")) || (c.fitted.depth = "float");
+  // The Plain Knot and the Mere Hook are everyone's (old saves gain them); the fitted leader and hook must be
+  // owned parts of their slot, else the default is fitted.
+  for (let [id, part] of Object.entries(t?.LOOP?.rig?.parts || {}))
+    part?.start && part.slot !== "depth" && !c.parts.includes(id) && c.parts.push(id);
+  for (let slot of ["leader", "hook"])
+    (t?.LOOP?.rig?.parts?.[c.fitted[slot]]?.slot === slot && c.parts.includes(c.fitted[slot])) ||
+      (c.fitted[slot] = o.fitted[slot]);
+  {
+    let arrivals = c.arrivals;
+    arrivals.seq = ha(arrivals.seq);
+    Ln(arrivals.beats) || (arrivals.beats = {});
+    for (let [key, initial] of Object.entries(o.arrivals.beats))
+      arrivals.beats[key] = ha(arrivals.beats[key] ?? initial);
+    arrivals.shelved = Array.isArray(arrivals.shelved)
+      ? arrivals.shelved.filter(
+          (id, n, all) => typeof t?.LOOP?.rig?.parts?.[id] == "object" && all.indexOf(id) === n,
+        )
+      : [];
+  }
   for (let [lake, record] of Object.entries(o.hunt)) {
     let saved = Ln(c.hunt[lake]) ? c.hunt[lake] : (c.hunt[lake] = record);
     normaliseHuntRecord(saved, record);
@@ -107057,6 +107401,13 @@ function CF(e) {
       );
     }
     Ln(ze.overCap) && (x(H).capLost = !0);
+    // A Reedjaw Pike lost (over the gear's limit too), or a fish that ran before the hook was set (within the
+    // limit), brings its part to Murk's shelf (wo.arrivals).
+    ze.legendary === !0 ||
+      noteFishArrivalBeats(p(), ze.zone || H.zone, ze.speciesId, {
+        lost: !0,
+        grade: Ln(ze.overCap) ? null : (ze.grade ?? null),
+      });
     let je = m(ze.speciesId);
     if (
       (je &&
@@ -107269,6 +107620,12 @@ function CF(e) {
       giftSay = Sle(x(ze).landedKinds).some((id) => hunters.includes(id)) ? "hunter" : "plain";
     }
     gift && (Array.isArray(H.parts) || (H.parts = ["cork_float"]), H.parts.push(gift));
+    // With no gift from Murk, a leader or the Turnback Hook may reach his shelf instead: one new piece of tackle
+    // a tally at most (wo.arrivals).
+    if (!gift) {
+      let arrival = rigArrivalAtTally(H, ze.zone);
+      arrival && ((gift = arrival.gift), (giftSay = arrival.giftSay));
+    }
     // A Live Minnow left on the hook is gone with the tin's last minnows: the hook goes back to the first bait
     // still in stock, so the next evening does not start on a bare hook.
     if (H.fitted?.bait === "live_minnow" && !(ha(H.bait?.[ze.zone]?.live_minnow) > 0)) {
@@ -107690,6 +108047,8 @@ function CF(e) {
           ? (talk = { first: 2, drew: null })
           : (drawHuntSketch(record, "map", evening),
             (record.mapBy = "hob"),
+            // His map carries his worn line end: the beat that brings the leaders to Murk's shelf.
+            noteArrivalBeat(p(), "leaders"),
             (talk = { first: 4, drew: "map" }));
     else if (record.hobNight !== evening) {
       record.hobNight = evening;
@@ -107742,6 +108101,42 @@ function CF(e) {
     return r(H)
       ? soundingLeadFishes(ze, H.zone, H.lure)
       : soundingLeadFishes(ze, ze?.barge?.water, ze?.fitted?.lure);
+  }
+  // The leader and the hook the rig fishes right now (null for the Plain Knot and the Mere Hook): on a trip in the
+  // trip's water with the run's lure, at home in the barge's water with the fitted lure.
+  function rigPartNow(slot) {
+    let ze = p(),
+      H = a();
+    return r(H)
+      ? rigPartFishes(ze, slot, H.zone, H.lure)
+      : rigPartFishes(ze, slot, ze?.barge?.water, ze?.fitted?.lure);
+  }
+  let rigLeader = () => rigPartNow("leader"),
+    rigHook = () => rigPartNow("hook");
+  // Fits an owned Leader or Hook part (slot "leader" or "hook"). Like the Depth part it waits while a fish is on,
+  // and reels a cast in first.
+  function fitPart(slot, id) {
+    let H = p();
+    if (!H) return { ok: !1, reason: "off" };
+    if (f().rig?.parts?.[id]?.slot !== slot || !Sle(H.parts).includes(id)) return { ok: !1, reason: "part" };
+    if (!de()) return { ok: !1, reason: "fish" };
+    if (H.fitted[slot] === id) return { ok: !0, changed: !1, reeled: !1, [slot]: id };
+    let K = !1;
+    if (r(a()) && q().out === !0)
+      try {
+        K = t.fishing?.reelInQuiet?.()?.ok === !0;
+      } catch (we) {
+        l("reelInQuiet", we);
+      }
+    return (
+      (H.fitted[slot] = id), c(), d("loop:fit", { slot, id }), { ok: !0, changed: !0, reeled: K, [slot]: id }
+    );
+  }
+  // A fish landed on a trip: the first Reedjaw Pike is the beat that brings Pike Wire (wo.arrivals).
+  function noteLanded(speciesId) {
+    let ze = a(),
+      H = p();
+    r(ze) && H && noteFishArrivalBeats(H, ze.zone, speciesId);
   }
   function de() {
     if (!p()) return !1;
@@ -108330,6 +108725,9 @@ function CF(e) {
     unfitFound: Ge,
     fitDepth,
     leadFishes,
+    rigLeader,
+    rigHook,
+    fitPart,
     hobLampLit,
     hobTalk,
     notepad,
@@ -108341,6 +108739,7 @@ function CF(e) {
       onTrip: r,
       noteFirst: ie,
       onEscaped: Y,
+      noteLanded,
       onZoneChange: le,
       resetSession: () => {
         Ne = [];
@@ -111637,6 +112036,7 @@ function Kle(e) {
       // Which kinds were landed this trip, kept or not: Murk's tin line asks whether a perch was among them.
       Array.isArray(Vn.landedKinds) || (Vn.landedKinds = []);
       Vn.landedKinds.includes(me.id) || Vn.landedKinds.push(me.id);
+      lt?.noteLanded?.(me.id);
       {
         let fe = ft.stats.biggest;
         (!fe || t().fishWeight(me, ce) > t().fishWeight(m(fe.speciesId), fe)) &&
@@ -130153,6 +130553,9 @@ function Y0e(e) {
     // Whether this cast fishes on the Sounding Lead, fixed at the release like the bait.
     i.castLead = xe() && !k() && p(() => N()?.leadFishes?.()) === !0;
     s.onLead = i.castLead;
+    // The leader and hook this cast fishes, fixed at the release like the lead (null for the defaults).
+    i.castLeader = castLeaderNow();
+    i.castHook = castHookNow();
     let tn = null;
     try {
       tn = e.actors?.getRodTip?.();
@@ -130630,6 +131033,8 @@ function Y0e(e) {
           notes: qe(),
           water: Re(),
           depth: i.castLead ? "lead" : null,
+          // The leader fitted at the release (null for the Plain Knot), on bait and lure casts alike.
+          leader: i.castLeader ?? null,
         })
       : null;
   }
@@ -131078,6 +131483,16 @@ function Y0e(e) {
       "fishing:bite",
       Dt ? { speciesId: Q.id, sizeClass: i.sizeClass, biteTell: i.tell } : { speciesId: Q.id },
     );
+  }
+  // The leader a cast released now fishes (bait or lure), or null for the Plain Knot or a water without leaders.
+  function castLeaderNow() {
+    return (xe() && p(() => N()?.rigLeader?.())) || null;
+  }
+  // The hook a cast released now fishes, or null for the Mere Hook. Lures carry their own hooks, so a lure cast
+  // (a fitted lure or a lure item) has none.
+  function castHookNow() {
+    let lure = k() ?? (t().CATCH_V3?.items?.[i.castItem]?.kind === "lure" ? i.castItem : null);
+    return (xe() && !lure && p(() => N()?.rigHook?.())) || null;
   }
   function rollHardTake(spinning = false) {
     if (!xe() || !pe() || i.find || i.tutorial || !(i.castBait || i.castItem || spinning)) return false;
@@ -131557,6 +131972,15 @@ function Y0e(e) {
     let Pe = t(),
       Ke = J(),
       At = Q.rarity === "legendary";
+    // The hook part (mossmere-gear-deeper.md B2): on the Turnback Hook an ordinary fish that grabs and runs sets
+    // the hook itself, and a quick nibbler is struck at best. Bait and bare casts only (castHook is null on a lure).
+    let setItself = !1;
+    if (xe() && !At && !i.find) {
+      let onHook = turnbackStrike(R, Q.id, i.castHook ?? null, Re());
+      (setItself = onHook === "clean" && R !== "clean"), (R = onHook);
+    }
+    // Whether the fish took hard, for the loss words when it gets away.
+    i.hardTook = !!hardTake;
     i.zRolled || Ft(),
       (i.grade = R),
       (i.perfect = R === "clean"),
@@ -131592,6 +132016,8 @@ function Y0e(e) {
         landings: bn.landings,
         night: j() === "gloomtide",
         perRun: tn.perRun ?? !!tn.hold,
+        // The fitted leader's Grip for this fish (none for the Plain Knot or a legend).
+        leader: i.castLeader ?? null,
       },
       Fn = null;
     try {
@@ -131719,6 +132145,8 @@ function Y0e(e) {
       g("fishing:strike", ue({ grade: R, sizeClass: Ji }));
       if (hookedRival) g("toast", { text: hookedRival.name + " is back on the line.", kind: "info" });
     }
+    // The Turnback Hook set itself: the strike area says so (after the strike word, a hard take included).
+    setItself && g("fishing:setItself", ue({ speciesId: Q.id, sizeClass: Ji }));
     g(
       "fishing:hook",
       ue({
@@ -132356,6 +132784,18 @@ function Y0e(e) {
       loss.oldRivalId = rival.id;
       if (rival.needsPurchase?.length && loss.overCap)
         loss.overCap.advice += " " + rivalShoppingClue(t(), rival.needsPurchase);
+    }
+    // Once Murk has the part that would have kept it, an ordinary fish lost on a default part says why, once a
+    // night for each kind of loss. Words only: the odds behind the loss are unchanged.
+    if (xe() && !Pe && !loss.overCap) {
+      const partLossText = ordinaryLossWord(e.state?.meta?.loop, h(), R.id, {
+        water: Yt(),
+        leader: i.castLeader ?? null,
+        hook: i.castHook ?? null,
+        lure: !!i.castVisualLure,
+        hardTake: !!i.hardTook,
+      });
+      partLossText && (loss.partLossText = partLossText);
     }
     g("fish:escaped", loss);
     if (rival) {
@@ -136925,10 +137365,12 @@ function Y0e(e) {
             let At = i.cast,
               Dt = i.forcePlace,
               tn = i.taperRule,
-              castLead = i.castLead;
+              castLead = i.castLead,
+              castLeader = i.castLeader;
             try {
-              // Rolled as a cast released now would be: on the Sounding Lead if it fishes.
+              // Rolled as a cast released now would be: on the Sounding Lead if it fishes, on the fitted leader.
               (i.castLead = !k() && p(() => N()?.leadFishes?.()) === !0), (i.forcePlace = Q || null);
+              i.castLeader = castLeaderNow();
               let yn = P();
               if (((i.cast = Ht(yn.x, yn.z, ye(yn.x, yn.z), Pe, !1)), i.cast.mist))
                 return { place: null, mist: i.cast.mist, counts: {} };
@@ -136951,14 +137393,37 @@ function Y0e(e) {
                 ...(vn?.entries?.some((Qn) => Qn.from === "preroll")
                   ? { preroll: vn.entries.find((Qn) => Qn.from === "preroll").p }
                   : {}),
+                leader: i.castLeader ?? null,
                 ...(vn ? { area: i.cast.area ?? null, shares: qn } : {}),
               };
             } catch (yn) {
               return y(yn), null;
             } finally {
-              (i.cast = At), (i.forcePlace = Dt), (i.taperRule = tn), (i.castLead = castLead);
+              (i.cast = At),
+                (i.forcePlace = Dt),
+                (i.taperRule = tn),
+                (i.castLead = castLead),
+                (i.castLeader = castLeader);
             }
           },
+          // The strike grade a fish of this kind gets on the hook a cast released now fishes, as the strike
+          // applies it (turnbackStrike), with that hook (null for the Mere Hook or under a lure).
+          fishHookSet: ({ grade: g = "struck", speciesId: sp = null } = {}) => {
+            if (!xe()) return null;
+            let hook = castHookNow();
+            return { grade: turnbackStrike(g, sp, hook, Re()), hook };
+          },
+          // The words a fish of this kind lost now on this rig would show (ordinaryLossWord), using up tonight's.
+          fishLossWord: ({ speciesId: sp = null, hardTake: hard = !1 } = {}) =>
+            xe()
+              ? ordinaryLossWord(e.state?.meta?.loop, h(), sp, {
+                  water: Yt(),
+                  leader: castLeaderNow(),
+                  hook: castHookNow(),
+                  lure: !!k(),
+                  hardTake: hard,
+                })
+              : null,
           // How a cast released now at `place` with `bait` would fare with the lake's legend: whether she may
           // take (her bait on this rig, then legendMayTake), and how many of `rolls` of her own roll bring her.
           fishLegendRoll: ({ place: Q = null, bait: Pe = null, rolls: Ke = 0 } = {}) => {
@@ -150486,8 +150951,12 @@ function yU(e, t, n, o) {
       (V = !1), (Je = !1), Ee();
     }),
     Pt("fish:escaped", (te) => {
-      b() ? (te.overCap || te.legendLossText) && kt(te) : $.push({ p: te, at: performance.now() });
+      b()
+        ? (te.overCap || te.legendLossText || te.partLossText) && kt(te)
+        : $.push({ p: te, at: performance.now() });
     }),
+    // The Turnback Hook set itself: its word replaces the strike word.
+    Pt("fishing:setItself", () => setItselfWord()),
     _t("player:scorched", () => je());
   function ht(te, ke) {
     let Ce = s(),
@@ -150922,9 +151391,31 @@ function yU(e, t, n, o) {
       w(he, "gw-on"),
       (Ge = 3);
   }
+  // The Turnback Hook set itself (mossmere-gear-deeper.md B2): its word in the strike area, in the clean tone.
+  function setItselfWord() {
+    let word = s().TEXT_LOOP?.hook?.setItself;
+    if (!word || (!Et.ok && b())) return;
+    let xt = e.vw,
+      Mt = e.vh,
+      zt = Et.ok ? Et.x : xt / 2,
+      Ut = Et.ok ? Et.y : Mt * 0.55;
+    (he.style.transform = `translate3d(${Math.max(70, Math.min(xt - 70, zt)).toFixed(0)}px,${Math.max(80, Math.min(Mt - 200, Ut)).toFixed(0)}px,0)`),
+      (he.dataset.grade = "clean"),
+      he.classList.toggle("gw-sb-water", b() && y()?.view?.waterWhite === !0),
+      (X.textContent = word),
+      (X.className = "gw-strike-w gw-tone-clean"),
+      w(he, "gw-on"),
+      (Ge = 3);
+  }
   function kt(te) {
     let ke = s().TEXT_LOOP?.gate?.away || {},
-      Ce = te.overCap?.advice || ke[te.overCap?.key] || ke[te.overCap?.by] || te.legendLossText || "";
+      Ce =
+        te.overCap?.advice ||
+        ke[te.overCap?.key] ||
+        ke[te.overCap?.by] ||
+        te.legendLossText ||
+        te.partLossText ||
+        "";
     if (!Ce) return;
     let qe = e.vw,
       st = e.vh,
@@ -160292,6 +160783,34 @@ function khe(e, { metaLoop: t = null, run: n = null, line: o = null, canChange: 
           }),
     });
   }
+  // The Leader and the Hook, in the Depth row's style, each once a second option is owned, in a water that has
+  // them. With a lure on, the Hook row says the lure carries its own hook instead of offering a choice.
+  for (let slot of ["leader", "hook"]) {
+    let text = i0(e?.TEXT_LOOP?.[slot]) ? e.TEXT_LOOP[slot] : {},
+      owned = Ed(s.parts).filter((z) => e?.LOOP?.rig?.parts?.[z]?.slot === slot);
+    if (!bs[c]?.[slot === "hook" ? "hookSet" : "leader"] || owned.length < 2) continue;
+    let fitted = owned.includes(s.fitted?.[slot])
+        ? s.fitted[slot]
+        : owned.find((z) => e.LOOP.rig.parts[z].start) || owned[0],
+      noChoice = slot === "hook" && !!x;
+    b.push({
+      kind: slot,
+      head: text.head || slot,
+      note: noChoice ? text.lure || "" : null,
+      lines: noChoice ? null : [text.good?.[fitted], text.cost?.[fitted]].filter(Boolean),
+      items: noChoice
+        ? []
+        : owned.map((z) => ({
+            kind: slot,
+            key: z,
+            pick: z,
+            name: text.names?.[z] || z,
+            on: z === fitted,
+            plain: z,
+            log: [],
+          })),
+    });
+  }
   let j = Ed(e?.ZONES).find((z) => z?.id === c)?.name || "";
   return { water: c, waterName: j, gearWater: d, carried: K1(e, s), busy: a === !1, words: r, rows: b };
 }
@@ -160304,11 +160823,13 @@ function Mhe(e) {
         ? ["changeHook", { lure: e.pick }]
         : e.kind === "depth"
           ? ["fitDepth", e.pick]
-          : e.kind === "bait"
-            ? e.pick == null
-              ? ["changeHook", { bait: null, lure: null }]
-              : ["changeHook", { bait: e.pick }]
-            : null;
+          : e.kind === "leader" || e.kind === "hook"
+            ? ["fitPart", e.kind, e.pick]
+            : e.kind === "bait"
+              ? e.pick == null
+                ? ["changeHook", { bait: null, lure: null }]
+                : ["changeHook", { bait: e.pick }]
+              : null;
 }
 var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" focusable="false">
   <path class="gw-tk-wallf" d="M3 36V45C3 49 5.5 52 10 52H98C102.5 52 105 49 105 45V36"/>
@@ -160327,6 +160848,21 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
       '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V30" stroke-width="2.4"/><path d="M100 30V44" stroke-width="4"/><path d="M100 44C114 44 124 58 124 74C124 92 112 104 100 104C88 104 76 92 76 74C76 58 86 44 100 44Z" stroke-width="5"/><path d="M79 70H121" stroke-width="3" stroke-opacity=".6"/><path d="M100 104V122C100 131 93 134 88 129" stroke-width="3.2"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     sounding_lead:
       '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M92 4V22" stroke-width="2.4"/><circle cx="92" cy="27" r="5" stroke-width="3"/><path d="M92 32V40" stroke-width="3"/><path d="M92 40C100 40 104 52 108 66C114 86 108 104 92 104C76 104 70 86 76 66C80 52 84 40 92 40Z" stroke-width="5"/><path d="M146 40V48" stroke-width="2.4"/><path d="M133 76C133 59 139 48 146 48C153 48 159 59 159 76Z" stroke-width="3.6"/><circle cx="146" cy="82" r="3.2" stroke-width="2.6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    // The Leader parts (a plain knot; brass wire twisted below a swivel; a short thick length of gut) and the two
+    // Hooks (a plain J; a circle hook, its point turned back in), in the same style. "leaders" is the tally's
+    // picture when Pike Wire and Chafe Gut arrive together.
+    plain_knot:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V54" stroke-width="2.4"/><path d="M100 54C88 54 88 74 100 74C112 74 112 54 100 54Z" stroke-width="4"/><path d="M91 60L109 68" stroke-width="3"/><path d="M100 74V98C100 112 92 118 84 113L80 106" stroke-width="3.6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    pike_wire:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V28" stroke-width="2.4"/><circle cx="100" cy="33" r="5" stroke-width="3"/><circle cx="100" cy="45" r="5" stroke-width="3"/><path d="M100 50L107 57L93 65L107 73L93 81L107 89L100 96" stroke-width="3"/><path d="M100 96V106C100 120 92 125 84 120L80 113" stroke-width="3.6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    chafe_gut:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V40" stroke-width="2.4"/><path d="M100 44V94" stroke-width="10"/><path d="M100 98V106C100 120 92 125 84 120L80 113" stroke-width="3.6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    leaders:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M72 4V28" stroke-width="2.4"/><circle cx="72" cy="33" r="5" stroke-width="3"/><path d="M72 38L79 45L65 53L79 61L65 69L79 77L72 84" stroke-width="3"/><path d="M72 84V96C72 110 64 115 56 110L52 103" stroke-width="3.6"/><path d="M128 4V36" stroke-width="2.4"/><path d="M128 40V84" stroke-width="10"/><path d="M128 88V96C128 110 120 115 112 110L108 103" stroke-width="3.6"/><path d="M40 138H160" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    mere_hook:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="106" cy="12" r="6" stroke-width="3.4"/><path d="M106 18V90C106 114 92 124 78 124C64 124 56 114 56 100V92L70 106" stroke-width="5"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    turnback_hook:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="112" cy="12" r="6" stroke-width="3.4"/><path d="M112 18V66C112 104 92 124 72 122C52 120 46 98 54 84C62 70 80 70 90 80" stroke-width="5"/><path d="M90 80L86 70" stroke-width="3.4"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     // The Live Minnow (a small fish hooked through the lip) and Murk's minnow tin, in the same style.
     live_minnow:
       '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M66 6V62C66 72 58 77 51 71L47 65" stroke-width="3.2"/><path d="M56 78C68 62 98 58 126 68L150 56V100L126 88C98 98 68 94 56 78Z" stroke-width="5"/><circle cx="73" cy="74" r="3.4" stroke-width="2.6"/><path d="M96 66C100 72 100 84 96 90" stroke-width="2.4" stroke-opacity=".6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
@@ -162095,7 +162631,9 @@ function zV(e) {
         ie.appendChild(_e);
     }
     let J = s("div", "gw-plate-art");
-    J.innerHTML = om(W, { uid: h(), geo: W.slot === "place" ? L(W.placeId) : null });
+    // A Leader or Hook part is drawn in the plain line style of the tackle screen (dV), not a crate.
+    let partArt = W.slot === "part" ? dV[String(W.id).replace(/^part:/, "")] : null;
+    J.innerHTML = partArt || om(W, { uid: h(), geo: W.slot === "place" ? L(W.placeId) : null });
     let Ne = iV(W);
     if (Ne && Y.layout === "desktop") {
       let N = s("i", "gw-plate-num");
@@ -165186,13 +165724,20 @@ function WV(e) {
     let gift = qt.tally?.gift,
       giftText = f().depth || {},
       liveText = f().live || {},
+      // A leader or the Turnback Hook put on Murk's shelf (wo.arrivals): its name and his line. "gutOnly" is the
+      // leaders' tally after Pike Wire came alone.
+      arrivalText = f().arrivals || {},
+      gutOnly = gift === "leaders" && qt.tally?.giftSay === "gutOnly",
+      arrivalKey = gutOnly ? "gutOnly" : gift,
       giftShown =
         gift === "minnow_tin"
           ? { name: liveText.tin, line: liveText.gift?.[qt.tally?.giftSay] || liveText.gift?.plain, fit: "" }
-          : { name: giftText.names?.[gift], line: giftText.gift, fit: giftText.fit };
+          : arrivalText.lines?.[arrivalKey]
+            ? { name: arrivalText.names?.[arrivalKey], line: arrivalText.lines[arrivalKey], fit: "" }
+            : { name: giftText.names?.[gift], line: giftText.gift, fit: giftText.fit };
     if (gift && giftShown.line) {
       let g = n("div", `gw-tally-gift${Le.empty ? " gw-in" : ""}`),
-        art = dV[gift] || "";
+        art = dV[gutOnly ? "chafe_gut" : gift] || "";
       g.innerHTML = `<span class="gw-tally-gift-art" aria-hidden="true">${art}</span><b class="gw-tally-gift-name"></b><p class="gw-murk-line gw-in"></p>${giftShown.fit ? '<p class="gw-tally-gift-fit"></p>' : ""}`;
       (g.querySelector(".gw-tally-gift-name").textContent = giftShown.name || ""),
         (g.querySelector(".gw-murk-line").textContent = giftShown.line),
