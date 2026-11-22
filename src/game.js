@@ -33863,7 +33863,7 @@ var Ms = [
         eyes: "normal",
         scale: 0.6,
       },
-      lore: "It hides under the stones by day. At night it walks the bottom and grabs nearly anything, even a drowned button.",
+      lore: "It hides under the stones by day. At night it walks the bottom and picks up drowned buttons. No one knows whose coat it is trying to finish.",
     },
     {
       id: "weeping_carp",
