@@ -24,9 +24,9 @@
 import { readFileSync } from "node:fs";
 import * as acorn from "acorn";
 import { join } from "node:path";
-import { DEFAULT_PAGE, GameSession, ROOT, launchBrowser } from "./game-driver.mjs";
+import { DEFAULT_PAGE, GameSession, ROOT, SLOW, launchBrowser } from "./game-driver.mjs";
 
-const BUDGET_MS = 3_600_000; // every scenario, launch to exit
+const BUDGET_MS = 3_600_000 * SLOW; // every scenario, launch to exit (GW_SLOW stretches every limit)
 const SCENARIO_TIMEOUT_MS = 240_000;
 // Smaller than the smoke test's 480 x 270: SwiftShader draws every frame on the CPU, and several
 // scenarios share it. The game's layout still fits (its phone layout).
@@ -2774,7 +2774,7 @@ const SCENARIOS = [
       const where = await visibleText(session, ".gw-jr-where");
       await session.eval(() => window.__gw.ui.closeAll());
       check(
-        where.includes("Feeds just after the old bell strikes midnight") && !/calm/i.test(where),
+        where.includes("She feeds just after the old bell strikes midnight") && !/calm/i.test(where),
         `her Journal page's feeding line: "${where}"`,
       );
       // She takes only a bait laid on the bottom: the Worm Bunch on the Sounding Lead, at 1 in 6.
@@ -5268,6 +5268,94 @@ const SCENARIOS = [
       return `${r.limit.text}`;
     },
   },
+
+  // ---- the words pass: the Journal and the Sheet in the house voice (voice.md) ----------------------------------
+  {
+    name: "words: each caught fish's Journal line says when it bites and where it feeds, in whole sentences that match the game",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      // The game's own rules for each caught Mossmere fish: its hours on the loop and its row in the depth table.
+      const fish = await session.eval(() => {
+        const g = window.__gw,
+          journal = g.state.meta.journal || {};
+        return g.data.SPECIES.filter((s) => s.zone === "mossmere" && journal[s.id]?.caught > 0).map((s) => ({
+          id: s.id,
+          hours: g.data.loopHours(s),
+          giant: !!s.giant,
+        }));
+      });
+      check(fish.length >= 8, `only ${fish.length} caught fish in the fixture`);
+      // Where each one feeds, as the depth table (mossmere-gear.md B2) puts it.
+      const FEEDS = {
+        rustfin_sucker: "bottom",
+        weeping_carp: "bottom",
+        milkeye_perch: "bottom",
+        dusk_minnow: "high",
+        reedjaw_pike: "high",
+      };
+      const HOURS = { day: "by day", dusk: "at dusk", night: "at night" };
+      const FEED_WORDS = {
+        bottom: "It feeds on the bottom.",
+        high: "It feeds high in the water.",
+        any: "It feeds at any depth.",
+      };
+      const lines = [];
+      for (const f of fish) {
+        await session.eval((id) => window.__gw.ui.openJournal({ sel: id }), f.id);
+        await session.waitFor(
+          `${f.id}'s Journal page`,
+          10_000,
+          () => !!document.querySelector(".gw-jr-where"),
+        );
+        const where = await visibleText(session, ".gw-jr-where");
+        const named = f.hours.map((h) => HOURS[h]);
+        const when =
+          f.hours.length >= 3
+            ? "at any hour"
+            : `${f.giant ? "most" : "only"} ${named.length > 1 ? `${named.slice(0, -1).join(", ")} and ${named.at(-1)}` : named[0]}`;
+        const want = `It bites ${when}. ${FEED_WORDS[FEEDS[f.id] || "any"]}`;
+        check(where === want, `${f.id}: the Journal says "${where}", the game's rules say "${want}"`);
+        lines.push(where);
+      }
+      // The fish that bite only by day and at dusk say so (they once read "at any hour").
+      check(
+        lines.includes("It bites only by day and at dusk. It feeds at any depth."),
+        `no day and dusk fish among ${JSON.stringify(lines)}`,
+      );
+      // The Sheet's Overview and Odds pages: whole sentences, with no "+", "×", "→" or "·" in a line.
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "sheet" }));
+      await session.waitFor("the Sheet", 10_000, () => !!document.querySelector(".gw-kit-row"));
+      const overview = await session.eval(() =>
+        [...document.querySelectorAll(".gw-kit-context, .gw-kit-row > span")].map((el) =>
+          el.textContent.trim(),
+        ),
+      );
+      for (const line of overview)
+        check(
+          /^[A-Z].*\.$/.test(line) && !/[+×→·]/.test(line),
+          `an Overview line is not a plain sentence: "${line}"`,
+        );
+      check(
+        /^At home, this shows what helps you .+\.$/.test(overview[0]),
+        `the Overview's first line: "${overview[0]}"`,
+      );
+      await session.eval(() => document.querySelector('[data-sheet-page="odds"]')?.click());
+      await session.pause(800);
+      const odds = await visibleText(session, ".gw-kit-page, .gw-sh-sec");
+      check(
+        odds.includes("A clean strike helps a little. Too early or too late costs a little.") &&
+          !odds.includes("an early or late one"),
+        `the Odds page's strike line: ${odds.slice(0, 400)}`,
+      );
+      check(
+        /You have yet to meet \d+ more here\./.test(odds),
+        `the Odds page's line for fish not met: ${odds.slice(0, 400)}`,
+      );
+      return `${fish.length} fish; ${overview.length} Overview lines`;
+    },
+  },
 ];
 
 // ---- the runner -----------------------------------------------------------------------------------------
@@ -5306,7 +5394,7 @@ async function runScenario(browser, scenario) {
       return detail;
     };
     const timeout = new Promise((_, reject) => {
-      const limit = scenario.timeoutMs ?? SCENARIO_TIMEOUT_MS;
+      const limit = (scenario.timeoutMs ?? SCENARIO_TIMEOUT_MS) * SLOW;
       timer = setTimeout(() => reject(new Error(`over ${limit / 1000}s`)), limit);
     });
     const detail = await Promise.race([work(), timeout]);

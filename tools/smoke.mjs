@@ -31,7 +31,9 @@ const CHARACTER = { label: "Tallow", id: "tallow" };
 const WICKS = ["The Wick", "Taper", "Stub", "Tallow", "Ashwick"];
 // Small viewport: Chromium renders WebGL on the CPU here (SwiftShader), and every frame costs.
 const VIEWPORT = { width: 480, height: 270 };
-const BUDGET_MS = 110_000; // the whole run, launch to exit
+// On a busy machine, GW_SLOW=2 (or more) stretches every time limit by that factor; it changes no check.
+const SLOW = Math.max(1, Number(process.env.GW_SLOW) || 1);
+const BUDGET_MS = 110_000 * SLOW; // the whole run, launch to exit
 
 const t0 = Date.now();
 const secs = () => ((Date.now() - t0) / 1000).toFixed(1).padStart(5) + "s";
@@ -194,6 +196,7 @@ async function expectRendering(page, where) {
 }
 
 async function waitFor(page, what, timeoutMs, fn, arg) {
+  timeoutMs *= SLOW;
   assertNoErrors();
   let wake;
   const errored = new Promise((resolve) => errorWaiters.add((wake = resolve)));
@@ -306,7 +309,7 @@ async function main() {
   await step("intro, opening tow and chart, then Sail", async () => {
     // The game decides what comes next; each turn does the one thing a player would do on that screen.
     const seen = [];
-    const deadline = Date.now() + 60_000;
+    const deadline = Date.now() + 60_000 * SLOW;
     while (Date.now() < deadline) {
       assertNoErrors();
       const { act, state } = await page.evaluate(() => {

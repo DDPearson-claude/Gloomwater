@@ -31533,7 +31533,7 @@ function BQ(e) {
     o = n > 0 ? Math.round(1 / n) : 0;
   return {
     snags: t.snags || "Snags",
-    rate: String(t.biteIn || "1 bite in {n}").replace("{n}", String(o)),
+    rate: String(t.biteIn || "One bite in {n} is a snag.").replace("{n}", String(o)),
     n: o,
   };
 }
@@ -32106,6 +32106,10 @@ function depthBiteMult(speciesId, depth, water) {
   let feeds = (water == null ? y0 : bs[water])?.depth?.[speciesId] || "any",
     rule = wo?.depthMult || {};
   return Math.max(ka(rule.floor, 0.5), ka(rule.lead?.[feeds], 1));
+}
+// Where a species feeds in a water, as the depth table above says: "bottom", "high" or "any" (for the Journal).
+function speciesFeedsAt(speciesId, water) {
+  return (water == null ? y0 : bs[water])?.depth?.[speciesId] || "any";
 }
 // A sign or sight take chance on the lead: raised (to at most 0.9, never below what it was) or lowered.
 function depthTakeChance(p, mult) {
@@ -32956,7 +32960,7 @@ function rivalGround(data, rival) {
     data.PLACE_V3_BY_ID?.[rival.place]?.name ||
     data.loopPlace?.(rival.place)?.name ||
     data.ZONE_BY_ID?.mossmere?.arena?.places?.find((x) => x.id === rival.place)?.name ||
-    "Mossmere open water"
+    "the open water"
   );
 }
 // Missing Murk purchases drawn from complete rigs that can hold this individual.
@@ -33009,12 +33013,9 @@ function rivalShoppingClue(data, keys) {
     const [slot, id] = key.split(":");
     return slot === "line" ? gF(data, "line", Number(id)) : qu(data, id);
   });
-  return (
-    "Before it will bite again, buy " +
-    (names.length > 1 ? "one of these from Murk: " : "from Murk: ") +
-    names.join(", ") +
-    "."
-  );
+  return names.length > 1
+    ? "It will not bite again until you buy one of these from Murk: " + names.join(", ") + "."
+    : "It will not bite again until you buy " + names[0] + " from Murk.";
 }
 function loseOldRival(meta, data, run, loss, rematchId, rig = null, random = Math.random) {
   if (
@@ -33037,7 +33038,7 @@ function loseOldRival(meta, data, run, loss, rematchId, rig = null, random = Mat
     if (loss.overCap?.advice) {
       fish.clue = loss.overCap.advice;
       delete fish.lastNote;
-    } else fish.lastNote = "Your setup could hold it. Try these waters again.";
+    } else fish.lastNote = "Your gear can hold it now. Fish this water again.";
     return fish;
   }
   if (!loss.overCap?.advice || rematchId || !["snapped", "thrown"].includes(loss.reason)) return null;
@@ -37862,7 +37863,7 @@ var Ms = [
     waystoneText: "Waystones remember the way down. Begin your descent in any water you have reached before.",
     kindlingDraft: "The Waystone remembers your flame. Choose what it carried.",
     journalTitle: "The Wick's Journal",
-    journalUnknown: "An unfamiliar ripple. Something here has not yet been named.",
+    journalUnknown: "You have not met this fish yet.",
     challengesTitle: "Trials of the Wick",
     challengeTiers: { 1: "First Flickers", 2: "The Long Vigil", 3: "Deeper Water" },
     creelFull: "Your creel is full. Eat, render, release, or let this one go.",
@@ -42707,7 +42708,7 @@ var Nf = [
         tallyAt: Oh.bell_pool,
         build: "existing",
         landmark: { x: -4, y: 2, z: -14 },
-        lore: "A harbour bell lies nine metres down. In Moonfall you can see her circling it, at whatever she weighs today.",
+        lore: "This is the deepest hole in Mossmere. An old bell stands over it, cracked and silent.",
         look: "the drowned harbour bell on the pool's floor, verdigris on its crack, seen only in Moonfall's second disc",
       },
       {
@@ -42746,7 +42747,7 @@ var Nf = [
         build:
           "the re-dressed bridge (W9: arch spans and deck over the existing piers) + merged chain strands",
         landmark: { x: -29.5, y: 3, z: 0.5 },
-        lore: "Rust chains hang from the break where the bridge went down. The fish hold in the dark under its three arches.",
+        lore: "Rust chains hang where the bridge broke. Fish wait in the dark under its three arches.",
         look: "three dark arch gaps under hanging chains",
       },
       {
@@ -42909,7 +42910,7 @@ var Nf = [
         tallyAt: Oh.lily_maze,
         build: "existing instanced pads (local density \xD7 2) + glow-buds",
         landmark: { x: -30, y: 3, z: 14 },
-        lore: "Notched pads in the lee of Mossbell Isle, and koi glowing under them like lanterns under snow. The size of the glow is the size of the fish.",
+        lore: "Lily pads float in the lee of Mossbell Isle, with koi glowing under them. The bigger the glow, the bigger the fish.",
         look: "notched lily pads with soft glows beneath",
       },
       {
@@ -42941,7 +42942,7 @@ var Nf = [
         build:
           "on-surface depth-tinted glow decals + 24 emissive float caps at y 0 (one InstancedMesh, 1 call)",
         landmark: { x: -48, y: 1, z: -14 },
-        lore: "At night the drowned channel-buoys still burn under the water, in two rows, showing the way to a harbour mouth that is not there.",
+        lore: "At night the old buoys still glow under the water in two rows. They show the way to a harbour that is gone.",
         look: "two rows of lanterns burning under the black water",
       },
       {
@@ -44778,7 +44779,7 @@ var pP = {
       log: {
         title: "Landing odds once hooked",
         with: "With the {item}:",
-        strike: "A clean strike adds a little; an early or late one costs a little.",
+        strike: "A clean strike helps a little. Too early or too late costs a little.",
         gloomtide: "Gloomtide: a hand slam that lands parts the line.",
         unseen: "Land or lose one to learn its odds.",
         marked: "{name}, {class}, near {size}",
@@ -44786,8 +44787,8 @@ var pP = {
       gear: {
         tackle: "Adds {hold} Grip on every fish, and more on {styles}.",
         item: "Adds {hold} Grip on {targets}.",
-        none: "Helps nothing you have met yet.",
-        compare: "{name} ({class}): {from} \u2192 {to} with this.",
+        none: "It helps no fish you have met yet.",
+        compare: "With this, {name} ({class}) goes from {from} to {to}.",
         lastAway: "The {name} that {cause} ({class})",
       },
       logLocked: "Reel in first.",
@@ -46787,7 +46788,7 @@ var pP = {
     newBest: "New best: {w} (was {was})",
     classFirst: "First {class} {species}",
     oldLedger: "Old Ledger beaten",
-    saidToReach: "said to reach {w}",
+    saidToReach: "Some are said to reach {w}.",
     stillOutThere: "still out there",
     resident: "Resident",
     murkFrontYard: "Lives in my front yard. I don't buy those. The real water's through the gate.",
@@ -47238,9 +47239,9 @@ var pP = {
       heartmoss: "A fistful of worms on a big hook. Too much for little mouths.",
     },
     maps: {
-      lily_maze: "Koi glow under the pads like lanterns.",
-      under_the_span: "The bridge kept its chain. Something kept it.",
-      buoy_lights: "The harbour lights went under, still lit.",
+      lily_maze: "Koi glow like lanterns under the lily pads.",
+      under_the_span: "Chains hang from the broken bridge, and big fish wait under its arches.",
+      buoy_lights: "The old harbour lights still glow under the water at night.",
     },
     murk: {
       empty: "Nothing? It happens. Go again.",
@@ -47895,8 +47896,24 @@ Ca.log = Object.assign(Ca.log || {}, {
   whoBites: "Who bites",
   bare: "Bare hook",
   under: "<1%",
-  unmet: "and {n} you have not met",
-  gear: "Adds {n} Grip on the fish it suits ({m} you have met).",
+  unmet: "You have yet to meet {n} more here.",
+  gear: "Adds {n} Grip on the fish it suits. You have met {m} of them.",
+  // The Journal's line under a caught fish: when it bites and where it feeds, built by journalBitesLine.
+  bites: {
+    line: "It bites {hours}.",
+    any: "at any hour",
+    only: "only {hours}",
+    most: "most {hours}",
+    hours: { day: "by day", dusk: "at dusk", night: "at night" },
+    and: "and",
+    feeds: {
+      bottom: "It feeds on the bottom.",
+      high: "It feeds high in the water.",
+      any: "It feeds at any depth.",
+    },
+    takes: "It takes only {bait}.",
+    midnight: "She feeds just after the old bell strikes midnight, in deep water.",
+  },
 });
 wo.start = { lures: ["bent_spoon"], bait: { mireworm: 10 }, fit: "mireworm" };
 wo.bare = { waitMult: 2.5, favour: -0.5 };
@@ -48093,24 +48110,27 @@ wo.finds = {
 };
 Ca.finds = {
   snags: "Snags",
-  biteIn: "1 bite in {n}",
+  biteIn: "One bite in {n} is a snag.",
   items: {
     tin_spoon: { name: "Bent Tin Spoon", line: "Someone ate every meal with this, slowly." },
-    door_ring: { name: "Brass Door-Ring", line: "Off a door four Wicks tall." },
-    salt_lens: { name: "Salt-Glass Lens", line: "Fitted to a lantern long since drowned." },
-    two_headed_coin: { name: "Two-Headed Coin", line: "Lucky, they said. Heads every time." },
-    toll_purse: { name: "The Toll-Keeper's Purse", line: "Full. Nobody came to collect." },
+    door_ring: { name: "Brass Door-Ring", line: "It came off a door four Wicks tall." },
+    salt_lens: { name: "Salt-Glass Lens", line: "It sat in a lantern that drowned long ago." },
+    two_headed_coin: { name: "Two-Headed Coin", line: "They said it was lucky. It lands heads every time." },
+    toll_purse: { name: "The Toll-Keeper's Purse", line: "It is still full. Nobody came to collect." },
     buoy_bell: { name: "Rust Buoy-Bell", line: "It rang the boats home once." },
-    gate_glass: { name: "Gate Lamp-Glass", line: "Amber, from the Gate's drowned lamps." },
-    moat_bollard: { name: "Moat Bollard", line: "Carved stone. Boats tied here for centuries." },
-    rod_tassel: { name: "Knotted Rod Tassel", line: "Every knot, a fish someone was proud of." },
+    gate_glass: { name: "Gate Lamp-Glass", line: "This amber glass came from the Gate's drowned lamps." },
+    moat_bollard: {
+      name: "Moat Bollard",
+      line: "It is carved stone. Boats tied up to it for hundreds of years.",
+    },
+    rod_tassel: { name: "Knotted Rod Tassel", line: "Each knot is a fish someone was proud of." },
     toll_vane: { name: "Toll-Tower Vane", line: "It still points into the wind." },
-    lily_boxes: { name: "Night-Lily Window Boxes", line: "A window box, still flowering." },
+    lily_boxes: { name: "Night-Lily Window Boxes", line: "This window box still has flowers in it." },
   },
 };
 Object.assign(Ca.murk, {
   firstTreasure: "The water keeps what it takes. Mostly.",
-  firstPart: "That'll fit her. I'll see to it by morning.",
+  firstPart: "That'll fit your raft. I'll see to it by morning.",
   firstJackpot: "Somebody's whole fortune. Now it's yours.",
 });
 function nte(e, t = { LOOP: wo, TEXT_LOOP: Ca }, n = "mossmere", o = {}) {
@@ -48156,33 +48176,33 @@ wo.lostTackle = {
 Object.assign(Ca.finds.items, {
   lamp_pole: {
     name: "Lamplighter's Pole",
-    does: "Casts farther than any rod sold.",
-    line: "It lit the drowned buoys, once.",
+    does: "It casts farther than any rod Murk sells.",
+    line: "It lit the buoys, before they drowned.",
   },
   belfry_winch: {
     name: "Belfry Winch",
-    does: "Brings every fish in quicker.",
-    line: "Cut from the belfry's clockwork.",
+    does: "It brings every fish in quicker.",
+    line: "It was cut from the belfry's clockwork.",
   },
   ferry_thread: {
     name: "Ferrywife's Thread",
     does: "Fish bite sooner on it.",
-    line: "Spun on the ferry between rows.",
+    line: "It was spun on the ferry, between trips.",
   },
   guard_button: {
     name: "Gate-Guard's Button",
-    does: "Most fish take it. Never giants.",
-    line: "Off a gate guard's coat, drilled.",
+    does: "Most fish take it, but never a giant.",
+    line: "It came off a gate guard's coat, with a hole drilled in it.",
   },
   veil_notebook: {
     name: "The Veil Angler's Notebook",
-    does: "Trout notes, and a hidden water.",
-    line: "Fished the Veil every day, it says.",
+    does: "It has notes on trout, and shows a hidden water.",
+    line: "It says its owner fished the Veil every day.",
   },
   lily_notebook: {
     name: "The Lily Gardener's Notebook",
-    does: "Carp notes, and one far carp.",
-    line: "Every carp in the moat, by name.",
+    does: "It has notes on carp, and on one from far away.",
+    line: "It names every carp in the moat.",
   },
 });
 Ca.murk.firstTackle = "Somebody fished here before you.";
@@ -48191,16 +48211,16 @@ Ca.gearItems.guard_button = "Gate-Guard's Button";
 Ca.tackle.kit = "Kit";
 Ca.lost = {
   log: {
-    cast: "Casts {m} m.",
-    play: "Plays {x}\xD7 as long.",
-    wait: "Bites come {p}% sooner.",
-    likes: "Liked by {n} fish here.",
-    boost: "{fish} come more often.",
-    guest: "{fish} bite at {where}, {lights}.",
-    reveals: "Shows the way to {place}.",
+    cast: "It casts {m} m.",
+    play: "Fights take {x} times as long.",
+    wait: "Fish bite {p}% sooner.",
+    likes: "It suits {n} of the fish here.",
+    boost: "{fish} bite more often.",
+    guest: "{fish} bite {where} {lights}.",
+    reveals: "It shows the way to {place}.",
   },
-  where: { inflow: "the Sluice Veil", pads: "the lily beds" },
-  lights: { day: "day", dusk: "dusk", night: "night", and: "and" },
+  where: { inflow: "at the Sluice Veil", pads: "in the lily beds" },
+  lights: { day: "by day", dusk: "at dusk", night: "at night", and: "and" },
   places: { veilback_brook: "Veilback Brook" },
 };
 wo.guests = { mossmere: ["rosefleck_trout", "rainglass_darter", "nightbloom_carp"] };
@@ -48245,7 +48265,7 @@ var J5 = Object.freeze({
     shoreNotch: { a: 3.9, w: 6, depth: 0.6, len: 18, pool: { at: [0.46, 0.76], w: 8.4 }, end: 2.4 },
     veil: "mist",
   },
-  lore: "Behind the falling water, the old cut still runs.",
+  lore: "An old stream still runs behind the falling water.",
   look: "a reed-banked brook under broken arches",
 });
 Er && !Mu.places.some((e) => e.id === J5.id) && Mu.places.push(Ki(J5));
@@ -48558,7 +48578,15 @@ Ca.murk.shelfBare = "Shelf's bare. Save your clams for new water.";
 Ca.goods = { name: "Murk's Goods", buy: "Buy \xB7 {price}" };
 Ca.sheet = {
   title: "{name}'s Sheet",
-  buffs: "Buffs",
+  buffs: "What helps you",
+  // The Overview page's line under its heading; {where} and {hour} are filled with " at the Lily Maze", " at dusk".
+  context: {
+    home: "At home, this shows what helps you{where}{hour}.",
+    trip: "This shows what helps you{where}{hour}.",
+    last: "where you last cast",
+    open: "on open water",
+    hours: { day: "by day", dusk: "at dusk", night: "at night" },
+  },
   odds: "Odds",
   exact: {
     wick: "Each one sells for {mult} times as much, and at least {floor} clams more. Giants do not count.",
@@ -48571,12 +48599,12 @@ Ca.sheet = {
   cast: "Casts {m} m \xB7 {n} longer to strike",
   hookSet: "Hook set: {hold} more Grip",
   bigger: { predator: "Bigger predators.", bottom: "Bigger bottom feeders." },
-  giants: "Giants \xD7{k}.",
+  giants: "Giants bite {k} times as often.",
   rarer: "Rarer fish.",
-  sooner: "Bites sooner \xD7{k}.",
+  sooner: "Fish bite {k} times as fast.",
   good: "Good bites",
-  move: "{what} {from} \u2192 {to}",
-  moveNext: "{what} {from} \u2192 {to} with this.",
+  move: "The {what} share goes from {from} to {to}.",
+  moveNext: "With this, the {what} share goes from {from} to {to}.",
   family: { predator: "Predators:", bottom: "Bottom feeders:" },
   lastCast: "Where you last cast",
   quiet: "Quiet water",
@@ -48875,7 +48903,7 @@ Object.assign(Ca.maps, {
   gill_harp: "The gills hang down. One of them hums.",
   veilwater: "Behind the moss, a lantern floats.",
   mothers_cup: "The Mother breathes. Big things breathe with her.",
-  sporewood: "A harp in the Pools knows one song.",
+  sporewood: "Sporewood is a new lake, with new fish to find.",
 });
 Ca.murk.at = {
   sporewood: {
@@ -48893,7 +48921,7 @@ Ca.leave = {
   tow: "Tow",
   notYet: "Not yet",
 };
-Ca.mapLeaves = "Moving on leaves bought gear behind.";
+Ca.mapLeaves = "Your gear here waits for you when you move on.";
 Ca.carry = "Carried {r} \xB7 {l} \xB7 {c}";
 Ca.guide.newWater = "New water: new gear, lures and bait at Murk's.";
 wo.finds.items.push(
@@ -110985,7 +111013,9 @@ function FF(e) {
       );
     let $ = J(ge);
     if ($ && $.suits === !0)
-      return String(n().TEXT_LOOP?.log?.gear || "Adds {n} Grip on the fish it suits ({m} you have met).")
+      return String(
+        n().TEXT_LOOP?.log?.gear || "Adds {n} Grip on the fish it suits. You have met {m} of them.",
+      )
         .replace("{n}", q)
         .replace("{m}", $.met.length);
     let de;
@@ -111000,7 +111030,7 @@ function FF(e) {
               .join(", ")),
       de
         ? (F.item || "Adds {hold} Grip on {targets}.").replace("{hold}", q).replace("{targets}", de)
-        : F.none || "Helps nothing you have met yet."
+        : F.none || "It helps no fish you have met yet."
     );
   }
   function lt(ge) {
@@ -151515,7 +151545,7 @@ function gU(
         : "",
     O = f
       ? [i.unseen || "Land or lose one to learn its odds."]
-      : [i.strike || "A clean strike adds a little; an early or late one costs a little."];
+      : [i.strike || "A clean strike helps a little. Too early or too late costs a little."];
   return (
     !f &&
       !h &&
@@ -151590,7 +151620,7 @@ function cU(e, t, { names: n = {} } = {}) {
   let i = t.targets,
     c = (f) => (Array.isArray(f?.met) ? f.met.length : xr(f?.met, -1));
   if (i && typeof i == "object" && i.suits === !0)
-    return Rc(e?.TEXT_LOOP?.log?.gear || "Adds {n} Grip on the fish it suits ({m} you have met).", {
+    return Rc(e?.TEXT_LOOP?.log?.gear || "Adds {n} Grip on the fish it suits. You have met {m} of them.", {
       n: a,
       m: Math.max(0, c(i)),
     });
@@ -151598,12 +151628,12 @@ function cU(e, t, { names: n = {} } = {}) {
   if (i === "all") d = "every fish";
   else if (Array.isArray(i)) {
     let f = l(i);
-    if (!f.length) return o.none || "Helps nothing you have met yet.";
+    if (!f.length) return o.none || "It helps no fish you have met yet.";
     d = f.length > 5 ? `${f.length} species you have met` : Wz(f.map(r));
   } else if (i && typeof i == "object")
     if (Array.isArray(i.species)) {
       let f = l(i.species);
-      if (!f.length) return o.none || "Helps nothing you have met yet.";
+      if (!f.length) return o.none || "It helps no fish you have met yet.";
       d = Wz(f.map(r));
     } else {
       let f = i.family
@@ -151614,7 +151644,7 @@ function cU(e, t, { names: n = {} } = {}) {
         u = c(i);
       d = u >= 0 ? `${f} (${u === 0 ? "none you have met yet" : `${u} species you have met`})` : f;
     }
-  else return o.none || "Helps nothing you have met yet.";
+  else return o.none || "It helps no fish you have met yet.";
   return d === "every fish"
     ? `Adds ${a} Grip on every fish.`
     : Rc(o.item || "Adds {hold} Grip on {targets}.", { hold: a, targets: d });
@@ -151624,7 +151654,7 @@ function vb(e, t, n, o, { speciesName: a = "" } = {}) {
   let s = ou(e).gear || {},
     r = a || Qu(String(t.speciesId || "fish").replace(/_/g, " ")),
     l = t.reason ? `The ${r.replace(/^the\s/i, "")} that ${ou(e).toastCause?.[t.reason] || "got away"}` : r;
-  return Rc(s.compare || "{name} ({class}): {from} \u2192 {to} with this.", {
+  return Rc(s.compare || "With this, {name} ({class}) goes from {from} to {to}.", {
     name: l,
     class: o0(e, t.sizeClass, t.ancient),
     from: QM(e, n),
@@ -151672,7 +151702,7 @@ function mU(e, t, { met: n = null, names: o = {}, item: a = "" } = {}) {
     cols: [a || "", s.bare || "Bare hook"],
     rows: d,
     unmet: f,
-    more: f > 0 ? Rc(s.unmet || "and {n} you have not met", { n: f }) : "",
+    more: f > 0 ? Rc(s.unmet || "You have yet to meet {n} more here.", { n: f }) : "",
   };
 }
 function t4(e, t, { speciesName: n = "" } = {}) {
@@ -169440,7 +169470,7 @@ function GV(e, t, { names: n = {}, phone: o = !1 } = {}) {
     Z = Ui(r.buffs).map(z);
   o && (Z = Z.filter((C) => C.glyph !== "passive"));
   let D = {
-      head: s.buffs || "Buffs",
+      head: s.buffs || "What helps you",
       where: j,
       hour: B.light,
       hourName: s.hours?.[B.light] || "",
@@ -169509,7 +169539,7 @@ function GV(e, t, { names: n = {}, phone: o = !1 } = {}) {
         cls: hh(t, m),
         rows: _,
       },
-      unmet: be.unmet > 0 ? s0(a.log?.unmet || "and {n} you have not met", { n: be.unmet }) : "",
+      unmet: be.unmet > 0 ? s0(a.log?.unmet || "You have yet to meet {n} more here.", { n: be.unmet }) : "",
       strike: t?.AUTOFISH?.text?.log?.strike || "",
       // The Sounding Lead's numbers, shown on this page only (elsewhere: "more often", "less often").
       depth: be.depth === "lead" ? a.depth?.odds || "" : "",
@@ -169821,7 +169851,7 @@ function fillRivalJournal(section, meta, data) {
       return node;
     };
   if (!book?.active && !book?.landed?.length) {
-    append(section, "p", "Murk keeps a page for the big ones that get away.");
+    append(section, "p", "Murk keeps a page here for the big ones that get away.");
     return;
   }
   function entry(fish, landed) {
@@ -169831,8 +169861,8 @@ function fillRivalJournal(section, meta, data) {
     append(row, "small", landed ? "Recovered hook" : "Still out there");
     append(row, "h4", fish.name);
     const where = rivalGround(data, fish),
-      escapes = fish.escapes + " escape" + (fish.escapes === 1 ? "" : "s");
-    append(row, "p", where + " · " + escapes);
+      escapes = fish.escapes === 1 ? "once" : fish.escapes === 2 ? "twice" : fish.escapes + " times";
+    append(row, "p", "It got away from you " + escapes + ", " + (bb(where) || where) + ".");
     if (landed) {
       const species = data.SPECIES_BY_ID?.[fish.speciesId];
       if (species) {
@@ -169859,12 +169889,13 @@ function fillRivalJournal(section, meta, data) {
       append(
         row,
         "p",
-        "“" +
+        "You kept " +
           fish.name +
-          "’s Bent Hook” · Landed on evening " +
+          "’s Bent Hook. You landed it on evening " +
           fish.landedEvening +
-          " · " +
-          date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }),
+          ", on " +
+          date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) +
+          ".",
       );
     } else {
       append(row, "p", fish.clue);
@@ -169877,8 +169908,12 @@ function fillRivalJournal(section, meta, data) {
           row,
           "p",
           fish.sightings
-            ? "Watch for a wake crossing your line and a brief silver glint."
-            : "First hooked on evening " + fish.evening + ". Return to " + where + " and cast again.",
+            ? "Watch for a wake across your line, and a quick flash of silver."
+            : "You first hooked it on evening " +
+                fish.evening +
+                ". Go back and cast again " +
+                (bb(where) || where) +
+                ".",
         );
     }
   }
@@ -169887,7 +169922,7 @@ function fillRivalJournal(section, meta, data) {
 }
 function currentKitRows(model, view, data, firstOpen) {
   const rows = [];
-  const add = (source, effect, when = "Equipped") => {
+  const add = (source, effect, when = "Fitted") => {
     if (source && effect) rows.push({ source, effect, when });
   };
   const names = data.TEXT_LOOP?.gearItems || {},
@@ -169898,40 +169933,49 @@ function currentKitRows(model, view, data, firstOpen) {
     data.BAITS?.find((x) => x.id === id)?.name ||
     data.LURES?.find((x) => x.id === id)?.name ||
     id;
-  const signed = (n) => (n >= 0 ? "+" : "") + num(n);
-  const hold = (n) => signed(n) + " Grip";
+  // Whole sentences for the numbers on this page (voice.md rules 5 and 8: no "+", "×" or "→").
+  const hold = (n) =>
+    n > 0 ? "Adds " + num(n) + " Grip." : n < 0 ? "Takes away " + num(-n) + " Grip." : "Adds no Grip.";
+  const sizeBy = (n) => "Their size goes " + (n < 0 ? "down" : "up") + " by " + num(Math.abs(n)) + ".";
   const exact = model.wick?.exact;
   if (exact?.id === "taper") {
     add(
       view.head.passive,
       "Your first bite each evening is never a common fish.",
-      model.trip ? (firstOpen ? "Ready this outing" : "Used this outing") : "First bite each outing",
+      model.trip ? (firstOpen ? "Ready this evening" : "Used this evening") : "First bite each evening",
     );
     add(
       view.head.passive,
       "Giants bite " + exact.values.share + " times as often, up to " + exact.values.cap + "% of bites.",
       "In giant water",
     );
-  } else add(view.head.passive, [view.head.line, view.head.exact].filter(Boolean).join(" "), "Wick passive");
+  } else add(view.head.passive, [view.head.line, view.head.exact].filter(Boolean).join(" "), "Your Wick");
   for (const s of model.tackle?.slots || []) {
     const v = s.values,
       stats = [hold(v.hold)];
     if (s.slot === "rod") {
-      stats.push(num(v.castMax) + " m cast");
-      if (v.strike) stats.push(signed(v.strike) + "% strike time");
+      stats.push("Casts " + num(v.castMax) + " m.");
+      if (v.strike)
+        stats.push(
+          "Gives you " +
+            num(Math.abs(v.strike)) +
+            "% " +
+            (v.strike < 0 ? "less" : "more") +
+            " time to strike.",
+        );
     }
     if (s.found) {
       const extra = e4(data, s.found);
       for (const line of extra) if (!/hold/i.test(line)) stats.push(line);
     }
-    add(s.name, stats.join(" · "));
+    add(s.name, stats.join(" "));
   }
   const hook = model.tackle?.hook || {};
   for (const kind of ["lure", "bait"]) {
     const id = hook[kind],
       p = hook.plates?.[kind];
     if (!id) continue;
-    if (p?.hold) add(gearName(id), hold(p.hold) + " against fish that favour it.", "Matching fish");
+    if (p?.hold) add(gearName(id), "Adds " + num(p.hold) + " Grip on fish that like it.", "Matching fish");
     if (id === data.LOOP?.legendBait?.[model.water]?.id)
       add(gearName(id), data.TEXT_LOOP?.shelf?.[id] || "Allows a legendary bite in its pool.", "At its pool");
   }
@@ -169946,64 +169990,64 @@ function currentKitRows(model, view, data, firstOpen) {
     let name = vrow?.name || gearName(src.id),
       effect = "",
       when = "Fitted";
-    const size = () => signed(v) + " to the size roll";
+    const size = () => sizeBy(v);
     switch (kind) {
       case "bigger":
       case "keel":
-        effect = "Fish tend to run larger (" + size() + ").";
+        effect = "Fish tend to run larger. " + size();
         break;
       case "family": {
         const family =
           { insect: "insect feeders", predator: "predators", bottom: "bottom feeders", glow: "glow feeders" }[
             ef.family
           ] || ef.family;
-        effect = "Larger " + family + " (" + size() + ").";
+        effect = family.charAt(0).toUpperCase() + family.slice(1) + " tend to run larger. " + size();
         when = "Matching fish";
         break;
       }
       case "lantern":
-        effect = "Fish tend to run larger (" + size() + ").";
+        effect = "Fish tend to run larger. " + size();
         when = model.picks.light === "night" ? "Active at night" : "Night only";
         break;
       case "sooner":
-        effect = "Bite speed ×" + num(v) + ".";
+        effect = "Fish bite " + num(v) + " times as fast.";
         break;
       case "rarer":
-        effect = "Adds " + num(v) + " to the rarity bonus for this bait.";
+        effect = "Rare fish bite more often on this bait.";
         break;
       case "giants":
-        effect = "Bite weight ×" + num(v) + " for its target giants.";
-        when = "Matching giant";
+        effect = "Its giants bite " + num(v) + " times as often.";
+        when = "Its giants";
         break;
       case "creel":
-        effect = v + " fish slots.";
+        effect = "Your hold has room for " + v + " fish.";
         break;
       case "good": {
         const place = model.picks.place,
           values = ef.list || [],
           n = values.find((x) => x.id === place)?.n ?? (place == null ? values[0]?.n : null);
         if (n == null) continue;
-        effect = n + " good bites before the water quiets.";
-        when = "Selected water";
+        effect = "You get " + n + " good bites here before the water goes quiet.";
+        when = "This water";
         break;
       }
       case "glass":
-        effect = "Adds " + v + " good bite.";
+        effect = "You get " + v + " more good bite.";
         break;
       case "orders":
-        effect = v + " order slots. Filled orders pay double.";
+        effect = "Murk\u2019s board holds " + v + " orders. Each one you fill pays double.";
         break;
       case "bed":
-        effect = "Restocks " + gearName(ef.baitId) + " to " + v + ".";
+        effect = "It fills your " + gearName(ef.baitId) + " back up to " + v + " each evening.";
         when = "At home";
         break;
       case "oars":
-        effect = "Rowing speed +" + num(v) + " m/s.";
+        effect = "You row " + num(v) + " m/s faster.";
         break;
       case "letGo":
       case "quiet":
-        effect = size() + " in this water.";
-        when = "This outing";
+        effect = "Fish here run " + (v < 0 ? "smaller" : "larger") + ". " + size();
+        when = "This evening";
         break;
       default:
         continue;
@@ -170014,11 +170058,11 @@ function currentKitRows(model, view, data, firstOpen) {
       (!row.night || model.picks.light === "night")
     ) {
       effect +=
-        " " +
+        " The " +
         (data.TEXT_V3?.classes?.[row.move.what] || row.move.what) +
-        " share " +
+        " share goes from " +
         pct(row.move.from) +
-        " → " +
+        " to " +
         pct(row.move.to) +
         ".";
     }
@@ -170028,7 +170072,7 @@ function currentKitRows(model, view, data, firstOpen) {
     if (part.effect?.glyph === "tick")
       add(
         data.TEXT_LOOP?.finds?.items?.[part.id]?.name,
-        "Adds " + part.effect.n + " order slot.",
+        "Murk\u2019s board holds " + part.effect.n + " more order.",
         part.effect.on ? "Fitted" : "Needs an order board",
       );
   }
@@ -170704,19 +170748,27 @@ function VV(e) {
     W.querySelector(".gw-sh-exact")?.remove();
     W.querySelector(".gw-sh-worn")?.remove();
     lt.replaceChildren();
-    lt.innerHTML = X("Your bonuses");
+    lt.innerHTML = X(n().TEXT_LOOP?.sheet?.buffs || "What helps you");
     const live = f(),
       overview = j.trip && live ? m({ place: live.place ?? null, light: live.light }) || j : j;
     const summary = overview === j ? D : GV(overview, n(), { names: d(), phone: z === "phone" });
     const context = document.createElement("p");
     context.className = "gw-kit-context";
-    context.textContent = [
-      j.trip ? "On the water" : "At home · preview",
-      summary.buffs.where,
-      summary.buffs.hourName,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+    // One sentence: where and when these rows hold, e.g. "At home, this shows what helps you at the Lily Maze at dusk."
+    const contextWords = n().TEXT_LOOP?.sheet?.context || {};
+    const pickedPlace = overview.picks?.place,
+      placeWords =
+        pickedPlace === "last"
+          ? contextWords.last
+          : pickedPlace
+            ? bb(summary.buffs.where)
+            : contextWords.open;
+    context.textContent = String((j.trip ? contextWords.trip : contextWords.home) || "")
+      .replace("{where}", placeWords ? " " + placeWords : "")
+      .replace(
+        "{hour}",
+        contextWords.hours?.[summary.buffs.hour] ? " " + contextWords.hours[summary.buffs.hour] : "",
+      );
     lt.appendChild(context);
     const definition = document.createElement("p");
     definition.className = "gw-kit-guide";
@@ -171288,8 +171340,33 @@ function YV(e) {
   function _e(K) {
     return typeof K == "string" ? e.zoneData(K) : K?.id ? e.zoneData(K.id) || K : null;
   }
+  // The Journal's line for a fish on the loop: whole sentences on when it bites (its loop hours), where it
+  // feeds (the lake's depth table) and the one bait it takes, if it takes only one.
+  function journalBitesLine(K) {
+    let words = d().TEXT_LOOP?.log?.bites || {};
+    if (K.id === MIDNIGHT.legend) return words.midnight || "";
+    let hours = i(d().loopHours(K)),
+      named = hours.map((h) => words.hours?.[h] || h),
+      joined =
+        named.length > 1
+          ? `${named.slice(0, -1).join(", ")} ${words.and || "and"} ${named.at(-1)}`
+          : named[0],
+      // Giants still bite now and then outside their hours, so they bite "most" in them.
+      when =
+        hours.length >= 3
+          ? words.any
+          : String(K.giant ? words.most || "most {hours}" : words.only || "only {hours}").replace(
+              "{hours}",
+              joined,
+            ),
+      lines = [String(words.line || "It bites {hours}.").replace("{hours}", when)];
+    lines.push(words.feeds?.[speciesFeedsAt(K.id, K.guestOf || K.zone)] || words.feeds?.any || "");
+    K.bait && words.takes && lines.push(words.takes.replace("{bait}", e.baitData(K.bait)?.name || K.bait));
+    return lines.filter(Boolean).join(" ");
+  }
   function rt(K, we = !1) {
     if (K.hint && !we) return K.hint;
+    if (B() && typeof d().loopHours == "function") return journalBitesLine(K);
     let te = [];
     K.id === MIDNIGHT.legend
       ? te.push("feeds just after the old bell strikes midnight")
@@ -173346,7 +173423,7 @@ function YV(e) {
           ut = P() ? d().weightSpan?.(K) : null,
           Ot =
             ut && wr(ut.reach) !== wr(ut.top)
-              ? a(d().TEXT_V3?.saidToReach || "said to reach {w}", { w: wr(ut.reach) })
+              ? a(d().TEXT_V3?.saidToReach || "Some are said to reach {w}.", { w: wr(ut.reach) })
               : "",
           Yt = P()
             ? ut
@@ -173368,8 +173445,8 @@ function YV(e) {
         let ue = i(Ut.gotAway).slice(-1)[0] || Ut.escape || null,
           Oe = ue ? yb(d(), K, ue.length) : "",
           ut = ue
-            ? `Got away: ${Uz(d(), ue.sizeClass, ue.ancient).toLowerCase()}${Oe ? `, ${Oe}` : ""}${bb(_(ue.place)) ? `, ${bb(_(ue.place))}` : ""}${ue.day && !xt ? `, day ${ue.day}` : ""}.`
-            : "It got away before you could name it properly.";
+            ? `One got away. It was ${Uz(d(), ue.sizeClass, ue.ancient).toLowerCase()}${Oe ? `, ${Oe}` : ""}${bb(_(ue.place)) ? `, ${bb(_(ue.place))}` : ""}${ue.day && !xt ? `, on day ${ue.day}` : ""}.`
+            : "It got away before you could get a good look.";
         Mt.insertAdjacentHTML(
           "beforeend",
           `<h3>Undiscovered</h3><div class="gw-kicker gw-glimpse-k">Glimpsed</div>
@@ -173402,7 +173479,7 @@ function YV(e) {
           }),
           Mt.appendChild(ue);
       } else if (U && t.flow === "playing") {
-        let ue = n("button", "gw-link gw-odds-gear", 'Your gear log <i aria-hidden="true">\u203A</i>');
+        let ue = n("button", "gw-link gw-odds-gear", 'Your gear <i aria-hidden="true">\u203A</i>');
         (ue.type = "button"),
           ue.addEventListener("click", () => {
             p("ui_click"), ct({ pauseChild: !!we.pauseChild });
@@ -173913,7 +173990,7 @@ function YV(e) {
         Kt = n("div", "gw-cat-big");
       Kt.dataset.fish = te.big.id;
       let $e = undiscoveredArt(vt.bw, vt.bh);
-      $e.textContent = "Catch to reveal";
+      $e.textContent = "Catch one to see it.";
       (Kt.innerHTML = `<span class="gw-cat-big-art${te.big.star ? " gw-star" : ""}"></span>${it(te.big.glyphs)}`),
         Kt.querySelector(".gw-cat-big-art").appendChild($e),
         Kt.addEventListener("click", (Fe) => {
@@ -174163,7 +174240,7 @@ function YV(e) {
                   xt = ke?.zone || "mossmere",
                   Mt = ee(xt, qe),
                   { content: zt, foot: Ut } = v(we, te, {
-                    title: "The Gear Log",
+                    title: "Your Gear",
                     sub: o(Mt || "What your tackle holds, fish by fish."),
                     cls: "gw-p-wide gw-p-gear gw-p-af",
                   });

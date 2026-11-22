@@ -16,6 +16,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULT_PAGE = join(ROOT, "Gloomwater-Mossmere.html");
 export const SAVE_KEY = "gloomwater.save.v1";
+// On a busy machine the game runs slowly and the fixed time limits fail tests that are only slow. Set GW_SLOW=2
+// (or more) to stretch every time limit by that factor; it changes no check.
+export const SLOW = Math.max(1, Number(process.env.GW_SLOW) || 1);
 
 // Small viewport: Chromium renders WebGL on the CPU here (SwiftShader), and every frame costs.
 const VIEWPORT = { width: 480, height: 270 };
@@ -92,6 +95,7 @@ export class GameSession {
   }
 
   async waitFor(what, timeoutMs, fn, arg) {
+    timeoutMs *= SLOW;
     try {
       await this.page.waitForFunction(fn, arg, { timeout: timeoutMs, polling: 250 });
     } catch {
@@ -174,7 +178,7 @@ export class GameSession {
   // skipped, the tow tapped through, the guide cards closed, the chart opened and Sail.
   // With `water`, that water's row is picked on the chart before Sail (a tow follows if the barge is elsewhere).
   async sail({ wick = "Tallow", water = null, timeoutMs = 90_000 } = {}) {
-    const end = Date.now() + timeoutMs;
+    const end = Date.now() + timeoutMs * SLOW;
     const seen = [];
     let picked = !water;
     let chartWaits = 0;
@@ -246,7 +250,7 @@ export class GameSession {
   // Waits until nothing holds the screen on the water (the mist-lift camera at a set-out, a landing show,
   // a card): the moment the game would let the player go home.
   async waitUntilFree(timeoutMs = 120_000) {
-    const end = Date.now() + timeoutMs;
+    const end = Date.now() + timeoutMs * SLOW;
     for (;;) {
       const why = await this.eval(() => window.__gw.game.canGoHome());
       if (why?.ok) return;
@@ -263,7 +267,7 @@ export class GameSession {
   async toHome() {
     await this.clickButton(/^Continue$/);
     await this.waitFor("home", 60_000, () => window.__gw.flow === "home");
-    const end = Date.now() + 30_000;
+    const end = Date.now() + 30_000 * SLOW;
     let calm = 0;
     while (Date.now() < end && calm < 5) {
       const pressed = (await this.clickButton(/^Sold$/)) || (await this.clickButton(/^Got it$/));
@@ -278,7 +282,7 @@ export class GameSession {
   async catchFish(speciesId, { keep = true } = {}) {
     const ok = await this.eval((id) => window.__gw.debug.instantCatch(id), speciesId);
     if (!ok) throw new Error(`instantCatch(${speciesId}) refused; ${JSON.stringify(await this.state())}`);
-    const end = Date.now() + 30_000;
+    const end = Date.now() + 30_000 * SLOW;
     while (Date.now() < end) {
       await this.pause(400);
       if (await this.clickButton(/^Got it$/)) continue;
@@ -295,7 +299,7 @@ export class GameSession {
   // Goes home from the water and closes Murk's tally once it has counted; returns the loop state summary.
   async goHomeAndTally() {
     // Home is refused while something holds the screen (a catch card, a guide card, the mist-lift camera).
-    const homeBy = Date.now() + 60_000;
+    const homeBy = Date.now() + 60_000 * SLOW;
     while (!(await this.eval(() => window.__gw.game.goHome()))) {
       if (Date.now() > homeBy) {
         const why = await this.eval(() => window.__gw.game.canGoHome());
@@ -311,7 +315,7 @@ export class GameSession {
         (b) => b.textContent.trim() === "Sold" && b.getBoundingClientRect().width > 0,
       );
     await this.waitFor("Murk's tally", 90_000, soldVisible);
-    const end = Date.now() + 60_000;
+    const end = Date.now() + 60_000 * SLOW;
     // The first press finishes the count, the next one closes the tally.
     while (Date.now() < end && (await this.eval(soldVisible))) {
       await this.clickButton(/^Sold$/);

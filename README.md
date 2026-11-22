@@ -35,6 +35,7 @@ npm test         # lint, build, then the smoke test: run this before every commi
 npm run lint     # every identifier the game reads must be declared (catches patch typos in seconds)
 npm run verify   # same program as another commit? See below
 npm run scenarios # load each save fixture, play from it, check the scenarios (about half an hour)
+GW_SLOW=3 npm run scenarios # the same on a busy machine: every time limit is stretched three times
 npm run format   # Prettier on src/game.js and tools/
 ```
 
