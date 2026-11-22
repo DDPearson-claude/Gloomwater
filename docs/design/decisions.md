@@ -84,10 +84,11 @@ Details are in `mossmere-review-addendum.md`.
 
 - **Not every Kissmark Trout has been in her mouth.** About one Kissmark in four carries the wide ring of fine scrapes, not all of them. The trout is named for a natural round pale mark on its cheek, and its lore says so. In the line-up, a Kissmark landed with the ring is crossed out with "It has the ring of scrapes on it. Something had it, and let go."; one without it is crossed out with "It is big, but its mouth could not take a bird." Fish landed near her water in her time still carry the ring about half the time. (This changes the bite-marks table in `mossmere-hunt-2.md`, which gave the ring to every Kissmark.)
 - **The tale may share a tally with one of Murk's gifts.** The tale, the line-up and the find are story, not new tackle, so "one new thing a tally" does not hold them back.
+- **The Waxed Silk stays at 600.** Earnings were measured on 22 November 2026 (prices checked against the game's own tally; bite rate and landing skill estimated; orders and finds left out). A casual player earns about 25 clams an evening and a keen one about 45, or about 80 once on Braided Gut. The full rig costs 800 (Braided Gut 100, which Murk needs before he shelves the Silk, the Turnback Hook 40, Chafe Gut 60, Waxed Silk 600), so a keen player has it on about evening 11 or 12 and a casual player on about evening 24. A lower price of 300 was offered and the designer said no: the player saves up for the right rig.
 
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.
 - The designer's approval of the Mossbell Isle rock artwork.
-- Hunt length and earnings have not been measured in play; the estimates in the proposals are untested.
+- A timed playtest of the whole hunt, start to finish, has not been done yet. Earnings have been measured (see the rulings above).
 - Murk's shelf after a Sporewood visit still offers Sporewood's rods, lines and reels back in Mossmere. The simple fix (the shelf follows the barge) was built and withdrawn: tackle tiers are one shared ladder and Mossmere's stats are carried over at the first tow, so it double-counted gear and made Sporewood tiers cheap. It is to be fixed with per-lake kits ("Between lakes" above).
