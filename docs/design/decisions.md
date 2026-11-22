@@ -80,6 +80,11 @@ Details are in `mossmere-review-addendum.md`.
 - **Earnings must be measured.** Because the silk has to be saved for, how many evenings it takes to earn its price is now part of the hunt's length. It is to be measured in play, and the price brought to the designer if it makes the hunt drag.
 - **The relic test.** A later monster's item passes only if it changes what the player finds, sees or carries or how they handle the rig; never adds Grip, landing odds or clams; never touches a lake's monster; stays small and does not stack; is felt on the first evening in a new lake; and can be said in one plain line. (The outside review's "wider strike notch" idea fails as worded, because a clean strike adds Grip.)
 
+## Rulings during the build, 22 November 2026
+
+- **Not every Kissmark Trout has been in her mouth.** About one Kissmark in four carries the wide ring of fine scrapes, not all of them. The trout is named for a natural round pale mark on its cheek, and its lore says so. In the line-up, a Kissmark landed with the ring is crossed out with "It has the ring of scrapes on it. Something had it, and let go."; one without it is crossed out with "It is big, but its mouth could not take a bird." Fish landed near her water in her time still carry the ring about half the time. (This changes the bite-marks table in `mossmere-hunt-2.md`, which gave the ring to every Kissmark.)
+- **The tale may share a tally with one of Murk's gifts.** The tale, the line-up and the find are story, not new tackle, so "one new thing a tally" does not hold them back.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.

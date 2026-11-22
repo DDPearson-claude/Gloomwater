@@ -1183,6 +1183,8 @@ const PIKE_CARD = "Look at its teeth. They leave two rows of small cuts.";
 const CUTS_OPEN = "Something leaves two rows of small cuts.";
 const CUTS_MATCH = "A pike's teeth leave two rows of small cuts.";
 const RING_OPEN = "Something else leaves a wide ring of fine scrapes.";
+const KISS_PLAIN = "It is big, but its mouth could not take a bird.";
+const KISS_RINGED = "It has the ring of scrapes on it. Something had it, and let go.";
 const HOOK_HUNT_LINE = "Something out there grabs and runs. There's a new hook on the shelf.";
 
 // withMap, with sketch 3 drawn at the tally of evening 3 as the game draws it: the fish already caught crossed
@@ -1197,7 +1199,10 @@ const withLineup =
     const h = save.meta.loop.hunt.mossmere;
     h.sketches.lineup = 3;
     h.crossed = Object.fromEntries(LINEUP.filter((id) => journal[id]?.caught > 0).map((id) => [id, 3]));
-    h.marks = { cuts: 0, holes: 0, ring: h.crossed.kissmark_trout ? 3 : 0 };
+    // A Kissmark crossed out from the Journal carried no ring: about one in four does, and that one is noted
+    // when it is landed.
+    h.marks = { cuts: 0, holes: 0, ring: 0 };
+    h.ringed = [];
   };
 
 // What a notepad element shows on its line-up page: the head line, each fish's row (crossed out or not, its words,
@@ -4579,15 +4584,16 @@ const SCENARIOS = [
         );
       }
       check(look.frame === LINEUP_FRAME, `the empty frame: ${look.frame}`);
-      check(
-        JSON.stringify(look.marks) === JSON.stringify([{ mark: "ring", words: RING_OPEN }]),
-        `the marks strip: ${JSON.stringify(look.marks)}`,
-      );
+      // A Kissmark known only from the Journal is crossed out for its small mouth, and no ring is claimed.
+      const kissRow = look.rows.find((r) => r.fish === "kissmark_trout");
+      check(kissRow?.why === KISS_PLAIN, `the Kissmark's reason: ${JSON.stringify(kissRow)}`);
+      check(look.marks.length === 0, `the marks strip: ${JSON.stringify(look.marks)}`);
       const record = await huntOf(session);
       check(
         record.sketches.lineup === 5 &&
           JSON.stringify(Object.keys(record.crossed).sort()) === JSON.stringify([...caught].sort()) &&
-          record.marks.ring === 5 &&
+          record.marks.ring === 0 &&
+          record.ringed.length === 0 &&
           record.padUnseen.length === 0,
         `the record: ${JSON.stringify(record)}`,
       );
@@ -4643,7 +4649,7 @@ const SCENARIOS = [
   },
 
   {
-    name: "bite marks: the roll puts cuts and holes only on their fish, in their places and light, about 1 in 8; the ring on every Kissmark; near her water only in her time and with Hob's map, about 1 in 2",
+    name: "bite marks: the roll puts cuts and holes only on their fish, in their places and light, about 1 in 8; the ring on about one Kissmark in four; near her water only in her time and with Hob's map, about 1 in 2",
     fixture: "mid-mossmere",
     debug: true,
     editSave: withMap,
@@ -4718,7 +4724,7 @@ const SCENARIOS = [
         "kissmarkNoMap",
       ])
         check(r[k].none === 1, `${k} carried a mark: ${JSON.stringify(r[k])}`);
-      check(r.kissmark.ring === 1, `the Kissmark: ${JSON.stringify(r.kissmark)}`);
+      check(about(r.kissmark.ring, 0.25), `the Kissmark: ${JSON.stringify(r.kissmark)}`);
       check(
         about(r.herTime.ring, 0.5) && about(r.herTime.none, 0.5),
         `near her water: ${JSON.stringify(r.herTime)}`,
@@ -4737,6 +4743,8 @@ const SCENARIOS = [
     async run(session, { page, browser }) {
       await session.sail(SLOW_SAIL);
       await listenForToasts(session);
+      // About one Kissmark in four carries the ring: make this one carry it.
+      await session.eval(() => (window.__gw.data.LOOP.hunt.marks.ring.oftenChance = 1));
       const kiss = await catchAndReadCard(session, "kissmark_trout");
       check(
         kiss.line === RING_LINE && /gw-cc-mark--ring/.test(kiss.ink || ""),
@@ -4749,13 +4757,21 @@ const SCENARIOS = [
       check(
         record.marks.ring === 5 &&
           record.padUnseen.includes("mark:ring") &&
-          record.padUnseen.includes("cross:kissmark_trout"),
+          record.padUnseen.includes("cross:kissmark_trout") &&
+          record.ringed.includes("kissmark_trout"),
         `after the Kissmark: ${JSON.stringify(record)}`,
       );
       const kept = await session.eval(() =>
         window.__gw.state.run.creel.map((f) => `${f.speciesId}:${f.mark ?? ""}`),
       );
       check(kept.includes("kissmark_trout:ring"), `the creel: ${JSON.stringify(kept)}`);
+      // Landed with the ring on it, the Kissmark is crossed out for that.
+      const kissRow = (await lineupInJournal(session)).rows.find((r) => r.fish === "kissmark_trout");
+      check(
+        kissRow?.out && kissRow.why === KISS_RINGED,
+        `the ringed Kissmark's row: ${JSON.stringify(kissRow)}`,
+      );
+      await session.eval(() => window.__gw.ui.closeAll());
       // A fish with no mark has no line; the cuts seen once (put in the record as a sighting would), then the pike.
       const carp = await catchAndReadCard(session, "weeping_carp");
       check(carp.line === null && carp.ink === null, `the carp's card: ${JSON.stringify(carp)}`);

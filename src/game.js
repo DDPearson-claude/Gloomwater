@@ -30936,7 +30936,7 @@ var O5 = {
       id: "kissmark_trout",
       name: "Kissmark Trout",
       journal:
-        "It is a spotted trout that grows large by eating other fish. It wears one round scar where something let go.",
+        "It is a spotted trout that grows large by eating other fish. It is named for the round pale mark on its cheek.",
       haunt:
         "It bites at any hour, in deep open water and at the Sluice Veil. The Glimmer Spoon suits it best.",
       play: "Sinker. Dives straight down and circles deep in steady surges. Can straighten a hook: spat.",
@@ -47565,7 +47565,7 @@ wo.hunt.marks = {
     phases: ["dusk", "gloomtide"],
     chance: 1 / 8,
   },
-  ring: { always: ["kissmark_trout"], near: 16, nearChance: 0.5 },
+  ring: { often: ["kissmark_trout"], oftenChance: 1 / 4, near: 16, nearChance: 0.5 },
   leftBy: { cuts: "reedjaw_pike", holes: "milkeye_perch" },
 };
 Ca.hunt = {
@@ -47714,6 +47714,8 @@ Ca.hunt = {
         kissmark_trout: {
           name: "Kissmark Trout",
           why: "It has the ring of scrapes on it. Something had it, and let go.",
+          // A trout crossed out without the ring on it.
+          whyPlain: "It is big, but its mouth could not take a bird.",
         },
         weeping_carp: {
           name: "Weeping Carp",
@@ -106636,6 +106638,8 @@ function freshHuntRecord() {
     // each bite mark was first seen (0 until then), which adds it to the strip at the foot of the page.
     crossed: {},
     marks: { cuts: 0, holes: 0, ring: 0 },
+    // The line-up fish that carried the ring of scrapes when they were crossed out (only the Kissmark can).
+    ringed: [],
     // The bird at midnight (B4): the once-only cutscene has played (or was skipped). From the next night a
     // splash marks the start of her time instead.
     birdCutsceneSeen: false,
@@ -106663,12 +106667,13 @@ function drawHuntSketch(record, key, evening) {
 }
 // ---- The line-up and the bite marks (sketch 3: mossmere-hunt-2.md section 3, B3 and B4) ----------------------
 const CATCH_MARKS = ["cuts", "holes", "ring"];
-// The mark a fish of this kind carries by the table alone (B3 "Marks"): the ring on every Kissmark Trout; the
-// cuts on the listed fish caught in reeds or pads, and the holes on the listed fish caught on a drop-off or in
-// deep water at dusk or night, each at its chance. `phase` is the run's ("calm", "dusk", "gloomtide"). Returns
+// The mark a fish of this kind carries by the table alone (B3 "Marks"): the ring on about one Kissmark Trout in
+// four (they share her deep water; the designer ruled that not every trout has been in her mouth); the cuts on
+// the listed fish caught in reeds or pads, and the holes on the listed fish caught on a drop-off or in deep
+// water at dusk or night, each at its chance. `phase` is the run's ("calm", "dusk", "gloomtide"). Returns
 // "ring", "cuts", "holes" or null; `rng` gives a number from 0 to 1.
 function catchMarkRoll(speciesId, area, phase, rng = Math.random, rule = wo.hunt.marks) {
-  if (Sr(rule.ring.always).includes(speciesId)) return "ring";
+  if (Sr(rule.ring.often).includes(speciesId)) return rng() < rule.ring.oftenChance ? "ring" : null;
   let { cuts, holes } = rule;
   if (Sr(cuts.fish).includes(speciesId) && Sr(cuts.areas).includes(area))
     return rng() < cuts.chance ? "cuts" : null;
@@ -106693,7 +106698,6 @@ function catchMarkFor(
   if (legendary || !speciesId || run?.zone !== "mossmere" || !(huntRecordOf(loop)?.sketches?.map > 0))
     return null;
   if (
-    !Sr(rule.ring.always).includes(speciesId) &&
     herTimeOpen(run) &&
     Number.isFinite(x) &&
     Number.isFinite(z) &&
@@ -106718,13 +106722,16 @@ function noteMarkSeen(loop, record, mark, evening, water, { unseen = !0 } = {}) 
   return !0;
 }
 // Crosses a line-up fish out, once: its evening in `crossed`, drawn in when the notepad next opens (`unseen`).
-// The Kissmark Trout is crossed out for the ring of scrapes on it, so that mark counts as seen with it.
-function crossLineupFish(loop, record, speciesId, evening, water, { unseen = !0 } = {}) {
+// A Kissmark Trout landed with the ring of scrapes on it (`ring`) is crossed out for that; one without it, or one
+// only known from the Journal, is crossed out for its small mouth.
+function crossLineupFish(loop, record, speciesId, evening, water, { unseen = !0, ring = !1 } = {}) {
   if (!Sr(wo.hunt.lineup).includes(speciesId) || ha(record.crossed[speciesId]) > 0) return !1;
   record.crossed[speciesId] = Math.max(1, ha(evening));
   unseen && !record.padUnseen.includes(`cross:${speciesId}`) && record.padUnseen.push(`cross:${speciesId}`);
-  Sr(wo.hunt.marks.ring.always).includes(speciesId) &&
-    noteMarkSeen(loop, record, "ring", evening, water, { unseen });
+  ring &&
+    Sr(wo.hunt.marks.ring.often).includes(speciesId) &&
+    (Array.isArray(record.ringed) || (record.ringed = []),
+    record.ringed.includes(speciesId) || record.ringed.push(speciesId));
   return !0;
 }
 // Sketch 3 drawn at a tally: the five fish, with those already caught (journal) crossed out as part of it.
@@ -106743,8 +106750,8 @@ function noteHuntCatch(loop, trip, speciesId, fish = null) {
     seen = {};
   noteMarkSeen(loop, record, fish?.mark, evening, trip.zone) && (seen.mark = fish.mark);
   record.sketches.lineup > 0 &&
-    crossLineupFish(loop, record, speciesId, evening, trip.zone) &&
-    (seen.crossed = speciesId);
+    crossLineupFish(loop, record, speciesId, evening, trip.zone, { ring: fish?.mark === "ring" }) &&
+    ((seen.crossed = speciesId), (seen.ringed = Sr(record.ringed).includes(speciesId)));
   return seen.mark || seen.crossed ? seen : null;
 }
 // The hunt's moment at a Mossmere tally (mossmere-hunt-2.md sections 1, 2 and 4): the tale at the tally of
@@ -108676,6 +108683,7 @@ function CF(e) {
       back: record.back.slice(),
       // Sketch 3: the line-up fish crossed out and the bite marks seen (ids only).
       crossed: Sr(f().hunt?.lineup).filter((id) => ha(record.crossed?.[id]) > 0),
+      ringed: Sr(record.ringed).filter((id) => typeof id == "string"),
       marks: CATCH_MARKS.filter((k) => ha(record.marks?.[k]) > 0),
     };
   }
@@ -165931,7 +165939,7 @@ function padLineupFishAt(id) {
   return { x: PAD_LU.fish.cx - art.w / 2, y: PAD_LU.fish.cy - h / 2, w: art.w, h, s };
 }
 // Why each fish could not be the thief, drawn large beside it once it is crossed out (before fitting).
-function padLineupReason(id, labels = {}) {
+function padLineupReason(id, labels = {}, ringed = !0) {
   if (id === "reedjaw_pike")
     // a jaw full of saw teeth; a line cut clean beside Hob's worn one
     return [
@@ -165966,8 +165974,20 @@ function padLineupReason(id, labels = {}) {
       `t119,94.5,10,l|${labels.thumb || ""}`,
     ];
   if (id === "kissmark_trout")
-    // the ring of scrapes close up
-    return ["p" + padEll(60, 98, 18, 15), "p" + padScrapes(60, 98, 11, 0.8, 26, 5)];
+    return ringed
+      ? // the ring of scrapes close up
+        ["p" + padEll(60, 98, 18, 15), "p" + padScrapes(60, 98, 11, 0.8, 26, 5)]
+      : // its head and small mouth, beside a water bird far too big for it
+        [
+          "pM14 74Q42 64 62 76Q70 82 74 88L62 90",
+          "pM62 91.6Q58 104 44 108Q28 111 14 104",
+          "p" + padEll(52, 80, 2.6, 2.6),
+          "fM40 74Q34 90 42 104",
+          "p" + padEll(122, 96, 17, 9),
+          "p" + padEll(141, 83, 5.4, 5.2),
+          "pM146 82.4L153 84.2L146 86",
+          "fM108 96Q120 88 134 95",
+        ];
   if (id === "weeping_carp")
     // soft lips pushed out like a tube, a worm and some weed
     return [
@@ -165992,9 +166012,9 @@ function padLineupReason(id, labels = {}) {
     "fM108 98L104 94M109 97L105 99",
   ];
 }
-// A crossed-out fish: the red line over it (and the Kissmark's scar ringed in red), then its reason, fitted large
-// into the right part of the row.
-function padLineupCrossing(id, labels) {
+// A crossed-out fish: the red line over it (and, on a Kissmark that carried the ring of scrapes, the ring marked
+// in red), then its reason, fitted large into the right part of the row.
+function padLineupCrossing(id, labels, ringed = !0) {
   let f = padLineupFishAt(id),
     list = [
       "r" +
@@ -166003,8 +166023,8 @@ function padLineupCrossing(id, labels) {
           [f.x + f.w, f.y - 3],
         ]),
     ];
-  id === "kissmark_trout" && list.push("r" + padEll(f.x + 123 * f.s, f.y + 36 * f.s, 7.5, 6.8));
-  let reason = padLineupReason(id, labels),
+  id === "kissmark_trout" && ringed && list.push("r" + padEll(f.x + 123 * f.s, f.y + 36 * f.s, 7.5, 6.8));
+  let reason = padLineupReason(id, labels, ringed),
     bb = padStrokesBox(reason),
     slot = PAD_LU.why,
     k = Math.min((slot.x1 - slot.x0) / (bb.x1 - bb.x0), (slot.y1 - slot.y0) / (bb.y1 - bb.y0), 2.6),
@@ -166063,18 +166083,26 @@ function padLineupPanel(text, view, at = null, fresh = []) {
       );
     advance(fish);
     let mark = "",
-      why = "";
+      why = "",
+      // Only the Kissmark has two reasons: with the ring of scrapes on it, or without.
+      ringed = !words.whyPlain || Sr(view?.ringed).includes(id);
     if (out) {
       let when = timeFor(isNew),
         x = sketch(
           `lu-x-${art.name}`,
           PAD_LU.vb,
-          padLineupCrossing(id, labels),
+          padLineupCrossing(id, labels, ringed),
           when,
           lu.art?.out || "",
           when == null,
         );
-      advance(x), (mark = x.html), (why = cap("gw-pad-why", words.why || "", when == null ? null : x.end));
+      advance(x),
+        (mark = x.html),
+        (why = cap(
+          "gw-pad-why",
+          (ringed ? words.why : (words.whyPlain ?? words.why)) || "",
+          when == null ? null : x.end,
+        ));
       isNew && t == null && (freshEnd = Math.max(freshEnd, x.end));
     }
     html += `<figure class="gw-pad-lu-row${out ? " gw-out" : ""}" data-fish="${id}"><span class="gw-pad-lu-nm">${padEsc(words.name || "")}</span><div class="gw-pad-lu-box">${fish.html}${mark}</div>${why}</figure>`;
@@ -166380,7 +166408,8 @@ function huntView(K) {
     });
     // A line-up fish crossed out (its reason) or a bite mark seen for the first time, drawn into sketch 3.
     t.bus?.on?.("hunt:noted", (noted = {}) => {
-      noted.crossed && say(text().pad?.lineup?.fish?.[noted.crossed]?.why);
+      let words = noted.crossed ? text().pad?.lineup?.fish?.[noted.crossed] : null;
+      words && say(noted.ringed ? words.why : (words.whyPlain ?? words.why));
       say(text().drawn);
     });
     t.bus?.on?.("place:lift", (lift = {}) => {
