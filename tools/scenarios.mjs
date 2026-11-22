@@ -172,9 +172,10 @@ async function buyAtHome(session, ids) {
 // The cast's own snag roll can put a find on the hook instead (a certain catch, p 1); that one is let go and
 // the hook tried again. With `lead` (seconds), the fight plays at its own pace that long before it is
 // skipped to its end, so what the first moments show (the banner) is seen.
-async function hookAndPlayOut(session, speciesId, outcome, { lead = 0 } = {}) {
+// `z` sets the fish's size (0 is an ordinary one), for a test that must not meet a fish over the line's limit.
+async function hookAndPlayOut(session, speciesId, outcome, { lead = 0, z = null } = {}) {
   for (let tries = 0; tries < 5; tries++) {
-    const result = await hookOnce(session, speciesId, outcome, lead);
+    const result = await hookOnce(session, speciesId, outcome, lead, z);
     if (!result.find) return result;
     await session.clickButton(/^\d?Let go\b/);
     await session.pause(800);
@@ -183,9 +184,9 @@ async function hookAndPlayOut(session, speciesId, outcome, { lead = 0 } = {}) {
   throw new Error(`a find came up on every hook of ${speciesId}`);
 }
 
-async function hookOnce(session, speciesId, outcome, lead = 0) {
+async function hookOnce(session, speciesId, outcome, lead = 0, z = null) {
   const hooked = await session.eval(
-    ([id, forced]) => {
+    ([id, forced, size]) => {
       const g = window.__gw;
       if (!window.__hookLog) {
         window.__hookLog = { escaped: [], landed: [] };
@@ -193,7 +194,7 @@ async function hookOnce(session, speciesId, outcome, lead = 0) {
         g.bus.on("fish:landed", (e) => window.__hookLog.landed.push(e?.species?.id ?? null));
       }
       g.debug.fishOutcome(forced);
-      const ok = g.debug.fishHook(id);
+      const ok = size == null ? g.debug.fishHook(id) : g.debug.fishHook(id, { z: size });
       return {
         ok,
         state: g.fishing.state,
@@ -203,7 +204,7 @@ async function hookOnce(session, speciesId, outcome, lead = 0) {
         landed: window.__hookLog.landed.length,
       };
     },
-    [speciesId, outcome],
+    [speciesId, outcome, z],
   );
   check(hooked.ok && hooked.state === "reeling", `could not hook ${speciesId}: ${JSON.stringify(hooked)}`);
   for (const leadEnd = Date.now() + 60_000; lead > 0 && Date.now() < leadEnd; ) {
@@ -6989,7 +6990,7 @@ const SCENARIOS = [
       // On the water: a carp on the Turnback Hook, then a carp on the Mere Hook, both kept and sold.
       await session.sail(SLOW_SAIL);
       const land = async () => {
-        const landed = await hookAndPlayOut(session, "weeping_carp", "land");
+        const landed = await hookAndPlayOut(session, "weeping_carp", "land", { z: 0 });
         check(landed.landed === "weeping_carp", `the carp was not landed: ${JSON.stringify(landed)}`);
         check(await session.clickButton(/^\d?Keep\b/), "no Keep on the carp's card");
         await session.pause(800);
