@@ -30342,6 +30342,8 @@ function wS(e) {
   return { meta: n, run: o };
 }
 function yS(e) {
+  // The rig in use is saved as it is fitted (syncRigInUse).
+  syncRigInUse(e?.meta?.loop);
   return dg.set(mS, {
     version: uQ,
     savedAt: Date.now(),
@@ -47606,6 +47608,20 @@ Ca.rig = {
     cut_strip: "Each cast uses one, and it can't land the biggest fish.",
     guard_button: "Giants never take it.",
   },
+};
+// The three saved rigs (mossmere-gear.md "Saved rigs", mossmere-gear-deeper.md "The rig picture and saved rigs"):
+// the tabs over the rig picture and the chip on the water. A rig's name is a label, not a sentence: its depth word
+// and its bait or lure ("Cork · Worms"), or the lure alone, which swims at its own depth; in a water that does not
+// fish by depth, the bait or lure alone. `short` are the names a rig shows for baits and lures whose own name is
+// long; any other shows its own name. `onRig` is the line when a new part goes on a rig.
+Ca.rig.saved = {
+  tab: "Rig {n}",
+  depth: { float: "Cork", lead: "Bottom" },
+  join: " · ",
+  bare: "Bare hook",
+  short: { mireworm: "Worms", live_minnow: "Minnow", bell_spinner: "Bell Spinner" },
+  out: "You have none of this bait left.",
+  onRig: "It is on Rig {n} now.",
 };
 Ca.partLoss = {
   toothy: "Bitten through. Pike Wire stops teeth.",
@@ -105896,6 +105912,48 @@ function rigHereNow(meta, D, { run = null, live = null, cast = null, rig = {}, m
   fish.sort((a, b) => b.share - a.share || (a.id < b.id ? -1 : 1));
   return { fish: fish.slice(0, max), unmet, place: placeId, area, light, water };
 }
+// The three saved rigs as the tabs and the chip show them (mossmere-gear.md B6 "Saved rigs"): for each, its name,
+// its bait or lure, whether that bait has none left here (its icon greys, and it fishes on a bare hook), and its
+// leader and hook when they are not the plain ones, in a water that has them (a lure carries its own hook). The
+// rig in use is read from the fitted rig. `sig` is what a rig shows, so two rigs that look the same match. "Here"
+// is the trip's water and its stock, else the barge's.
+function savedRigsModel(loop, D, { run = null } = {}) {
+  if (!Ln(loop)) return null;
+  let trip = Ln(run) && run.outing === "trip",
+    water = (trip && typeof run.zone == "string" && run.zone) || loop.barge?.water || il(D),
+    words = Ln(D?.TEXT_LOOP?.rig?.saved) ? D.TEXT_LOOP.rig.saved : {},
+    legendWater = (id) =>
+      Object.entries(Ln(D?.LOOP?.legendBait) ? D.LOOP.legendBait : {}).find(([, b]) => b?.id === id)?.[0],
+    stock = (id) => ha((trip ? run.bait : loop.bait?.[legendWater(id) ?? water])?.[id]),
+    named = (id) => words.short?.[id] || f4(D, id),
+    active = qy(loop.activeRig, 0, RIG_COUNT - 1),
+    saved = Sle(loop.rigs);
+  return {
+    active,
+    water,
+    rigs: Array.from({ length: RIG_COUNT }, (_, i) => {
+      let rig = cleanRig(i === active ? loop.fitted : saved[i]),
+        what = rig.lure ? named(rig.lure) : rig.bait ? named(rig.bait) : words.bare || "",
+        name =
+          bs[water]?.depth && !rig.lure
+            ? `${words.depth?.[rig.depth] || ""}${words.join || " "}${what}`
+            : what,
+        leader = bs[water]?.leader && !wo.rig.parts[rig.leader]?.start ? rig.leader : null,
+        hook = bs[water]?.hookSet && !rig.lure && !wo.rig.parts[rig.hook]?.start ? rig.hook : null;
+      return {
+        n: i + 1,
+        label: Ab(words.tab || "", { n: i + 1 }),
+        name,
+        lure: rig.lure,
+        bait: rig.bait,
+        out: !!rig.bait && !(stock(rig.bait) > 0),
+        leader,
+        hook,
+        sig: `${name}|${leader || ""}|${hook || ""}`,
+      };
+    }),
+  };
+}
 function hF(
   e,
   t,
@@ -106728,8 +106786,11 @@ function yF(e) {
     holdSlots: ha(e?.LOOP?.hold?.start, 3) || 3,
     tackle: { rod: 0, line: 0, reel: 0 },
     lures: t.lures,
-    fitted: { lure: null, bait: t.fit, depth: "float", leader: "plain_knot", hook: "mere_hook" },
+    fitted: plainRig(e),
     parts: ["cork_float", "plain_knot", "mere_hook"],
+    // The three saved rigs and the one in use (savedRigs). Rig 1 is the fitted rig; the others start plain.
+    rigs: [plainRig(e), plainRig(e), plainRig(e)],
+    activeRig: 0,
     // Rig parts reaching Murk's shelf with the story (wo.arrivals): each beat's number in the order they came
     // (0 while it has not), the last number given, and the parts on the shelf.
     arrivals: { seq: 0, beats: { turnback_hook: 0, pike_wire: 0, leaders: 0 }, shelved: [] },
@@ -106763,6 +106824,58 @@ function yF(e) {
     eveningsAt: { [il(e)]: 0 },
     hunt: { mossmere: freshHuntRecord() },
   };
+}
+// The plain starting rig: the starting bait under the Cork Float, on the Plain Knot and the Mere Hook.
+function plainRig(D) {
+  return { lure: null, bait: wF(D).fit, depth: "float", leader: "plain_knot", hook: "mere_hook" };
+}
+// Saved rigs (mossmere-gear.md "Saved rigs" and B4, mossmere-gear-deeper.md B4 "Rigs"): three, each storing only
+// what the rig picture chooses: bait or lure, depth, leader and hook. Rod, reel and line are always the best owned,
+// so a rig never stores them. The rig in use (activeRig) is the fitted rig: `fitted` stays what the rest of the game
+// reads and changes, and the rig in use is copied from it when it is saved, loaded or switched away from.
+var RIG_FIELDS = ["lure", "bait", "depth", "leader", "hook"],
+  RIG_COUNT = 3;
+// A rig's own fields from a rig or the fitted rig, each checked: a lure and a bait never together, the depth
+// "float" or "lead", a leader and a hook ids of their slot (else the plain ones).
+function cleanRig(rig, plain = { leader: "plain_knot", hook: "mere_hook" }) {
+  let from = Ln(rig) ? rig : {},
+    lure = typeof from.lure == "string" ? from.lure : null,
+    part = (slot) => (wo.rig.parts[from[slot]]?.slot === slot ? from[slot] : plain[slot]);
+  return {
+    lure,
+    bait: !lure && typeof from.bait == "string" ? from.bait : null,
+    depth: from.depth === "lead" ? "lead" : "float",
+    leader: part("leader"),
+    hook: part("hook"),
+  };
+}
+// Copies the fitted rig into the rig in use (before a save, and before switching away from it).
+function syncRigInUse(loop) {
+  if (!Ln(loop) || !Array.isArray(loop.rigs) || !Ln(loop.fitted)) return;
+  loop.rigs[qy(loop.activeRig, 0, RIG_COUNT - 1)] = cleanRig(loop.fitted);
+}
+// The loader's part for saved rigs: three, each with every field, the rig in use a number from 0 to 2 and the
+// fitted rig. An old save has none, so it gains three plain ones here and Rig 1 becomes what it has fitted.
+function normaliseRigs(loop, D) {
+  let saved = Array.isArray(loop.rigs) ? loop.rigs : [],
+    plain = plainRig(D);
+  loop.rigs = Array.from({ length: RIG_COUNT }, (_, i) => cleanRig(Ln(saved[i]) ? saved[i] : plain, plain));
+  loop.activeRig = qy(loop.activeRig, 0, RIG_COUNT - 1);
+  syncRigInUse(loop);
+}
+// When Murk gives a new part (the lead), the next rig that is still plain after the one in use is set up with it
+// (mossmere-gear.md "Saved rigs": "Rig 2 is filled automatically by the lead gift"). Returns its number (1 to 3),
+// or 0 when every other rig is already the player's own.
+function setUpPlainRig(loop, D, change) {
+  let plain = cleanRig(plainRig(D)),
+    same = (rig) => RIG_FIELDS.every((k) => cleanRig(rig)[k] === plain[k]),
+    active = qy(loop?.activeRig, 0, RIG_COUNT - 1);
+  if (!Array.isArray(loop?.rigs)) return 0;
+  for (let step = 1; step < RIG_COUNT; step++) {
+    let i = (active + step) % RIG_COUNT;
+    if (same(loop.rigs[i])) return (loop.rigs[i] = cleanRig({ ...plain, ...change })), i + 1;
+  }
+  return 0;
 }
 // One lake's monster hunt in the save. Only the part built so far: lineLesson is set by the first loss to a
 // line too weak for her.
@@ -107217,6 +107330,7 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
   for (let slot of ["leader", "hook"])
     (t?.LOOP?.rig?.parts?.[c.fitted[slot]]?.slot === slot && c.parts.includes(c.fitted[slot])) ||
       (c.fitted[slot] = o.fitted[slot]);
+  normaliseRigs(c, t);
   {
     let arrivals = c.arrivals;
     arrivals.seq = ha(arrivals.seq);
@@ -108388,6 +108502,14 @@ function CF(e) {
       let stock = H.bait?.[ze.zone] || {};
       H.fitted.bait = [...Sle(f().tins?.[ze.zone]), "cut_strip"].find((id) => ha(stock[id]) > 0) ?? null;
     }
+    // The lead goes on the next rig that is still plain, as a bottom rig with the bait in use (savedRigs).
+    let giftRig =
+      gift === "sounding_lead"
+        ? setUpPlainRig(H, n(), {
+            depth: "lead",
+            bait: typeof H.fitted?.bait == "string" ? H.fitted.bait : plainRig(n()).bait,
+          })
+        : 0;
     // The tale and Murk's word about Hob are story, not new tackle, so they may share a tally with his gift.
     let huntBeat = mossmereTallyBeat(H, ze, f().hunt, { quiet: !1, journal: o()?.journal });
     if (
@@ -108404,6 +108526,7 @@ function CF(e) {
         ...(x(ze).capLost ? { away: !0 } : {}),
         ...(gift ? { gift } : {}),
         ...(giftSay ? { giftSay } : {}),
+        ...(giftRig ? { giftRig } : {}),
         ...(huntBeat ? { hunt: huntBeat } : {}),
       }),
       je)
@@ -108506,8 +108629,12 @@ function CF(e) {
     try {
       e.invalidate?.();
     } catch {}
+    // A bought leader or hook is fitted, so it is on the rig in use: its number, for the line that says so.
+    let onRig = je.slot === "part" ? { rig: qy(H.activeRig, 0, RIG_COUNT - 1) + 1 } : {};
     return (
-      c(), d("loop:buy", { item: Ee, price: je.price, clams: H.clams }), { ok: !0, msg: "", clams: H.clams }
+      c(),
+      d("loop:buy", { item: Ee, price: je.price, clams: H.clams }),
+      { ok: !0, msg: "", clams: H.clams, ...onRig }
     );
   }
   function N(ze) {
@@ -108907,6 +109034,52 @@ function CF(e) {
     return (
       (H.fitted[slot] = id), c(), d("loop:fit", { slot, id }), { ok: !0, changed: !0, reeled: K, [slot]: id }
     );
+  }
+  // Makes saved rig `index` (0 to 2) the rig in use (mossmere-gear.md "Saved rigs"): the rig in use keeps what is
+  // fitted, and the new one's parts are fitted. Like changing a part it waits while a fish is on and reels a cast
+  // in first; with `idle` (the chip on the water) it also waits while a cast is out. A lure no longer owned, or not
+  // for this water, is left off; a bait with none left is fitted all the same, so the rig fishes on a bare hook.
+  function useRig(index, { idle = !1 } = {}) {
+    let H = p();
+    if (!H) return { ok: !1, reason: "off" };
+    let want = ha(index, -1);
+    if (!(want >= 0 && want < RIG_COUNT)) return { ok: !1, reason: "rig" };
+    if (!de()) return { ok: !1, reason: "fish" };
+    let run = a(),
+      trip = r(run);
+    if (idle && trip && q().out === !0) return { ok: !1, reason: "cast" };
+    if (want === H.activeRig) return { ok: !0, changed: !1, reeled: !1, rig: want };
+    let reeled = !1;
+    if (trip && q().out === !0)
+      try {
+        reeled = t.fishing?.reelInQuiet?.()?.ok === !0;
+      } catch (we) {
+        l("reelInQuiet", we);
+      }
+    syncRigInUse(H);
+    let rig = cleanRig(H.rigs[want]),
+      owned = Sle(H.parts),
+      lureOk = !!rig.lure && O3(n(), rig.lure) && Sle(H.lures).includes(rig.lure) && $c(n(), rig.lure, w()),
+      partOk = (slot) => owned.includes(rig[slot]),
+      was = { ...H.fitted };
+    (H.fitted.lure = lureOk ? rig.lure : null),
+      (H.fitted.bait = lureOk ? null : rig.bait),
+      (H.fitted.depth = rig.depth === "lead" && owned.includes("sounding_lead") ? "lead" : "float"),
+      (H.fitted.leader = partOk("leader") ? rig.leader : "plain_knot"),
+      (H.fitted.hook = partOk("hook") ? rig.hook : "mere_hook"),
+      (H.activeRig = want);
+    // On a trip the run fishes what is fitted: its lure, and its bait only while there is some.
+    if (trip) {
+      let bait = H.fitted.bait;
+      (run.lure = H.fitted.lure),
+        bait && ha(run.bait?.[bait]) > 0
+          ? ((run.equippedBait = bait), (run.equipped = bait))
+          : ((run.equippedBait = null), (run.equipped = null)),
+        d("bait:change", { baitId: run.equippedBait ?? null, lureId: run.lure ?? null });
+    }
+    c();
+    for (let slot of RIG_FIELDS) was[slot] !== H.fitted[slot] && d("loop:fit", { slot, id: H.fitted[slot] });
+    return d("loop:rig", { rig: want }), { ok: !0, changed: !0, reeled, rig: want };
   }
   // A fish landed on a trip: the first Reedjaw Pike is the beat that brings Pike Wire (wo.arrivals). On Mossmere,
   // the line-up crosses it out and a new bite mark on it goes into the strip (noteHuntCatch), with their lines.
@@ -109512,6 +109685,12 @@ function CF(e) {
     rigLeader,
     rigHook,
     fitPart,
+    useRig,
+    // The three saved rigs as the tabs and the chip show them (savedRigsModel).
+    savedRigs: () => {
+      let run = a();
+      return p() ? savedRigsModel(p(), n(), { run: r(run) ? run : null }) : null;
+    },
     // The rig picture's "Here, now" strip for this rig ({ bait, lure }); live and cast as the sheet takes them.
     rigHereNow: (live = null, cast = null, rig = {}) => {
       let run = a();
@@ -162254,6 +162433,27 @@ function rigLureSvg(id, x, y) {
             ? `<circle class="gw-rig-lure" cx="${x}" cy="${y + 8}" r="7"/><circle class="gw-rig-knob" cx="${x - 2}" cy="${y + 7}" r="1.2"/><circle class="gw-rig-knob" cx="${x + 2}" cy="${y + 9}" r="1.2"/>${treble(y + 15)}`
             : `<path class="gw-rig-lure" d="M${x} ${y} C${x + 8} ${y + 6} ${x + 8} ${y + 24} ${x} ${y + 30} C${x - 8} ${y + 24} ${x - 8} ${y + 6} ${x} ${y}Z"/>${treble(y + 30)}`;
 }
+// A saved rig's small icons on its tab (savedRigsModel), drawn as the picture draws them: its bait or lure (a bare
+// hook when it has neither), greyed when the bait has none left; then its leader and its hook when they are not
+// the plain ones.
+function rigTabIcons(rig) {
+  let icon = (box, body, cls = "") =>
+      `<svg class="gw-rig-ico${cls}" viewBox="${box}" focusable="false"><g fill="none" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`,
+    bareHook = `<path class="gw-rig-hook" d="M18 3 V19 C18 28 6 28 6 19 L9 15"/>`,
+    out = [
+      rig.lure
+        ? icon("0 0 32 40", rigLureSvg(rig.lure, 16, 3))
+        : rig.bait
+          ? icon("0 0 32 32", rigBaitSvg(rig.bait, 16, 16), rig.out ? " gw-rig-ico--out" : "")
+          : icon("0 0 32 32", bareHook),
+    ];
+  rig.leader && out.push(icon("0 0 32 32", rigLeaderPath(rig.leader, "M16 4 V28", 16, 4, 0, 24)));
+  rig.hook &&
+    out.push(
+      icon("0 0 32 32", `<path class="gw-rig-hook" d="M20 2 V14 C20 28 2 30 2 18 C2 10 10 9 13 14"/>`),
+    );
+  return out.join("");
+}
 var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" focusable="false">
   <path class="gw-tk-wallf" d="M3 36V45C3 49 5.5 52 10 52H98C102.5 52 105 49 105 45V36"/>
   <path class="gw-tk-hatch" d="M10 43V49M16 43.5V50M22 44V50.5M28 44V50.5M34 44V50.5M40 44V50.5M46 44V50.5M52 44V50.5M58 44V50.5M64 44V50.5M70 44V50.5M76 44V50.5M82 44V50.5M88 44V50.5M94 44V50M100 43.5V49"/>
@@ -162536,6 +162736,27 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
 .gw-rig-here .gw-ts-note { padding: 2px 0 0; }
 .gw-rig-tray { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: inherit; background: rgba(var(--veil-rgb), .97); }
 .gw-ts.gw-rig-traying > :not(.gw-rig-tray):not(.gw-ts-pool) { visibility: hidden; }
+/* The saved rigs (mossmere-gear.md B6): three tabs over the picture, the rig in use lit; and the chip on the water
+   beside the tin, the name of the rig in use (dimmed while a tap would do nothing). */
+.gw-rig-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; width: 100%; max-width: 440px; margin: 0 auto 6px; }
+.gw-rig-tab { min-height: 56px; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 2px; padding: 5px 8px 6px;
+  border: 1px solid rgba(174, 172, 208, .16); border-radius: 10px; background: none; color: var(--ink-dim); text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: background-color .2s, border-color .2s; }
+.gw-rig-tab[aria-pressed=true] { border-color: rgba(174, 172, 208, .5); background-color: rgba(174, 172, 208, .1); }
+.gw-rig-tab:hover, .gw-rig-tab:focus-visible { outline: none; background-color: rgba(174, 172, 208, .08); }
+.gw-rig-tabn { font: 400 14px/1.1 var(--f-display); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); text-shadow: var(--ink-shadow); }
+.gw-rig-tabname { font: 400 16px/1.15 var(--f-body); color: var(--ink); text-shadow: var(--ink-shadow); overflow-wrap: normal; word-break: normal; }
+.gw-rig-tab[aria-pressed=true] .gw-rig-tabname { color: var(--ink-hi); text-shadow: 0 0 14px var(--glow), var(--ink-shadow); }
+.gw-rig-icons { display: flex; align-items: center; gap: 2px; margin-top: auto; height: 24px; }
+.gw-rig-ico { width: 22px; height: 24px; overflow: visible; }
+.gw-rig-ico--out { opacity: .32; filter: grayscale(1); }
+.gw-ts.gw-ts-busy .gw-rig-tab[aria-pressed=false] { opacity: .45; }
+.gw-rig-chip { flex: none; align-self: center; min-height: 44px; max-width: 46vw; padding: 4px 14px; border: 1px solid rgba(174, 172, 208, .32); border-radius: 22px;
+  background: rgba(var(--veil-rgb), .62); color: var(--ink); font: 400 16px/1.1 var(--f-body); text-align: left;
+  text-shadow: var(--ink-shadow); cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; transition: opacity .25s, border-color .25s; }
+.gw-rig-chip[hidden] { display: none; }
+.gw-rig-chip:hover, .gw-rig-chip:focus-visible { outline: none; border-color: var(--ink-dim); }
+.gw-rig-chip.gw-busy { opacity: .45; }
 .gw-rig-trayhead { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .gw-rig-back { min-height: 48px; }
 .gw-rig-opts { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; display: flex; flex-direction: column; gap: 2px; }
@@ -162607,7 +162828,10 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
   let h = a("button", "gw-tk-tin");
   (h.type = "button"), (h.dataset.loop = "tin"), h.setAttribute("aria-haspopup", "dialog");
   let m = a("span", "gw-tk-note");
-  m.setAttribute("aria-live", "polite"), u.appendChild(h), u.appendChild(m);
+  // The saved rig in use, by name (mossmere-gear.md "Saved rigs"): one tap fits the next rig.
+  let rigChip = a("button", "gw-rig-chip");
+  (rigChip.type = "button"), (rigChip.dataset.loop = "rig-chip"), (rigChip.hidden = !0);
+  m.setAttribute("aria-live", "polite"), u.appendChild(h), u.appendChild(rigChip), u.appendChild(m);
   let g = e.layers?.hud;
   try {
     (g?.querySelector(".gw-tl") || g)?.appendChild(u);
@@ -162663,6 +162887,35 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     h.addEventListener("click", (J) => {
       J.preventDefault(), J.stopPropagation(), b();
     });
+  // The rig chip shows on a trip once the rigs are not all the same (three plain rigs would switch to nothing).
+  // It shows the rig's name and nothing more, and is dimmed while a cast is out or a fish is on, when a tap does
+  // nothing.
+  let rigChipModel = null;
+  function paintRigChip() {
+    try {
+      let model = d() && f() ? t("savedRigs") : null,
+        shown = !!model && new Set(model.rigs.map((rg) => rg.sig)).size > 1;
+      if (((rigChip.hidden = !shown), (rigChipModel = shown ? model : null), !shown)) return;
+      let rig = model.rigs[model.active],
+        busy = t("canChangeHook") === !1 || c()?.out === !0;
+      rigChip.textContent !== rig.name && (rigChip.textContent = rig.name);
+      (rigChip.dataset.rig = String(rig.n)),
+        rigChip.classList.toggle("gw-busy", busy),
+        rigChip.setAttribute("aria-label", `${rig.label}: ${rig.name}`);
+    } catch (J) {
+      o("tackle.rigChip", J);
+    }
+  }
+  rigChip.addEventListener("pointerdown", (J) => {
+    J.stopPropagation();
+  }),
+    rigChip.addEventListener("click", (J) => {
+      J.preventDefault(), J.stopPropagation();
+      let model = rigChipModel,
+        res = model && d() ? t("useRig", (model.active + 1) % model.rigs.length, { idle: !0 }) : null;
+      res?.ok === !0 ? l("ui_click", { volume: 0.5, pitch: 0.74 }) : l("denied", { volume: 0.35 });
+      paintRigChip(), y(!0);
+    });
   try {
     for (let J of [
       "run:start",
@@ -162678,8 +162931,9 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       "flow:change",
       "home:enter",
       "loop:tutorial",
+      "loop:rig",
     ])
-      s.bus?.on?.(J, () => y());
+      s.bus?.on?.(J, () => (y(), paintRigChip()));
   } catch (J) {
     o("tackle.bus", J);
   }
@@ -162997,7 +163251,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     },
     focusSig = (el) =>
       el?.dataset
-        ? `${el.dataset.part || ""}|${el.dataset.key || ""}|${el.dataset.buy || ""}|${el.dataset.action || ""}`
+        ? `${el.dataset.part || ""}|${el.dataset.key || ""}|${el.dataset.buy || ""}|${el.dataset.action || ""}|${el.dataset.rig || ""}`
         : "";
   // A part's drawing in a tray, as the rows drew it: a plain line drawing, an engraved plate, or a find's picture.
   function rigArt(item, uid) {
@@ -163063,7 +163317,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     return el;
   }
   // A node's tray, over the picture: its options, then what Murk has for it.
-  function rigTray(model, part, words) {
+  function rigTray(model, part, words, said = null) {
     let node = model.nodes.find((nd) => nd.part === part),
       w = rigWords();
     if (!node) return null;
@@ -163079,7 +163333,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     });
     head.appendChild(h), head.appendChild(back), tray.appendChild(head);
     let list = a("div", "gw-rig-opts");
-    for (let line of [...Ed(node.notes), model.busy ? words.after : null].filter(Boolean)) {
+    for (let line of [said, ...Ed(node.notes), model.busy ? words.after : null].filter(Boolean)) {
       let p = a("p", "gw-ts-note gw-rig-note");
       (p.textContent = line), list.appendChild(p);
     }
@@ -163099,6 +163353,57 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     }
     tray.appendChild(list);
     return tray;
+  }
+  // The three saved rigs as tabs over the picture (mossmere-gear.md B6 "Saved rigs"): each its number, its name, its
+  // bait or lure drawn small (greyed when none is left) and a small leader or hook when it is not the plain one.
+  // Pressing one makes it the rig in use, and the picture follows.
+  function rigTabs() {
+    let model = null;
+    try {
+      model = t("savedRigs");
+    } catch (err) {
+      o("rig.tabs", err);
+    }
+    if (!model) return null;
+    let w = rigWords().saved || {},
+      bar = a("div", "gw-rig-tabs");
+    (bar.dataset.loop = "rig-tabs"), bar.setAttribute("role", "group");
+    for (let rig of model.rigs) {
+      let b = a("button", "gw-rig-tab"),
+        on = rig.n === model.active + 1;
+      (b.type = "button"), (b.dataset.rig = String(rig.n)), b.setAttribute("aria-pressed", String(on));
+      rig.out && (b.dataset.out = "true");
+      let num = a("span", "gw-rig-tabn"),
+        name = a("span", "gw-rig-tabname"),
+        icons = a("span", "gw-rig-icons");
+      (num.textContent = rig.label), (name.textContent = rig.name);
+      icons.setAttribute("aria-hidden", "true"), (icons.innerHTML = rigTabIcons(rig));
+      b.appendChild(num), b.appendChild(name), b.appendChild(icons);
+      b.setAttribute(
+        "aria-label",
+        [
+          `${rig.label}: ${rig.name}`,
+          ...[rig.leader, rig.hook].filter(Boolean).map((id) => {
+            let tx = n()?.TEXT_LOOP || {};
+            return tx.leader?.names?.[id] || tx.hook?.names?.[id] || id;
+          }),
+        ].join(", ") + (rig.out ? `. ${w.out || ""}` : ""),
+      );
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation(), rigUse(rig.n - 1);
+      });
+      bar.appendChild(b);
+    }
+    return bar;
+  }
+  // A tab pressed: that rig is fitted (it waits while a fish is on, as a part does), and the picture follows.
+  function rigUse(index) {
+    let r = t("useRig", index);
+    if (r?.ok !== !0) {
+      l("denied", { volume: 0.35 }), _();
+      return;
+    }
+    r.changed && (l("ui_click", { volume: 0.5, pitch: 0.74 }), r.reeled && (z = !0)), _(), y(!0);
   }
   // The picture: the slice, a label button for each part with a pointer to where it sits, then the limit line and
   // the "Here, now" strip.
@@ -163214,8 +163519,9 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     }
     rt.childNodes.length && N.appendChild(rt), xe.appendChild(N);
     // The rig as one picture, in place of the rows (mossmere-gear.md B6).
-    let dt = a("div", "gw-ts-rows");
-    dt.appendChild(rigCard(Xe)), xe.appendChild(dt);
+    let dt = a("div", "gw-ts-rows"),
+      tabs = rigTabs();
+    tabs && dt.appendChild(tabs), dt.appendChild(rigCard(Xe)), xe.appendChild(dt);
     let G = a("footer", "gw-ts-foot"),
       Ve = e.screens?.parts?.btn,
       tt = (Me, ve) => {
@@ -163252,7 +163558,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     });
     (wt.dataset.action = "close"), G.appendChild(wt), xe.appendChild(G);
     // A part's tray covers the picture until an option is fitted or Back is pressed.
-    let tray = Ze.tray ? rigTray(Xe, Ze.tray, lt) : null;
+    let tray = Ze.tray ? rigTray(Xe, Ze.tray, lt, Ze.said) : null;
     tray ? (xe.appendChild(tray), xe.classList.add("gw-rig-traying")) : (Ze.tray = null);
     Ne.appendChild(xe);
     let gt = Ze.keep || null;
@@ -163301,7 +163607,9 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     let J = e.entry?.("tacklescreen");
     if (!J) return;
     let was = J.state.tray || null;
-    (J.state.tray = part || null), _(part ? { into: part } : was ? { outOf: was } : {});
+    (J.state.said = null),
+      (J.state.tray = part || null),
+      _(part ? { into: part } : was ? { outOf: was } : {});
   }
   // An owned option pressed in a tray: fitted as the rows' chips were (Mhe), then the tray closes so the picture
   // shows it. The fitted one only closes the tray.
@@ -163325,6 +163633,9 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       l("denied", { volume: 0.35 });
       return;
     }
+    // A leader or hook goes on the rig in use, and the tray says which.
+    let J = e.entry?.("tacklescreen");
+    J && (J.state.said = r.rig ? Ab(rigWords().saved?.onRig || "", { n: r.rig }) : null);
     l("ui_click", { volume: 0.5, pitch: 0.74 }), _(), y(!0);
   }
   function W(J) {
@@ -163362,6 +163673,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
             ...[...trayEl.querySelectorAll("button.gw-rig-opt")].map((b) => [b]),
           ]
         : [
+            [...Xe.querySelectorAll(".gw-rig-tab")],
             ...[...Xe.querySelectorAll(".gw-rig-node")].map((b) => [b]),
             [...Xe.querySelectorAll(".gw-ts-foot button")],
           ]
@@ -163370,8 +163682,12 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     let Ze = document.activeElement,
       xe = lt.findIndex((_e) => _e.includes(Ze)),
       N = null;
+    // Nothing focused yet: the fitted option in a tray, else the first part of the picture (the rig tabs sit
+    // above it, one move up).
     if (xe < 0)
-      N = trayEl ? lt.find((r) => r[0].getAttribute("aria-pressed") === "true")?.[0] || lt[0][0] : lt[0][0];
+      N = trayEl
+        ? lt.find((r) => r[0].getAttribute("aria-pressed") === "true")?.[0] || lt[0][0]
+        : Xe.querySelector(".gw-rig-node") || lt[0][0];
     else if (Ne[1]) {
       let _e = lt[xe].indexOf(Ze);
       N = lt[xe][Math.max(0, Math.min(lt[xe].length - 1, _e + Ne[1]))];
@@ -168127,7 +168443,14 @@ function WV(e) {
           ? { name: liveText.tin, line: liveText.gift?.[qt.tally?.giftSay] || liveText.gift?.plain, fit: "" }
           : arrivalText.lines?.[arrivalKey]
             ? { name: arrivalText.names?.[arrivalKey], line: arrivalText.lines[arrivalKey], fit: "" }
-            : { name: giftText.names?.[gift], line: giftText.gift, fit: giftText.fit };
+            : {
+                name: giftText.names?.[gift],
+                line: giftText.gift,
+                // Set up on a saved rig, it says which; else where to fit it.
+                fit: qt.tally?.giftRig
+                  ? Ab(f().rig?.saved?.onRig || "", { n: qt.tally.giftRig })
+                  : giftText.fit,
+              };
     if (gift && giftShown.line) {
       let g = n("div", `gw-tally-gift${Le.empty ? " gw-in" : ""}`),
         art = dV[gutOnly ? "chafe_gut" : gift] || "";
@@ -168579,7 +168902,10 @@ function WV(e) {
     return qt;
   }
   function Ge(_t, Pt) {
-    if (i("buy", Pt)?.ok === !0) {
+    let bought = i("buy", Pt);
+    if (bought?.ok === !0) {
+      // A leader or hook goes on the rig in use, and Murk says which.
+      bought.rig && (_t.state.line = Ab(f().rig?.saved?.onRig || "", { n: bought.rig }));
       if (
         (p(!0, { volume: 0.4 }), e.sfx?.("shop_buy"), e.hud?.dirtyStats?.(), String(Pt).startsWith("place:"))
       ) {

@@ -730,6 +730,22 @@ async function rigScreen(session) {
 }
 const closeTackle = (session) => session.eval(() => window.__gw.ui.loop.tackle.closeScreen());
 
+// The saved rigs' tabs on the tackle screen (opened from the rack): each one's label, name, whether it is pressed,
+// whether its bait has none left and whether its bait icon is greyed. Leaves the screen open.
+async function rigTabsShown(session) {
+  await session.eval(() => window.__gw.ui.loop.tackle.openScreen({ from: "rack" }));
+  await session.pause(800);
+  return session.eval(() =>
+    [...document.querySelectorAll(".gw-rig-tab")].map((b) => ({
+      label: b.querySelector(".gw-rig-tabn")?.textContent ?? "",
+      name: b.querySelector(".gw-rig-tabname")?.textContent ?? "",
+      on: b.getAttribute("aria-pressed") === "true",
+      out: b.dataset.out === "true",
+      greyed: !!b.querySelector(".gw-rig-ico--out"),
+    })),
+  );
+}
+
 // The foot lines of the Odds page (the Wick's sheet, opened as Murk's "Odds" button does).
 async function oddsFoot(session) {
   await session.eval(() => window.__gw.ui.openTackle());
@@ -5354,6 +5370,443 @@ const SCENARIOS = [
         `the Odds page's line for fish not met: ${odds.slice(0, 400)}`,
       );
       return `${fish.length} fish; ${overview.length} Overview lines`;
+    },
+  },
+
+  // ---- saved rigs (mossmere-gear.md "Saved rigs", B4, B6; mossmere-gear-deeper.md "The rig picture and saved rigs")
+
+  {
+    name: "saved rigs: a fresh game has three plain rigs, Rig 1 in use and named from what is on it; an old save loads with Rig 1 as its fitted rig",
+    fixture: "mid-mossmere",
+    debug: true,
+    // An old save (no rigs yet) with its own rig fitted: Lumen Moss, not the plain worms.
+    editSave: (save) => {
+      delete save.meta.loop.rigs, delete save.meta.loop.activeRig;
+      save.meta.loop.fitted = { ...save.meta.loop.fitted, lure: null, bait: "lumen_moss" };
+    },
+    async run(session) {
+      await session.toHome();
+      const r = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          meta = window.__gw.state.meta,
+          read = () => {
+            const s = loop.state();
+            return {
+              rigs: JSON.parse(JSON.stringify(s.rigs)),
+              active: s.activeRig,
+              fitted: { ...s.fitted },
+              names: loop.savedRigs().rigs.map((rg) => rg.name),
+            };
+          };
+        const old = read();
+        // A fresh game: the loader builds a new loop when the save has none.
+        const kept = meta.loop;
+        delete meta.loop;
+        const fresh = read();
+        meta.loop = kept;
+        return { old, fresh, back: read() };
+      });
+      const plain = { lure: null, bait: "mireworm", depth: "float", leader: "plain_knot", hook: "mere_hook" };
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      check(
+        r.fresh.rigs.length === 3 &&
+          r.fresh.rigs.every((rg) => same(rg, plain)) &&
+          r.fresh.active === 0 &&
+          same(r.fresh.fitted, plain) &&
+          same(r.fresh.names, ["Cork · Worms", "Cork · Worms", "Cork · Worms"]),
+        `a fresh game's rigs: ${JSON.stringify(r.fresh)}`,
+      );
+      check(
+        r.old.rigs.length === 3 &&
+          r.old.active === 0 &&
+          same(r.old.rigs[0], { ...plain, bait: "lumen_moss" }) &&
+          same(r.old.rigs[1], plain) &&
+          same(r.old.rigs[2], plain) &&
+          r.old.names[0] === "Cork · Lumen Moss" &&
+          same(r.back.rigs, r.old.rigs),
+        `the old save's rigs: ${JSON.stringify(r.old)}`,
+      );
+      // The tackle screen shows them as three tabs, Rig 1 pressed.
+      const tabs = await rigTabsShown(session);
+      await closeTackle(session);
+      check(
+        same(
+          tabs.map((t) => `${t.label}|${t.name}|${t.on}`),
+          ["Rig 1|Cork · Lumen Moss|true", "Rig 2|Cork · Worms|false", "Rig 3|Cork · Worms|false"],
+        ),
+        `the tabs: ${JSON.stringify(tabs)}`,
+      );
+      return r.old.names.join(", ");
+    },
+  },
+
+  {
+    name: "saved rigs: a part changed on the picture changes only the rig in use; a tab fits its rig, and the first comes back as it was",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: withParts(["sounding_lead", "pike_wire", "turnback_hook"]),
+    async run(session) {
+      await session.toHome();
+      // Rig 1: the lead, Pike Wire and the Turnback Hook with Lumen Moss, fitted part by part.
+      const one = await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        loop.fitDepth("lead"), loop.fitPart("leader", "pike_wire"), loop.fitPart("hook", "turnback_hook");
+        loop.changeHook({ bait: "lumen_moss" });
+        const s = loop.state();
+        return { rigs: JSON.parse(JSON.stringify(s.rigs.slice(1))), names: loop.savedRigs().rigs };
+      });
+      check(
+        one.rigs.every(
+          (rg) => rg.bait === "mireworm" && rg.depth === "float" && rg.leader === "plain_knot",
+        ) &&
+          one.names[0].name === "Bottom · Lumen Moss" &&
+          one.names[0].leader === "pike_wire" &&
+          one.names[0].hook === "turnback_hook" &&
+          one.names[1].name === "Cork · Worms" &&
+          !one.names[1].leader,
+        `the other rigs changed: ${JSON.stringify(one)}`,
+      );
+      // Rig 2's tab: its plain parts are fitted and the picture follows.
+      const pressTab = async (n) => {
+        await session.eval(() => window.__gw.ui.loop.tackle.openScreen({ from: "rack" }));
+        await session.pause(800);
+        await session.eval((k) => document.querySelector(`.gw-rig-tab[data-rig="${k}"]`)?.click(), n);
+        await session.pause(800);
+        const shown = await rigScreen(session);
+        const tabs = await session.eval(() =>
+          [...document.querySelectorAll(".gw-rig-tab")].map((b) => b.getAttribute("aria-pressed")),
+        );
+        const fitted = await session.eval(() => ({ ...window.__gw.progression.loop.state().fitted }));
+        await closeTackle(session);
+        return { shown, tabs, fitted };
+      };
+      const two = await pressTab(2);
+      check(
+        JSON.stringify(two.fitted) ===
+          '{"lure":null,"bait":"mireworm","depth":"float","leader":"plain_knot","hook":"mere_hook"}' &&
+          two.shown.depth === "float" &&
+          two.shown.drawn.cork &&
+          two.shown.drawn.worm &&
+          two.shown.nodes.find((nd) => nd.part === "leader")?.key === "plain_knot" &&
+          JSON.stringify(two.tabs) === '["false","true","false"]',
+        `Rig 2: ${JSON.stringify(two)}`,
+      );
+      // A change now goes on Rig 2 only.
+      const changed = await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        loop.changeHook({ lure: "bent_spoon" });
+        return loop.savedRigs().rigs.map((rg) => rg.name);
+      });
+      check(
+        JSON.stringify(changed) === '["Bottom · Lumen Moss","Bent Spoon","Cork · Worms"]',
+        `after changing Rig 2: ${JSON.stringify(changed)}`,
+      );
+      const back = await pressTab(1);
+      check(
+        JSON.stringify(back.fitted) ===
+          '{"lure":null,"bait":"lumen_moss","depth":"lead","leader":"pike_wire","hook":"turnback_hook"}' &&
+          back.shown.depth === "lead" &&
+          back.shown.drawn.wire &&
+          JSON.stringify(back.tabs) === '["true","false","false"]',
+        `back on Rig 1: ${JSON.stringify(back)}`,
+      );
+      const kept = await session.eval(() => window.__gw.progression.loop.state().rigs[1]);
+      check(kept.lure === "bent_spoon", `Rig 2 lost its lure: ${JSON.stringify(kept)}`);
+      return changed.join(", ");
+    },
+  },
+
+  {
+    name: "saved rigs: the chip on the water shows the rig's name, a tap fits the next rig and the next cast fishes it; it does nothing while a cast is out or a fish is on",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 360_000,
+    editSave: (save) => {
+      withParts(["sounding_lead"])(save);
+      const plain = { lure: null, bait: "mireworm", depth: "float", leader: "plain_knot", hook: "mere_hook" };
+      save.meta.loop.rigs = [plain, { ...plain, bait: "lumen_moss", depth: "lead" }, plain];
+      save.meta.loop.activeRig = 0;
+    },
+    async run(session) {
+      await session.sail();
+      const chip = () =>
+        session.eval(() => {
+          const el = document.querySelector(".gw-rig-chip");
+          return el && !el.hidden && el.getBoundingClientRect().width > 0
+            ? { text: el.textContent.trim(), busy: el.classList.contains("gw-busy") }
+            : null;
+        });
+      const tap = () => session.eval(() => document.querySelector(".gw-rig-chip")?.click());
+      const rigNow = () =>
+        session.eval(() => {
+          const g = window.__gw,
+            loop = g.progression.loop;
+          return {
+            active: loop.state().activeRig,
+            bait: g.state.run?.equippedBait ?? null,
+            lead: loop.leadFishes(),
+          };
+        });
+      const first = await chip();
+      check(first?.text === "Cork · Worms" && !first.busy, `the chip: ${JSON.stringify(first)}`);
+      await tap();
+      await session.pause(500);
+      const second = { chip: await chip(), rig: await rigNow() };
+      check(
+        second.chip?.text === "Bottom · Lumen Moss" &&
+          second.rig.active === 1 &&
+          second.rig.bait === "lumen_moss" &&
+          second.rig.lead === true,
+        `after one tap: ${JSON.stringify(second)}`,
+      );
+      // A cast: it fishes the new rig. While it is out, a tap does nothing.
+      const cast = await session.eval(async () => {
+        const g = window.__gw,
+          p = g.player.position,
+          yaw = g.render.getYaw();
+        g.debug.castAt(p.x - Math.sin(yaw) * 9, p.z - Math.cos(yaw) * 9, 0.6);
+        for (let i = 0; i < 40 && g.fishing.state !== "waiting"; i++)
+          await new Promise((r) => setTimeout(r, 250));
+        return { state: g.fishing.state, line: g.fishing.hookLine?.() ?? null };
+      });
+      check(
+        cast.state === "waiting" && cast.line?.castBait === "lumen_moss",
+        `the cast: ${JSON.stringify(cast)}`,
+      );
+      const outChip = await chip();
+      await tap();
+      await session.pause(500);
+      const whileOut = await rigNow();
+      check(
+        outChip?.busy && whileOut.active === 1 && whileOut.bait === "lumen_moss",
+        `a tap while the cast is out: ${JSON.stringify({ outChip, whileOut })}`,
+      );
+      // A fish on (its catch card up): a tap does nothing.
+      await session.eval(() => {
+        window.__gw.fishing.reelInQuiet?.();
+        return window.__gw.debug.instantCatch("dusk_minnow");
+      });
+      await session.pause(1500);
+      const onState = await session.eval(() => window.__gw.progression.loop.canChangeHook());
+      await tap();
+      await session.pause(500);
+      const whileOn = await rigNow();
+      check(
+        onState === false && whileOn.active === 1,
+        `a tap with a fish on: ${JSON.stringify({ onState, whileOn })}`,
+      );
+      return `${first.text} > ${second.chip.text}; refused with a cast out and with a fish on`;
+    },
+  },
+
+  {
+    name: "saved rigs: the lead's gift sets up Rig 2 as a bottom rig and the tally says so; a bought leader or hook goes on the rig in use and says so",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 480_000,
+    async run(session) {
+      await session.sail();
+      await session.catchFish("dusk_minnow");
+      const gift = await tallyAndGift(session);
+      const r = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          s = loop.state();
+        return {
+          rigs: JSON.parse(JSON.stringify(s.rigs)),
+          active: s.activeRig,
+          names: loop.savedRigs().rigs.map((rg) => rg.name),
+          giftRig: s.lastTrip?.giftRig ?? null,
+        };
+      });
+      check(
+        gift?.text.includes(GIFT_LINE) && gift.text.includes("It is on Rig 2 now."),
+        `the gift block: ${JSON.stringify(gift)}`,
+      );
+      check(
+        r.active === 0 &&
+          r.giftRig === 2 &&
+          r.rigs[1].depth === "lead" &&
+          r.rigs[1].bait === "mireworm" &&
+          r.rigs[0].depth === "float" &&
+          JSON.stringify(r.names) === '["Cork · Worms","Bottom · Worms","Cork · Worms"]',
+        `the rigs after the gift: ${JSON.stringify(r)}`,
+      );
+      // Rig 2 in use, Chafe Gut bought in the Leader tray at Murk's: it goes on Rig 2 and the tray says so.
+      const bought = await session.eval(async () => {
+        const loop = window.__gw.progression.loop,
+          s = loop.state();
+        s.parts.includes("pike_wire") || s.parts.push("pike_wire");
+        s.arrivals.shelved = [...new Set([...s.arrivals.shelved, "chafe_gut", "turnback_hook"])];
+        window.__gw.debug.loop.giveClams(500);
+        loop.useRig(1);
+        window.__gw.ui.loop.tackle.openScreen({ from: "rack" });
+        await new Promise((res) => setTimeout(res, 800));
+        document.querySelector('.gw-rig-node[data-part="leader"]')?.click();
+        await new Promise((res) => setTimeout(res, 800));
+        document.querySelector('.gw-rig-tray .gw-rig-shop[data-buy="part:chafe_gut"]')?.click();
+        await new Promise((res) => setTimeout(res, 800));
+        const notes = [...document.querySelectorAll(".gw-rig-tray .gw-rig-note")].map((n) => n.textContent);
+        window.__gw.ui.loop.tackle.closeScreen();
+        // The Turnback Hook through the shop's own buy: its answer names the rig.
+        const hook = loop.buy("part:turnback_hook");
+        return {
+          notes,
+          hook,
+          rigs: JSON.parse(JSON.stringify(loop.state().rigs)),
+          fitted: { ...loop.state().fitted },
+        };
+      });
+      check(
+        bought.notes.includes("It is on Rig 2 now.") &&
+          bought.hook?.ok === true &&
+          bought.hook.rig === 2 &&
+          bought.fitted.leader === "chafe_gut" &&
+          bought.fitted.hook === "turnback_hook" &&
+          bought.rigs[1].leader === "chafe_gut" &&
+          bought.rigs[0].leader === "plain_knot" &&
+          bought.rigs[2].hook === "mere_hook",
+        `buying: ${JSON.stringify(bought)}`,
+      );
+      return `"${gift.text.slice(-40)}"; ${bought.notes.join(" ")}`;
+    },
+  },
+
+  {
+    name: "saved rigs: a rig never stores rod, reel or line; a rig whose bait has run out greys its bait and fishes on a bare hook",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 360_000,
+    editSave: (save) => {
+      const plain = { lure: null, bait: "mireworm", depth: "float", leader: "plain_knot", hook: "mere_hook" };
+      // Rig 2 holds Cut Strip, of which there is none.
+      save.meta.loop.rigs = [plain, { ...plain, bait: "cut_strip" }, plain];
+      save.meta.loop.activeRig = 0;
+      delete save.meta.loop.bait.mossmere.cut_strip;
+    },
+    async run(session) {
+      await session.toHome();
+      await buyAtHome(session, ["rod:1", "line:1"]);
+      const tabs = await rigTabsShown(session);
+      await closeTackle(session);
+      check(
+        tabs[1].name === "Cork · Cut Strip" &&
+          tabs[1].out &&
+          tabs[1].greyed &&
+          !tabs[0].out &&
+          !tabs[0].greyed,
+        `the tabs: ${JSON.stringify(tabs)}`,
+      );
+      const r = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          tackle = () => JSON.stringify(loop.state().tackle),
+          before = tackle();
+        loop.useRig(1);
+        const after = tackle();
+        loop.useRig(0);
+        return {
+          before,
+          after,
+          back: tackle(),
+          keys: loop.state().rigs.map((rg) => Object.keys(rg).sort().join(",")),
+        };
+      });
+      check(
+        r.before === r.after &&
+          r.after === r.back &&
+          r.keys.every((k) => k === "bait,depth,hook,leader,lure"),
+        `the rigs touched rod, reel or line: ${JSON.stringify(r)}`,
+      );
+      // On the water, Rig 2 fishes bare: no bait goes on the hook, and the picture shows the bare hook.
+      await session.sail();
+      const bare = await session.eval(() => {
+        const g = window.__gw,
+          loop = g.progression.loop,
+          used = loop.useRig(1);
+        return { used: used.ok, bait: g.state.run?.equippedBait ?? null, fitted: loop.state().fitted.bait };
+      });
+      const shown = await rigScreen(session);
+      await closeTackle(session);
+      check(
+        bare.used &&
+          bare.bait === null &&
+          bare.fitted === "cut_strip" &&
+          shown.nodes.find((nd) => nd.part === "bait")?.key === "bare",
+        `Rig 2 on the water: ${JSON.stringify({ bare, nodes: shown.nodes })}`,
+      );
+      return "tackle kept through two switches; Cut Strip greyed and fished bare";
+    },
+  },
+
+  {
+    name: "saved rigs: rigs and the rig in use survive a save and reload, and in Sporewood a rig is named by its bait or lure alone",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 360_000,
+    editSave: withParts(["sounding_lead", "pike_wire"], { depth: "lead", leader: "pike_wire" }),
+    async run(session, { page, browser }) {
+      await session.toHome();
+      const r = await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        const first = loop.savedRigs().rigs.map((rg) => ({ name: rg.name, leader: rg.leader }));
+        loop.useRig(2);
+        loop.changeHook({ lure: "seedpod_twirl" });
+        return {
+          first,
+          names: loop.savedRigs().rigs.map((rg) => rg.name),
+          rigs: JSON.parse(JSON.stringify(loop.state().rigs)),
+          fitted: { ...loop.state().fitted },
+        };
+      });
+      // Sporewood: no depth word and no leader icon; Rig 1 keeps its lead and Pike Wire for Mossmere.
+      check(
+        r.first[0].name === "Spore Cake" &&
+          !r.first[0].leader &&
+          r.rigs[0].depth === "lead" &&
+          r.rigs[0].leader === "pike_wire" &&
+          r.rigs[0].bait === "spore_cake" &&
+          r.fitted.lure === "seedpod_twirl" &&
+          r.names[2] === "Seedpod Twirl",
+        `Sporewood's rigs: ${JSON.stringify(r)}`,
+      );
+      const tabs = await rigTabsShown(session);
+      await closeTackle(session);
+      check(
+        JSON.stringify(tabs.map((t) => t.on)) === "[false,false,true]" && tabs[2].name === "Seedpod Twirl",
+        `Sporewood's tabs: ${JSON.stringify(tabs)}`,
+      );
+      const saved = await session.saved();
+      const again = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await again.boot();
+        await again.toHome();
+        const back = await again.eval(() => {
+          const s = window.__gw.progression.loop.state();
+          return { rigs: JSON.parse(JSON.stringify(s.rigs)), active: s.activeRig, fitted: { ...s.fitted } };
+        });
+        check(
+          back.active === 2 &&
+            JSON.stringify(back.rigs) === JSON.stringify(r.rigs) &&
+            back.fitted.lure === "seedpod_twirl",
+          `after the reload: ${JSON.stringify(back)} vs ${JSON.stringify(r.rigs)}`,
+        );
+        // Sporewood fishes the rig in use: back to Rig 1 and out on the water, the Spore Cake goes on.
+        await again.eval(() => window.__gw.progression.loop.useRig(0));
+        await again.sail({ water: "sporewood" });
+        const run = await again.eval(() => ({
+          zone: window.__gw.state.run?.zone,
+          bait: window.__gw.state.run?.equippedBait ?? null,
+          lure: window.__gw.state.run?.lure ?? null,
+        }));
+        check(
+          run.zone === "sporewood" && run.bait === "spore_cake" && !run.lure,
+          `Sporewood's trip: ${JSON.stringify(run)}`,
+        );
+        await again.collectGameErrors();
+        check(!again.errors.length, `errors after reloading: ${again.errors.join("; ")}`);
+      } finally {
+        await again.close();
+      }
+      return r.names.join(", ");
     },
   },
 ];
