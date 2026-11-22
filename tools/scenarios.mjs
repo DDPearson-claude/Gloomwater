@@ -1324,6 +1324,95 @@ async function catchAndReadCard(session, speciesId) {
   return card;
 }
 
+// ---- the end of the hunt: measure and release, the bounty, Hob's Lamp, Hob's rod, Sporewood opens ----------
+const MEASURED = [
+  "So that's the thief. She's a great wels catfish, the biggest fish in Mossmere.",
+  "An old brass bell is grown into her head. A scrap of old line is still wound round it.",
+];
+const RELEASE_LINE = "You let her go. She sinks back down to her hole, slow and easy.";
+const MURK_LANDED = "You landed the thief. Sit down, I'll count it twice.";
+const MURK_LAMP = "Hob rowed over with this. He says you've earned it.";
+const LAMP_LINE =
+  "Hob lit it on his rock every night for forty years. New kinds of fish bite more often while it hangs on your raft. It goes with you to every lake.";
+const ROD_LINES = [
+  "Your hook catches on something heavy. It's an old rod, green with weed, and its bell is gone.",
+  "Take it to Hob on Mossbell Isle.",
+];
+const HOB_LANDED = "A bell, on its head? Well, now. I had a bell like that once.";
+const HOB_ROD_BACK = "My rod! And she's got my old bell. Well, she can keep it.";
+const PAD_SOLVED = "You solved it. It was never the gloom. It was her.";
+const NEXT_ROD = "Take it to Hob on Mossbell Isle.";
+const RING_LANDED = "She leaves the wide ring of scrapes.";
+const FRAME_LANDED = "It was her all along.";
+const LAMP = "hobs_lamp";
+
+// legend-sold as if she had never been landed: her sale and her catch record taken out. The Bell Pool stays
+// owned, so her water is found, and the hunt is not over.
+const unsold =
+  (more = null) =>
+  (save) => {
+    save.meta.loop.legends.belled_matriarch = 0;
+    delete save.meta.journal.belled_matriarch;
+    if (save.meta.loop.prints) delete save.meta.loop.prints.belled_matriarch;
+    more?.(save);
+  };
+
+// Takes Hob's Lamp away again (an older save that sold her is given it on loading), so that scenarios which
+// compare bite rolls with the build before the lamp roll the same.
+const dropLamp = (session) =>
+  session.eval(() => {
+    window.__gw.progression.loop.state().relics.length = 0;
+  });
+
+// The tally as the player sees it: goes home, finishes the count, and returns the hunt block's and the gift
+// block's words, then closes the tally and anything that opens after it (the notepad included).
+async function tallyWords(session) {
+  for (const homeBy = Date.now() + 60_000; !(await session.eval(() => window.__gw.game.goHome())); ) {
+    check(Date.now() < homeBy, `the game will not go home; ${JSON.stringify(await session.state())}`);
+    await session.closeGuides(3000);
+    await session.pause(1000);
+  }
+  const soldVisible = () =>
+    [...document.querySelectorAll("button")].some(
+      (b) => b.textContent.trim() === "Sold" && b.getBoundingClientRect().width > 0,
+    );
+  await session.waitFor("Murk's tally", 90_000, soldVisible);
+  await session.clickButton(/^Sold$/);
+  await session.pause(2500);
+  const shown = await session.eval(() => {
+    const text = (sel) => document.querySelector(sel)?.textContent.replace(/\s+/g, " ").trim() ?? "";
+    return {
+      hunt: text(".gw-tally-hunt"),
+      gift: text(".gw-tally-gift"),
+      rows: [...document.querySelectorAll(".gw-trow")].map((r) => r.textContent.replace(/\s+/g, " ").trim()),
+    };
+  });
+  for (const end = Date.now() + 60_000; Date.now() < end && (await session.eval(soldVisible)); )
+    await session.clickButton(/^Sold$/), await session.pause(1500);
+  for (let i = 0; i < 8; i++) {
+    await session.eval(() =>
+      document.querySelector('.gw-modal[data-modal="notepad"].gw-in .gw-pad-close')?.click(),
+    );
+    await session.closeGuides(1000);
+    await session.pause(500);
+  }
+  return shown;
+}
+
+// Whether Hob's Lamp stands on the raft (its 3D object, by name) and whether his rock still shows it.
+const lampsInWorld = (session) =>
+  session.eval(() => {
+    const g = window.__gw,
+      scene = g.render?.scene;
+    let raft = null,
+      rock = null;
+    scene?.traverse((o) => {
+      o.name === "relic:hobsLamp" && (raft = o.visible);
+      o.name === "Hob's lamp" && (rock = o.visible);
+    });
+    return { raft, rock, lit: g.progression.loop.hobLampLit(), here: g.progression.loop.hobHere() };
+  });
+
 const SCENARIOS = [
   {
     name: "gear: on the water with the lead: no float, the line slants in, the Tip Bell on every rod, the depth word, the tip answers, a real press strikes and lands",
@@ -1507,6 +1596,8 @@ const SCENARIOS = [
     debug: true,
     timeoutMs: 360_000,
     async run(session, { fixture }) {
+      // An older save that sold her has Hob's Lamp: taken away here, so the rolls compare with the build before it.
+      await dropLamp(session);
       const want = JSON.parse(readFileSync(join(FIXTURES_DIR, "bite-sequence-float.json"), "utf8"));
       check(fixture.meta.loop.fitted.depth === undefined, "the fixture already knows the Depth part");
       await session.sail();
@@ -1546,6 +1637,8 @@ const SCENARIOS = [
     debug: true,
     editSave: withLead(false),
     async run(session) {
+      // An older save that sold her has Hob's Lamp: taken away here, so the rolls compare with the build before it.
+      await dropLamp(session);
       await session.sail();
       // 1. Pool rows (l1), open water by day: each kind's share against an any-depth fish (Mossback Perch).
       const day = await rollBoth(session, { light: "calm", roll: {} });
@@ -2054,6 +2147,8 @@ const SCENARIOS = [
     fixture: "legend-sold",
     debug: true,
     async run(session) {
+      // An older save that sold her has Hob's Lamp: taken away here, so the rolls compare with the build before it.
+      await dropLamp(session);
       await session.sail();
       const rolls = await session.eval((id) => {
         const d = window.__gw.debug,
@@ -2107,6 +2202,8 @@ const SCENARIOS = [
     debug: true,
     editSave: withLead(true),
     async run(session) {
+      // An older save that sold her has Hob's Lamp: taken away here, so the rolls compare with the build before it.
+      await dropLamp(session);
       await session.sail();
       const N = 6000;
       await session.eval(() => (window.__gw.state.run.bait.live_minnow = 2));
@@ -2584,7 +2681,8 @@ const SCENARIOS = [
         heard.models.some((m) => m.revealed && m.model > 0),
         `her model is not shown at the landing: ${JSON.stringify(heard.models.slice(-4))}`,
       );
-      await session.clickButton(/^\d?Keep\b/);
+      // She is measured and let go (the measuring card has no Keep).
+      await session.clickButton(/^\d?Let go\b/);
       await session.pause(800);
       await session.closeGuides(5000);
       await session.goHomeAndTally();
@@ -2788,11 +2886,14 @@ const SCENARIOS = [
       await session.eval((id) => window.__gw.ui.openJournal({ sel: id }), LEGEND_ID);
       await session.waitFor("her journal page", 10_000, () => !!document.querySelector(".gw-jr-where"));
       const where = await visibleText(session, ".gw-jr-where");
-      await session.eval(() => window.__gw.ui.closeAll());
+      // Closed as a player closes it (closing every screen at once would also take the barge's own screen away).
+      await backToJetty(session);
       check(
         where.includes("She feeds just after the old bell strikes midnight") && !/calm/i.test(where),
         `her Journal page's feeding line: "${where}"`,
       );
+      // Her time as it runs while she is hunted: the hunt record taken back to before her landing.
+      await session.eval(() => (window.__gw.progression.loop.state().hunt.mossmere.landed = 0));
       // She takes only a bait laid on the bottom: the Worm Bunch on the Sounding Lead, at 1 in 6.
       const rigged = await session.eval(() => {
         const loop = window.__gw.progression.loop,
@@ -2830,7 +2931,9 @@ const SCENARIOS = [
       seen.lateInHerTime = await roll();
       let toasts = await toastsSeen(session);
       check(!toasts.includes(STILL_LINE), "the still-water line showed inside her time");
-      // After the three minutes: closed, and the still-water line shows once.
+      // After the three minutes: closed, and the still-water line shows once. (Setting out re-reads the save
+      // and marks her landed again, so the record is taken back once more.)
+      await session.eval(() => (window.__gw.progression.loop.state().hunt.mossmere.landed = 0));
       await atNight(session, MIDNIGHT_AT + 181);
       seen.after = await roll();
       await atNight(session, MIDNIGHT_AT + 200);
@@ -3655,6 +3758,8 @@ const SCENARIOS = [
   {
     name: "her water: an old save that owns the Bell Pool loads as found, with sketches 1 and 2 drawn and sketch 2 saying it found the spot itself",
     fixture: "legend-sold",
+    // Her hunt is not over: she has never been landed in this copy of the save.
+    editSave: unsold(),
     debug: true,
     async run(session) {
       await session.toHome();
@@ -3727,6 +3832,8 @@ const SCENARIOS = [
     debug: true,
     editSave: withParts(["sounding_lead", "pike_wire", "chafe_gut"]),
     async run(session) {
+      // An older save that sold her has Hob's Lamp: taken away here, so the rolls compare with the build before it.
+      await dropLamp(session);
       await session.sail(SLOW_SAIL);
       const ratioCheck = (rolls, leader, want, label) => {
         const plain = rolls.plain_knot.shares,
@@ -4207,6 +4314,8 @@ const SCENARIOS = [
   {
     name: "her tries: three a night, counted only on a rig that could bring her; her time then closes for the night",
     fixture: "legend-sold",
+    // Her hunt is not over: she has never been landed in this copy of the save.
+    editSave: unsold(),
     debug: true,
     async run(session) {
       await session.toHome();
@@ -4255,6 +4364,8 @@ const SCENARIOS = [
   {
     name: "her refusals: a lure, the Cork Float, a bait she won't take, the Worm Bunch's weak half and Pike Wire each swirl with their own line once a night and use no try; the first draws sketch 4",
     fixture: "legend-sold",
+    // Her hunt is not over: she has never been landed in this copy of the save.
+    editSave: unsold(),
     debug: true,
     async run(session) {
       await session.toHome();
@@ -4328,6 +4439,8 @@ const SCENARIOS = [
   {
     name: "her first take waits until the Turnback Hook and Chafe Gut are both shelved or owned; until then a right rig is no bite and no try",
     fixture: "legend-sold",
+    // Her hunt is not over: she has never been landed in this copy of the save.
+    editSave: unsold(),
     debug: true,
     async run(session) {
       await session.toHome();
@@ -4394,6 +4507,8 @@ const SCENARIOS = [
   {
     name: "her losses: the Mere Hook early, a leader not Chafe Gut halfway, a weak line at the end; each named, taught, drawn into sketch 5, no wound; then she turns away at the bite",
     fixture: "legend-sold",
+    // Her hunt is not over: she has never been landed in this copy of the save.
+    editSave: unsold(),
     debug: true,
     timeoutMs: 600_000,
     async run(session) {
@@ -4486,6 +4601,8 @@ const SCENARIOS = [
   {
     name: "her right rig: a lost fight says everything held and wounds her; landed with no loss, sketch 5 reads What held",
     fixture: "legend-sold",
+    // Her hunt is not over: she has never been landed in this copy of the save.
+    editSave: unsold(),
     debug: true,
     timeoutMs: 420_000,
     async run(session) {
@@ -4922,6 +5039,402 @@ const SCENARIOS = [
       check(r.cutsBeat === 0 && r.cutsMarks.cuts === 5, `the cuts: ${JSON.stringify(r)}`);
       check(r.sporeNoted === null && r.sporeMarks.ring === 0, `Sporewood: ${JSON.stringify(r)}`);
       return `the ring noted the hook's beat; Murk says "${HOOK_HUNT_LINE}"`;
+    },
+  },
+  // ---- the end of the hunt (mossmere-hunt-2.md sections 1, 5 and 6, B4 to B6) ----------------------------
+
+  {
+    name: "ending: landed, she gets the measuring card with her name and bell and one Let go, is never in the hold, opens Sporewood with no sale; the tally pays 900 once with Murk's line and gives Hob's Lamp",
+    fixture: "legend-sold",
+    debug: true,
+    editSave: unsold(),
+    timeoutMs: 600_000,
+    async run(session) {
+      await session.toHome();
+      await buyAtHome(session, ["line:1", "line:2"]);
+      await fitHerParts(session, { depth: "lead" });
+      const before = await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        return { open: loop.isOpen("sporewood"), lakes: [...loop.state().maps.lakes] };
+      });
+      check(
+        before.open === false && !before.lakes.includes("sporewood"),
+        `before: ${JSON.stringify(before)}`,
+      );
+      await session.sail();
+      await listenForToasts(session);
+      const hooked = await hookOnce(session, LEGEND_ID, "land");
+      check(hooked.landed === LEGEND_ID, `she was not landed: ${JSON.stringify(hooked)}`);
+      const card = await session.eval(() => {
+        const el = document.querySelector('.gw-modal[data-modal="catch"]');
+        return {
+          name: el?.querySelector(".gw-catch-name")?.textContent.trim() ?? null,
+          words: [...(el?.querySelectorAll(".gw-cc-measured-words p") || [])].map((p) => p.textContent),
+          length: el?.querySelector(".gw-cc-len")?.textContent.trim() ?? "",
+          weight: el?.querySelector(".gw-cc-hero")?.getAttribute("aria-label") ?? "",
+          buttons: [...(el?.querySelectorAll(".gw-catch-actions button") || [])].map((b) =>
+            b.textContent.trim(),
+          ),
+        };
+      });
+      check(card.name === "Bellhead Catfish", `the card's name: ${JSON.stringify(card)}`);
+      check(
+        JSON.stringify(card.words) === JSON.stringify(MEASURED),
+        `the card's lines: ${JSON.stringify(card)}`,
+      );
+      check(/\d/.test(card.length) && /\d/.test(card.weight), `length and weight: ${JSON.stringify(card)}`);
+      check(card.buttons.length === 1 && /^\d?Let go$/.test(card.buttons[0]), `the buttons: ${card.buttons}`);
+      // Keeping her is refused even when asked for directly.
+      const kept = await session.eval(
+        (id) => window.__gw.progression.fishAction({ uid: "her-test", speciesId: id }, "keep")?.ok ?? null,
+        LEGEND_ID,
+      );
+      check(kept === false, `keeping her was not refused: ${kept}`);
+      await session.clickButton(/^\d?Let go\b/);
+      await session.pause(1500);
+      const after = await session.eval((id) => {
+        const g = window.__gw,
+          loop = g.progression.loop,
+          s = loop.state();
+        return {
+          creel: (g.state.run.creel || []).map((f) => f.speciesId),
+          landed: s.hunt.mossmere.landed,
+          sold: s.legends[id] | 0,
+          open: loop.isOpen("sporewood"),
+          clams: s.clams,
+        };
+      }, LEGEND_ID);
+      const toasts = await toastsSeen(session);
+      check(toasts.includes(RELEASE_LINE), `no release line: ${JSON.stringify(toasts)}`);
+      check(!after.creel.includes(LEGEND_ID), `she is in the hold: ${after.creel}`);
+      check(after.landed > 0 && after.sold === 0, `landed ${after.landed}, sold ${after.sold}`);
+      check(after.open === true, "Sporewood is not open after the landing");
+      // At the tally: the bounty row and Murk's line, then Hob's Lamp with his line.
+      const tally = await tallyWords(session);
+      const trip = await session.eval(() => window.__gw.progression.loop.lastTrip());
+      const home = await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        return { clams: s.clams, relics: [...s.relics], paid: s.hunt.mossmere.bountyPaid };
+      });
+      check(tally.hunt.includes(MURK_LANDED), `the tally's hunt words: ${tally.hunt}`);
+      check(
+        tally.gift.includes("Hob's Lamp") && tally.gift.includes(MURK_LAMP) && tally.gift.includes(LAMP_LINE),
+        `the tally's gift: ${tally.gift}`,
+      );
+      check(
+        tally.rows.some((r) => r.includes("Bellhead Catfish") && r.includes("Bounty") && r.includes("900")),
+        `the tally's rows: ${JSON.stringify(tally.rows)}`,
+      );
+      check(trip.bounty === 900 && trip.gift === LAMP, `the trip: ${JSON.stringify(trip)}`);
+      check(
+        home.clams - after.clams === trip.total && trip.total >= 900,
+        `clams ${after.clams} -> ${home.clams}`,
+      );
+      check(home.relics.includes(LAMP) && home.paid === true, `after the tally: ${JSON.stringify(home)}`);
+      // The next evening: the lamp on the raft and not on Hob's rock; the next tally pays nothing more.
+      await session.sail();
+      await session.pause(1500);
+      const lamps = await lampsInWorld(session);
+      check(lamps.raft === true && lamps.rock === false, `the lamps: ${JSON.stringify(lamps)}`);
+      const again = await tallyWords(session);
+      const trip2 = await session.eval(() => window.__gw.progression.loop.lastTrip());
+      check(
+        trip2.bounty === undefined && !again.hunt.includes(MURK_LANDED) && trip2.gift !== LAMP,
+        `the next tally: ${JSON.stringify({ trip2, again })}`,
+      );
+      const saved = JSON.parse(await session.saved());
+      check(
+        saved.meta.loop.relics.includes(LAMP) && saved.meta.loop.hunt.mossmere.landed > 0,
+        "the written save lost the lamp or the landing",
+      );
+      return `card "${card.name}", ${card.length}, ${card.weight}; bounty ${trip.bounty} once; lamp on the raft`;
+    },
+  },
+
+  {
+    name: "Hob's Lamp: kept on loading, it makes a never-caught kind bite 1.5 times as often in all three bite paths, never a legend, never a kind already caught",
+    fixture: "mid-mossmere",
+    debug: true,
+    editSave: (save) => {
+      withLead(false)(save);
+      save.meta.loop.relics = [LAMP];
+    },
+    async run(session) {
+      await session.sail();
+      const kept = await session.eval(() => [...window.__gw.progression.loop.state().relics]);
+      check(JSON.stringify(kept) === JSON.stringify([LAMP]), `the relics after loading: ${kept}`);
+      const lamps = await lampsInWorld(session);
+      check(lamps.raft === true && lamps.rock === false, `the lamps: ${JSON.stringify(lamps)}`);
+      const roll = (opts) =>
+        session.eval(
+          ([o, lamp]) => {
+            const g = window.__gw,
+              s = g.progression.loop.state();
+            s.relics.length = 0;
+            lamp && s.relics.push("hobs_lamp");
+            g.debug.setPhase("calm");
+            return g.debug.fishPoolRoll(1, { bait: "mireworm", ...o });
+          },
+          [opts, opts.lamp],
+        );
+      const caught = (id) => session.eval((id) => (window.__gw.state.meta.journal[id]?.caught | 0) > 0, id);
+      // 1. Pool rows (l1): each kind's share against a caught kind's (Mossback Perch).
+      const off = await roll({ lamp: false }),
+        on = await roll({ lamp: true });
+      const base = on.shares.mossback_perch / off.shares.mossback_perch;
+      const kinds = Object.keys(off.shares).filter((id) => off.shares[id] > 0);
+      let unmet = 0;
+      for (const id of kinds) {
+        const want = (await caught(id)) ? 1 : 1.5;
+        want > 1 && unmet++;
+        const ratio = on.shares[id] / off.shares[id] / base;
+        check(near(ratio, want, 1e-6), `${id}: ${ratio.toFixed(4)} times as often, expected ${want}`);
+      }
+      check(unmet > 0 && unmet < kinds.length, `no mix of met and unmet kinds here: ${kinds}`);
+      // 2. Guests (P7): the Lily Gardener's Notebook brings the Nightbloom Carp (never caught) to the pads at night.
+      await session.eval(() => {
+        window.__gw.progression.loop.state().finds.got.lily_notebook = 1;
+        window.__gw.player.teleport({ x: 40, z: 28 }, 0);
+      });
+      await session.pause(1500);
+      const night = (lamp) =>
+        session.eval((lamp) => {
+          const g = window.__gw,
+            s = g.progression.loop.state();
+          s.relics.length = 0;
+          lamp && s.relics.push("hobs_lamp");
+          g.debug.setPhase("gloomtide");
+          return g.debug.fishPoolRoll(1, { bait: "mireworm" });
+        }, lamp);
+      const p0 = (await night(false)).shares.nightbloom_carp,
+        p1 = (await night(true)).shares.nightbloom_carp;
+      check(p0 > 0 && !(await caught("nightbloom_carp")), `no Nightbloom Carp guest here: ${p0}`);
+      // A guest's weight is the pool's times x = p / (1 - p), so the lamp makes x half again as large.
+      const x0 = p0 / (1 - p0),
+        x1 = p1 / (1 - p1);
+      check(near(x1 / x0, 1.5, 1e-6), `the guest ${p0} -> ${p1}: x times ${x1 / x0}`);
+      // 3. Sign and sight takes (_7): an unmet kind's prerolled take rises by half; a met kind's stays.
+      const take = async (speciesId, lamp) =>
+        (await roll({ lamp, roll: undefined, preroll: { speciesId, base: 0.2 } })).preroll;
+      await session.eval(() => window.__gw.player.teleport({ x: 0, z: 30 }, 0));
+      await session.pause(1200);
+      check(!(await caught("gutter_crayfish")), "the Gutter Crayfish has been caught in this save");
+      const u0 = await take("gutter_crayfish", false),
+        u1 = await take("gutter_crayfish", true),
+        m0 = await take("mossback_perch", false),
+        m1 = await take("mossback_perch", true);
+      check(near(u1, Math.min(0.9, 1.5 * u0), 1e-9) && u1 > u0, `the crayfish's take ${u0} -> ${u1}`);
+      check(near(m0, m1, 1e-12), `a caught kind's take moved: ${m0} -> ${m1}`);
+      // Never a legend, whatever the journal says.
+      const rule = await session.eval(() => {
+        const g = window.__gw.data,
+          lamp = g.lampOf({ loop: { relics: ["hobs_lamp"] }, journal: {} });
+        return {
+          her: g.lampBiteMult({ id: "belled_matriarch", rarity: "legendary" }, lamp),
+          grove: g.lampBiteMult({ id: "drifting_grove", rarity: "legendary" }, lamp),
+          pike: g.lampBiteMult({ id: "reedjaw_pike", rarity: "rare" }, lamp),
+          none: g.lampOf({ loop: { relics: [] }, journal: {} }),
+        };
+      });
+      check(
+        rule.her === 1 && rule.grove === 1 && rule.pike === 1.5 && rule.none === null,
+        `the rule: ${JSON.stringify(rule)}`,
+      );
+      return `pool: ${unmet} unmet kinds x1.5 of ${kinds.length}; guest ${p0.toFixed(3)} -> ${p1.toFixed(3)}; take ${u0} -> ${u1}`;
+    },
+  },
+
+  {
+    name: "ending, old save: a save that sold her loads with every sketch drawn, the hunt landed and Hob's Lamp; no tale, line-up, nudge or bounty; Sporewood is open and the lamp crosses with the tow",
+    fixture: "legend-sold",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session) {
+      await session.toHome();
+      const r = await session.eval(() => {
+        const g = window.__gw,
+          loop = g.progression.loop,
+          s = loop.state(),
+          h = s.hunt.mossmere,
+          evening = s.evenings + 1;
+        return {
+          h: JSON.parse(JSON.stringify(h)),
+          relics: [...s.relics],
+          lakes: [...s.maps.lakes],
+          open: loop.isOpen("sporewood"),
+          beat: g.data.mossmereTallyBeat(JSON.parse(JSON.stringify(s)), { zone: "mossmere", evening }),
+          next: loop.notepad()?.next ?? null,
+        };
+      });
+      check(
+        Object.values(r.h.sketches).every((v) => v > 0),
+        `sketches: ${JSON.stringify(r.h.sketches)}`,
+      );
+      check(
+        r.h.landed > 0 && r.h.landedBy === "save" && r.h.bountyPaid === true,
+        `the record: ${JSON.stringify(r.h)}`,
+      );
+      check(r.h.birdCutsceneSeen === true && r.h.taleAt > 0, `cutscene or tale due: ${JSON.stringify(r.h)}`);
+      check(r.relics.includes(LAMP), `no lamp: ${r.relics}`);
+      check(r.lakes.includes("sporewood") && r.open === true, `Sporewood: ${JSON.stringify(r)}`);
+      check(r.beat === null, `a tally would say ${JSON.stringify(r.beat)}`);
+      check(r.next === "solved", `the notepad's foot: ${r.next}`);
+      // The notepad in the Journal: its last line, the frame's line and the ring's line once she is landed.
+      await session.eval(() => {
+        const h = window.__gw.progression.loop.state().hunt.mossmere;
+        h.marks.ring = h.marks.ring || 1;
+      });
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "notepad" }));
+      await session.waitFor(
+        "the notepad tab",
+        10_000,
+        () => !!document.querySelector(".gw-journal-pad .gw-pad"),
+      );
+      const pad = await session.eval(() => ({
+        foot: document.querySelector(".gw-journal-pad .gw-pad-next")?.textContent.trim() ?? "",
+        words: [...document.querySelectorAll(".gw-journal-pad .gw-pad-cap")].map((c) => c.textContent),
+        text: document.querySelector(".gw-journal-pad")?.textContent ?? "",
+      }));
+      await session.eval(() => window.__gw.ui.closeAll());
+      check(pad.foot === PAD_SOLVED, `the foot: "${pad.foot}"`);
+      check(
+        pad.words.includes(FRAME_LANDED) && pad.words.includes(RING_LANDED),
+        `captions: ${JSON.stringify(pad.words)}`,
+      );
+      check(!/What to try next/i.test(pad.foot), "the foot still has its heading");
+      // To Sporewood: the first tow leaves its kit behind, but not the lamp.
+      await session.sail({ water: "sporewood" });
+      await session.pause(1500);
+      const there = await session.eval(() => ({
+        water: window.__gw.state.run?.zone,
+        relics: [...window.__gw.progression.loop.state().relics],
+      }));
+      const lamps = await lampsInWorld(session);
+      check(
+        there.water === "sporewood" && there.relics.includes(LAMP),
+        `in Sporewood: ${JSON.stringify(there)}`,
+      );
+      check(lamps.raft === true, `the raft's lamp in Sporewood: ${JSON.stringify(lamps)}`);
+      return `all five drawn, landed, lamp kept through the tow; foot "${pad.foot}"`;
+    },
+  },
+
+  {
+    name: "Hob's rod: the first cast in her water after the landing brings it up with its two lines, once; at Mossbell Isle Hob says his last lines once and the notepad ends; her time no longer runs",
+    fixture: "legend-sold",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session) {
+      await session.toHome();
+      await buyAtHome(session, ["line:1", "line:2"]);
+      await fitHerParts(session, { depth: "lead" });
+      await session.sail();
+      await listenForToasts(session);
+      // After the landing, in her time: a wrong rig uses no try and says nothing; no boil, no still-water line.
+      await atNight(session, MIDNIGHT_AT + 5, { evening: 6 });
+      await herRig(session, { lure: "bent_spoon" });
+      const lure = await herCast(session, { bait: "live_minnow", u: 0 });
+      await herRig(session, { lure: null });
+      const worms = await herCast(session, { bait: "mireworm", u: 0 });
+      check(
+        [lure, worms].every((a) => !a || (!a.said && !a.part && a.tries === 0)),
+        `after the landing she still refuses or counts tries: ${JSON.stringify([lure, worms])}`,
+      );
+      await atNight(session, MIDNIGHT_AT + 200);
+      await session.pause(800);
+      let toasts = await toastsSeen(session);
+      check(
+        !toasts.includes(STILL_LINE) && !toasts.some((t) => BOIL_LINE.test(t)),
+        `her time ran: ${JSON.stringify(toasts)}`,
+      );
+      // The rod: cast into her water.
+      await session.eval(() => {
+        const g = window.__gw;
+        g.progression.loop.markLifted?.("bell_pool");
+        g.debug.setPhase("calm");
+        g.player.teleport({ x: -4, z: -3 }, 0);
+      });
+      await session.pause(1500);
+      await session.closeGuides(3000);
+      const castOnce = () =>
+        session.eval(async () => {
+          const g = window.__gw,
+            found = () => g.progression.loop.state().hunt.mossmere.rodFound;
+          const before = found();
+          g.debug.castAt(-4, -14, 0.6);
+          for (let i = 0; i < 400 && g.fishing.state !== "waiting"; i++)
+            await new Promise((r) => setTimeout(r, 25));
+          const f = g.debug.fishing(),
+            snagged = !!f.rodDue;
+          // The game's clock runs slowly in a software-rendered browser: wait for the snag on its own clock.
+          for (let i = 0; i < 300 && snagged && found() === before; i++) {
+            // A guide card holds the game's clock: close any that opens.
+            document.querySelector(".gw-m-guide .gw-guide-ok")?.click();
+            await new Promise((r) => setTimeout(r, 100));
+          }
+          return {
+            place: f.place,
+            snagged,
+            state: g.fishing.state,
+            rodFound: found(),
+            rodDue: g.debug.fishing().rodDue,
+            paused: !!g.paused,
+            top: document.querySelector(".gw-modal.gw-in")?.dataset.modal ?? null,
+          };
+        });
+      const first = await castOnce();
+      toasts = await toastsSeen(session);
+      check(first.rodFound > 0, `no rod: ${JSON.stringify(first)}`);
+      check(
+        ROD_LINES.every((l) => toasts.filter((t) => t === l).length === 1),
+        `the rod's lines: ${JSON.stringify(toasts)}`,
+      );
+      check(
+        (await session.eval(() => window.__gw.progression.loop.notepad().next)) === "rod",
+        "the foot does not point to Hob",
+      );
+      await session.eval(() => window.__gw.fishing.reelInQuiet?.());
+      await session.pause(800);
+      await castOnce();
+      toasts = await toastsSeen(session);
+      check(
+        ROD_LINES.every((l) => toasts.filter((t) => t === l).length === 1),
+        "the rod came up twice",
+      );
+      await session.eval(() => window.__gw.fishing.reelInQuiet?.());
+      // To Hob: his last lines, once; then only his greeting.
+      await session.pause(800);
+      await session.closeGuides(5000);
+      await nearHob(session);
+      const lines = await hearHob(session);
+      const why = lines.length
+        ? null
+        : await session.eval(() => {
+            const g = window.__gw;
+            return {
+              fishing: g.fishing.state,
+              top: document.querySelector(".gw-modal.gw-in")?.dataset.modal ?? null,
+              paused: !!g.paused,
+              cinematic: !!g.cinematic,
+              here: g.progression.loop.hobHere(),
+              pos: g.player.position,
+              hunt: g.ui?.debug?.hunt?.() ?? null,
+              flow: g.flow,
+            };
+          });
+      check(
+        lines.length >= 2 && lines.at(-2) === HOB_LANDED && lines.at(-1) === HOB_ROD_BACK,
+        `Hob said: ${JSON.stringify(lines)} ${JSON.stringify(why)}`,
+      );
+      const again = await passHobAgain(session, 12_000);
+      check(
+        !again.includes(HOB_ROD_BACK) && !again.includes(HOB_LANDED),
+        `Hob again: ${JSON.stringify(again)}`,
+      );
+      const h = await huntOf(session);
+      check(h.rodReturned > 0, `the rod was not given back: ${JSON.stringify(h)}`);
+      check((await session.eval(() => window.__gw.progression.loop.notepad().next)) === "solved", "the foot");
+      return `rod found, Hob: ${JSON.stringify(lines)}; again: ${JSON.stringify(again)}`;
     },
   },
   // ---- the rig picture (mossmere-gear.md "The rig picture" and B6; mossmere-gear-deeper.md) ---------------

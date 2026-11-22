@@ -104,7 +104,16 @@ const FIXTURES = [
       // The rest of Mossmere's list (let go), then the rod and the chart, then the crossing.
       await evening(session, ["gutter_crayfish", "lampsipper", "likely_chub", "dusk_minnow"], { keep: 2 });
       await giveClams(session, 3000);
-      for (const id of ["rod:1", "lake:sporewood"]) log(`  buy ${id}: ${await buy(session, id)}`);
+      log(`  buy rod:1: ${await buy(session, "rod:1")}`);
+      // Sporewood's chart is never sold before she is landed now; the fixture is an older save that bought it,
+      // so it is laid down here as the purchase did: the lake, then its two lake places (the debug hook saves).
+      log(
+        `  chart sporewood: ${await session.eval(() => {
+          const maps = window.__gw.progression.loop.state().maps;
+          maps.lakes.includes("sporewood") || maps.lakes.push("sporewood");
+          return window.__gw.debug.loop.own("lullaby") && window.__gw.debug.loop.own("gill_harp")?.join(", ");
+        })}`,
+      );
       await evening(session, ["netcloud_fry", "falsesmile_barb"], {
         water: "sporewood",
         before: async () => {
