@@ -107072,20 +107072,6 @@ function normaliseRigs(loop, D) {
   loop.activeRig = qy(loop.activeRig, 0, RIG_COUNT - 1);
   syncRigInUse(loop);
 }
-// When Murk gives a new part (the lead), the next rig that is still plain after the one in use is set up with it
-// (mossmere-gear.md "Saved rigs": "Rig 2 is filled automatically by the lead gift"). Returns its number (1 to 3),
-// or 0 when every other rig is already the player's own.
-function setUpPlainRig(loop, D, change) {
-  let plain = cleanRig(plainRig(D)),
-    same = (rig) => RIG_FIELDS.every((k) => cleanRig(rig)[k] === plain[k]),
-    active = qy(loop?.activeRig, 0, RIG_COUNT - 1);
-  if (!Array.isArray(loop?.rigs)) return 0;
-  for (let step = 1; step < RIG_COUNT; step++) {
-    let i = (active + step) % RIG_COUNT;
-    if (same(loop.rigs[i])) return (loop.rigs[i] = cleanRig({ ...plain, ...change })), i + 1;
-  }
-  return 0;
-}
 // One lake's monster hunt in the save. Only the part built so far: lineLesson is set by the first loss to a
 // line too weak for her.
 function freshHuntRecord() {
@@ -108766,14 +108752,7 @@ function CF(e) {
       let stock = H.bait?.[ze.zone] || {};
       H.fitted.bait = [...Sle(f().tins?.[ze.zone]), "cut_strip"].find((id) => ha(stock[id]) > 0) ?? null;
     }
-    // The lead goes on the next rig that is still plain, as a bottom rig with the bait in use (savedRigs).
-    let giftRig =
-      gift === "sounding_lead"
-        ? setUpPlainRig(H, n(), {
-            depth: "lead",
-            bait: typeof H.fitted?.bait == "string" ? H.fitted.bait : plainRig(n()).bait,
-          })
-        : 0;
+    // Murk's gift goes in the kit and changes no rig: the three rigs are the player's own to build (decisions.md).
     // The tale and Murk's word about Hob are story, not new tackle, so they may share a tally with his gift.
     let huntBeat = mossmereTallyBeat(H, ze, f().hunt, { quiet: !1, journal: o()?.journal });
     ending && ((gift = "hobs_lamp"), (giftSay = "lamp"), (huntBeat = { ...(huntBeat || {}), landed: !0 }));
@@ -108791,7 +108770,6 @@ function CF(e) {
         ...(x(ze).capLost ? { away: !0 } : {}),
         ...(gift ? { gift } : {}),
         ...(giftSay ? { giftSay } : {}),
-        ...(giftRig ? { giftRig } : {}),
         ...(huntBeat ? { hunt: huntBeat } : {}),
         ...(ending ? { bounty: ending.bounty } : {}),
       }),
@@ -168841,7 +168819,7 @@ function WV(e) {
               : {
                   name: giftText.names?.[gift],
                   line: giftText.gift,
-                  // Set up on a saved rig, it says which; else where to fit it.
+                  // It says where to fit it. (An older save's last tally may name the rig its gift went on.)
                   fit: qt.tally?.giftRig
                     ? Ab(f().rig?.saved?.onRig || "", { n: qt.tally.giftRig })
                     : giftText.fit,

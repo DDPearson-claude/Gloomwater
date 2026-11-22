@@ -6128,7 +6128,7 @@ const SCENARIOS = [
   },
 
   {
-    name: "saved rigs: the lead's gift sets up Rig 2 as a bottom rig and the tally says so; a bought leader or hook goes on the rig in use and says so",
+    name: "saved rigs: the lead's gift goes in the kit, changes no rig and the tally says how to fit it; a bought leader or hook goes on the rig in use and says so",
     fixture: "mid-mossmere",
     debug: true,
     timeoutMs: 480_000,
@@ -6146,17 +6146,18 @@ const SCENARIOS = [
           giftRig: s.lastTrip?.giftRig ?? null,
         };
       });
+      // The rigs are the player's own: the gift fills none of them, and the tally says where to fit it.
       check(
-        gift?.text.includes(GIFT_LINE) && gift.text.includes("It is on Rig 2 now."),
+        gift?.text.includes(GIFT_LINE) &&
+          gift.text.includes("To fit it, press the float on the Tackle screen.") &&
+          !gift.text.includes("It is on Rig"),
         `the gift block: ${JSON.stringify(gift)}`,
       );
       check(
         r.active === 0 &&
-          r.giftRig === 2 &&
-          r.rigs[1].depth === "lead" &&
-          r.rigs[1].bait === "mireworm" &&
-          r.rigs[0].depth === "float" &&
-          JSON.stringify(r.names) === '["Cork · Worms","Bottom · Worms","Cork · Worms"]',
+          r.giftRig === null &&
+          r.rigs.every((rig) => rig.depth === "float" && rig.bait === "mireworm") &&
+          JSON.stringify(r.names) === '["Cork · Worms","Cork · Worms","Cork · Worms"]',
         `the rigs after the gift: ${JSON.stringify(r)}`,
       );
       // Rig 2 in use, Chafe Gut bought in the Leader tray at Murk's: it goes on Rig 2 and the tray says so.
