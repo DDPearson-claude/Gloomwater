@@ -47087,6 +47087,9 @@ var pP = {
       strikes: "Far off, the old bell on the toll-tower strikes midnight.",
       missing: "This is when things go missing.",
       still: "The water goes still again.",
+      birds: "The birds by the Gatehouse scatter across the water.",
+      // The Odds sheet's line under her row, once she is landed.
+      odds: "The {name} bites only in the few minutes after the old bell strikes midnight.",
       holdFull: "Your hold is full. You can still fish and let them go. The old bell strikes midnight soon.",
     },
     home: "Home",
@@ -60288,7 +60291,11 @@ function qI(e, { dt: t = 0.016, raft: n = null, phase: o = "calm", rng: a = Math
         l.events.push("dive"),
         y && (l.flees++, l.events.push("flee"));
     };
-    if (l.mode !== "dive" && (c < Us(s.keep, 3) || (c < s.flee && l.cool <= 0))) {
+    // A bird told to scatter (the midnight bell, scatterRoost below) takes the same flee as one the raft
+    // comes too close to. The flag is used once, even by a bird that is already under.
+    let scattered = l.scatter === !0;
+    scattered && (l.scatter = !1);
+    if (l.mode !== "dive" && (scattered || c < Us(s.keep, 3) || (c < s.flee && l.cool <= 0))) {
       u(!0);
       continue;
     }
@@ -60746,8 +60753,21 @@ function XI(e) {
         (Te.needsUpdate = !0);
     }
   }
+  // Scatters one lampbill flock (its index in lampbills.groups) when the raft is within `near` metres of its
+  // roost and the birds are on screen: each bird takes the flee the raft's approach sets off, on the next
+  // frame. Returns how many birds were sent, so the caller says something only when the birds really go.
+  function scatterRoost(groupIndex, near) {
+    let flock = d.groups[groupIndex],
+      raft = e.player?.position;
+    if (!flock?.roost || !raft || !y.on || !i?.mesh.visible) return 0;
+    if (Math.hypot(raft.x - flock.roost.x, raft.z - flock.roost.z) > near) return 0;
+    let sent = 0;
+    for (let bird of d.birds) bird.g === groupIndex && ((bird.scatter = !0), sent++);
+    return sent;
+  }
   return {
     update: z,
+    scatterRoost,
     state: () => ({
       on: y.on,
       moths: l
@@ -104577,6 +104597,10 @@ const MIDNIGHT = Object.freeze({
   volume: 0.75,
   // A stroke more than this late (a save loaded past it) is skipped silently rather than rung late.
   late: 1.5,
+  // At the first stroke the water birds roosting by the Gatehouse (the third lampbill flock) scatter, when
+  // the raft is within this many metres of their roost.
+  roostFlock: 2,
+  roostNear: 30,
 });
 // True on a trip on Mossmere from evening 2: the evenings the bell strikes.
 function midnightEvening(run) {
@@ -104590,7 +104614,7 @@ function midnightEvening(run) {
 function midnightFlags(run) {
   let m = run.midnight;
   if (!m || typeof m != "object" || Array.isArray(m))
-    m = run.midnight = { struck: 0, said: !1, stillSaid: !1, holdFullSaid: !1, hooked: !1 };
+    m = run.midnight = { struck: 0, said: !1, stillSaid: !1, holdFullSaid: !1, hooked: !1, birdsSaid: !1 };
   return m;
 }
 // Seconds since dark fell, or null while it is still day or dusk.
@@ -104607,8 +104631,9 @@ function herTimeOpen(run) {
 function noteHerHookup(run) {
   midnightEvening(run) && (midnightFlags(run).hooked = !0);
 }
-// Called every frame from the phase clock with the run. Rings the strokes, flares the tower, and shows the
-// midnight, still-water and full-hold lines once an evening each.
+// Called every frame from the phase clock with the run. Rings the strokes, flares the tower, scatters the
+// Gatehouse birds when the raft is near, and shows the midnight, birds, still-water and full-hold lines once
+// an evening each.
 function updateMidnightBell(game, run) {
   if (!midnightEvening(run)) return;
   let m = midnightFlags(run),
@@ -104636,6 +104661,11 @@ function updateMidnightBell(game, run) {
         m.said = !0;
         say(words.strikes);
         bellPoolFoundFor(game) || say(words.missing);
+        let scattered = 0;
+        try {
+          scattered = game.waterBirds?.scatterRoost?.(MIDNIGHT.roostFlock, MIDNIGHT.roostNear) || 0;
+        } catch {}
+        scattered > 0 && !m.birdsSaid && ((m.birdsSaid = !0), say(words.birds));
       }
     }
     m.struck++;
@@ -105081,7 +105111,14 @@ function hF(
       !!_t &&
       (() => {
         let re = W3(t, _t);
-        return (typeof t?.loopHours == "function" ? t.loopHours(re) : QA).includes(Se);
+        // Mossmere's legend bites only in her time after the midnight bell, so the sheet lists her by night.
+        return (
+          _t === MIDNIGHT.legend && d === MIDNIGHT.water
+            ? ["night"]
+            : typeof t?.loopHours == "function"
+              ? t.loopHours(re)
+              : QA
+        ).includes(Se);
       })(),
     // Her chance per cast on this rig, by the same rule as the bite check (legendBaitChance).
     legendShare = ht
@@ -105406,6 +105443,8 @@ function hF(
         ref: ee,
         legend: legendShare === 1 ? _t : null,
         depth: sheetDepth,
+        // Her row is shown (she is landed): the sheet also says that she bites only after the midnight bell.
+        herTime: d === MIDNIGHT.water && qt.some((row) => row.id === MIDNIGHT.legend),
       },
       fresh: lt,
     }
@@ -156129,7 +156168,13 @@ function ZU(e) {
           xe = C.getBoundingClientRect(),
           N = Math.round(xe.width),
           _e = Math.round(xe.height);
-        if (N < 40 || _e < 40) return null;
+        if (N < 40 || _e < 40) {
+          // Not laid out yet: try again next frame (for about two seconds), so the map and its tap areas
+          // never wait on a resize that may not come.
+          (se.sizeTries = (se.sizeTries || 0) + 1) < 120 &&
+            requestAnimationFrame(() => Y.isConnected && Ye(l()));
+          return null;
+        }
         let rt = Math.min(3, (typeof devicePixelRatio == "number" && devicePixelRatio) || 1);
         (Y.width !== Math.round(N * rt) || Y.height !== Math.round(_e * rt)) &&
           ((Y.width = Math.round(N * rt)),
@@ -163948,7 +163993,14 @@ function WV(e) {
     setTimeout(
       () =>
         _t(() => {
-          v.prepare();
+          // A chart opened before its art is ready is drawn as the plain list, without the map's tap areas,
+          // and nothing drew it again. Once the art is ready, an open list chart is drawn again as the map.
+          Promise.resolve(v.prepare())
+            .then((status) => {
+              let open = status === "ready" ? e.entry("chart") : null;
+              open && !open.el?.querySelector(".gw-chart--drawn") && open.render();
+            })
+            .catch((Pt) => r("chart.prepare", Pt));
         }),
       400,
     );
@@ -165979,6 +166031,7 @@ function GV(e, t, { names: n = {}, phone: o = !1 } = {}) {
       strike: t?.AUTOFISH?.text?.log?.strike || "",
       // The Sounding Lead's numbers, shown on this page only (elsewhere: "more often", "less often").
       depth: be.depth === "lead" ? a.depth?.odds || "" : "",
+      herTime: be.herTime ? s0(Ca.midnight.odds, { name: l(MIDNIGHT.legend) }) : "",
     };
   return {
     head: b,
@@ -167121,7 +167174,7 @@ function VV(e) {
       }
       Ze.appendChild(N);
     }
-    for (let N of [D.odds.depth, D.odds.unmet, D.odds.strike])
+    for (let N of [D.odds.herTime, D.odds.depth, D.odds.unmet, D.odds.strike])
       if (N) {
         let _e = document.createElement("p");
         (_e.className = "gw-sh-foot"), (_e.textContent = N), Ze.appendChild(_e);
@@ -176541,7 +176594,7 @@ function Mj(e) {
     }
   if (ms && bp !== !1)
     try {
-      bp || ((bp = XI($t) || !1), bp && ($t.debug.wildlife = bp.state)),
+      bp || ((bp = XI($t) || !1), bp && (($t.debug.wildlife = bp.state), ($t.waterBirds = bp))),
         bp && bp.update(l ? n : 0, { show: i });
     } catch (c) {
       (bp = !1), _a("update(wildlife)", c);

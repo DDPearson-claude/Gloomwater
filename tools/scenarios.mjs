@@ -26,7 +26,7 @@ import * as acorn from "acorn";
 import { join } from "node:path";
 import { DEFAULT_PAGE, GameSession, ROOT, launchBrowser } from "./game-driver.mjs";
 
-const BUDGET_MS = 2_400_000; // every scenario, launch to exit
+const BUDGET_MS = 3_600_000; // every scenario, launch to exit
 const SCENARIO_TIMEOUT_MS = 240_000;
 // Smaller than the smoke test's 480 x 270: SwiftShader draws every frame on the CPU, and several
 // scenarios share it. The game's layout still fits (its phone layout).
@@ -434,24 +434,29 @@ function expectGuideHidden(guide) {
   check(!all.includes(HER_LORE), "the field guide shows her lore");
 }
 
-// Her odds row on the Odds sheet at home, for the Bell Pool (owned, its mist lifted) by day with the
-// Worm Bunch on the Sounding Lead (the lead given if the save has none): a place, light and rig she bites on
-// today. Also the count of kinds not met.
-async function bellPoolOdds(session) {
-  const odds = await session.eval((id) => {
-    const loop = window.__gw.progression.loop,
-      s = loop.state();
-    loop.markLifted("bell_pool");
-    s.parts.includes("sounding_lead") || s.parts.push("sounding_lead");
-    const fitted = loop.fit("bait", "heartmoss")?.ok === true && loop.fitDepth("lead")?.ok === true;
-    const sheet = loop.sheet({ place: "bell_pool", light: "day" });
-    return {
-      fitted,
-      place: sheet?.picks?.place ?? null,
-      row: sheet?.odds?.rows?.find((r) => r.id === id) ?? null,
-      unmet: sheet?.odds?.unmet ?? null,
-    };
-  }, LEGEND_ID);
+// Her odds row on the Odds sheet at home, for the Bell Pool (owned, its mist lifted) by night (or `light`)
+// with the Worm Bunch on the Sounding Lead (the lead given if the save has none): the place, light and rig she
+// bites on (by night, after the midnight bell). Also the count of kinds not met, and whether the sheet carries
+// the line about her time.
+async function bellPoolOdds(session, light = "night") {
+  const odds = await session.eval(
+    ([id, light]) => {
+      const loop = window.__gw.progression.loop,
+        s = loop.state();
+      loop.markLifted("bell_pool");
+      s.parts.includes("sounding_lead") || s.parts.push("sounding_lead");
+      const fitted = loop.fit("bait", "heartmoss")?.ok === true && loop.fitDepth("lead")?.ok === true;
+      const sheet = loop.sheet({ place: "bell_pool", light });
+      return {
+        fitted,
+        place: sheet?.picks?.place ?? null,
+        row: sheet?.odds?.rows?.find((r) => r.id === id) ?? null,
+        unmet: sheet?.odds?.unmet ?? null,
+        herTime: sheet?.odds?.herTime ?? null,
+      };
+    },
+    [LEGEND_ID, light],
+  );
   check(
     odds.fitted && odds.place === "bell_pool",
     `the Odds sheet is not on the Bell Pool with the Worm Bunch on the lead: ${JSON.stringify(odds)}`,
@@ -508,6 +513,30 @@ const MISSING_LINE = "This is when things go missing.";
 const STILL_LINE = "The water goes still again.";
 const HOLD_FULL_LINE =
   "Your hold is full. You can still fish and let them go. The old bell strikes midnight soon.";
+const BIRDS_LINE = "The birds by the Gatehouse scatter across the water.";
+const HER_ODDS_LINE =
+  "The Bellhead Catfish bites only in the few minutes after the old bell strikes midnight.";
+// The Gatehouse roost (LOOP.wildlife.lampbills.groups[2]) and her centre, 20.4 m from it.
+const ROOST = { x: 13.4, z: -24.6 };
+const HER_CENTRE = { x: -4, z: -14 };
+
+// Puts the raft at `at` and returns its distance from the Gatehouse roost.
+const raftAt = (session, at) =>
+  session.eval(
+    ([at, roost]) => {
+      const g = window.__gw;
+      g.player.teleport(at, 0);
+      return Math.hypot(g.player.position.x - roost.x, g.player.position.z - roost.z);
+    },
+    [at, ROOST],
+  );
+// How many times the Gatehouse birds have fled (the raft's flee and the bell's scatter both count).
+const roostFlees = (session) =>
+  session.eval(() =>
+    (window.__gw.debug.wildlife?.()?.lampbills ?? [])
+      .filter((b) => b.g === 2)
+      .reduce((n, b) => n + b.flees, 0),
+  );
 
 // Records every toast's text from now on; read it back with toastsSeen.
 const listenForToasts = (session) =>
@@ -2499,6 +2528,177 @@ const SCENARIOS = [
         JSON.stringify(record),
       );
       return "Murk's word at evening 5, the map at evening 6";
+    },
+  },
+
+  {
+    name: "midnight birds: at the first stroke the Gatehouse birds scatter, with their line once, only when the raft is within 30 m; never on evening 1",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.sail();
+      await listenForToasts(session);
+      const frames = () =>
+        session.eval(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const strike = async (evening) => {
+        await atNight(session, MIDNIGHT_AT - 1, { evening });
+        const before = await roostFlees(session);
+        await atNight(session, MIDNIGHT_AT + 0.05);
+        await frames();
+        await atNight(session, MIDNIGHT_AT + 2.3);
+        await frames();
+        return (await roostFlees(session)) - before;
+      };
+      const farFrom = {
+        x: ROOST.x + (HER_CENTRE.x - ROOST.x) * 2,
+        z: ROOST.z + (HER_CENTRE.z - ROOST.z) * 2,
+      };
+      // The birds are drawn only above the lowest quality, and they only scatter where they can be seen.
+      await session.eval(() => window.__gw.render.setQuality("medium"));
+      // Evening 1: no bell, so no scatter, even close by.
+      const nearOne = await raftAt(session, HER_CENTRE);
+      const eveningOne = await strike(1);
+      // Evening 2, about 41 m off: the bell strikes and the birds stay.
+      const far = await raftAt(session, farFrom);
+      const farFled = await strike(2);
+      let toasts = await toastsSeen(session);
+      check(
+        toasts.includes(MIDNIGHT_LINE),
+        `the bell did not strike on evening 2: ${JSON.stringify(toasts)}`,
+      );
+      // Evening 3, 20 m off (out of the raft's own 10 m reach): they scatter at the first stroke.
+      const near = await raftAt(session, HER_CENTRE);
+      const nearFled = await strike(3);
+      // Later strokes and her time do not scatter them again or repeat the line.
+      await atNight(session, MIDNIGHT_AT + 10);
+      await frames();
+      toasts = await toastsSeen(session);
+      check(
+        nearOne < 30 && near < 30 && near > 12 && far > 30,
+        `raft distances: ${nearOne}, ${far}, ${near}`,
+      );
+      check(eveningOne === 0, `the birds fled on evening 1: ${eveningOne}`);
+      check(farFled === 0, `the birds fled with the raft ${far.toFixed(1)} m off: ${farFled}`);
+      check(
+        nearFled === 3,
+        `${nearFled} of the 3 Gatehouse birds fled with the raft ${near.toFixed(1)} m off`,
+      );
+      check(
+        toasts.filter((t) => t === BIRDS_LINE).length === 1,
+        `the birds' line: ${JSON.stringify(toasts)}`,
+      );
+      check(
+        toasts.indexOf(BIRDS_LINE) > toasts.lastIndexOf(MIDNIGHT_LINE),
+        `the birds' line came before the third evening's bell: ${JSON.stringify(toasts)}`,
+      );
+      return `evening 1: none; ${far.toFixed(0)} m: none; ${near.toFixed(0)} m: ${nearFled} fled and the line once`;
+    },
+  },
+
+  {
+    name: "midnight odds: once she is landed, her Odds row is under Night with the line about the bell, and not by day or dusk",
+    fixture: "legend-sold",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      await session.eval(() => window.__gw.ui.closeAll());
+      const day = await bellPoolOdds(session, "day");
+      const dusk = await bellPoolOdds(session, "dusk");
+      const night = await bellPoolOdds(session, "night");
+      check(!day.row && !day.herTime, `by day: ${JSON.stringify(day)}`);
+      check(!dusk.row && !dusk.herTime, `at dusk: ${JSON.stringify(dusk)}`);
+      check(
+        night.row?.legend === true && night.row.share > 0 && night.herTime === true,
+        `by night: ${JSON.stringify(night)}`,
+      );
+      // The sheet itself, as the player opens it: Odds, the Bell Pool, Night.
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "sheet" }));
+      await session.pause(800);
+      await clickAll(session, '[data-sheet-page="odds"]', 0);
+      await session.pause(500);
+      await clickAll(session, '[data-where="bell_pool"]', 0);
+      await session.pause(300);
+      const shown = {};
+      for (const hour of ["day", "night"]) {
+        await clickAll(session, `[data-hour="${hour}"]`, 0);
+        await session.pause(500);
+        shown[hour] = await session.eval(() => ({
+          rows: [...document.querySelectorAll(".gw-sh-row")].map((r) => r.dataset.fish),
+          foot: [...document.querySelectorAll(".gw-sh-foot")].map((p) => p.textContent),
+        }));
+      }
+      check(
+        !shown.day.rows.includes(LEGEND_ID) && !shown.day.foot.includes(HER_ODDS_LINE),
+        `the sheet by day: ${JSON.stringify(shown.day)}`,
+      );
+      check(
+        shown.night.rows.includes(LEGEND_ID) && shown.night.foot.includes(HER_ODDS_LINE),
+        `the sheet by night: ${JSON.stringify(shown.night)}`,
+      );
+      return `no row by day or dusk; by night share ${night.row.share} and the line`;
+    },
+  },
+
+  {
+    name: "chart at once: a chart opened the moment home is free after Continue, before its art is ready, gets its tap areas",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 420_000,
+    async run(session, { fixture }) {
+      const water = fixture.meta.loop.barge.water;
+      // Hold the chart's art (its images decode only when released), so the chart is surely opened before
+      // its art is ready, as it can be on a slow phone or a busy machine. Then boot again with the hold on.
+      await session.context.addInitScript(() => {
+        window.__holdChartArt = true;
+        const decode = HTMLImageElement.prototype.decode;
+        HTMLImageElement.prototype.decode = function () {
+          return new Promise((done, fail) => {
+            const go = () =>
+              window.__holdChartArt ? setTimeout(go, 100) : decode.call(this).then(done, fail);
+            go();
+          });
+        };
+      });
+      await session.page.reload({ waitUntil: "domcontentloaded" });
+      await session.boot();
+      await session.clickButton(/^Continue$/);
+      // Press Chart on the first frame home is free, while the title screen is still fading out.
+      const opened = await session.eval(
+        () =>
+          new Promise((done) => {
+            const t0 = performance.now();
+            const tick = () => {
+              const g = window.__gw;
+              const chart = [...document.querySelectorAll("button")].find(
+                (b) => b.getBoundingClientRect().width > 0 && b.textContent.trim() === "Chart",
+              );
+              if (g.flow === "home" && !g.ui.isBlocking() && chart) return chart.click(), done(true);
+              if (performance.now() - t0 > 60_000) return done(false);
+              requestAnimationFrame(tick);
+            };
+            tick();
+          }),
+      );
+      check(opened, "home was never free with a Chart button");
+      await session.pause(1000);
+      const before = await session.eval(() => ({
+        status: window.__gw.debug.loop.chart()?.status ?? null,
+        list: document.querySelectorAll(".gw-m-chart .gw-chart-row").length,
+        hits: document.querySelectorAll(".gw-chart-hit").length,
+      }));
+      check(before.status === "loading" && before.hits === 0, `before the art: ${JSON.stringify(before)}`);
+      await session.eval(() => (window.__holdChartArt = false));
+      await session.waitFor(
+        `the chart's tap area for ${water}`,
+        20_000,
+        (w) => !!document.querySelector(`.gw-chart-hit[data-id="water:${w}"]`),
+        water,
+      );
+      const ids = await session.eval(() =>
+        [...document.querySelectorAll(".gw-chart-hit")].map((h) => h.dataset.id),
+      );
+      return `the list (${before.list} rows) while the art loaded, then ${ids.length} tap areas: ${ids.join(" ")}`;
     },
   },
 ];
