@@ -1190,9 +1190,10 @@ const SCENARIOS = [
         await again.catchFish("mossback_perch");
         const second = await tallyAndGift(again);
         const record = await leadRecord(again);
-        check(second === null, `a second gift: ${JSON.stringify(second)}`);
+        // The next tally brings the next new thing (the Minnow Tin), never a second lead.
+        check(!/Sounding Lead/.test(second?.text ?? ""), `a second lead: ${JSON.stringify(second)}`);
         check(
-          record.gift === null && record.parts.filter((id) => id === LEAD).length === 1,
+          record.gift !== LEAD && record.parts.filter((id) => id === LEAD).length === 1,
           `after reloading and another tally: ${JSON.stringify(record)}`,
         );
         await again.collectGameErrors();
@@ -1668,15 +1669,16 @@ const SCENARIOS = [
         const r = await legendBite(session, bait, 200);
         check(r.chance === 0 && r.hits === 0, `${bait} under a lure: ${JSON.stringify(r)}`);
       }
-      // The Odds sheet (she has been landed, so she has a row) reads the same rule: the Bell Pool by day.
+      // The Odds sheet (she has been landed, so she has a row) reads the same rule: the Bell Pool by night,
+      // the only light her row is listed under.
       const sheet = await session.eval((id) => {
         const loop = window.__gw.progression.loop,
           share = (bait, depth) => {
             loop.changeHook({ lure: null, bait });
             loop.fitDepth(depth);
             return (
-              loop.sheet({ place: "bell_pool", light: "day" })?.odds?.rows?.find((r) => r.id === id)?.share ??
-              0
+              loop.sheet({ place: "bell_pool", light: "night" })?.odds?.rows?.find((r) => r.id === id)
+                ?.share ?? 0
             );
           };
         loop.markLifted("bell_pool");
@@ -1797,7 +1799,7 @@ const SCENARIOS = [
       check(fixture.meta.loop.hunt === undefined, "the fixture already has a hunt record");
       const loaded = await legendRecord(session);
       check(
-        JSON.stringify(loaded.hunt) === JSON.stringify({ mossmere: { lineLesson: false } }),
+        loaded.hunt?.mossmere?.lineLesson === false && loaded.hunt.mossmere.sketches?.map === 0,
         `the loaded save's hunt record: ${JSON.stringify(loaded.hunt)}`,
       );
       await session.toHome();
