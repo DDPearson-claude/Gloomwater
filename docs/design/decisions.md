@@ -92,6 +92,9 @@ Details are in `mossmere-review-addendum.md`.
   - Not measured: earning in Sporewood from no clams and plain tackle. The first tackle step there costs 600.
 - **Mossmere's four local kinds (built):** Stone Minnow, Archshade Minnow, Mirror Carp and Buoy Rudd. In its one home a local kind takes 1 in 4 of its base fish's bites (3 in 8 with Hob's Lamp while never caught), so nothing else's share changes. They never bite in her water, carry no bite marks, and stay off the lake's list, the catch seal, "every fish named" and the Order Board. The two minnows go in the tin.
   - Gaps filled during the build: the "stony shallows" are the open-water stones areas, which include water near docks and stony islands. The "Local kinds" strip sits under the base fish on the Journal's lake page. A local kind keeps its base fish's real hours, so the Mirror Carp bites at any hour like the Weeping Carp.
+- **The guide opens with the hunt.** Its welcome is now two pages. The first says why you are here: "Mossmere is full of monster fish, but one has a reputation like no other. Your job is to hunt it down and catch it." The second says how: catch, sell, buy better gear, "You'll need all of it to land the big one." The other nine steps are unchanged. (The designer asked for this; the guide was otherwise never to be edited.)
+- **The rig picture replaces the old tackle rows** on Taper's Sheet (Tackle page) and at Murk's (Tackle tab), as the gear design said. Gaps filled during the build: at Murk's a Leader or Hook part shows as soon as he sells one, so the first can be bought from its tray; a tray buy takes one tap; Murk's Tackle chapter is one scrolling page.
+- **Murk speaks in a speech box like Hob's** for his story lines, gifts and new orders (asked for by the designer on 22 November 2026: "way more in your face and obvious").
 
 ## Still open
 

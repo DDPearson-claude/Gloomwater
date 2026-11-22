@@ -47403,8 +47403,12 @@ Ca.guide = {
   ok: "Got it",
   skip: "Skip the guide",
   boxes: {
+    // The welcome has two pages: why you are here, then how you get there (decisions.md). The first press of
+    // "Got it" turns the page.
     welcome:
-      "Welcome! This is a calm fishing game, and you can't lose. Catch fish, sell them for clams, and spend clams on better gear to catch bigger, rarer fish.",
+      "Welcome! This is a calm fishing game, and you can't lose. Mossmere is full of monster fish, but one has a reputation like no other. Your job is to hunt it down and catch it.",
+    welcome2:
+      "Nobody knows what it is yet. Catch fish, sell them for clams, and spend clams on better gear. You'll need all of it to land the big one.",
     chart:
       "This is your chart of the lake. Press SAIL to head out and fish. Later, Murk sells maps to new spots, each with its own fish.",
     cast: "Sail with WASD to reeds, lily pads or stones, where fish gather. To cast, press on the water and let go as the swinging aim reaches your spot.",
@@ -163168,6 +163172,40 @@ function rigPicture(e, opts = {}, shelf = []) {
       row.items.map((i) => ({ ...i, lines: partLines(slot, i.key) })),
     );
   }
+  // At Murk's (opts.shopParts) a Leader or Hook he sells shows its part even before a second option is owned, or
+  // under a lure where the Hook is otherwise left out, so the piece can be bought from that part's tray. Its tray
+  // lists what is owned (under a lure, the line that says the lure carries its own hook instead).
+  if (opts.shopParts)
+    for (let slot of ["leader", "hook"]) {
+      if (
+        nodes.some((nd) => nd.part === slot) ||
+        !bs[water]?.[slot === "hook" ? "hookSet" : "leader"] ||
+        !more(slot).length
+      )
+        continue;
+      let text = i0(tx[slot]) ? tx[slot] : {},
+        owned = Ed(s.parts).filter((z) => e?.LOOP?.rig?.parts?.[z]?.slot === slot),
+        fitted = owned.includes(s.fitted?.[slot])
+          ? s.fitted[slot]
+          : owned.find((z) => e.LOOP.rig.parts[z].start) || owned[0],
+        underLure = slot === "hook" && !!lure;
+      node(
+        slot,
+        underLure
+          ? []
+          : owned.map((z) => ({
+              kind: slot,
+              key: z,
+              pick: z,
+              name: text.names?.[z] || z,
+              on: z === fitted,
+              plain: z,
+              log: [],
+              lines: partLines(slot, z),
+            })),
+        { notes: underLure ? [text.lure].filter(Boolean) : [] },
+      );
+    }
   // The bait or lure: one node, its tray holding the baits (the bare hook last) and the lures.
   let baitItems = Ed(rows.bait?.items).map((i) => ({ ...i, lines: baitLines(i) })),
     lureItems = Ed(rows.lure?.items).map((i) => ({ ...i, lines: baitLines(i) })),
@@ -163750,6 +163788,31 @@ button.gw-rig-opt:hover, button.gw-rig-opt:focus-visible { outline: none; backgr
 div.gw-rig-shop { cursor: default; opacity: .8; }
 .gw-ts.gw-ts-busy .gw-rig-opt[data-owned=true]:not([aria-pressed=true]) { opacity: .45; }
 @media (max-width: 699px) { .gw-rig-opt { grid-template-columns: 52px minmax(0, 1fr); } }
+/* The rig picture on a paper page (rigPanel: the Sheet's Tackle page, Murk's Tackle tab): the same parts, inked
+   dark on the page's paper, a tray covering the picture on paper too. */
+.gw-rig-host { position: relative; width: 100%; max-width: 440px; margin: 0 auto; padding: 4px 0 8px; box-sizing: border-box; }
+.gw-rig-host.gw-rig-traying { min-height: 420px; }
+.gw-rig-host.gw-rig-traying > :not(.gw-rig-tray) { visibility: hidden; }
+.gw-rig-host.gw-ts-busy .gw-rig-tab[aria-pressed=false], .gw-rig-host.gw-ts-busy .gw-rig-opt[data-owned=true]:not([aria-pressed=true]) { opacity: .45; }
+.gw-rig-paper { --ink: var(--cat-ink, rgb(38, 29, 44)); --ink-hi: var(--cat-ink, rgb(38, 29, 44)); --ink-dim: rgba(38, 29, 44, .74); --ink-faint: rgba(38, 29, 44, .6);
+  --ink-line: rgba(38, 29, 44, .3); --ink-ghost: rgba(38, 29, 44, .1); --glow: rgba(168, 96, 22, .3); --glow-soft: rgba(168, 96, 22, .22);
+  --ink-shadow: 0 0 0 transparent; --veil-rgb: 238, 228, 210; color: var(--ink); }
+.gw-rig-paper .gw-rig-tray { padding: 4px 2px; background: var(--cat-paper, rgb(238, 228, 210)); }
+.gw-rig-paper .gw-rig-bed { fill: rgba(38, 29, 44, .14); }
+.gw-rig-paper .gw-rig-band--0 { fill: rgba(70, 96, 140, .07); }
+.gw-rig-paper .gw-rig-band--1 { fill: rgba(70, 96, 140, .13); }
+.gw-rig-paper .gw-rig-band--2 { fill: rgba(50, 70, 120, .2); }
+.gw-rig-paper .gw-ts-art .cat-pp { fill: var(--cat-paper, rgb(238, 228, 210)); }
+.gw-rig-paper .gw-rig-tab { border-color: rgba(38, 29, 44, .22); }
+.gw-rig-paper .gw-rig-tab[aria-pressed=true] { border-color: rgba(38, 29, 44, .6); background-color: rgba(38, 29, 44, .07); }
+.gw-rig-paper .gw-rig-node:hover, .gw-rig-paper .gw-rig-node:focus-visible, .gw-rig-paper button.gw-rig-opt:hover, .gw-rig-paper button.gw-rig-opt:focus-visible,
+  .gw-rig-paper .gw-rig-tab:hover, .gw-rig-paper .gw-rig-tab:focus-visible { background-color: rgba(38, 29, 44, .08); }
+.gw-rig-paper .gw-rig-back { color: var(--cat-ink, rgb(38, 29, 44)); }
+.gw-rig-opt.gw-dear .gw-rig-price, .gw-rig-opt.gw-dear .gw-rig-oname { opacity: .55; }
+.gw-rig-stamp { color: var(--cat-stamp, rgb(150, 58, 42)); font-family: var(--f-fell, inherit); letter-spacing: .08em; text-transform: uppercase; }
+.gw-rig-stamp.gw-press { display: inline-block; animation: gwRigStamp .42s cubic-bezier(.2, .9, .3, 1.2) both; }
+@keyframes gwRigStamp { 0% { opacity: 0; transform: rotate(-8deg) scale(1.7); } 100% { opacity: 1; transform: rotate(-8deg) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .gw-rig-stamp.gw-press { animation: none; transform: rotate(-8deg); } }
 /* a trip's tips and Murk's lines wait under the drawer and the Tackle screen (quiet modals, which ui.js's .gw-tipless does not count):
    never a line over a chip or Done */
 .gw-loop-on.gw-tk-veiled .gw-loop-tip, .gw-loop-on.gw-tk-veiled .gw-toast--murk { opacity: 0 !important; visibility: hidden; }
@@ -164223,6 +164286,17 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       el?.dataset
         ? `${el.dataset.part || ""}|${el.dataset.key || ""}|${el.dataset.buy || ""}|${el.dataset.action || ""}|${el.dataset.rig || ""}`
         : "";
+  // Where the rig picture is drawn: the tackle screen (screenHost), or a page that embeds it (rigPanel). A host
+  // keeps the open tray and its note in its own state and draws itself again; `buyable` says whether a piece on
+  // Murk's shelf can be bought in a tray there, and a host with its own `buy` buys through Murk's shelf.
+  let screenHost = {
+    state: () => e.entry?.("tacklescreen")?.state || null,
+    rerender: (move) => _(move),
+    buyable: () => atMurks(),
+    buy: null,
+    snap: () => {},
+    reeled: () => (z = !0),
+  };
   // A part's drawing in a tray, as the rows drew it: a plain line drawing, an engraved plate, or a find's picture.
   function rigArt(item, uid) {
     let wrap = a("span", "gw-ts-art");
@@ -164247,10 +164321,17 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
   }
   // One option in a tray: its drawing, its name with Owned, its count or its price, and its lines. An owned one
   // fits when pressed; one on Murk's shelf is bought when pressed at Murk's, and is only shown out on the water.
-  function rigOption(node, item, uid, { shop = !1 } = {}) {
+  function rigOption(node, item, uid, { shop = !1, host = screenHost } = {}) {
     let w = rigWords(),
-      buyable = shop && atMurks(),
-      el = a(shop && !buyable ? "div" : "button", `gw-rig-opt${shop ? " gw-rig-shop" : ""}`);
+      buyable = shop && host.buyable(),
+      // At Murk's: a piece costing more than the purse holds is dimmed as on his shelf, and a piece his shelf
+      // marks as yours says so in his word, stamped when it was just bought.
+      dear = shop && !!host.dear?.(item),
+      yours = shop ? null : host.yours?.(node, item) || null,
+      el = a(
+        shop && !buyable ? "div" : "button",
+        `gw-rig-opt${shop ? " gw-rig-shop" : ""}${dear ? " gw-dear" : ""}`,
+      );
     el.tagName === "BUTTON" && (el.type = "button");
     el.dataset.part = node.part;
     shop
@@ -164265,14 +164346,21 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     shop
       ? (tag.innerHTML = sm(item.price))
       : (tag.textContent =
-          item.count != null ? String(item.count) : item.key === "bare" ? "" : w.owned || "Owned");
+          item.count != null
+            ? String(item.count)
+            : item.key === "bare"
+              ? ""
+              : yours?.word || w.owned || "Owned");
+    yours?.press && tag.classList.add("gw-rig-stamp", "gw-press");
     txt.appendChild(name), tag.textContent || tag.innerHTML ? txt.appendChild(tag) : null;
     el.appendChild(txt);
     Ed(item.lines).forEach((line, k) => {
       let p = a("span", `gw-rig-line${k ? " gw-rig-cost" : ""}`);
       (p.textContent = line), el.appendChild(p);
     });
-    for (let line of Ed(item.log)) {
+    // A host may say more about an option than the tray does (the Sheet keeps its old plates' lines here).
+    let log = shop ? [...Ed(host.moreLines?.(node, item))] : (host.log?.(node, item) ?? item.log);
+    for (let line of Ed(log)) {
       let p = a("span", "gw-rig-line gw-rig-log");
       (p.textContent = line), el.appendChild(p);
     }
@@ -164282,12 +164370,12 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     );
     el.tagName === "BUTTON" &&
       el.addEventListener("click", (ev) => {
-        ev.stopPropagation(), shop ? rigBuy(item.id) : rigFit(node, item);
+        ev.stopPropagation(), shop ? rigBuy(item.id, host) : rigFit(node, item, host);
       });
     return el;
   }
   // A node's tray, over the picture: its options, then what Murk has for it.
-  function rigTray(model, part, words, said = null) {
+  function rigTray(model, part, words, said = null, host = screenHost) {
     let node = model.nodes.find((nd) => nd.part === part),
       w = rigWords();
     if (!node) return null;
@@ -164299,7 +164387,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     let back = a("button", "gw-btn gw-rig-back");
     (back.type = "button"), (back.dataset.action = "back"), (back.textContent = w.back || "Back");
     back.addEventListener("click", (ev) => {
-      ev.stopPropagation(), l("ui_click"), rigTrayOpen(null);
+      ev.stopPropagation(), l("ui_click"), rigTrayOpen(null, host);
     });
     head.appendChild(h), head.appendChild(back), tray.appendChild(head);
     let list = a("div", "gw-rig-opts");
@@ -164312,13 +164400,15 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         let sub = a("h4", "gw-ts-h gw-rig-sub");
         (sub.textContent = group.head), list.appendChild(sub);
       }
-      group.items.forEach((item, k) => list.appendChild(rigOption(node, item, `rig-${part}-${gi}-${k}`)));
+      group.items.forEach((item, k) =>
+        list.appendChild(rigOption(node, item, `rig-${part}-${gi}-${k}`, { host })),
+      );
     });
     if (node.more.length) {
       let sub = a("h4", "gw-ts-h gw-rig-sub gw-rig-more");
       (sub.textContent = w.more || "More at Murk's"), list.appendChild(sub);
       node.more.forEach((item, k) =>
-        list.appendChild(rigOption(node, item, `rig-${part}-m${k}`, { shop: !0 })),
+        list.appendChild(rigOption(node, item, `rig-${part}-m${k}`, { shop: !0, host })),
       );
     }
     tray.appendChild(list);
@@ -164327,7 +164417,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
   // The three saved rigs as tabs over the picture (mossmere-gear.md B6 "Saved rigs"): each its number, its name, its
   // bait or lure drawn small (greyed when none is left) and a small leader or hook when it is not the plain one.
   // Pressing one makes it the rig in use, and the picture follows.
-  function rigTabs() {
+  function rigTabs(host = screenHost) {
     let model = null;
     try {
       model = t("savedRigs");
@@ -164360,24 +164450,27 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         ].join(", ") + (rig.out ? `. ${w.out || ""}` : ""),
       );
       b.addEventListener("click", (ev) => {
-        ev.stopPropagation(), rigUse(rig.n - 1);
+        ev.stopPropagation(), rigUse(rig.n - 1, host);
       });
       bar.appendChild(b);
     }
     return bar;
   }
   // A tab pressed: that rig is fitted (it waits while a fish is on, as a part does), and the picture follows.
-  function rigUse(index) {
+  function rigUse(index, host = screenHost) {
+    host.snap();
     let r = t("useRig", index);
     if (r?.ok !== !0) {
-      l("denied", { volume: 0.35 }), _();
+      l("denied", { volume: 0.35 }), host.rerender();
       return;
     }
-    r.changed && (l("ui_click", { volume: 0.5, pitch: 0.74 }), r.reeled && (z = !0)), _(), y(!0);
+    r.changed && (l("ui_click", { volume: 0.5, pitch: 0.74 }), r.reeled && host.reeled()),
+      host.rerender(),
+      y(!0);
   }
   // The picture: the slice, a label button for each part with a pointer to where it sits, then the limit line and
   // the "Here, now" strip.
-  function rigCard(model) {
+  function rigCard(model, host = screenHost) {
     let w = rigWords(),
       card = a("div", "gw-rig");
     (card.dataset.loop = "rig"),
@@ -164408,7 +164501,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         name = a("span", "gw-rig-name");
       (kind.textContent = nd.head), (name.textContent = nd.name), b.appendChild(kind), b.appendChild(name);
       b.addEventListener("click", (ev) => {
-        ev.stopPropagation(), l("ui_click", { volume: 0.42, pitch: 0.7 }), rigTrayOpen(nd.part);
+        ev.stopPropagation(), l("ui_click", { volume: 0.42, pitch: 0.7 }), rigTrayOpen(nd.part, host);
       });
       card.appendChild(b);
     });
@@ -164423,7 +164516,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         hit.setAttribute("r", "16"),
         (hit.dataset.part = nd.part),
         hit.addEventListener("click", (ev) => {
-          ev.stopPropagation(), l("ui_click", { volume: 0.42, pitch: 0.7 }), rigTrayOpen(nd.part);
+          ev.stopPropagation(), l("ui_click", { volume: 0.42, pitch: 0.7 }), rigTrayOpen(nd.part, host);
         });
       card.querySelector("svg")?.appendChild(hit);
     }
@@ -164573,40 +164666,141 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       J.render();
   }
   // Opens a part's tray (part) or closes it (null).
-  function rigTrayOpen(part) {
-    let J = e.entry?.("tacklescreen");
-    if (!J) return;
-    let was = J.state.tray || null;
-    (J.state.said = null),
-      (J.state.tray = part || null),
-      _(part ? { into: part } : was ? { outOf: was } : {});
+  function rigTrayOpen(part, host = screenHost) {
+    let st = host.state();
+    if (!st) return;
+    host.snap();
+    let was = st.tray || null;
+    (st.said = null),
+      (st.tray = part || null),
+      host.rerender(part ? { into: part } : was ? { outOf: was } : {});
   }
   // An owned option pressed in a tray: fitted as the rows' chips were (Mhe), then the tray closes so the picture
   // shows it. The fitted one only closes the tray.
-  function rigFit(node, item) {
+  function rigFit(node, item, host = screenHost) {
     let act = Mhe(item);
-    if (!act) return void rigTrayOpen(null);
+    if (!act) return void rigTrayOpen(null, host);
+    host.snap();
     let r = t(...act);
     if (r?.ok !== !0) {
-      l("denied", { volume: 0.35 }), _();
+      l("denied", { volume: 0.35 }), host.rerender();
       return;
     }
-    r.changed && (l("ui_click", { volume: 0.5, pitch: 0.74 }), r.reeled && (z = !0)),
-      rigTrayOpen(null),
+    r.changed && (l("ui_click", { volume: 0.5, pitch: 0.74 }), r.reeled && host.reeled()),
+      rigTrayOpen(null, host),
       y(!0);
   }
   // Something on Murk's shelf bought in a tray at Murk's, through the shop's own buy. The tray stays open, the
-  // bought option now among those owned (a leader or hook is fitted at once, as at the shelf).
-  function rigBuy(id) {
+  // bought option now among those owned (a leader or hook is fitted at once, as at the shelf). Murk's own Tackle
+  // tab (a host with its own `buy`) buys through his shelf, with its lines and marks.
+  function rigBuy(id, host = screenHost) {
+    host.snap();
+    if (host.buy) return void host.buy(id);
     let r = t("buy", id);
     if (r?.ok !== !0) {
       l("denied", { volume: 0.35 });
       return;
     }
     // A leader or hook goes on the rig in use, and the tray says which.
-    let J = e.entry?.("tacklescreen");
-    J && (J.state.said = r.rig ? Ab(rigWords().saved?.onRig || "", { n: r.rig }) : null);
-    l("ui_click", { volume: 0.5, pitch: 0.74 }), _(), y(!0);
+    let st = host.state();
+    st && (st.said = r.rig ? Ab(rigWords().saved?.onRig || "", { n: r.rig }) : null);
+    l("ui_click", { volume: 0.5, pitch: 0.74 }), host.rerender(), y(!0);
+  }
+  // The rig picture on a page other than the tackle screen (mossmere-gear.md "Where it lives"): Taper's Sheet's
+  // Tackle page and Murk's Tackle tab. The same tabs, picture and trays, drawn in ink on the page's paper.
+  // spec: id ("sheet", "shop"); state, an object the page keeps between its renders (the open tray, its note,
+  // focus to restore); render(), which draws the page again; at Murk's, shelf() (his Tackle tab's own items, so a
+  // tray offers only what that tab sells) and buy(id); and on the Sheet, log() and moreLines(), what its old plates
+  // said beside an option. Returns the element, or null when there is no loop.
+  function rigPanel(spec = {}) {
+    if (!t("state")) return null;
+    let st = i0(spec.state) ? spec.state : {},
+      root = null,
+      snapped = null,
+      // What the next render restores: the tray's scroll, and the focus as it is now or as it was at the press.
+      remember = (move = {}) => {
+        let el = typeof document < "u" ? document.activeElement : null,
+          now = root && el && root.contains(el) ? { focus: focusSig(el), hadFocus: !0 } : null;
+        (st.keep = {
+          trayTop: move.into || move.outOf ? 0 : root?.querySelector(".gw-rig-opts")?.scrollTop || 0,
+          ...(now || snapped || { focus: null, hadFocus: !1 }),
+          ...move,
+        }),
+          (snapped = null);
+      },
+      host = {
+        state: () => st,
+        // Focus as it was when the press came, since the page may have been drawn again by then (the Sheet
+        // follows loop:fit).
+        snap: () => {
+          let el = typeof document < "u" ? document.activeElement : null;
+          root && el && root.contains(el) && (snapped = { focus: focusSig(el), hadFocus: !0 });
+        },
+        rerender: (move = {}) => (remember(move), spec.render?.()),
+        buyable: () => (spec.buy ? !0 : atMurks()),
+        // Murk's buy draws his book again itself; the tray's scroll and focus are kept for it.
+        buy: spec.buy ? (id) => (remember(), spec.buy(id)) : null,
+        reeled: () => {},
+        log: spec.log || null,
+        moreLines: spec.moreLines || null,
+        yours: spec.yours || null,
+        dear: spec.dear || null,
+      },
+      model = rigPicture(
+        n(),
+        {
+          metaLoop: t("state"),
+          run: D(),
+          line: D() ? c() : null,
+          canChange: t("canChangeHook") !== !1,
+          shopParts: !!spec.buy,
+        },
+        spec.shelf ? Ed(spec.shelf()) : shelfItems(),
+      );
+    root = a("div", `gw-rig-host gw-rig-paper${model.busy ? " gw-ts-busy" : ""}`);
+    (root.dataset.loop = "rig-host"), (root.dataset.host = String(spec.id || ""));
+    let tabs = rigTabs(host);
+    tabs && root.appendChild(tabs), root.appendChild(rigCard(model, host));
+    // The open tray covers the picture. The bait's tray is the lure's once a lure is on, and back.
+    let bait = (p) => p === "bait" || p === "lure",
+      open = st.tray
+        ? model.nodes.find((nd) => nd.part === st.tray || (bait(st.tray) && bait(nd.part))) || null
+        : null,
+      tray = open ? rigTray(model, open.part, model.words, st.said, host) : null;
+    tray
+      ? ((st.tray = open.part), root.appendChild(tray), root.classList.add("gw-rig-traying"))
+      : (st.tray = null);
+    let keep = st.keep || null,
+      buyFocus = st.focusBuy || null;
+    (st.keep = null), (st.focusBuy = null);
+    // Focus follows the move as on the tackle screen; a piece asked for at Murk's (his "Next" goal, a seal) is
+    // focused in its tray.
+    let settle = () => {
+      if (!root.isConnected) return;
+      let list = root.querySelector(".gw-rig-opts");
+      list && keep && (list.scrollTop = fh(keep.trayTop, 0));
+      let buttons = [...root.querySelectorAll("button")],
+        target = keep?.focus ? buttons.find((b) => focusSig(b) === keep.focus) : null;
+      keep?.into &&
+        (target =
+          tray?.querySelector(".gw-rig-opt[aria-pressed=true]") || tray?.querySelector(".gw-rig-opt"));
+      keep?.outOf && (target = root.querySelector(`.gw-rig-node[data-part="${keep.outOf}"]`));
+      keep?.hadFocus &&
+        !target &&
+        (target =
+          tray?.querySelector(".gw-rig-opt[aria-pressed=true]") ||
+          tray?.querySelector("button") ||
+          buttons[0]);
+      buyFocus && (target = tray?.querySelector(`[data-buy="${buyFocus}"]`) || target);
+      if (target && (keep?.hadFocus || buyFocus))
+        try {
+          target.focus({ preventScroll: !0 }), target.scrollIntoView?.({ block: "nearest" });
+        } catch {}
+    };
+    try {
+      requestAnimationFrame(settle);
+    } catch {}
+    return root;
   }
   function W(J) {
     let Ne = Mhe(J);
@@ -164772,6 +164966,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     closeScreen: le,
     screenOpen: Z,
     pauseItem: Te,
+    rigPanel,
     debug: () => ({
       shown: !u.hidden,
       busy: h.classList.contains("gw-busy"),
@@ -165082,7 +165277,7 @@ function MV(e, t, n = mC(e, t)) {
 }
 function TV(
   e,
-  { layout: t = "desktop", size: n = "full", odds: o = !1, goal: a = null, oddsLabel: s = "" } = {},
+  { layout: t = "desktop", size: n = "full", odds: o = !1, goal: a = null, oddsLabel: s = "", rig = !1 } = {},
 ) {
   let r = t === "phone" ? "phone" : "desktop",
     l = r === "desktop" && (n === "short" || n === "low") ? n : "full",
@@ -165103,6 +165298,22 @@ function TV(
       v = vV(y?.cards).filter((T) => gC(T) && T.id != null);
     if (!v.length) continue;
     f.push({ id: w, label: String(y.label ?? w), page: d.length });
+    // With `rig`, the Tackle chapter is one page, the rig picture, and every piece it sells is found on it.
+    if (rig && w === "tackle") {
+      let M = v.map((A) => String(A.id));
+      for (let A of M) A in u || (u[A] = d.length);
+      d.push({
+        kind: "rig",
+        chapter: w,
+        label: String(y.label ?? w),
+        first: !0,
+        items: M,
+        part: 0,
+        cols: 1,
+        rows: 1,
+      });
+      continue;
+    }
     let b = i.chapters?.[w] || null,
       L = b?.per || c,
       E = b?.cols || i.cols,
@@ -165276,6 +165487,9 @@ var Cb = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' widt
 .gw-mb-head .gw-mb-ch { font: italic 400 16px/1 var(--f-body); letter-spacing: .04em; text-transform: none; color: var(--cat-ink-2); }
 .gw-mb-slot--l .gw-mb-head, .gw-mb-slot--r .gw-mb-head { margin: 0 6px; }
 .gw-mb-body { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.gw-mb-page--rig .gw-mb-body { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.gw-mb-page--rig .gw-mb-body::-webkit-scrollbar { display: none; }
+.gw-mb-page--rig .gw-rig-host { flex: none; padding-top: 6px; }
 .gw-mb-foot { display: flex; justify-content: center; align-items: center; min-height: 34px; padding: 0; flex: none; font: 500 16px/1 var(--f-body); color: var(--cat-ink-2); letter-spacing: .1em; }
 .gw-mb-foot::before, .gw-mb-foot::after { content: '\\2014'; margin: 0 8px; color: var(--cat-faint); }
 .gw-mb-foot:empty::before, .gw-mb-foot:empty::after { content: none; }
@@ -165548,6 +165762,7 @@ function zV(e) {
         odds: e.hasOdds(),
         goal: _,
         oddsLabel: a().odds || "Odds \u203A",
+        rig: typeof e.rigPanel == "function",
       }),
     };
   }
@@ -165769,6 +165984,39 @@ function zV(e) {
     }
     return C;
   }
+  // Murk's Tackle chapter as the rig picture (mossmere-gear.md "Where it lives"): each piece he sells is bought
+  // from its part's tray through his own buy, with its price, rules, lines and "Yours." stamp, and the trays offer
+  // only what his Tackle tab sells.
+  function rigPage(X) {
+    let st = X.state,
+      rs = st.rig || (st.rig = {}),
+      raw = () => zb(zb(n("shelf")?.tabs).find((tab) => tab?.id === "tackle")?.items),
+      // The shelf card an owned option was bought as: a rod, line or reel step, a lure or a Leader or Hook part.
+      cardId = (item) =>
+        ["rod", "line", "reel"].includes(item.kind) && item.tier != null && !item.find
+          ? `${item.kind}:${item.tier}`
+          : item.kind === "lure"
+            ? `lure:${item.key}`
+            : item.kind === "leader" || item.kind === "hook"
+              ? `part:${item.key}`
+              : null;
+    return e.rigPanel({
+      id: "shop",
+      state: rs,
+      render: () => X.render(),
+      shelf: raw,
+      buy: (id) => {
+        let card = raw().find((c) => String(c.id) === String(id));
+        (st.stamp = card && card.consumable !== !0 ? String(id) : null), e.buy(X, id);
+      },
+      dear: (item) => ru(Number(n("state")?.clams), 0) < item.price,
+      yours: (node, item) => {
+        let id = cardId(item),
+          card = id ? raw().find((c) => c.id === id && c.bought === !0) : null;
+        return card ? { word: a().yours || "Yours.", press: st.stamp === id } : null;
+      },
+    });
+  }
   function T(X, _, W, C, Y) {
     let le = W.pages[C],
       ie = s("section", `gw-mb-page gw-mb-page--${le?.kind || "end"}`);
@@ -165792,7 +166040,23 @@ function zV(e) {
         ee.appendChild(pe),
         Te.appendChild(ee);
     } else if (le.kind === "end") Te.appendChild(s("div", "gw-mb-end", uC({ uid: h() })));
-    else {
+    else if (le.kind === "rig") {
+      let ee = _.tabs.find((J) => J.id === le.chapter),
+        J = s("div", "gw-mb-chap"),
+        Ne = s("h3", "");
+      (Ne.textContent = ee?.label || ""),
+        J.appendChild(Ne),
+        J.insertAdjacentHTML("beforeend", yC),
+        Te.appendChild(J);
+      let pe = null;
+      try {
+        pe = rigPage(X);
+      } catch (Xe) {
+        r("cat.rig", Xe);
+      }
+      pe && Te.appendChild(pe),
+        Y && le.items.includes(Y.id) && !e.tutorial?.() && ie.appendChild(s("i", "gw-mb-ribbon"));
+    } else {
       let ee = _.tabs.find((J) => J.id === le.chapter);
       if (le.first) {
         let J = s("div", "gw-mb-chap"),
@@ -165818,6 +166082,22 @@ function zV(e) {
     let Ye = s("div", "gw-mb-foot");
     return le.folio != null && (Ye.textContent = String(le.folio)), ie.appendChild(Ye), ie;
   }
+  // A piece asked for on the rig page (his "Next" goal, a seal, the Sheet): its part's tray opens with it focused.
+  function rigFocus(W, ie) {
+    let id = W.focusCard;
+    if (id == null || ie.pages[ie.itemPage[id]]?.kind !== "rig") return;
+    let rs = W.rig || (W.rig = {}),
+      kind = String(id).split(":")[0];
+    (rs.tray = ["rod", "line", "reel"].includes(kind)
+      ? kind
+      : kind === "lure"
+        ? "bait"
+        : kind === "part"
+          ? o()?.LOOP?.rig?.parts?.[String(id).slice(5)]?.slot || null
+          : null),
+      (rs.focusBuy = rs.tray ? String(id) : null),
+      (W.focusCard = null);
+  }
   function x(X, _) {
     let W = X.state,
       C = p(),
@@ -165834,6 +166114,7 @@ function zV(e) {
         (rt = Mw(ie, W.focus) ?? Mw(ie, W.tab)),
         W.focus != null &&
           (W.focusCard = [String(W.focus), `place:${W.focus}`].find((dt) => dt in ie.itemPage) || null)),
+        rigFocus(W, ie),
         rt == null &&
           W.anchor &&
           (rt =
@@ -168853,6 +169134,8 @@ function WV(e) {
       close: () => wt("shelf"),
       hasOdds: () => typeof e.screens?.openTackle == "function" && !!o().AUTOFISH,
       openOdds: () => e.screens?.openTackle?.({ titleChild: !0 }),
+      // The Tackle chapter is the rig picture (the tackle screen's, pV.rigPanel), when there is one.
+      rigPanel: typeof L?.rigPanel == "function" ? (spec) => L.rigPanel(spec) : null,
     }),
     x = e.layers.hud,
     M = n("div", "gw-hold");
@@ -169693,7 +169976,13 @@ function WV(e) {
     e.openModal("shelf", Ht, {
       state: ht,
       cls: "gw-m-center gw-m-shelf gw-m-book",
-      onEscape: () => wt("shelf"),
+      // An open tray on the Tackle chapter's rig picture closes first, as on the tackle screen.
+      onEscape: () => {
+        let qt = e.entry("shelf");
+        qt?.state?.rig?.tray && qt.el?.querySelector?.(".gw-mb-page--rig .gw-rig-tray")
+          ? ((qt.state.rig.tray = null), qt.render())
+          : wt("shelf");
+      },
       onKey: (qt) => {
         if (T.onKey(qt) === !0) return !0;
         if (!["BracketLeft", "BracketRight", "ArrowLeft", "ArrowRight"].includes(qt)) return !1;
@@ -170910,7 +171199,8 @@ var lpe = `
 .gw-rival-entry h4{font:600 23px var(--f-body);margin:2px 0}.gw-rival-entry p{margin:5px 0}
 .gw-rival-entry canvas{display:block;max-width:100%;object-fit:contain}.gw-rival-entry small{color:var(--cat-ink-2)}
 .gw-kit-tabs{display:flex;flex:none;gap:2px;border-bottom:1px solid var(--cat-faint);padding:4px 8px;background:var(--cat-paper)}
-.gw-kit-tabs button{flex:1;min-width:0;min-height:40px;padding:3px 1px;border:0;background:transparent;font:600 16px var(--f-body);color:var(--cat-ink-2);cursor:pointer}
+.gw-kit-tabs button{flex:1 1 auto;min-width:0;min-height:40px;padding:3px 1px;border:0;background:transparent;font:600 16px var(--f-body);color:var(--cat-ink-2);cursor:pointer}
+@media (max-width:380px){.gw-kit-tabs button{font-size:15px}}
 .gw-kit-tabs button[aria-pressed=true]{color:var(--cat-ink);box-shadow:inset 0 -3px var(--cat-amber)}
 .gw-kit-tabs button:focus-visible{outline:2px solid var(--cat-amber);outline-offset:-3px}
 .gw-kit-page .gw-sh-sec[hidden]{display:none}.gw-kit-page .gw-sh-head{display:flex;align-items:center;gap:12px}.gw-kit-page .gw-sh-head .gw-sh-portrait,.gw-kit-page .gw-sh-head .gw-sh-portrait svg{width:48px;height:54px}
@@ -171784,10 +172074,40 @@ function VV(e) {
       let N = document.createElement("p");
       (N.className = "gw-sh-hookset"), (N.textContent = D.tackle.hookSet), Te.appendChild(N);
     }
-    for (let N of D.tackle.plates) Te.appendChild(Y(N, { open: le(N.key, P.from === "rack") }));
+    // The rig as one picture in place of the tackle plates and the hook row (mossmere-gear.md "Where it lives"):
+    // the tackle screen's own picture, tabs and trays. What a plate said that a tray does not stays beside its
+    // option: the fitted rod, line, reel, bait or lure keeps its plate's lines, and the next piece Murk sells keeps
+    // its "With this" line. The notebooks are not parts of the rig, so their plates stay under the picture.
+    let rigEl = null;
+    try {
+      let plateOf = (slot) => D.tackle.plates.find((p) => p.slot === slot) || null;
+      rigEl =
+        e.loop?.tackle?.rigPanel?.({
+          id: "sheet",
+          state: P.rig || (P.rig = {}),
+          render: () => {
+            (P.scroll = x(A.el || Z)), A.render();
+          },
+          log: (node, item) => {
+            if (!item.on) return null;
+            if (["rod", "line", "reel"].includes(node.part)) return plateOf(node.part)?.lines || null;
+            let hook = D.tackle.hook[item.kind === "lure" ? "lure" : "bait"];
+            return hook?.id && hook.id === item.key ? [...Ui(item.log), ...Ui(hook.lines)] : null;
+          },
+          moreLines: (node, item) =>
+            [D.tackle.plates.find((p) => p.next?.id === item.id)?.next?.compare].filter(Boolean),
+        }) || null;
+    } catch (N) {
+      o("rig", N), (rigEl = null);
+    }
+    if (rigEl) {
+      Te.appendChild(rigEl);
+      for (let N of D.tackle.plates)
+        N.slot === "notebook" && Te.appendChild(Y(N, { open: le(N.key, P.from === "rack") }));
+    } else for (let N of D.tackle.plates) Te.appendChild(Y(N, { open: le(N.key, P.from === "rack") }));
     let Ye = document.createElement("div");
     Ye.className = "gw-sh-hookrow";
-    for (let N of ["lure", "bait"]) {
+    for (let N of rigEl ? [] : ["lure", "bait"]) {
       let _e = D.tackle.hook[N],
         rt = Y(
           { ..._e, key: `hook:${N}`, name: _e.name || "\u2014" },
@@ -171798,7 +172118,7 @@ function VV(e) {
         .appendChild(ie(N === "lure" ? D.tackle.hook.lureChips : D.tackle.hook.baitChips, N)),
         Ye.appendChild(rt);
     }
-    Te.appendChild(Ye);
+    rigEl || Te.appendChild(Ye);
     let ee = _("raft", D.raft.head);
     {
       let N = document.createElement("div");
@@ -175151,6 +175471,15 @@ function YV(e) {
         (we.big = null), K.render();
         return;
       }
+      // An open tray on the Sheet's rig picture closes first, as on the tackle screen.
+      if (
+        we.tab === "sheet" &&
+        we.rig?.tray &&
+        K.el?.querySelector?.(".gw-sh-sec--tackle:not([hidden]) .gw-rig-tray")
+      ) {
+        (we.rig.tray = null), K.render();
+        return;
+      }
       if (we.view === "species") {
         (we.view = "page"), (we.sel = null), (we.hl = null), (we.section = null), K.render();
         return;
@@ -177488,6 +177817,8 @@ function Epe(e, t, { touch: n = !1 } = {}) {
     text:
       (t === Ad && typeof o.newWater == "string" ? o.newWater : null) ??
       (n && typeof o.touch?.[t] == "string" ? o.touch[t] : typeof o.boxes?.[t] == "string" ? o.boxes[t] : ""),
+    // The welcome's second page.
+    more: t === "welcome" && typeof o.boxes?.welcome2 == "string" ? o.boxes.welcome2 : "",
     tag: o.tag || "Guide",
     ok: o.ok || "Got it",
     skip: o.skip || "Skip the guide",
@@ -177863,6 +178194,15 @@ function ej(e) {
     if (!T.text) return c.open(E, O), c.close(), !1;
     c.open(E, O), E === "away" && (d.away = !1), (d.id = E);
     let x = e.h;
+    // A box with a second page turns to it on the first press, and closes on the next.
+    let pages = T.more ? [T.text, T.more] : [T.text],
+      page = 0,
+      okOrTurn = () => {
+        if (page >= pages.length - 1) return y("ok");
+        page += 1;
+        let words = d.el?.querySelector(".gw-guide-text");
+        words && (words.textContent = pages[page]), p(), e.sfx?.("ui_click", { volume: 0.45 });
+      };
     e.openModal(
       "guide",
       (M, A) => {
@@ -177887,7 +178227,7 @@ function ej(e) {
           (B.dataset.guideAct = "ok"),
           (B.dataset.autofocus = "1"),
           (B.textContent = T.ok),
-          B.addEventListener("click", () => y("ok")),
+          B.addEventListener("click", okOrTurn),
           P.appendChild(B),
           A.appendChild(S),
           (d.el = S);
@@ -177897,13 +178237,15 @@ function ej(e) {
         quiet: !0,
         dismissable: !1,
         cls: "gw-m-guide",
-        onEscape: () => y("ok"),
+        onEscape: okOrTurn,
         onKey: (M) =>
           M === "Tab"
             ? !1
             : (M === "Enter" || M === "Space" || M === "NumpadEnter"
-                ? y(document.activeElement?.dataset?.guideAct === "skip" ? "skip" : "ok")
-                : M === "Escape" && y("ok"),
+                ? document.activeElement?.dataset?.guideAct === "skip"
+                  ? y("skip")
+                  : okOrTurn()
+                : M === "Escape" && okOrTurn(),
               !0),
       },
     );
