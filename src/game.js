@@ -32851,7 +32851,7 @@ function loseOldRival(meta, data, run, loss, rematchId, rig = null, random = Mat
   if (!needsPurchase.length || random() >= 0.8) return null;
   book = meta.oldRivals || (meta.oldRivals = { landed: [] });
   const id = "mere-" + ((book.landed?.length || 0) + 1),
-    name = K3(data, species, id + ":" + loss.z, "mossmere") || "The Hook-Thief";
+    name = K3(data, species, id + ":" + loss.z, "mossmere") || "The Rod-Bender";
   return (book.active = {
     id,
     name,
@@ -33498,7 +33498,7 @@ var Y5 = {
       },
       unlock: {
         shells: 180,
-        requires: [{ type: "legendary", id: "belled_matriarch", label: "Land the Bellhead Catfish" }],
+        requires: [{ type: "legendary", id: "belled_matriarch", label: "Land the thief of the mere." }],
       },
       drain: { oil: 1.2, satiety: 1.15 },
       gloom: 1.13,
@@ -33991,8 +33991,8 @@ var Ms = [
         eyes: "glow",
         scale: 2,
       },
-      hint: "Listen for a bell beneath the calm, far out in deep water. She takes only Heartmoss.",
-      lore: "A great catfish, older than the harbour. A bell grew into her broad head when she was young, and her skin has gone the colour of tarnished bronze.",
+      hint: "She lives in the deepest hole in Mossmere, and feeds on the bottom.",
+      lore: "She's a wels catfish, the biggest fish in Mossmere. At midnight she rises to take what moves on top. The bell on her head was Hob's.",
     },
     {
       id: "sporebelly_puffer",
@@ -41420,7 +41420,7 @@ var Nf = [
       { size: U5(260, 120), family: "bottom", phase: 1, src: "v1", legendPlace: "bell_pool" },
       {
         model: { body: 6969924, glow: 14209279, fin: 9075292 },
-        lore: "A great catfish, older than the harbour. A bell grew into her broad head when she was young, and her skin has gone the colour of tarnished bronze.",
+        lore: "She's a wels catfish, the biggest fish in Mossmere. At midnight she rises to take what moves on top. The bell on her head was Hob's.",
       },
     ),
     mi("sporebelly_puffer", {
@@ -46840,11 +46840,11 @@ var pP = {
         card: "hullkiss_lamprey",
         giant: "hullkiss_lamprey",
       },
+      // No card fish: the Bell Pool's map card is plain water, so it never shows the thief's picture or name.
       bell_pool: {
         water: "mossmere",
         kind: "crown",
         price: 500,
-        card: "belled_matriarch",
         legend: "belled_matriarch",
       },
     },
@@ -47245,10 +47245,27 @@ Ca.gate = {
 // weak to land her, "fight" for a lost fight on the right line. Legends not listed here say nothing.
 Ca.legendAway = {
   belled_matriarch: {
-    line: "She ran for the bell and rasped the {line} through. Only Waxed Silk will hold her.",
-    fight: "The hook pulled at the bell. She'll remember it.",
+    line: "That one got away! Your {line} snaps by the rod. Only Waxed Silk will hold it.",
+    fight: "It shook free right under the raft. Everything held.",
   },
 };
+// What Mossmere's monster is called until she is first landed (mossmere-hunt-2.md, section 3).
+Ca.thief = { seal: "Land the thief of the mere." };
+// Mossmere's monster is "the thief" until the player first lands her: until then nothing may show or say
+// what she is (her name, kind, picture or model). A save that sold her has landed her.
+function thiefHidden(meta, speciesId) {
+  return (
+    speciesId === "belled_matriarch" &&
+    !(Number(meta?.journal?.[speciesId]?.caught) > 0) &&
+    !(Number(meta?.loop?.legends?.[speciesId]) > 0)
+  );
+}
+// The hook-up banner's words for a legend: her name and title, or "Something ancient." while she is the thief.
+function legendBannerWords(meta, data, species) {
+  return thiefHidden(meta, species?.id)
+    ? [data?.TEXT_LOOP?.heart?.ancient || "Something ancient.", ""]
+    : [species?.name || "", species?.epithet || ""];
+}
 Ca.murk.firstAway = "Lost a big one? Better gear holds them.";
 function $ee(e, t, { zone: n = e?.zone, tier: o = wo.waters[n]?.tier } = {}) {
   if (!e || e.rarity === "legendary") return null;
@@ -104436,7 +104453,8 @@ function hF(
   }
   for (let [re, De] of Object.entries(Ht)) {
     if (!(De > 0)) continue;
-    if (!ew(e, re)) {
+    // The thief has no row until she is landed: she counts as a kind not yet met.
+    if (!ew(e, re) || thiefHidden(e, re)) {
       Le++;
       continue;
     }
@@ -105429,7 +105447,8 @@ function $3(e, t, n) {
     a = Ln(e?.loop) ? e.loop : {},
     s = Ln(t?.LOOP?.places) ? t.LOOP.places : {},
     r = new Set(Array.isArray(a.maps?.places) ? a.maps.places : []),
-    l = (t?.SPECIES || []).filter((L) => Ln(L) && L.zone === n && !L.cove),
+    // The thief gets no card, glyph or name on the lake page until she is landed.
+    l = (t?.SPECIES || []).filter((L) => Ln(L) && L.zone === n && !L.cove && !thiefHidden(e, L.id)),
     i = new Map(l.map((L) => [L.id, L])),
     c = (L, E) => ({
       id: L.id,
@@ -110607,7 +110626,13 @@ function Kle(e) {
     let me = ce ? De(ce.zone) : null;
     return me
       ? (me.unlock?.requires || []).map((ft) => ({
-          label: ft.label || (ft.type === "legendary" ? `Land ${m(ft.id)?.name || ft.id}` : String(ft.type)),
+          label:
+            ft.label ||
+            (ft.type === "legendary"
+              ? thiefHidden(n(), ft.id)
+                ? t().TEXT_LOOP?.thief?.seal || "Land the thief of the mere."
+                : `Land ${m(ft.id)?.name || ft.id}`
+              : String(ft.type)),
           done: We(ft, ce),
           type: ft.type,
           id: ft.id,
@@ -130390,10 +130415,15 @@ function Y0e(e) {
       (d.yaw = Math.atan2(c.lineDir.x, c.lineDir.z)),
       R.rarity === "legendary")
     ) {
+      // While she is the thief the fight shows only a dark shape (the proxy), never her model: it is made
+      // at the reveal instead, when she is landed (ft).
+      i.thiefUnseen = thiefHidden(e.state?.meta, R.id);
       let I = null,
         Q = ma(R);
       try {
-        I = e.models?.createFish?.(R.id, Q != null ? { z: i.z, zone: Yt() } : i.weight);
+        I = i.thiefUnseen
+          ? null
+          : e.models?.createFish?.(R.id, Q != null ? { z: i.z, zone: Yt() } : i.weight);
       } catch (Pe) {
         y(Pe);
       }
@@ -130403,7 +130433,7 @@ function Y0e(e) {
           a.add(I.object3d),
           (i.fishLen = Q ?? Dn(Bt(I.length, 2), 0.12, 12)))
         : ((d.fv = null), (i.fishLen = Q ?? 2));
-    } else (d.fv = null), (i.fishLen = eq() ?? Jt());
+    } else (d.fv = null), (i.thiefUnseen = !1), (i.fishLen = eq() ?? Jt());
     c.fish.copy(c.bob);
   }
   let Xt = {};
@@ -130545,7 +130575,7 @@ function Y0e(e) {
     }
     if (i.bannerT >= 0 && ((i.bannerT -= R), i.bannerT < 0)) {
       let At = i.species;
-      p(() => e.ui?.banner?.(At?.name || "", At?.epithet || ""));
+      p(() => e.ui?.banner?.(...legendBannerWords(e.state?.meta, t(), At)));
     }
     let Ke = P8(Q, i.playT, Xt);
     i.panFrom || (i.panYaw = $i(i.panYaw, 0, 6, R)),
@@ -130988,7 +131018,9 @@ function Y0e(e) {
     let I = (i.find && p(() => iH(i.find, t()))) || null,
       Q = I ? I.length : (ma(R) ?? i.fishLen),
       Pe = I || d.fv;
-    if ((I && (p(() => I.setSilhouette?.(1)), a.add(I.object3d), (d.fv = I)), !Pe && !Oe())) {
+    if (
+      (I && (p(() => I.setSilhouette?.(1)), a.add(I.object3d), (d.fv = I)), !Pe && (!Oe() || i.thiefUnseen))
+    ) {
       try {
         Pe = e.models?.createFish?.(R.id, { z: i.z, zone: Yt() });
       } catch (ro) {
@@ -134654,7 +134686,7 @@ function Y0e(e) {
     }
     if ((Q.step(R, i.holding), i.bannerT >= 0 && ((i.bannerT -= R), i.bannerT < 0))) {
       let tn = i.species;
-      p(() => e.ui?.banner?.(tn?.name || "", tn?.epithet || ""));
+      p(() => e.ui?.banner?.(...legendBannerWords(e.state?.meta, t(), tn)));
     }
     for (let tn = i.summons.length - 1; tn >= 0; tn--) {
       let yn = i.summons[tn];
@@ -161660,7 +161692,10 @@ function BV(e, t, n = ["mossmere"]) {
   let o = Oa(e?.journal) ? e.journal : {},
     a = ri(n);
   return ri(t?.SPECIES)
-    .filter((s) => Oa(s) && a.includes(s.zone) && (s.giant === !0 || s.rarity === "legendary"))
+    .filter(
+      (s) =>
+        Oa(s) && a.includes(s.zone) && (s.giant === !0 || s.rarity === "legendary") && !thiefHidden(e, s.id),
+    )
     .map((s) => {
       let r = o[s.id],
         l = Yo(Number(r?.caught), 0) > 0,
@@ -162910,17 +162945,18 @@ function WV(e) {
     (Tt.style.width = `${Le.wick.w.toFixed(1)}px`), (Tt.style.height = `${Le.wick.h.toFixed(1)}px`);
     let Ft = n("canvas", "gw-map-fish");
     try {
-      Or(Ft, qt, {
-        w: Math.max(8, Math.round(Le.fish.w)),
-        h: Math.max(6, Math.round(Le.fish.h)),
-        pad: g4.pad,
-        gain: 6.5,
-        color: Pt.star ? "#f1d7a0" : "#ece8f4",
-      });
+      qt &&
+        Or(Ft, qt, {
+          w: Math.max(8, Math.round(Le.fish.w)),
+          h: Math.max(6, Math.round(Le.fish.h)),
+          pad: g4.pad,
+          gain: 6.5,
+          color: Pt.star ? "#f1d7a0" : "#ece8f4",
+        });
     } catch (We) {
       r("map art", We);
     }
-    it.appendChild(Tt), it.appendChild(Ft), Ht.appendChild(it);
+    qt && (it.appendChild(Tt), it.appendChild(Ft)), Ht.appendChild(it);
     let Ct = n("b", "gw-shelf-name gw-map-name");
     Pt.star && (Ct.innerHTML = '<i class="gw-map-star" aria-hidden="true">\u2605</i>'),
       Ct.appendChild(document.createTextNode(Pt.fishName || "")),
@@ -168077,7 +168113,8 @@ function YV(e) {
       );
     te.length || te.push(i(d().ZONES)[0]?.id || "mossmere");
     let ke = u()?.zone,
-      Ce = K.sel ? e.speciesData(K.sel) : null,
+      // The thief's own page never opens before she is landed.
+      Ce = K.sel && !thiefHidden(h(), K.sel) ? e.speciesData(K.sel) : null,
       st = {
         zone: te.includes(K.zone)
           ? K.zone
@@ -172742,7 +172779,8 @@ function Npe(e) {
       }),
       xt("fishing:hook", ({ speciesId: U }) => {
         let ue = P(U);
-        ue?.rarity === "legendary" && k(ue.name, ue.epithet || "", { kind: "legend", dur: 3.2 });
+        let [title, subtitle] = legendBannerWords(x(), a(), ue);
+        ue?.rarity === "legendary" && k(title, subtitle, { kind: "legend", dur: 3.2 });
       }),
       xt("fish:measured", (U) => Te.onMeasured(U)),
       xt("fish:landed", (U) => {

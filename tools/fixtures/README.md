@@ -12,7 +12,7 @@ Every step plays the game in headless Chromium with `?debug=1`. Fish are landed 
 
 | File | How it was made |
 | --- | --- |
-| `fresh-first-evening.json` | New Descent as Tallow, the opening tow, then the first evening: a Dusk Minnow and a Mossback Perch kept and sold. |
+| `fresh-first-evening.json` | New Game as Tallow, the opening tow, then the first evening: a Dusk Minnow and a Mossback Perch kept and sold. |
 | `mid-mossmere.json` | From the first: three more Mossmere evenings (ten fish landed and sold, eight new kinds, so ten kinds in the journal), then 37 clams given (`debug.loop.giveClams`, to make up 160) and The Lily Maze, ten Heartmoss Balls and ten Lumen Moss bought; the Lily Maze lifted at the next set-out. Heartmoss, Lumen Moss and Mire Worms are in stock. |
 | `legend-sold.json` | From mid-Mossmere: 2,000 clams given (`debug.loop.giveClams`), Under the Span, The Buoy Lights and The Bell Pool bought, then an evening at the Bell Pool with the Heartmoss Ball fitted in which the legend (`belled_matriarch`) was landed, kept and sold at the tally for her 900. |
 | `sporewood-crossed.json` | From mid-Mossmere: an evening landing the rest of the Mossmere list, 3,000 clams given, the Ashwood rod and the Sporewood chart bought, then Sporewood picked on the chart, the tow, and one Sporewood evening (two fish sold). The barge is left at Sporewood. |

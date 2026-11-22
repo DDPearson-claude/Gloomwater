@@ -142,11 +142,12 @@ export class GameSession {
   }
 
   // Waits for the title screen (after boot), then switches to low quality so software rendering keeps up
-  // (the call the Settings menu makes; it is not saved).
+  // (the call the Settings menu makes; it is not saved). The wait is long because several sessions may be
+  // booting on the same CPU at once.
   async boot() {
     await this.waitFor(
       'the title screen with "New Game" or "Continue"',
-      90_000,
+      180_000,
       () =>
         window.__gw?.flow === "title" &&
         [...document.querySelectorAll("button")].some((b) =>
