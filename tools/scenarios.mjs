@@ -687,6 +687,119 @@ async function catchCard(session, speciesId, z) {
 
 const FIXTURE_NAMES = ["fresh-first-evening", "mid-mossmere", "legend-sold", "sporewood-crossed"];
 
+// ---- the hunt: the tale, the notepad and Hob (mossmere-hunt-2.md sections 1, 2 and 5) --------------------------
+const TALE =
+  "Things go missing on Mossmere at night. Birds go, and floats, and once a whole rod. People say the gloom takes them.";
+const TALE_MURK =
+  "It's always just after the old bell strikes midnight. Hob on Mossbell Isle says it's a fish. Go and ask him.";
+const PAD_INTRO =
+  "This is your notepad. Each time you find a clue, you draw it here. Look at the pictures to work out what you're hunting, and where.";
+const NEXT_HOB = "Hob's lamp is lit on Mossbell Isle. Sail close to talk to him.";
+const NEXT_MIDNIGHT = "Be in Hob's part when the old bell strikes midnight.";
+const MAP_WORDS = "Hob lost it somewhere in this shaded part, between the Gatehouse and the Sisters.";
+const HOB_FIRST = [
+  "Evening! I'm Hob. I've fished off this rock for forty years.",
+  "I hooked something huge once, out in my old boat. It broke my line. I can't think now what it was.",
+  "It was out this way, I'm nearly sure. Here, I'll draw it for you.",
+  "My line came back like this, worn rough, not cut. You keep it.",
+];
+const HOB_ROD = "Another night it took my whole rod. It pulled it right over the side.";
+const HOB_GREETING = "Any luck out there? Stay warm.";
+const DRAWN = "You draw it in your notepad.";
+const MURK_FIND_HOB = "Hob's lamp is lit on Mossbell Isle. Sail close and say hello.";
+const MURK_MAP = "Hob always said it was between the Gatehouse and the Sisters. I've drawn it for you.";
+
+// Setting out can take minutes when several sessions share the CPU.
+const SLOW_SAIL = { timeoutMs: 300_000 };
+
+const huntOf = (session) => session.eval(() => window.__gw.progression.loop.state().hunt.mossmere);
+
+// What the open notepad shows (the one that opened by itself, or the Journal's Notepad tab), or null.
+const notepadShown = (session, where) =>
+  session.eval((sel) => {
+    const pad = document.querySelector(sel);
+    if (!pad) return null;
+    return {
+      pages: [...pad.querySelectorAll(".gw-pad-tab")].map((b) => b.textContent.trim()),
+      page: pad.querySelector(".gw-pad-page.gw-on")?.dataset.page ?? null,
+      places: pad.querySelectorAll(".gw-pad-fig").length,
+      drawn: [...pad.querySelectorAll(".gw-pad-fig[data-drawn]")].map((f) => f.dataset.sketch),
+      blank: pad.querySelectorAll(".gw-pad-fig.gw-pad-blank").length,
+      intro: pad.querySelector(".gw-pad-intro")?.textContent ?? null,
+      next: pad.querySelector(".gw-pad-next em")?.textContent ?? null,
+      words: [...pad.querySelectorAll(".gw-pad-cap")].map((c) => c.textContent),
+    };
+  }, where);
+
+// Goes home and closes Murk's tally; returns the hunt lines the tally showed ("" for none) and what the notepad
+// showed if it then opened by itself (closed with one press of its button), or null. `look` runs while it is open.
+async function tallyAndPad(session, { look = null } = {}) {
+  for (const homeBy = Date.now() + 60_000; !(await session.eval(() => window.__gw.game.goHome())); ) {
+    check(Date.now() < homeBy, `the game will not go home; ${JSON.stringify(await session.state())}`);
+    await session.closeGuides(3000);
+    await session.pause(1000);
+  }
+  const soldVisible = () =>
+    [...document.querySelectorAll("button")].some(
+      (b) => b.textContent.trim() === "Sold" && b.getBoundingClientRect().width > 0,
+    );
+  await session.waitFor("Murk's tally", 90_000, soldVisible);
+  await session.clickButton(/^Sold$/); // finishes the count
+  await session.pause(2500);
+  const hunt = await session.eval(
+    () => document.querySelector(".gw-tally-hunt")?.textContent.replace(/\s+/g, " ").trim() ?? "",
+  );
+  for (const end = Date.now() + 60_000; Date.now() < end && (await session.eval(soldVisible)); )
+    await session.clickButton(/^Sold$/), await session.pause(1500);
+  // At the barge the notepad opens by itself if it has something new; guide cards are closed on the way.
+  let pad = null;
+  for (const end = Date.now() + 15_000; Date.now() < end; ) {
+    pad = await notepadShown(session, '.gw-modal[data-modal="notepad"].gw-in .gw-pad');
+    if (pad) break;
+    await session.eval(() => document.querySelector(".gw-m-guide .gw-guide-ok")?.click());
+    await session.pause(600);
+  }
+  if (pad) {
+    if (look) await look();
+    await session.eval(() => document.querySelector(".gw-pad-close").click());
+    await session.pause(900);
+    pad.closedByOnePress = !(await session.eval(
+      () => !!document.querySelector('.gw-modal[data-modal="notepad"].gw-in'),
+    ));
+  }
+  await session.closeGuides(4000);
+  return { hunt, pad };
+}
+
+// Hob: the raft put near his rock on Mossbell Isle (the isle's middle is at -30, 14), or well away from it.
+const nearHob = (session) => session.eval(() => window.__gw.player.teleport({ x: -30, z: 4 }, 0));
+const awayFromHob = (session) => session.eval(() => window.__gw.player.teleport({ x: 0, z: 30 }, 0));
+// Reads each of Hob's boxes and presses its button until he is done; [] if he says nothing within waitMs.
+async function hearHob(session, waitMs = 20_000) {
+  const lines = [];
+  for (const end = Date.now() + waitMs; Date.now() < end; ) {
+    const said = await session.eval(
+      () => document.querySelector('.gw-modal[data-modal="hob"].gw-in .gw-hob-text')?.textContent ?? null,
+    );
+    if (said) {
+      lines.push(said);
+      await session.eval(() =>
+        document.querySelector('.gw-modal[data-modal="hob"].gw-in .gw-hob-ok').click(),
+      );
+      await session.pause(600);
+    } else if (lines.length) break;
+    else await session.pause(500);
+  }
+  return lines;
+}
+// Sails away from Hob and back, so he may speak again.
+async function passHobAgain(session, waitMs) {
+  await awayFromHob(session);
+  await session.pause(1500);
+  await nearHob(session);
+  return hearHob(session, waitMs);
+}
+
 const SCENARIOS = [
   {
     name: "gear: on the water with the lead: no float, the line slants in, the Tip Bell on every rod, the depth word, the tip answers, a real press strikes and lands",
@@ -1862,6 +1975,66 @@ const SCENARIOS = [
   },
 
   {
+    name: "hunt: the tale is told once, at the tally of evening 2 and never on evening 1; the notepad then opens by itself, blank under Where, Suspects and Gear, and one press closes it",
+    fixture: "fresh-first-evening",
+    debug: true,
+    timeoutMs: 720_000,
+    // The first evening again (the lead already given, so no gift shares the tally).
+    editSave(save) {
+      withLead(false)(save);
+      save.meta.loop.evenings = 0;
+      save.meta.loop.eveningsAt = { ...save.meta.loop.eveningsAt, mossmere: 0 };
+    },
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      check(
+        (await session.eval(() => window.__gw.progression.loop.hobLampLit())) === false,
+        "Hob's lamp is lit on evening 1",
+      );
+      await nearHob(session);
+      check((await hearHob(session, 5000)).length === 0, "Hob spoke on evening 1");
+      const first = await tallyAndPad(session);
+      check(first.hunt === "" && first.pad === null, `evening 1's tally: ${JSON.stringify(first)}`);
+      check(
+        (await session.eval(() => window.__gw.progression.loop.notepad())) === null,
+        "the notepad exists after evening 1",
+      );
+      await session.sail(SLOW_SAIL);
+      check(
+        (await session.eval(() => window.__gw.progression.loop.hobLampLit())) === true,
+        "Hob's lamp is not lit on evening 2",
+      );
+      const second = await tallyAndPad(session);
+      check(
+        second.hunt.includes(TALE) && second.hunt.includes(TALE_MURK),
+        `evening 2's tally: "${second.hunt}"`,
+      );
+      const pad = second.pad;
+      check(pad, "the notepad did not open by itself after the tale");
+      check(pad.intro === PAD_INTRO, `its first line: ${pad.intro}`);
+      check(
+        pad.places === 5 && pad.blank === 5 && pad.drawn.length === 0 && pad.page === "where",
+        `the notepad: ${JSON.stringify(pad)}`,
+      );
+      check(JSON.stringify(pad.pages) === '["Where","Suspects","Gear"]', `its pages: ${pad.pages}`);
+      check(pad.next === NEXT_HOB, `What to try next: ${pad.next}`);
+      check(pad.closedByOnePress, "one press did not close the notepad");
+      const record = await huntOf(session);
+      check(record.taleAt === 2 && record.padDue === false, `the record: ${JSON.stringify(record)}`);
+      // The Journal has it too, under its own tab.
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "notepad" }));
+      await session.pause(1200);
+      const tab = await notepadShown(session, ".gw-m-catalogue .gw-pad");
+      check(
+        tab && tab.places === 5 && tab.blank === 5 && tab.next === NEXT_HOB && tab.intro === null,
+        `the Journal's Notepad tab: ${JSON.stringify(tab)}`,
+      );
+      await backToJetty(session);
+      return "no lamp, Hob or tale on evening 1; the tale and a blank notepad at evening 2's tally";
+    },
+  },
+
+  {
     name: "midnight: she can take only in her time (from the first stroke for three minutes, until she is hooked); the still-water line shows once; her Journal page says she feeds after the bell",
     fixture: "legend-sold",
     debug: true,
@@ -1936,6 +2109,105 @@ const SCENARIOS = [
   },
 
   {
+    name: "hunt: an old save loads with the hunt record filled in and hears the tale at its next tally; nothing on the notepad names the thief",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 600_000,
+    // The lead already given: a tally with Murk's gift tells nothing else (one new thing a tally).
+    editSave: withLead(false),
+    async run(session) {
+      await session.toHome();
+      const loaded = await huntOf(session);
+      check(
+        loaded.taleAt === 0 &&
+          JSON.stringify(loaded.sketches) === '{"map":0,"taken":0,"lineup":0,"swirl":0,"back":0}' &&
+          Array.isArray(loaded.padUnseen) &&
+          Array.isArray(loaded.hobLines) &&
+          loaded.hobMet === 0,
+        `the old save's hunt record: ${JSON.stringify(loaded)}`,
+      );
+      await session.sail(SLOW_SAIL);
+      const seen = [];
+      const { hunt, pad } = await tallyAndPad(session, {
+        look: () => expectHidden(session, "the notepad as it opens by itself", seen),
+      });
+      check(hunt.includes(TALE) && hunt.includes(TALE_MURK), `the tally: "${hunt}"`);
+      check(pad?.closedByOnePress && pad.blank === 5, `the notepad: ${JSON.stringify(pad)}`);
+      check((await huntOf(session)).taleAt === 5, "the tale was not told at evening 5");
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "notepad" }));
+      await session.pause(1200);
+      await expectHidden(session, "the Journal's Notepad tab", seen);
+      await backToJetty(session);
+      return "back-filled, the tale at evening 5, the notepad says nothing of her";
+    },
+  },
+
+  {
+    name: "hunt: Hob talks once near his lit lamp and draws his map, which opens in the notepad at the next tally; next evening he says one new line, once; it all survives a reload",
+    fixture: "fresh-first-evening",
+    debug: true,
+    timeoutMs: 900_000,
+    editSave: withLead(false),
+    async run(session, { page, browser }) {
+      await session.sail(SLOW_SAIL);
+      await nearHob(session);
+      const talk = await hearHob(session);
+      check(JSON.stringify(talk) === JSON.stringify(HOB_FIRST), `Hob's first talk: ${JSON.stringify(talk)}`);
+      const toast = await session.eval(() =>
+        [...document.querySelectorAll(".gw-toast")].map((t) => t.textContent.trim()).join(" | "),
+      );
+      check(toast.includes(DRAWN), `no "${DRAWN}" on the water: ${toast}`);
+      const met = await huntOf(session);
+      check(
+        met.sketches.map === 2 && met.mapBy === "hob" && met.hobMet === 2 && met.padUnseen.includes("map"),
+        `after the talk: ${JSON.stringify(met)}`,
+      );
+      // The same evening he only greets, once.
+      const again = await passHobAgain(session, 15_000);
+      check(
+        JSON.stringify(again) === JSON.stringify([HOB_GREETING]),
+        `passing again: ${JSON.stringify(again)}`,
+      );
+      check((await passHobAgain(session, 5000)).length === 0, "Hob spoke a third time in one evening");
+      const { hunt, pad } = await tallyAndPad(session);
+      check(hunt.includes(TALE), `the tally: "${hunt}"`);
+      check(
+        pad && pad.page === "where" && JSON.stringify(pad.drawn) === '["map"]' && pad.blank === 4,
+        `the notepad at the tally: ${JSON.stringify(pad)}`,
+      );
+      check(pad.words.includes(MAP_WORDS) && pad.next === NEXT_MIDNIGHT, `its words: ${JSON.stringify(pad)}`);
+      check(pad.closedByOnePress, "one press did not close the notepad");
+      // Reloaded: the map and Hob's progress are kept; on evening 3 he says one new line, then only greets.
+      const saved = await session.saved();
+      const next = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await next.boot();
+        await next.sail(SLOW_SAIL);
+        const kept = await huntOf(next);
+        check(
+          kept.sketches.map === 2 && kept.hobMet === 2 && kept.padDue === false && kept.taleAt === 2,
+          `after a reload: ${JSON.stringify(kept)}`,
+        );
+        await nearHob(next);
+        const night = await hearHob(next);
+        check(JSON.stringify(night) === JSON.stringify([HOB_ROD]), `evening 3: ${JSON.stringify(night)}`);
+        const later = await passHobAgain(next, 15_000);
+        check(
+          JSON.stringify(later) === JSON.stringify([HOB_GREETING]),
+          `evening 3 again: ${JSON.stringify(later)}`,
+        );
+        const record = await huntOf(next);
+        check(JSON.stringify(record.hobLines) === '["rod"]' && record.hobNight === 3, JSON.stringify(record));
+        await next.collectGameErrors();
+        check(!next.errors.length, `errors after reloading: ${next.errors.join("; ")}`);
+      } finally {
+        await next.close();
+      }
+      return "four boxes and the map; a greeting once; the map at the tally; the rod line on evening 3";
+    },
+  },
+
+  {
     name: "midnight: a hold that fills before midnight from evening 2 shows the full-hold line once",
     fixture: "mid-mossmere",
     debug: true,
@@ -1955,6 +2227,38 @@ const SCENARIOS = [
       const flags = await session.eval(() => window.__gw.state.run.midnight);
       check(flags?.holdFullSaid === true, `the run's flag: ${JSON.stringify(flags)}`);
       return "the line showed once when the hold filled";
+    },
+  },
+
+  {
+    name: "hunt: Hob missed: after one evening Murk says where he is, after two Murk passes the map on",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 720_000,
+    // The tale was told at evening 4's tally; Hob has not been met.
+    editSave(save) {
+      withLead(false)(save);
+      save.meta.loop.hunt = { mossmere: { lineLesson: false, taleAt: 4 } };
+    },
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      const one = await tallyAndPad(session);
+      check(one.hunt === MURK_FIND_HOB && one.pad === null, `after one evening: ${JSON.stringify(one)}`);
+      const view = await session.eval(() => window.__gw.progression.loop.notepad());
+      check(view?.next === "hob" && view.sketches.map === 0, `the notepad: ${JSON.stringify(view)}`);
+      await session.sail(SLOW_SAIL);
+      const two = await tallyAndPad(session);
+      check(two.hunt === MURK_MAP, `after two evenings: "${two.hunt}"`);
+      check(
+        two.pad && JSON.stringify(two.pad.drawn) === '["map"]' && two.pad.next === NEXT_MIDNIGHT,
+        `the notepad: ${JSON.stringify(two.pad)}`,
+      );
+      const record = await huntOf(session);
+      check(
+        record.mapBy === "murk" && record.sketches.map === 6 && record.murkNudged,
+        JSON.stringify(record),
+      );
+      return "Murk's word at evening 5, the map at evening 6";
     },
   },
 ];

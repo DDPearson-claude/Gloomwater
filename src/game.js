@@ -47324,6 +47324,64 @@ Ca.live = {
   good: "Good for: hunters such as perch, pike and bass.",
   cost: "Costs you: you must catch it first, and grazers ignore it.",
 };
+// The first part of the hunt (mossmere-hunt-2.md sections 1, 2 and 5, B6): the tale at a Mossmere tally from
+// evening 2, the fisherman's notepad, and Hob on Mossbell Isle with his map (sketch 1). Distances are metres
+// from the middle of Mossbell Isle. Sketches 2 to 5 come in later steps, so their places stay blank.
+wo.hunt = { taleEvening: 2, lampEvening: 2, hobReach: 12, hobLeave: 16 };
+Ca.hunt = {
+  tale: "Things go missing on Mossmere at night. Birds go, and floats, and once a whole rod. People say the gloom takes them.",
+  murk: {
+    tale: "It's always just after the old bell strikes midnight. Hob on Mossbell Isle says it's a fish. Go and ask him.",
+    findHob: "Hob's lamp is lit on Mossbell Isle. Sail close and say hello.",
+    mapPassed: "Hob always said it was between the Gatehouse and the Sisters. I've drawn it for you.",
+  },
+  drawn: "You draw it in your notepad.",
+  hob: {
+    tag: "Hob",
+    // His first talk, four boxes. The last two go with his map, so a player Murk gave the map to hears two.
+    first: [
+      "Evening! I'm Hob. I've fished off this rock for forty years.",
+      "I hooked something huge once, out in my old boat. It broke my line. I can't think now what it was.",
+      "It was out this way, I'm nearly sure. Here, I'll draw it for you.",
+      "My line came back like this, worn rough, not cut. You keep it.",
+    ],
+    // One a night after that, in order. His other lines wait for what they speak of: sketches 2, 4 and 5.
+    nights: {
+      rod: "Another night it took my whole rod. It pulled it right over the side.",
+      bell: "Both times it was just after the old bell struck midnight. I'm sure of that much.",
+    },
+    greeting: "Any luck out there? Stay warm.",
+    next: "Next",
+    ok: "Got it",
+  },
+  pad: {
+    tab: "Notepad",
+    intro:
+      "This is your notepad. Each time you find a clue, you draw it here. Look at the pictures to work out what you're hunting, and where.",
+    pages: { where: "Where", suspects: "Suspects", gear: "Gear" },
+    titles: {
+      map: "Hob's map",
+      taken: "Taken at midnight",
+      lineup: "The line-up",
+      swirl: "The swirl",
+      back: "What came back",
+    },
+    blank: "Not found yet",
+    nextHead: "What to try next",
+    next: {
+      hob: "Hob's lamp is lit on Mossbell Isle. Sail close to talk to him.",
+      midnight: "Be in Hob's part when the old bell strikes midnight.",
+    },
+    map: "Hob lost it somewhere in this shaded part, between the Gatehouse and the Sisters.",
+    end: "This is Hob's old line end. It is worn rough, not cut.",
+    labels: { gatehouse: "Gatehouse", sisters: "Sisters", isle: "Mossbell Isle", home: "home" },
+    art: {
+      map: "A pencil map of Mossmere with a shaded part between the Gatehouse and the Sisters",
+      end: "An old line end taped to the page, its end worn rough",
+    },
+    close: "Got it",
+  },
+};
 var VS = 2;
 function SP(e = globalThis) {
   let t = Number(e?.GW_LOOP_COST);
@@ -75223,6 +75281,39 @@ function a3(e, t) {
     a = Math.min(1, Math.abs(t) / n);
   return e.domeY0 + o * Math.pow(Math.max(0, 1 - a * a * a * a), 0.25);
 } // Mossbell Isle's resident angler. All points use local coordinates facing +Z.
+// Hob's lamp (mossmere-hunt-2.md section 5): a storm lantern on a short pole beside him on his rock, lit on
+// Mossmere evenings from evening 2. Dark and unlit before then. Its glow is a sprite, not a light, so it adds
+// nothing to the lake's shaders.
+function makeHobLamp() {
+  let group = new fo();
+  group.name = "Hob's lamp";
+  let iron = sa({ color: 0x2c2830, rim: 0.3 }),
+    glass = Jl(0xffc36a, 1.6),
+    litColor = glass.color.clone(),
+    darkColor = new Vt(0x3a3026),
+    pole = new An(new Xn(0.03, 0.035, 1.1, 6), iron);
+  pole.position.y = 0.55;
+  let cap = new An(new Xn(0.02, 0.13, 0.1, 6), iron);
+  cap.position.y = 1.43;
+  let lantern = new An(new Xn(0.09, 0.09, 0.22, 6), glass);
+  lantern.position.y = 1.27;
+  let base = new An(new Xn(0.11, 0.11, 0.04, 6), iron);
+  base.position.y = 1.15;
+  let glow = Js({ color: 0xffb35c, size: 2.4, opacity: 0.55 });
+  glow.position.y = 1.27;
+  group.add(pole, cap, lantern, base, glow);
+  let flicker = 0;
+  return {
+    group,
+    lit: !1,
+    update(dt, lit) {
+      (this.lit = !!lit), glass.color.copy(lit ? litColor : darkColor), (glow.visible = !!lit);
+      if (!lit) return;
+      flicker += dt;
+      glow.material.opacity = 0.5 + 0.06 * Math.sin(flicker * 7.3) + 0.04 * Math.sin(flicker * 13.1);
+    },
+  };
+}
 function makeRockWick() {
   const T = Ha,
     root = new T.Group(),
@@ -77185,6 +77276,10 @@ ${qe}`,
         const actor = rockAngler.root;
         actor.position.set(best.x, best.y, best.z);
         actor.rotation.y = best.yaw;
+        // Hob's lamp stands at his side on the rock.
+        rockAngler.lamp = makeHobLamp();
+        rockAngler.lamp.group.position.set(0.42, 0, -0.12);
+        actor.add(rockAngler.lamp.group);
         E.add(actor);
         actor.traverse((obj) => {
           if (obj.geometry) v(obj.geometry);
@@ -78392,6 +78487,13 @@ ${qe}`,
   function It(H, Ee, je, K) {
     if (rockAngler) {
       rockAngler.root.visible = e.flow === "playing" && !e.cinematic;
+      if (rockAngler.lamp && rockAngler.root.visible) {
+        let lampLit = !1;
+        try {
+          lampLit = e.progression?.loop?.hobLampLit?.() === !0;
+        } catch {}
+        rockAngler.lamp.update(Math.min(0.1, Math.max(0, H)), lampLit);
+      }
       if (rockAngler.root.visible && !e.paused)
         rockAngler.update(
           Math.min(0.1, Math.max(0, H)),
@@ -105448,7 +105550,71 @@ function yF(e) {
 // One lake's monster hunt in the save. Only the part built so far: lineLesson is set by the first loss to a
 // line too weak for her.
 function freshHuntRecord() {
-  return { lineLesson: false };
+  return {
+    lineLesson: false,
+    // The tale (mossmere-hunt-2.md section 1): the evening it was told at the tally, 0 until then.
+    taleAt: 0,
+    // The notepad's five sketches: the evening each was drawn, 0 while its place is blank.
+    sketches: { map: 0, taken: 0, lineup: 0, swirl: 0, back: 0 },
+    // Who drew Hob's map: "hob", or "murk" when he passed it on after two evenings without meeting Hob.
+    mapBy: "",
+    // Sketches not yet drawn in front of the player, and whether the notepad opens by itself when next at home
+    // after a tally. padIntro: its first opening has shown the line that says what it is.
+    padUnseen: [],
+    padDue: false,
+    padIntro: false,
+    // Murk's word after one evening without meeting Hob (once).
+    murkNudged: false,
+    // Hob: the evening he was first met, the nightly lines he has said, the last evening he said one and the
+    // last evening he gave his greeting.
+    hobMet: 0,
+    hobLines: [],
+    hobNight: 0,
+    hobGreeted: 0,
+  };
+}
+// Back-fills one lake's hunt record from a fresh one: a missing or wrongly typed field takes its default, one
+// level deep for the sketches, and lists keep only strings.
+function normaliseHuntRecord(saved, fresh) {
+  for (let [key, value] of Object.entries(fresh)) {
+    let have = saved[key];
+    if (Array.isArray(value))
+      saved[key] = Array.isArray(have) ? have.filter((x) => typeof x == "string") : value;
+    else if (Ln(value)) {
+      Ln(have) || (saved[key] = have = {});
+      for (let [inner, initial] of Object.entries(value))
+        typeof have[inner] != typeof initial && (have[inner] = initial);
+    } else typeof have != typeof value && (saved[key] = value);
+  }
+  return saved;
+}
+// Draws a sketch into the hunt record on an evening; it draws in when the notepad next opens.
+function drawHuntSketch(record, key, evening) {
+  (record.sketches[key] = Math.max(1, ha(evening))),
+    record.padUnseen.includes(key) || record.padUnseen.push(key);
+}
+// The hunt's moment at a Mossmere tally (mossmere-hunt-2.md sections 1, 2 and 4): the tale at the tally of
+// evening 2, or at an older save's next tally; then, while Hob's map is missing, Murk's word after one evening
+// and the map passed on after two. Returns what the tally shows ({ tale, murk }) or null. The notepad is marked
+// to open by itself after this tally when the tale is told or a sketch waits to be seen. `quiet` (a tally with
+// Murk's gift): nothing is told this time, so the tale and the nudges come one tally later.
+function mossmereTallyBeat(loop, trip, rule = wo.hunt, { quiet = !1 } = {}) {
+  let record = loop?.hunt?.mossmere;
+  if (trip?.zone !== "mossmere" || !Ln(record)) return null;
+  let evening = ha(trip.evening) || ha(loop.evenings),
+    beat = {};
+  if (quiet) record.padUnseen.length && (record.padDue = !0);
+  else if (!record.taleAt) {
+    if (evening < rule.taleEvening) return null;
+    (record.taleAt = evening), (beat.tale = !0);
+  } else if (!record.sketches.map) {
+    let missed = evening - record.taleAt;
+    missed >= 2
+      ? (drawHuntSketch(record, "map", evening), (record.mapBy = "murk"), (beat.murk = "mapPassed"))
+      : missed >= 1 && !record.murkNudged && ((record.murkNudged = !0), (beat.murk = "findHob"));
+  }
+  (beat.tale || record.padUnseen.length) && (record.padDue = !0);
+  return beat.tale || beat.murk ? beat : null;
 }
 // The Sounding Lead fishes when it is owned and fitted, in a water with a depth table, and no lure is on (a lure
 // swims at its own depth). Otherwise the rig fishes under the Cork Float, as it always has.
@@ -105575,8 +105741,7 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
   (c.fitted.depth === "lead" && c.parts.includes("sounding_lead")) || (c.fitted.depth = "float");
   for (let [lake, record] of Object.entries(o.hunt)) {
     let saved = Ln(c.hunt[lake]) ? c.hunt[lake] : (c.hunt[lake] = record);
-    for (let [key, value] of Object.entries(record))
-      typeof saved[key] != typeof value && (saved[key] = value);
+    normaliseHuntRecord(saved, record);
   }
   for (let [g, p] of Object.entries(c.eveningsAt)) c.eveningsAt[g] = Math.max(0, ha(p));
   for (let [g, p] of Object.entries(t?.LOOP?.lostTackle || {}))
@@ -106708,6 +106873,8 @@ function CF(e) {
       let stock = H.bait?.[ze.zone] || {};
       H.fitted.bait = [...Sle(f().tins?.[ze.zone]), "cut_strip"].find((id) => ha(stock[id]) > 0) ?? null;
     }
+    // The tale and Murk's word about Hob are story, not new tackle, so they may share a tally with his gift.
+    let huntBeat = mossmereTallyBeat(H, ze, f().hunt, { quiet: !1 });
     if (
       (typeof H.fitted?.bait == "string" &&
         !(ha(H.bait?.[ze.zone]?.[H.fitted.bait]) > 0) &&
@@ -106722,6 +106889,7 @@ function CF(e) {
         ...(x(ze).capLost ? { away: !0 } : {}),
         ...(gift ? { gift } : {}),
         ...(giftSay ? { giftSay } : {}),
+        ...(huntBeat ? { hunt: huntBeat } : {}),
       }),
       je)
     ) {
@@ -107097,6 +107265,58 @@ function CF(e) {
       d("loop:fit", { slot: "depth", id: ze }),
       { ok: !0, changed: !0, reeled: K, depth: ze }
     );
+  }
+  // The hunt (mossmere-hunt-2.md): Hob's lamp burns on his rock on Mossmere trips from evening 2.
+  function hobLampLit() {
+    let ze = a();
+    return r(ze) && ze.zone === "mossmere" && ha(ze.evening) >= ha(f().hunt?.lampEvening, 2);
+  }
+  // Hob speaks when the raft comes near his lit lamp. The first time: his first talk, and he draws his map
+  // (sketch 1) unless Murk has passed it on already. After that, one new line a night, then his greeting once
+  // more that night. Returns { first: number of first-talk boxes, drew } or { line } or { greeting }, or null when
+  // he has nothing more to say tonight.
+  function hobTalk() {
+    let ze = a(),
+      record = p()?.hunt?.mossmere;
+    if (!Ln(record) || !hobLampLit()) return null;
+    let evening = ha(ze.evening),
+      talk = null;
+    if (!record.hobMet)
+      (record.hobMet = evening),
+        (record.hobNight = evening),
+        record.sketches.map
+          ? (talk = { first: 2, drew: null })
+          : (drawHuntSketch(record, "map", evening),
+            (record.mapBy = "hob"),
+            (talk = { first: 4, drew: "map" }));
+    else if (record.hobNight !== evening) {
+      record.hobNight = evening;
+      let line = Object.keys(n().TEXT_LOOP?.hunt?.hob?.nights || {}).find(
+        (k) => !record.hobLines.includes(k),
+      );
+      line
+        ? (record.hobLines.push(line), (talk = { line }))
+        : ((record.hobGreeted = evening), (talk = { greeting: !0 }));
+    } else record.hobGreeted !== evening && ((record.hobGreeted = evening), (talk = { greeting: !0 }));
+    return talk && (c(), d("hunt:hob", { ...talk })), talk;
+  }
+  // The notepad as the Journal and its own page show it, or null before it exists (before the tale and any sketch).
+  function notepad() {
+    let record = p()?.hunt?.mossmere;
+    if (!Ln(record) || !(record.taleAt > 0 || Object.values(record.sketches).some((v) => v > 0))) return null;
+    return {
+      sketches: { ...record.sketches },
+      mapBy: record.mapBy,
+      unseen: record.padUnseen.slice(),
+      due: record.padDue === !0,
+      intro: record.padIntro !== !0,
+      next: record.sketches.map ? "midnight" : "hob",
+    };
+  }
+  // The notepad opened by itself and was closed: what it drew in has been seen.
+  function notepadShown() {
+    let record = p()?.hunt?.mossmere;
+    Ln(record) && ((record.padDue = !1), (record.padUnseen = []), (record.padIntro = !0), c());
   }
   // Whether the Sounding Lead fishes right now: on a trip, in the trip's water with the run's lure; at home, in
   // the barge's water with the fitted lure.
@@ -107694,6 +107914,10 @@ function CF(e) {
     unfitFound: Ge,
     fitDepth,
     leadFishes,
+    hobLampLit,
+    hobTalk,
+    notepad,
+    notepadShown,
   };
   return (
     (e.loopInternal = {
@@ -144887,6 +145111,10 @@ var hG = `/* ui.css \u2014 GLOOMWATER interface, UI style v2 (CONTRACT \xA79, DE
 .gw-tally-gift-name { font: 400 18px/1.2 var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
 .gw-tally-gift .gw-murk-line { margin-top: 2px; font-size: 19px; }
 .gw-tally-gift-fit { margin: 2px 0 0; font: 400 16px/1.3 var(--f-body); color: var(--ink-dim); text-align: center; }
+.gw-tally-hunt { display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 32em; margin: 12px auto 0; opacity: 0; transform: translateY(4px); transition: opacity .5s .3s, transform .5s .3s; }
+.gw-tally-hunt.gw-in { opacity: 1; transform: none; }
+.gw-tally-tale { margin: 0; font: 400 17px/1.38 var(--f-body); color: var(--ink); text-align: center; text-wrap: pretty; }
+.gw-tally-hunt .gw-murk-line { margin: 0; font-size: 19px; }
 .gw-tally-sold { font-size: 23px; transition: opacity .5s, color .3s; }
 .gw-tally-sold.gw-wait { opacity: .38; }
 
@@ -162750,6 +162978,811 @@ function tpe(e) {
 }
 var npe =
   '<svg class="gw-trow-seal" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c2.2 0 2.6 1.6 4.4 2.3s3.4.1 4 2.1-.8 2.9-.7 4.6.9 3.2-.4 4.6-2.9.6-4.4 1.6-1.9 2.8-3.9 2.8-2.5-1.8-3.9-2.8-3.2-.2-4.4-1.6-.4-2.9-.4-4.6S2.4 9.6 3 7.6s2.3-1.4 4-2.1S9.8 3.2 12 3.2z"/><path class="k" d="M8.6 12.4l2.4 2.4 4.6-5"/></svg>';
+// ---- The fisherman's notepad (mossmere-notepad.md and its mock-up, notepad-mockup.html) -----------------------
+// A sketch is a list of strokes, one short string each. The first letter says how it is drawn:
+//   p pencil, b heavy pencil, f faint pencil, d dotted, h hatching "h<deg>,<gap>|<points>" inside a shape,
+//   w paper (hides what is under it), T tape, t words "t<x>,<y>,<size>,<flags>|text" (flag f: faint).
+//   A leading _ puts the stroke behind everything drawn so far. Paths use M L Q C Z.
+// Every line gets a seeded wobble and a faint second pass, so a sketch looks the same each time it is drawn.
+// Only ids are saved; the art is drawn from these lists, so it can change without touching saves.
+const PAD_TAU = Math.PI * 2;
+function padRng(seed) {
+  let t = seed >>> 0;
+  return () => {
+    (t |= 0), (t = (t + 1831565813) | 0);
+    let o = Math.imul(t ^ (t >>> 15), 1 | t);
+    return (o = (o + Math.imul(o ^ (o >>> 7), 61 | o)) ^ o), ((o ^ (o >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function padHash(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+const padR1 = (v) => Math.round(v * 10) / 10,
+  padPath = (pts) => "M" + pts.map((p) => padR1(p[0]) + " " + padR1(p[1])).join("L"),
+  padParsePts = (s) =>
+    s
+      .trim()
+      .split(/\s+/)
+      .map((p) => p.split(",").map(Number)),
+  padPtsStr = (pts) => pts.map((p) => padR1(p[0]) + "," + padR1(p[1])).join(" ");
+function padEllPts(cx, cy, rx, ry, a0 = 0, a1 = 360, rot = 0) {
+  let n = Math.max(8, Math.round(Math.abs(a1 - a0) / 14)),
+    pts = [],
+    c = Math.cos((rot * Math.PI) / 180),
+    s = Math.sin((rot * Math.PI) / 180);
+  for (let i = 0; i <= n; i++) {
+    let a = ((a0 + ((a1 - a0) * i) / n) * Math.PI) / 180,
+      x = rx * Math.cos(a),
+      y = ry * Math.sin(a);
+    pts.push([cx + x * c - y * s, cy + x * s + y * c]);
+  }
+  return pts;
+}
+const padEll = (...a) => padPath(padEllPts(...a));
+function padBlobPts(cx, cy, rx, ry, seed, rot = 0, j = 0.14) {
+  let R = padRng(seed),
+    n = 18,
+    ph = [R() * PAD_TAU, R() * PAD_TAU],
+    pts = [],
+    c = Math.cos((rot * Math.PI) / 180),
+    s = Math.sin((rot * Math.PI) / 180);
+  for (let i = 0; i <= n; i++) {
+    let a = (i / n) * PAD_TAU,
+      k = 1 + j * Math.sin(2 * a + ph[0]) + j * 0.6 * Math.sin(3 * a + ph[1]),
+      x = rx * k * Math.cos(a),
+      y = ry * k * Math.sin(a);
+    pts.push([cx + x * c - y * s, cy + x * s + y * c]);
+  }
+  return pts;
+}
+const padBlob = (...a) => padPath(padBlobPts(...a)) + "Z";
+// A line end worn rough by a mouth like a file: the sound line goes pale and swells where it was rubbed, with a
+// few scuffs, and ends in three loose strands. map(u, v) places it: u runs along the line, v across it.
+function padWornEnd(map, u0, u1, s, seed) {
+  let R = padRng(seed),
+    L = u1 - u0,
+    side = (sg) => {
+      let pts = [];
+      for (let i = 0; i <= 12; i++) {
+        let t = i / 12,
+          h = (0.5 + 1.15 * Math.sin((Math.min(1, t * 1.35) * Math.PI) / 2)) * s;
+        i % 4 === 2 && (h *= 0.72), pts.push(map(u0 + L * t, sg * h));
+      }
+      return pts;
+    },
+    a = side(-1),
+    b = side(1),
+    scuff = "",
+    strands = "",
+    wisp = "";
+  for (let i = 0; i < 5; i++) {
+    let u = u0 + L * (0.22 + (0.62 * i) / 4 + (R() - 0.5) * 0.05),
+      w = 0.95 * s;
+    scuff += padPath([map(u - 1.1 * s, -w), map(u + 1.1 * s, w)]);
+  }
+  for (let [v0, v1, c] of [
+    [-0.8, -2.9, -0.4],
+    [0, 0.5, 0.9],
+    [0.8, 3.1, 0.5],
+  ]) {
+    let p0 = map(u1, v0 * s),
+      q = map(u1 + 2.6 * s, (v0 + (v1 - v0) * 0.35 + c) * s),
+      p1 = map(u1 + (4.6 + R() * 0.8) * s, v1 * s);
+    strands += `M${padR1(p0[0])} ${padR1(p0[1])}Q${padR1(q[0])} ${padR1(q[1])} ${padR1(p1[0])} ${padR1(p1[1])}`;
+  }
+  for (let i = 0; i < 3; i++) {
+    let u = u0 + L * (0.35 + 0.25 * i + (R() - 0.5) * 0.08),
+      sg = i % 2 ? 1 : -1,
+      h = 1.5 * s;
+    wisp += padPath([map(u, sg * h), map(u + 0.9 * s, sg * (h + 1.3 * s))]);
+  }
+  return [
+    "w" + padPath(a.concat(b.slice().reverse())) + "Z",
+    "p" + padPath(a) + padPath(b),
+    "f" + scuff,
+    "p" + strands,
+    "f" + wisp,
+  ];
+}
+// Path data to polylines (M L H V Q C Z, absolute or relative).
+function padPolylines(d) {
+  let tk = d.match(/[MLHVQCZmlhvqcz]|-?\d*\.?\d+/g) || [],
+    out = [],
+    cur = null,
+    x = 0,
+    y = 0,
+    sx = 0,
+    sy = 0,
+    cmd = "M",
+    i = 0,
+    num = () => parseFloat(tk[i++]),
+    seg = (n, f) => {
+      for (let k = 1; k <= n; k++) cur.push(f(k / n));
+    };
+  for (; i < tk.length; ) {
+    /[A-Za-z]/.test(tk[i]) && (cmd = tk[i++]);
+    let rel = cmd === cmd.toLowerCase(),
+      C = cmd.toUpperCase(),
+      ox = rel ? x : 0,
+      oy = rel ? y : 0;
+    if (C === "M")
+      (x = num() + ox),
+        (y = num() + oy),
+        (sx = x),
+        (sy = y),
+        (cur = [[x, y]]),
+        out.push(cur),
+        (cmd = rel ? "l" : "L");
+    else if (C === "L") (x = num() + ox), (y = num() + oy), cur.push([x, y]);
+    else if (C === "H") (x = num() + ox), cur.push([x, y]);
+    else if (C === "V") (y = num() + oy), cur.push([x, y]);
+    else if (C === "Q") {
+      let x1 = num() + ox,
+        y1 = num() + oy,
+        x2 = num() + ox,
+        y2 = num() + oy,
+        x0 = x,
+        y0 = y;
+      seg(Math.max(4, Math.ceil(Math.hypot(x2 - x0, y2 - y0) / 2.5)), (t) => [
+        (1 - t) ** 2 * x0 + 2 * (1 - t) * t * x1 + t * t * x2,
+        (1 - t) ** 2 * y0 + 2 * (1 - t) * t * y1 + t * t * y2,
+      ]),
+        (x = x2),
+        (y = y2);
+    } else if (C === "C") {
+      let x1 = num() + ox,
+        y1 = num() + oy,
+        x2 = num() + ox,
+        y2 = num() + oy,
+        x3 = num() + ox,
+        y3 = num() + oy,
+        x0 = x,
+        y0 = y;
+      seg(Math.max(6, Math.ceil(Math.hypot(x3 - x0, y3 - y0) / 2.5)), (t) => {
+        let u = 1 - t;
+        return [
+          u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+          u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3,
+        ];
+      }),
+        (x = x3),
+        (y = y3);
+    } else C === "Z" ? (cur.push([sx, sy]), (cur.closed = !0), (x = sx), (y = sy)) : i++;
+  }
+  return out.filter((p) => p.length > 1);
+}
+// Wobbles a polyline the way a hand does: a low, slow waver and a little overshoot at loose ends.
+function padRough(pl, R, amp) {
+  let pts = [],
+    step = Math.max(amp * 2.2, 0.5);
+  for (let k = 0; k < pl.length - 1; k++) {
+    let [x0, y0] = pl[k],
+      [x1, y1] = pl[k + 1],
+      n = Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / step));
+    for (let j = 0; j < n; j++) pts.push([x0 + ((x1 - x0) * j) / n, y0 + ((y1 - y0) * j) / n]);
+  }
+  if ((pts.push(pl[pl.length - 1]), !pl.closed && pts.length > 1)) {
+    let a = pts[0],
+      b = pts[1],
+      c = pts[pts.length - 1],
+      d = pts[pts.length - 2],
+      la = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1,
+      lc = Math.hypot(c[0] - d[0], c[1] - d[1]) || 1,
+      o = amp * (1.2 + R() * 1.6);
+    pts.unshift([a[0] + ((a[0] - b[0]) / la) * o, a[1] + ((a[1] - b[1]) / la) * o]),
+      pts.push([c[0] + ((c[0] - d[0]) / lc) * o * 0.6, c[1] + ((c[1] - d[1]) / lc) * o * 0.6]);
+  }
+  let f1 = 0.35 + R() * 0.25,
+    f2 = 1.1 + R() * 0.6,
+    p1 = R() * PAD_TAU,
+    p2 = R() * PAD_TAU,
+    s = 0,
+    res = [];
+  for (let k = 0; k < pts.length; k++) {
+    let p = pts[k],
+      q = pts[Math.min(k + 1, pts.length - 1)],
+      pr = pts[Math.max(k - 1, 0)];
+    k && (s += Math.hypot(p[0] - pts[k - 1][0], p[1] - pts[k - 1][1]));
+    let tx = q[0] - pr[0],
+      ty = q[1] - pr[1],
+      tl = Math.hypot(tx, ty) || 1;
+    (tx /= tl), (ty /= tl);
+    let w = amp * (0.65 * Math.sin((s / (amp * 9)) * f1 + p1) + 0.35 * Math.sin((s / (amp * 9)) * f2 + p2));
+    res.push([p[0] - ty * w, p[1] + tx * w]);
+  }
+  return pl.closed && (res[res.length - 1] = res[0]), res;
+}
+const padLength = (pts) =>
+  pts.reduce((sum, p, i) => (i ? sum + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0), 0);
+// A dotted line as real short dashes, so it draws in like any other stroke.
+function padDashes(pl, on, off) {
+  let out = "",
+    acc = 0,
+    draw = !0,
+    seg = [pl[0]];
+  for (let i = 1; i < pl.length; i++) {
+    let [x0, y0] = pl[i - 1],
+      [x1, y1] = pl[i],
+      L = Math.hypot(x1 - x0, y1 - y0);
+    for (; L > 0; ) {
+      let need = (draw ? on : off) - acc;
+      if (L < need) (acc += L), draw && seg.push([x1, y1]), (L = 0);
+      else {
+        let t = need / L,
+          nx = x0 + (x1 - x0) * t,
+          ny = y0 + (y1 - y0) * t;
+        draw ? (seg.push([nx, ny]), (out += padPath(seg))) : (seg = [[nx, ny]]),
+          (draw = !draw),
+          (acc = 0),
+          (L -= need),
+          (x0 = nx),
+          (y0 = ny);
+      }
+    }
+  }
+  return draw && seg.length > 1 && (out += padPath(seg)), out;
+}
+// Zigzag shading inside a polygon, one continuous pencil stroke.
+function padHatch(poly, deg, gap) {
+  let a = (deg * Math.PI) / 180,
+    ca = Math.cos(a),
+    sa = Math.sin(a),
+    rot = poly.map(([x, y]) => [x * ca + y * sa, -x * sa + y * ca]),
+    ys = rot.map((p) => p[1]),
+    y1 = Math.max(...ys),
+    pts = [],
+    flip = !1;
+  for (let y = Math.min(...ys) + gap * 0.5; y < y1; y += gap) {
+    let xs = [];
+    for (let i = 0; i < rot.length; i++) {
+      let p = rot[i],
+        q = rot[(i + 1) % rot.length];
+      p[1] <= y != q[1] <= y && xs.push(p[0] + ((y - p[1]) / (q[1] - p[1])) * (q[0] - p[0]));
+    }
+    if (xs.length < 2) continue;
+    xs.sort((m, n) => m - n);
+    let l = xs[0],
+      r = xs[xs.length - 1],
+      inset = Math.min(gap * 0.4, (r - l) * 0.2);
+    (l += inset),
+      (r -= inset),
+      pts.push(
+        ...(flip
+          ? [
+              [r, y],
+              [l, y],
+            ]
+          : [
+              [l, y],
+              [r, y],
+            ]),
+      ),
+      (flip = !flip);
+  }
+  return pts.map(([x, y]) => [x * ca - y * sa, x * sa + y * ca]);
+}
+const padEsc = (s) =>
+  String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+// Draws one sketch as SVG markup. With `at` (seconds), every stroke also gets its moment to draw in, from
+// that time on, about as fast as a pencil; `end` is when the last stroke is done.
+const PAD_WIDTH = { p: 1, b: 1.65, f: 0.85, d: 1, h: 0.7 };
+function padSketchSvg(id, vb, list, { sw = 1.1, amp = 0.42, label = "", at = null, speed = 1 } = {}) {
+  let R = padRng(padHash(id)),
+    pxPerUnit = 360 / vb[2],
+    back = [],
+    front = [],
+    time = at ?? 0,
+    timing = () => (at == null ? "" : ` style="--d:${time.toFixed(2)}s"`),
+    stroke = (kind, pts, isBack) => {
+      let w = sw * PAD_WIDTH[kind],
+        main = "",
+        ghost = "",
+        length = 0;
+      for (let pl of pts) {
+        if (!(pl?.length > 1)) continue;
+        let r = padRough(pl, R, amp);
+        (length += padLength(r)),
+          (main += kind === "d" ? padDashes(r, 1.1, 2.2) : padPath(r)),
+          (kind === "p" || kind === "b") && (ghost += padPath(padRough(pl, R, amp * 1.4)));
+      }
+      let dur = Math.min(
+          1.5,
+          Math.max(0.08, (length * pxPerUnit) / ((kind === "h" ? 1700 : kind === "d" ? 700 : 560) * speed)),
+        ),
+        anim = at == null ? "" : ` style="--d:${time.toFixed(2)}s;--t:${dur.toFixed(2)}s"`,
+        out =
+          (ghost
+            ? `<path class="pl g" d="${ghost}" stroke-width="${padR1(w * 70) / 100}" pathLength="1"${anim}/>`
+            : "") +
+          `<path class="pl ${kind}" d="${main}" stroke-width="${padR1(w * 100) / 100}" pathLength="1"${anim}/>`;
+      (time += dur + (kind === "h" ? 0.02 : 0.04)), (isBack ? back : front).push(out);
+    };
+  for (let raw of list) {
+    let isBack = raw[0] === "_";
+    isBack && (raw = raw.slice(1));
+    let k = raw[0],
+      body = raw.slice(1);
+    if ("pbfd".includes(k)) stroke(k, padPolylines(body), isBack);
+    else if (k === "h") {
+      let [head, pts] = body.split("|"),
+        [deg, gap] = head.split(",").map(Number);
+      stroke(k, [padHatch(padParsePts(pts), deg, gap)], isBack);
+    } else if (k === "w") (isBack ? back : front).push(`<path class="pp" d="${body}"${timing()}/>`);
+    else if (k === "T")
+      (isBack ? back : front).push(`<path class="tape" d="${body}"${timing()}/>`), (time += 0.26);
+    else if (k === "t") {
+      let [head, words] = body.split("|"),
+        [x, y, size, flags = ""] = head.split(",");
+      (isBack ? back : front).push(
+        `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle"${flags.includes("f") ? ' class="f"' : ""}${timing()}>${padEsc(words)}</text>`,
+      ),
+        (time += 0.24);
+    }
+  }
+  return {
+    html: `<svg class="gw-pad-sk" viewBox="${vb.join(" ")}" role="img" aria-label="${padEsc(label)}"><g filter="url(#gw-pad-pencil)">${back.reverse().join("")}${front.join("")}</g></svg>`,
+    end: time,
+  };
+}
+
+// ---- Mossmere in world units (x east, z south: the Sluice is at the top). The shore is the game's own (x1:
+// radius 60, seed 1307); the islands are the arena record's (id: "mossmere"), drawn a little smaller.
+const PAD_SHORE = padParsePts(
+  "58,0 58,4 57,8 57,12 56,16 55,20 54,24 53,28 51,32 49,36 47,40 45,43 42,46 38,49 35,52 31,54 27,56 23,57 19,59 15,60 11,61 6,61 2,61 -2,61 -6,60 -11,60 -15,59 -19,57 -22,55 -26,53 -29,51 -33,48 -36,46 -39,44 -42,41 -45,38 -48,35 -50,31 -52,28 -55,24 -56,21 -58,17 -59,13 -60,8 -60,4 -60,0 -60,-4 -59,-8 -59,-12 -57,-16 -56,-20 -54,-24 -52,-28 -50,-31 -48,-35 -45,-38 -42,-41 -40,-44 -37,-47 -33,-50 -30,-52 -27,-54 -23,-56 -19,-58 -15,-59 -11,-60 -6,-61 -2,-62 2,-62 6,-61 11,-61 15,-60 19,-58 23,-57 27,-56 31,-54 35,-51 38,-48 41,-45 43,-42 46,-38 48,-35 50,-31 52,-27 53,-24 54,-20 55,-16 56,-12 57,-8 57,-4",
+);
+function padShoreTicks(R) {
+  let d = "";
+  for (let i = 0; i < 150; i++) {
+    if (R() < 0.2) continue;
+    let p = PAD_SHORE[Math.floor((i / 150) * PAD_SHORE.length)],
+      r = Math.hypot(p[0], p[1]) + 1.1,
+      l = 1.6 + R() * 2.4,
+      ang = Math.atan2(p[1], p[0]) + (R() - 0.5) * 0.25;
+    d += padPath([
+      [Math.cos(ang) * r, Math.sin(ang) * r],
+      [Math.cos(ang) * (r + l), Math.sin(ang) * (r + l)],
+    ]);
+  }
+  return d;
+}
+const PAD_ISLES = {
+    gate: [22, -12, 5.4, 3],
+    hob: [-30, 14, 4.8, 5],
+    root: [34, 20, 3.8, 8],
+    stair: [-14, 28, 3.2, 11],
+    elder: [-30, -24, 4.2, 13],
+    younger: [-18, -34, 3.3, 17],
+  },
+  padIsle = (key) => {
+    let [x, z, r, seed] = PAD_ISLES[key],
+      d = padBlob(x, z, r, r * 0.82, seed, seed * 7);
+    return ["w" + d, "p" + d];
+  },
+  padGatehouse = (x, z, s = 1) =>
+    "p" +
+    padPath([
+      [x - 2.5 * s, z + 1],
+      [x - 2.5 * s, z - 6 * s],
+      [x - 1.3 * s, z - 6 * s],
+      [x - 1.3 * s, z - 4.8 * s],
+      [x, z - 4.8 * s],
+      [x, z - 6 * s],
+      [x + 1.3 * s, z - 6 * s],
+      [x + 1.3 * s, z - 4.8 * s],
+      [x + 2.5 * s, z - 4.8 * s],
+      [x + 2.5 * s, z - 6 * s],
+      [x + 2.5 * s, z + 1],
+    ]),
+  // Hob's part: the water between the Gatehouse and the Sisters, about an eighth of the lake. The whole 8 m
+  // circle of the thief's water lies inside it with 2 m to spare, well south of its middle, so the patch never
+  // points at the spot.
+  PAD_HOB_PART = padBlobPts(-5, -22, 27.5, 16.5, 41, 14, 0.06);
+// Sketch 1: Hob's map, and under it his old line end taped to the page.
+function padHobMap(labels) {
+  return [
+    "p" + padPath(PAD_SHORE.concat([PAD_SHORE[0]])),
+    "f" + padShoreTicks(padRng(77)),
+    "pM-3 -53L-3 -47M3 -53L3 -47M-4 -53L4 -53",
+    "fM-1.5 -53.5L-1.5 -58M1.5 -53.5L1.5 -58",
+    ...padIsle("gate"),
+    padGatehouse(22, -12.4, 0.9),
+    ...padIsle("elder"),
+    ...padIsle("younger"),
+    ...padIsle("hob"),
+    // Hob's lamp on his rock
+    "pM-30 10.8L-30 6.6",
+    "p" +
+      padPath([
+        [-31.2, 6.6],
+        [-28.8, 6.6],
+        [-28.8, 3.8],
+        [-31.2, 3.8],
+        [-31.2, 6.6],
+      ]) +
+      padPath([
+        [-31.6, 3.8],
+        [-30, 2.6],
+        [-28.4, 3.8],
+      ]),
+    "fM-33 5.2L-34.8 5.2M-27 5.2L-25.2 5.2M-32.6 2.6L-34 1.4M-27.4 2.6L-26 1.4",
+    ...padIsle("root"),
+    "fM32 19Q34 21 36 19M33 22Q35 20 37 22",
+    ...padIsle("stair"),
+    // the broken Span
+    "pM-41 -4.5L-31.5 -.8M-24.2 2.4L-18.6 5.2",
+    "f" + padEll(-40, -4, 1, 1) + padEll(-33, -1, 1, 1) + padEll(-26, 2, 1, 1) + padEll(-19, 5, 1, 1),
+    // home: the dock and Murk's hut
+    "pM24 41L24 36M27 41L27 36M23 36L28.5 36",
+    "pM19.5 49L19.5 44.5L22.5 41.8L25.5 44.5L25.5 49Z",
+    "fM21.6 49L21.6 46.6L23.4 46.6L23.4 49",
+    `t33,-1.4,5.4|${labels.gatehouse}`,
+    `t-45,-15.5,5.4|${labels.sisters}`,
+    `t-30,24,5.4|${labels.isle}`,
+    `t14,52.5,5.4|${labels.home}`,
+    // Hob's part, shaded last
+    "d" + padPath(PAD_HOB_PART) + "Z",
+    "_h34,2.1|" + padPtsStr(PAD_HOB_PART),
+  ];
+}
+function padLineEnd() {
+  return [
+    "T" +
+      padPath([
+        [3, 6.4],
+        [24, 5.2],
+        [24.6, 22],
+        [3.6, 23.2],
+      ]) +
+      "Z",
+    "bM1 14.4Q50 13.2 112 15",
+    ...padWornEnd((u, v) => [u, 15 + v], 112, 172, 2.2, 31),
+  ];
+}
+// The five places: their pages, and how a drawn one is made (sketches 2 to 5 come in later steps).
+const PAD_PLACES = [
+  { key: "map", n: 1, page: "where" },
+  { key: "taken", n: 2, page: "where" },
+  { key: "lineup", n: 3, page: "suspects" },
+  { key: "swirl", n: 4, page: "gear" },
+  { key: "back", n: 5, page: "gear" },
+];
+const padPageOf = (key) => PAD_PLACES.find((p) => p.key === key)?.page || "where";
+function padPanels(key, text, at) {
+  if (key !== "map") return null;
+  let map = padSketchSvg("s1-0", [-68, -67, 136, 135], padHobMap(text.labels || {}), {
+      sw: 0.5,
+      amp: 0.32,
+      label: text.art?.map || "",
+      at,
+      speed: 2,
+    }),
+    end = padSketchSvg("s1-1", [0, 0, 200, 30], padLineEnd(), {
+      sw: 0.9,
+      amp: 0.3,
+      label: text.art?.end || "",
+      at: at == null ? null : map.end + 0.5,
+    }),
+    cap = (words, t) =>
+      `<p class="gw-pad-cap"${t == null ? "" : ` style="--d:${t.toFixed(2)}s"`}>${padEsc(words)}</p>`;
+  return (
+    `<div class="gw-pad-pnl"><div class="gw-pad-box">${map.html}</div>${cap(text.map, at == null ? null : map.end)}</div>` +
+    `<div class="gw-pad-pnl gw-pad-end"><div class="gw-pad-box">${end.html}</div>${cap(text.end, at == null ? null : end.end)}</div>`
+  );
+}
+function padCoils(n = 12) {
+  let s = `<svg viewBox="0 0 ${n * 30} 30" preserveAspectRatio="none" aria-hidden="true">`;
+  for (let i = 0; i < n; i++) {
+    let c = i * 30 + 15,
+      d = `M${c - 4} 27 C${c - 10} 32 ${c - 14} 10 ${c - 6} 3 C${c - 2} -1 ${c + 6} 6 ${c + 6} 16`;
+    s += `<path d="${d}" fill="none" stroke="#2a2734" stroke-width="3.6" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#b7b4c4" stroke-width="1.6" stroke-linecap="round" opacity=".9"/><circle cx="${c}" cy="23" r="2.6" fill="#3b302c" opacity=".55"/>`;
+  }
+  return s + "</svg>";
+}
+// The notepad as an element: one page at a time with paper tabs under it, and the What to try next line at
+// the foot. `view` is the loop's notepad(); `animate` lists the sketches that draw in now.
+function notepadElement(h, text, view, { page = "where", animate = [], intro = !1, close = null } = {}) {
+  let el = h("div", "gw-pad"),
+    titles = text.titles || {},
+    pages = text.pages || {},
+    fig = (place) => {
+      let drawn = view.sketches?.[place.key] > 0,
+        panels = drawn ? padPanels(place.key, text, animate.includes(place.key) ? 0.6 : null) : null;
+      return `<figure class="gw-pad-fig${panels ? "" : " gw-pad-blank"}" data-sketch="${place.key}"${panels ? ' data-drawn="1"' : ""}><div class="gw-pad-fig-h"><span class="n">${place.n}</span>${padEsc(titles[place.key] || "")}</div><div class="gw-pad-panels">${panels || `<p class="gw-pad-none">${padEsc(text.blank || "")}</p>`}</div></figure>`;
+    };
+  el.dataset.loop = "notepad";
+  el.innerHTML =
+    `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><filter id="gw-pad-pencil" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="4" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.2 1.75" result="g"/><feComposite in="SourceGraphic" in2="g" operator="in"/></filter></defs></svg>` +
+    (intro ? `<p class="gw-pad-intro">${padEsc(text.intro || "")}</p>` : "") +
+    `<div class="gw-pad-sheet${animate.length ? " gw-pad-anim" : ""}"><div class="gw-pad-coils">${padCoils()}</div>` +
+    ["where", "suspects", "gear"]
+      .map(
+        (p) =>
+          `<section class="gw-pad-page${p === page ? " gw-on" : ""}" data-page="${p}"><div class="gw-pad-head"><h2>${padEsc(pages[p] || p)}</h2><small>Mossmere</small></div>${PAD_PLACES.filter(
+            (x) => x.page === p,
+          )
+            .map(fig)
+            .join("")}</section>`,
+      )
+      .join("") +
+    `</div><nav class="gw-pad-tabs">${["where", "suspects", "gear"]
+      .map(
+        (p) =>
+          `<button type="button" class="gw-pad-tab${p === page ? " gw-on" : ""}" data-page="${p}">${padEsc(pages[p] || p)}</button>`,
+      )
+      .join(
+        "",
+      )}</nav><p class="gw-pad-next"><span>${padEsc(text.nextHead || "")}</span><em>${padEsc(text.next?.[view.next] || "")}</em></p>`;
+  for (let tab of el.querySelectorAll(".gw-pad-tab"))
+    tab.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      for (let x of el.querySelectorAll("[data-page]"))
+        x.classList.toggle("gw-on", x.dataset.page === tab.dataset.page);
+    });
+  if (close) {
+    let btn = h("button", "gw-btn gw-btn--primary gw-pad-close");
+    (btn.type = "button"), (btn.dataset.autofocus = "1"), (btn.textContent = text.close || "Got it");
+    btn.addEventListener("click", () => close()), el.appendChild(btn);
+  }
+  return el;
+}
+// The hunt's lines at a tally: the tale (the narrator, then Murk), or Murk's word about Hob.
+function tallyHuntBlock(h, text, beat, now) {
+  let el = h("div", `gw-tally-hunt${now ? " gw-in" : ""}`),
+    add = (cls, words) => {
+      if (!words) return;
+      let p = h("p", cls);
+      (p.textContent = words), el.appendChild(p);
+    };
+  return (
+    (el.dataset.loop = "tallyhunt"),
+    beat.tale && (add("gw-tally-tale", text.tale), add("gw-murk-line gw-in", text.murk?.tale)),
+    beat.murk && add("gw-murk-line gw-in", text.murk?.[beat.murk]),
+    el
+  );
+}
+const NOTEPAD_CSS = `
+.gw-m-notepad .gw-modal-body { max-width: none; width: 100%; }
+.gw-pad-wrap { box-sizing: border-box; width: 100%; max-height: 100dvh; overflow-y: auto; padding: 18px 16px calc(16px + var(--sab, 0px)); display: flex; justify-content: center; }
+.gw-pad { position: relative; width: min(100%, 400px); margin: 0 auto; color: var(--ink); text-align: left; }
+.gw-pad-intro { margin: 0 0 18px; font: 400 17px/1.4 var(--f-body); color: var(--ink); text-shadow: var(--ink-shadow); text-wrap: pretty; }
+.gw-pad-sheet { position: relative; margin-top: 12px; color: rgb(38, 29, 44); }
+.gw-pad-page { position: relative; display: none; padding: 30px 14px 16px; border-radius: 3px 3px 6px 5px; background-color: rgb(238, 228, 210);
+  background-image: radial-gradient(ellipse 120% 100% at 50% 50%, rgba(0,0,0,0) 60%, rgba(120, 92, 70, .2) 100%);
+  box-shadow: 1px 1px 0 rgb(226, 214, 194), 2px 2px 0 rgb(214, 204, 190), 3px 3px 0 rgb(226, 214, 194), 4px 4px 0 rgb(206, 195, 180), 6px 6px 0 rgb(196, 184, 168), 8px 10px 22px rgba(0,0,0,.6); }
+.gw-pad-page.gw-on { display: block; }
+.gw-pad-page::after { content: ''; position: absolute; pointer-events: none; right: 0; bottom: 0; width: 26px; height: 26px; border-radius: 0 0 5px 0;
+  background: linear-gradient(135deg, rgba(0,0,0,0) 50%, rgba(160, 132, 100, .28) 50%, rgb(214, 202, 184) 64%, rgb(232, 221, 202) 100%); }
+.gw-pad-coils { position: absolute; left: 14px; right: 14px; top: -11px; height: 30px; z-index: 4; pointer-events: none; }
+.gw-pad-coils svg { width: 100%; height: 100%; display: block; }
+.gw-pad-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 4px 3px; border-bottom: 1.5px solid rgba(38, 29, 44, .62); margin-bottom: 6px; }
+.gw-pad-head h2 { margin: 0; font: 400 24px/1.1 var(--f-fell); letter-spacing: .05em; color: rgb(38, 29, 44); }
+.gw-pad-head small { font: italic 400 15px/1 var(--f-body); color: rgba(38, 29, 44, .62); }
+.gw-pad-tabs { display: flex; gap: 6px; padding: 0 10px; margin-top: -2px; position: relative; z-index: 3; }
+.gw-pad-tab { flex: 1 1 0; min-height: 48px; padding: 9px 4px 8px; border: 0; cursor: pointer; border-radius: 0 0 8px 8px; font: 400 15px/1.1 var(--f-fell); letter-spacing: .03em;
+  color: rgba(38, 29, 44, .62); background: rgb(214, 202, 184); box-shadow: 0 6px 12px rgba(0,0,0,.45); transform: translateY(-3px); }
+.gw-pad-tab.gw-on { background: rgb(238, 228, 210); color: rgb(38, 29, 44); transform: none; padding-top: 11px; }
+.gw-pad-fig { position: relative; margin: 4px 0 14px; }
+.gw-pad-fig + .gw-pad-fig { margin-top: 18px; }
+.gw-pad-fig-h { display: flex; align-items: baseline; gap: 8px; margin: 0 2px 2px; font: 400 15px/1.2 var(--f-fell); letter-spacing: .06em; color: rgba(38, 29, 44, .62); }
+.gw-pad-fig-h .n { font: 400 20px/1 var(--f-hand); color: rgb(38, 29, 44); min-width: 14px; }
+.gw-pad-blank .gw-pad-fig-h, .gw-pad-blank .gw-pad-fig-h .n { color: rgba(38, 29, 44, .3); }
+.gw-pad-none { display: flex; align-items: center; justify-content: center; min-height: 96px; margin: 4px 10px; border: 1.5px dashed rgba(38, 29, 44, .13); border-radius: 4px;
+  font: italic 400 15px/1 var(--f-body); color: rgba(38, 29, 44, .3); }
+.gw-pad-cap { margin: 2px 6px 0; text-align: center; font: 400 19px/1.22 var(--f-hand); color: rgb(38, 29, 44); transform: rotate(-1deg); }
+.gw-pad-end { margin-top: 10px; }
+.gw-pad-end .gw-pad-box { width: 80%; margin: 0 auto; transform: rotate(-2.5deg); }
+.gw-pad-end .gw-pad-cap { font-size: 17.5px; margin-top: 0; }
+.gw-pad-sk { display: block; width: 100%; height: auto; overflow: visible; }
+.gw-pad-sk .pl { fill: none; stroke: rgb(48, 41, 56); stroke-linecap: round; stroke-linejoin: round; }
+.gw-pad-sk .pl.g { opacity: .3; }
+.gw-pad-sk .pl.f { opacity: .55; }
+.gw-pad-sk .pl.d { opacity: .72; }
+.gw-pad-sk .pl.h { opacity: .46; }
+.gw-pad-sk .pp { fill: rgb(238, 228, 210); stroke: none; }
+.gw-pad-sk .tape { fill: rgba(232, 214, 160, .62); stroke: rgba(140, 116, 70, .35); stroke-width: .3; }
+.gw-pad-sk text { font-family: var(--f-hand); fill: rgb(48, 41, 56); }
+.gw-pad-sk text.f { opacity: .7; }
+/* drawing in: each stroke after the one before, its words wiped in after it */
+.gw-pad-anim .pl { stroke-dasharray: 1 2; animation: gwPadDraw var(--t, .3s) ease-out var(--d, 0s) both; }
+.gw-pad-anim .pp, .gw-pad-anim .tape { animation: gwPadShow .3s ease-out var(--d, 0s) both; }
+.gw-pad-anim text, .gw-pad-anim .gw-pad-cap { animation: gwPadInk .8s ease-out var(--d, 0s) both; }
+@keyframes gwPadDraw { 0% { stroke-dashoffset: 1; visibility: hidden; } 1% { visibility: visible; } 100% { stroke-dashoffset: 0; visibility: visible; } }
+@keyframes gwPadShow { from { opacity: 0; } }
+@keyframes gwPadInk { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .gw-pad-anim .pl, .gw-pad-anim .pp, .gw-pad-anim .tape, .gw-pad-anim text, .gw-pad-anim .gw-pad-cap { animation: none; } }
+.gw-pad-next { margin: 18px 0 0; padding: 10px 4px; text-align: center; font: italic 400 16px/1.35 var(--f-body); color: var(--ink-dim);
+  border-top: 1px solid rgba(174, 172, 208, .2); border-bottom: 1px solid rgba(174, 172, 208, .2); }
+.gw-pad-next span { display: block; font: 400 12px/1.4 var(--f-display); letter-spacing: .16em; text-transform: uppercase; font-style: normal; color: var(--ink-faint); }
+/* the one press that closes it stays in reach at the foot of the screen */
+.gw-pad-close { position: sticky; bottom: calc(var(--sab, 0px) + 10px); z-index: 5; display: block; margin: 16px auto 0; min-width: 160px; min-height: 48px;
+  border-radius: 999px; background: rgba(10, 12, 25, .9); box-shadow: 0 6px 18px rgba(4, 5, 12, .6); }
+.gw-m-hob .gw-modal-body { position: static; }
+.gw-hob-box { position: absolute; left: 50%; bottom: calc(var(--sab, 0px) + 28px); transform: translateX(-50%); box-sizing: border-box; width: min(400px, calc(100vw - 32px)); padding: 14px 20px 10px;
+  border-radius: 14px; color: var(--ink); text-align: left; pointer-events: auto;
+  background: radial-gradient(120% 90% at 0% 0%, rgba(120, 96, 60, .3), rgba(120, 96, 60, 0) 60%), rgb(19, 22, 50);
+  box-shadow: 0 12px 36px rgba(4, 5, 12, .72), 0 0 42px rgba(232, 190, 119, .14); }
+.gw-hob-tag { display: flex; align-items: center; gap: 6px; font: 400 13px/1 var(--f-display); letter-spacing: .24em; text-transform: uppercase; color: var(--gold, #e8be77); }
+.gw-hob-tag .gw-ico { width: 15px; height: 15px; }
+.gw-hob-text { margin: 9px 0 8px; font: italic 400 18px/1.42 var(--f-body); color: var(--ink); text-wrap: pretty; }
+.gw-hob-foot { display: flex; justify-content: flex-end; }
+.gw-hob-ok { min-height: 44px; padding: 0 22px; border: 0; border-radius: 999px; cursor: pointer; background: rgba(126, 129, 180, .26); color: var(--ink-hi, #fff);
+  font: 400 16px/1 var(--f-display); letter-spacing: .16em; text-transform: uppercase; }
+.gw-journal-pad { padding: 14px 16px 24px; }
+`;
+// The hunt on screen: Hob's talk when the raft comes near his lit lamp, the line when a sketch is drawn, and the
+// notepad opening by itself at home after a tally that has something new for it.
+function huntView(K) {
+  let { ctx: t } = K,
+    D = () => (typeof K.D == "function" ? K.D() : t.data) || {},
+    text = () => D().TEXT_LOOP?.hunt || {},
+    report = (what, err) => {
+      try {
+        K.report?.(`hunt.${what}`, err);
+      } catch {}
+    },
+    call = (name, ...args) => {
+      let p = t.progression,
+        loop = p && !p.isStub && p.loop && !p.loop.isStub ? p.loop : null;
+      try {
+        return typeof loop?.[name] == "function" ? loop[name](...args) : null;
+      } catch (err) {
+        return report(name, err), null;
+      }
+    },
+    // armed: the raft has been away from Hob since he last spoke; padWait: time at home with nothing open.
+    state = { armed: !0, padWait: 0, talks: 0 };
+  if (typeof document < "u" && !document.getElementById("gw-notepad-css")) {
+    let style = document.createElement("style");
+    (style.id = "gw-notepad-css"), (style.textContent = NOTEPAD_CSS), document.head.appendChild(style);
+  }
+  let isle = () => {
+      let zone = D().ZONE_BY_ID?.mossmere || (D().ZONES || []).find((z) => z?.id === "mossmere");
+      return (zone?.arena?.islands || []).find((i) => i?.name === "Mossbell Isle") || null;
+    },
+    // Hob waits until nothing is on screen and the line is in, so he never cuts into a bite or a card.
+    free = () => {
+      let f = t.fishing;
+      return !K.top?.() && !t.paused && !t.cinematic && (!f || f.isStub || f.state === "idle");
+    };
+  function openHob(talk) {
+    let hob = text().hob || {},
+      boxes = talk.first
+        ? (hob.first || []).slice(0, talk.first)
+        : talk.line
+          ? [hob.nights?.[talk.line]]
+          : [hob.greeting];
+    if (!(boxes = boxes.filter(Boolean)).length) return;
+    let at = 0,
+      words = null,
+      ok = null,
+      done = () => {
+        K.closeModal("hob"), K.sfx?.("ui_click", { volume: 0.45 });
+        talk.drew &&
+          K.toast?.(text().drawn || "", "lore", {
+            icon: "quill",
+            cls: "gw-toast--loop gw-toast--drawn",
+            dur: 4600,
+          });
+      },
+      step = () => {
+        if (++at >= boxes.length) return done();
+        (words.textContent = boxes[at]), (ok.textContent = at === boxes.length - 1 ? hob.ok : hob.next);
+        K.sfx?.("ui_click", { volume: 0.35 });
+      };
+    state.talks++;
+    K.openModal(
+      "hob",
+      (M, A) => {
+        let box = K.h("div", "gw-hob-box");
+        (box.dataset.loop = "hob"),
+          box.setAttribute("role", "note"),
+          (box.innerHTML = `<div class="gw-hob-tag">${K.icon ? K.icon("lantern") : ""}<span></span></div><p class="gw-hob-text"></p><div class="gw-hob-foot"><button type="button" class="gw-hob-ok" data-autofocus="1"></button></div>`),
+          (box.querySelector(".gw-hob-tag span").textContent = hob.tag || "Hob"),
+          (words = box.querySelector(".gw-hob-text")),
+          (ok = box.querySelector(".gw-hob-ok")),
+          (words.textContent = boxes[at]),
+          (ok.textContent = boxes.length > 1 ? hob.next : hob.ok),
+          ok.addEventListener("click", step),
+          A.appendChild(box);
+      },
+      {
+        blocking: !0,
+        quiet: !0,
+        dismissable: !1,
+        cls: "gw-m-guide gw-m-hob",
+        onEscape: () => done(),
+        onKey: (k) => (k === "Enter" || k === "Space" || k === "NumpadEnter" ? (step(), !0) : k !== "Tab"),
+      },
+    );
+    K.sfx?.("ui_open", { volume: 0.4 });
+  }
+  function closePad() {
+    K.has?.("notepad") &&
+      (call("notepadShown"), K.closeModal("notepad"), K.sfx?.("ui_click", { volume: 0.45 }));
+  }
+  function openPad(view) {
+    if (K.has?.("notepad")) return !1;
+    let page = view.unseen.length ? padPageOf(view.unseen[0]) : "where";
+    return (
+      K.openModal(
+        "notepad",
+        (M, A) => {
+          let wrap = K.h("div", "gw-pad-wrap gw-scroll");
+          wrap.appendChild(
+            notepadElement(K.h, text().pad || {}, view, {
+              page,
+              animate: view.unseen,
+              intro: view.intro,
+              close: closePad,
+            }),
+          ),
+            A.appendChild(wrap);
+        },
+        {
+          cls: "gw-m-center gw-m-notepad",
+          dismissable: !1,
+          onEscape: () => closePad(),
+          onKey: (k) => (k === "Enter" || k === "Space" || k === "NumpadEnter" ? (closePad(), !0) : !1),
+        },
+      ),
+      K.sfx?.("ui_open", { volume: 0.4 }),
+      !0
+    );
+  }
+  function update(dt) {
+    let run = t.state?.run,
+      pos = t.player?.position,
+      spot = isle();
+    if (
+      t.flow === "playing" &&
+      run?.outing === "trip" &&
+      run.zone === "mossmere" &&
+      spot &&
+      Number.isFinite(pos?.x)
+    ) {
+      let rule = D().LOOP?.hunt || {},
+        dist = Math.hypot(pos.x - spot.x, pos.z - spot.z),
+        talk = null;
+      dist > (rule.hobLeave ?? 16)
+        ? (state.armed = !0)
+        : state.armed &&
+          dist <= (rule.hobReach ?? 12) &&
+          free() &&
+          call("hobLampLit") === !0 &&
+          ((state.armed = !1), (talk = call("hobTalk")), talk && openHob(talk));
+    } else t.flow !== "playing" && (state.armed = !0);
+    // At home after a tally, once the jetty is up and nothing else is: the notepad opens by itself.
+    if (t.flow === "home" && K.top?.()?.id === "jetty" && !K.has?.("tally")) {
+      if ((state.padWait += Math.max(0, Math.min(0.25, Number(dt) || 0))) > 0.8) {
+        state.padWait = 0;
+        let view = call("notepad");
+        view?.due && openPad(view);
+      }
+    } else state.padWait = 0;
+  }
+  return {
+    update,
+    // The notepad in the Journal's Notepad tab: drawn still, nothing to operate.
+    renderJournal(content) {
+      let view = call("notepad");
+      if (!view) return;
+      let wrap = K.h("div", "gw-journal-pad");
+      wrap.appendChild(notepadElement(K.h, text().pad || {}, view, {})), content.appendChild(wrap);
+    },
+    openPad: () => {
+      let view = call("notepad");
+      return !!view && openPad(view);
+    },
+    debug: () => ({
+      armed: state.armed,
+      talks: state.talks,
+      hob: K.has?.("hob") === !0,
+      pad: K.has?.("notepad") === !0,
+    }),
+  };
+}
 function WV(e) {
   let { ctx: t, h: n, D: o, safe: a } = e,
     s = e.esc || Tw,
@@ -163461,6 +164494,10 @@ function WV(e) {
         giftShown.fit && (g.querySelector(".gw-tally-gift-fit").textContent = giftShown.fit),
         Tt.querySelector(".gw-tally")?.appendChild(g);
     }
+    // The hunt's moment at this tally (the tale, or Murk's word about Hob), shown like the gift.
+    let huntBeat = qt.tally?.hunt;
+    huntBeat &&
+      Tt.querySelector(".gw-tally")?.appendChild(tallyHuntBlock(n, f().hunt || {}, huntBeat, Le.empty));
     let Ct = Tt.querySelector(".gw-tally-rows");
     Le.rows.forEach((We, at) => {
       let ct = n(
@@ -163555,6 +164592,7 @@ function WV(e) {
     let Ft = Le >= Ht.totalAt,
       Ct = qt.querySelector(".gw-tally-total");
     qt.querySelector(".gw-tally-gift")?.classList.toggle("gw-in", Ft);
+    qt.querySelector(".gw-tally-hunt")?.classList.toggle("gw-in", Ft);
     if (Ct) {
       Ct.classList.toggle("gw-on", Ft);
       let ct = Ct.querySelector(".gw-tally-plus"),
@@ -168980,7 +170018,13 @@ function YV(e) {
             : te.includes(ke)
               ? ke
               : te[0],
-        tab: K.tab === "giants" || K.tab === "prints" || (K.tab === "sheet" && z()) ? K.tab : "water",
+        tab:
+          K.tab === "giants" ||
+          K.tab === "prints" ||
+          (K.tab === "notepad" && c(() => t.progression?.loop?.notepad?.(), null)) ||
+          (K.tab === "sheet" && z())
+            ? K.tab
+            : "water",
         view: Ce ? "species" : "page",
         sel: Ce?.id || null,
         hl: K.hl || null,
@@ -169004,8 +170048,14 @@ function YV(e) {
           onKey: (Mt) => {
             let zt = e.top();
             if (!zt || zt.id !== "journal" || zt.state.view !== "page" || zt.state.big) return !1;
-            let Ut = [...(z() ? ["sheet"] : []), ...te, "prints", "giants"],
-              on = (Ue) => Ue === "giants" || Ue === "prints" || Ue === "sheet",
+            let Ut = [
+                ...(z() ? ["sheet"] : []),
+                ...te,
+                ...(c(() => t.progression?.loop?.notepad?.(), null) ? ["notepad"] : []),
+                "prints",
+                "giants",
+              ],
+              on = (Ue) => Ue === "giants" || Ue === "prints" || Ue === "sheet" || Ue === "notepad",
               ae = on(zt.state.tab) ? zt.state.tab : zt.state.zone;
             return E(
               zt,
@@ -169129,11 +170179,14 @@ function YV(e) {
         let bt = m4(ue(vt), d());
         return { id: vt, label: se(vt).replace(/^The /, ""), badge: bt ? bt.head.count : "" };
       });
+    // The notepad, once the tale is told or a sketch is drawn (mossmere-hunt-2.md section 2).
+    c(() => t.progression?.loop?.notepad?.(), null) &&
+      Oe.push({ id: "notepad", label: d().TEXT_LOOP?.hunt?.pad?.tab || "Notepad" });
     Oe.push({ id: "prints", label: qe.tabs?.prints || "Prints" }),
       Oe.push({ id: "giants", label: "", icon: "star" });
     let ut = z();
     ut && Oe.unshift({ id: "sheet", label: ut.title() });
-    let Ot = (vt) => vt === "giants" || vt === "prints" || vt === "sheet",
+    let Ot = (vt) => vt === "giants" || vt === "prints" || vt === "sheet" || vt === "notepad",
       Yt = Ot(te.tab) ? te.tab : te.zone,
       Jt = L(Oe, Yt, (vt) => {
         Ot(vt) ? (te.tab = vt) : ((te.tab = "water"), (te.zone = vt)),
@@ -169220,6 +170273,7 @@ function YV(e) {
         ((K.state.picks = { ...(K.state.picks || {}), ...te.sheetView }), (te.sheetView = null)),
         c(() => ut.render(K, on), null);
     else if (te.tab === "giants") De(K, on, U);
+    else if (te.tab === "notepad") c(() => e.loop?.hunt?.renderJournal?.(on), null);
     else if (te.tab === "prints") {
       let vt = c(() => t.progression?.loop?.prints?.(U), null);
       bV({
@@ -173412,6 +174466,12 @@ function Npe(e) {
     } catch (U) {
       l("guide view", U);
     }
+  if (et)
+    try {
+      et.hunt = huntView(Mn);
+    } catch (U) {
+      l("hunt view", U);
+    }
   let kt = null;
   if (s)
     try {
@@ -173858,6 +174918,12 @@ function Npe(e) {
           et.guide.update(Oe);
         } catch (ut) {
           l("guide view", ut);
+        }
+      if (et?.hunt)
+        try {
+          et.hunt.update(Oe);
+        } catch (ut) {
+          l("hunt view", ut);
         }
       if (kt)
         try {
