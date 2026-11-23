@@ -1,5 +1,7 @@
 # Mossmere gear: one new part, one new bait, one picture
 
+> **Two promises here were overruled** (see `decisions.md`, "Rulings during the build, 22 November 2026"). Nothing fills a saved rig for the player: Murk's Sounding Lead goes in the kit and the tally says how to fit it. Each lake keeps its own tackle and clams. The rest stands as approved, with the changes `decisions.md` lists.
+
 **The proposal.** Mossmere gets one new rig part, **Depth**, with two options:
 - the **Cork Float**, which is everyone's rig today;
 - the **Sounding Lead**, which lays the bait on the bottom and tells you how deep it is.
@@ -9,7 +11,7 @@ It also gets one new bait, the **Live Minnow**, which you catch yourself. Heartm
 ## How it plays
 
 - **Evening 1.** Today's game. The tutorial shows the rig picture once: rod, reel, line, cork, worms.
-- **First tally.** Murk hands over a Sounding Lead: *"Not every fish looks up. A lead takes your worm down to the ones that don't."* It is saved as Rig 2, "Bottom · Worms".
+- **First tally.** Murk hands over a Sounding Lead: *"Not every fish looks up. A lead takes your worm down to the ones that don't."* It goes in your kit, and the tally says how to fit it.
 - **Evening 2.** One tap on the rig chip fits Rig 2. The float vanishes. The line slants into the water, and a small brass bell sits on the rod tip. After the cast a word appears: *Deep*. Crayfish and Rustfin Suckers come more often. The tip knocks, the bell tinkles, and the rod pulls round.
 - A Dusk Minnow's catch card shows **Into the tin (3 left)**. With a live minnow on, the cork wanders as it swims. A Mossback Perch takes it, then a Reedjaw Pike.
 - In the Bell Pool after dark the rig fails. That part gets a red notch on the picture, and the swirl on the water says why.
@@ -229,7 +231,7 @@ Dropped: the Barge Hook, the Mere Hook cap, the Skimmer Cork, lure running depth
 - **Red notch and brass tick.** They come from `legend:refused` and from a take.
 - **Where it lives.** It replaces the Sheet's Tackle page (`pages = { buffs, tackle, raft, home, odds, rivals }`; clues §7) and Murk's Tackle tab. The Overview, Raft, Home, Odds and Rivals pages stay.
 - **Controller.** The stick moves between nodes and A opens the tray, following `gw-padfocus` (handoff "Controller input around Home").
-- **Saved rigs.** Rig 1 is "Cork · Worms". Rig 2 is filled automatically by the lead gift. Rig 3 is free. When bait runs out, the tab greys its bait icon and the rig fishes bare, as today.
+- **Saved rigs.** Rig 1 is "Cork · Worms". Rigs 2 and 3 are free: nothing fills a rig for the player (decisions.md, 22 November 2026). When bait runs out, the tab greys its bait icon and the rig fishes bare, as today.
 
 ### B7. Generated text
 

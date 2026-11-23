@@ -1,5 +1,7 @@
 # Clue surfaces in Gloomwater (key: clues)
 
+> **Out of date.** This map describes the game of 21 November 2026. Her hunt has been redesigned since: she is the Bellhead Catfish (never "the Matriarch"), the Worm Bunch replaced Heartmoss, the notepad's five sketches replaced the Case page and the bell hints, and the midnight bell tells the player when she feeds. See `docs/design/decisions.md` (it wins over this file) and `docs/design/mossmere-hunt-2.md`. Section 1.5 (escapes are not recorded on a trip) is still true.
+
 Scope: every way the game already tells the player something they can act on. Raw material for a River Monsters style hunt loop (one target monster per lake).
 
 Conventions

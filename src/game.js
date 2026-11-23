@@ -47738,6 +47738,8 @@ Ca.rig = {
     bait: "Lands up to {class}: the bait is the limit.",
     bare: "Lands up to {class}: the bare hook is the limit.",
   },
+  // Read out with a part's label when it carries the red notch or the brass tick.
+  marks: { notch: "This one failed.", tick: "This one worked." },
   here: "Here, now",
   hereNone: "None of the fish you have caught bite this rig here and now.",
   unmet: {
@@ -48211,6 +48213,12 @@ function legendLanded(loop, speciesId) {
     Number(loop?.legends?.[speciesId]) > 0 ||
     (speciesId === "belled_matriarch" && Number(loop?.hunt?.mossmere?.landed) > 0)
   );
+}
+// How many landings make a legend's fight harder (LEGEND growthPerLanding). The fight and the Odds page both
+// read this one count. Today she does not grow, so it is 0: whether she should is with the designer.
+function legendGrowthLandings(meta, speciesId) {
+  // To switch growth on, return the landings instead: Number(meta?.journal?.[speciesId]?.caught) | 0.
+  return 0;
 }
 // The hook-up banner's words for a legend: her name and title, or "Something ancient." while she is the thief.
 function legendBannerWords(meta, data, species) {
@@ -49173,6 +49181,8 @@ Ca.murkTalk = { tag: "Murk", next: "Next", ok: "Got it" };
 Ca.leave = {
   title: "To {water}",
   stays: "Your tackle, rigs, raft parts, creels and clams stay in this lake.",
+  // Said plainly, since a player just paid the 900 may expect to spend it in the new lake.
+  bounty: "Any bounty you were paid stays here too, with your clams.",
   keeps: "You start fresh in the new lake, with plain tackle.",
   wait: "It all waits here for you, just as you left it.",
   come: "Hob's Lamp and the things you found come with you.",
@@ -51534,7 +51544,8 @@ function nI(e) {
     let xe = Ze.loop;
     return xe && typeof xe == "object" && !xe.isStub ? xe : null;
   }
-  let v = { glide: null, sailing: !1, lift: null },
+  // sailRefused: a short word for the check that refused the last sail call (homeState), or null.
+  let v = { glide: null, sailing: !1, lift: null, sailRefused: null, failTrip: !1 },
     // The bird at midnight on Mossmere: played, skipped and put away here beside the place lifts.
     birdScene = birdSceneDirector(t, { report: o }),
     b = { thin: $l(m.lift?.thin, 3), title: $l(m.lift?.title, 1.2), back: $l(m.lift?.back, 0.6) },
@@ -51998,9 +52009,12 @@ function nI(e) {
         o("loop.leave", new Error(`the leaving card for ${Ze} could not show`));
         let gt = n?.TEXT_LOOP?.leave || {},
           Ae = n?.ZONE_BY_ID?.[Ze]?.name || Ze,
-          Me = [String(gt.title || "To {water}").replace("{water}", Ae), gt.stays, gt.keeps].filter(
-            (ve) => typeof ve == "string" && ve,
-          ).join(`
+          Me = [
+            String(gt.title || "To {water}").replace("{water}", Ae),
+            gt.stays,
+            gt.bounty,
+            gt.keeps,
+          ].filter((ve) => typeof ve == "string" && ve).join(`
 `);
         return typeof globalThis.confirm == "function" && p(() => globalThis.confirm(Me), !1) === !0
           ? tt()
@@ -52028,15 +52042,34 @@ function nI(e) {
         : ((v.sailing = !1), p(() => N?.towBarge?.(Ze)), l(), r(Ze), x(), Ne(dt))
     );
   }
+  // A sail call refused: the check's word is kept for homeState, and the caller (the chart's Sail) wakes again.
+  let sailNo = (why) => ((v.sailRefused = why), !1),
+    towing = () => p(() => (typeof e.tow == "function" ? e.tow()?.active?.() === !0 : !1), !1) === !0;
   function Ne(Ze = {}) {
-    if (v.sailing || !JS({ flow: t.flow, hasSavedTrip: c() })) return !1;
+    v.sailRefused = null;
+    // The sailing flag lives only as long as its sail-out glide or tow: with neither in flight it is stale (a
+    // glide or tow that never finished), so it is cleared rather than lock Sail for the rest of the visit.
+    v.sailing && v.glide?.kind !== "sailOut" && !towing() && (v.sailing = !1);
+    if (v.sailing) return sailNo("sailing");
+    if (!JS({ flow: t.flow, hasSavedTrip: c() })) return sailNo(c() ? "savedTrip" : "flow");
     let xe = (Ze && typeof Ze.water == "string" && Ze.water) || h,
       N = y();
-    if (N?.isOpen?.(xe) === !1) return !1;
+    if (N?.isOpen?.(xe) === !1) return sailNo("closed");
     if (t.flow === "home") {
       let $ = J(xe, Ze, N);
-      if ($ !== null) return $;
+      if ($ !== null) return $ === !1 && !v.sailRefused ? sailNo("tow") : $;
     }
+    let _e = !!Ze && typeof Ze == "object" && Object.prototype.hasOwnProperty.call(Ze, "place"),
+      rt = _e ? Ze.place : null;
+    if (!_e) {
+      let $ = p(() => N?.pick?.(), null);
+      $ && $.water === xe && (rt = $.place);
+    }
+    if (typeof rt != "string" || !rt) rt = null;
+    let dt = !!rt && (p(() => N?.state?.()?.maps?.places, null) || []).includes(rt);
+    // The last check that can refuse comes before anything is closed, so a refused Sail leaves the screen as it was.
+    if (rt && !dt && m.places?.[rt]?.secret === !0) return sailNo("secret");
+    _e && p(() => N?.setPick?.({ water: xe, place: rt }), null);
     if (N?.tutorial?.()?.done !== !0)
       try {
         N?.tutorialDone?.();
@@ -52044,16 +52077,6 @@ function nI(e) {
         o("loop.tutorialDone", $);
       }
     P(), t.flow !== "home" && (r(xe), s(), (t.state.run = null), (t.paused = !1), a("home"), x());
-    let _e = !!Ze && typeof Ze == "object" && Object.prototype.hasOwnProperty.call(Ze, "place"),
-      rt = _e ? Ze.place : null;
-    if (!_e) {
-      let $ = p(() => N?.pick?.(), null);
-      $ && $.water === xe && (rt = $.place);
-    }
-    (typeof rt != "string" || !rt) && (rt = null),
-      _e && p(() => N?.setPick?.({ water: xe, place: rt }), null);
-    let dt = !!rt && (p(() => N?.state?.()?.maps?.places, null) || []).includes(rt);
-    if (rt && !dt && m.places?.[rt]?.secret === !0) return (v.sailing = !1), !1;
     let G = dt ? z(rt) : null,
       Ve = O(),
       tt = S(),
@@ -52089,8 +52112,14 @@ function nI(e) {
         E("place:veil", { placeId: rt, phase: "glide" });
     }
     (v.sailPlace = oe || Re ? rt : null), (v.sailing = !0);
+    // After the glide: the trip starts. If it is refused, the raft goes back to the dock and the jetty opens again,
+    // so the player is never left at home with nothing to press.
     let q = () => {
-      v.sailing && ((v.sailing = !1), Ye({ water: xe, at: { position: k, yaw: F } }) || x());
+      if (!v.sailing) return;
+      v.sailing = !1;
+      let failTrip = v.failTrip === !0;
+      if (((v.failTrip = !1), !failTrip && Ye({ water: xe, at: { position: k, yaw: F } }))) return;
+      (v.sailRefused = "trip"), x(), t.flow === "home" && p(() => t.ui?.loop?.openJetty?.());
     };
     return (
       B(ge, {
@@ -52147,6 +52176,18 @@ function nI(e) {
     gliding: () => (v.glide ? v.glide.kind : null),
     get sailing() {
       return v.sailing;
+    },
+    get sailRefused() {
+      return v.sailRefused;
+    },
+    // A tow dropped its done step (play left home mid-tow): the sailing flag it held goes with it.
+    towDropped: () => {
+      v.glide?.kind === "sailOut" || (v.sailing = !1);
+    },
+    // Debug only (behind the debug gate): "flag" leaves the sailing flag set with nothing in flight, as a glide or
+    // tow that never finished would; "trip" makes the next trip refuse to start after its sail-out glide.
+    debugSailStall: (kind) => {
+      kind === "flag" ? (v.sailing = !0) : kind === "trip" && (v.failTrip = !0);
     },
     update: X,
     skipLift: _,
@@ -57502,6 +57543,7 @@ function uI(e) {
       }
   }
   function Se() {
+    let dropped = !!g.onDone;
     i(() => d()?.close?.()),
       i(() => d()?.dip?.(0)),
       B(!1),
@@ -57511,6 +57553,8 @@ function uI(e) {
       (g.onDone = null),
       p("cancel"),
       (g.phase = null);
+    // The done step was a sail's (it set the home's sailing flag); it will never run now, so the flag is cleared.
+    dropped && i(() => a()?.towDropped?.());
   }
   function ye() {
     if (!g.begun) {
@@ -107425,6 +107469,48 @@ function noteHerLoss(record, reason, evening) {
 function noteHerLanded(record, evening) {
   Ln(record) && !record.sketches.back && drawHuntSketch(record, "back", evening);
 }
+// ---- The rig picture's marks (mossmere-gear.md "When something fails" and B6) -----------------------------------
+// A red notch on a piece that failed (a fish got away because of it, or she refused it) and a brass tick on a piece
+// she has proven right (she took it, or it held while she was on). Each is kept in the save as "part:piece"
+// (loop.rigMarks), and the picture shows it only while that piece is fitted, so changing the part takes the mark
+// off. A piece with a tick is never notched later. Landing her clears every notch.
+function rigPieceNow(loop, part) {
+  let fitted = Ln(loop?.fitted) ? loop.fitted : {};
+  if (part === "depth") return fitted.depth === "lead" ? "sounding_lead" : "cork_float";
+  if (part === "leader" || part === "hook")
+    return Sr(loop?.parts).includes(fitted[part])
+      ? fitted[part]
+      : part === "leader"
+        ? "plain_knot"
+        : "mere_hook";
+  if (!Ug.includes(part)) return null;
+  let found = o1(loop, vg, part);
+  if (found) return found;
+  let tier = ju(vg, loop, part);
+  return jr(vg, al(vg, loop), part)[tier]?.id ?? vg.TACKLE?.[part]?.[tier]?.id ?? `${part}_${tier}`;
+}
+function rigMarksOf(loop) {
+  let m = Ln(loop?.rigMarks) ? loop.rigMarks : {};
+  return { notch: Sr(m.notch), tick: Sr(m.tick) };
+}
+function markRigPiece(loop, kind, part, piece) {
+  if (!Ln(loop) || typeof part != "string" || typeof piece != "string" || !piece) return;
+  let m = Ln(loop.rigMarks) ? loop.rigMarks : (loop.rigMarks = {}),
+    id = `${part}:${piece}`;
+  (m.notch = Sr(m.notch)), (m.tick = Sr(m.tick));
+  kind === "tick"
+    ? (m.tick.includes(id) || m.tick.push(id), (m.notch = m.notch.filter((x) => x !== id)))
+    : m.tick.includes(id) || m.notch.includes(id) || m.notch.push(id);
+}
+// Her loss to a part ("hook", "leader", "line") notches it and ticks the parts that held before it; a loss with
+// everything held ("fight") ticks all three.
+function markHerLoss(loop, reason) {
+  let at = HER_RIG.order.indexOf(reason);
+  if (at < 0 && reason !== "fight") return;
+  for (let [k, part] of HER_RIG.order.entries())
+    (at < 0 || k < at) && markRigPiece(loop, "tick", part, rigPieceNow(loop, part));
+  at >= 0 && markRigPiece(loop, "notch", reason, rigPieceNow(loop, reason));
+}
 // ---- The end of the hunt (mossmere-hunt-2.md sections 1, 5 and 6, B4 to B6) ----------------------------------
 // Whether she has been landed in this save's hunt (an older save that sold her counts once it is loaded).
 function huntLanded(loop) {
@@ -107461,6 +107547,9 @@ function markHerLanded(loop, evening) {
   let record = huntRecordOf(loop);
   if (!record) return !1;
   noteHerLanded(record, evening);
+  // Landed: every part she pulled against held, and nothing on the rig failed.
+  markHerLoss(loop, "fight");
+  Ln(loop.rigMarks) && (loop.rigMarks.notch = []);
   if (record.landed > 0) return !1;
   (record.landed = Math.max(1, ha(evening))), (record.landedBy = "catch");
   layMonsterChart(loop, MIDNIGHT.legend);
@@ -109230,9 +109319,23 @@ function ordinaryLossWord(
   speciesId,
   { water = null, leader = null, hook = null, lure = !1, hardTake = !1 } = {},
 ) {
+  if (!Ln(run)) return null;
+  let kind = ordinaryLossKind(loop, speciesId, { water, leader, hook, lure, hardTake });
+  if (!kind) return null;
+  let flags = Ln(run.flags) ? run.flags : (run.flags = {}),
+    said = Ln(flags.partWords) ? flags.partWords : (flags.partWords = {});
+  return said[kind] ? null : ((said[kind] = !0), Ca.partLoss?.[kind] || null);
+}
+// The kind of loss an ordinary fish lost on a default part names, once Murk has the part that would have kept it:
+// "toothy" or "rough" (the leader), "self" (the hook), or null.
+function ordinaryLossKind(
+  loop,
+  speciesId,
+  { water = null, leader = null, hook = null, lure = !1, hardTake = !1 } = {},
+) {
   let offered = (id) => Sr(loop?.parts).includes(id) || Sr(loop?.arrivals?.shelved).includes(id),
     kind = null;
-  if (typeof water != "string" || !Ln(run)) return null;
+  if (typeof water != "string") return null;
   !leader &&
     (leaderTags(speciesId, "pike_wire", water).includes("toothy") && offered("pike_wire")
       ? (kind = "toothy")
@@ -109246,10 +109349,7 @@ function ordinaryLossWord(
     bs[water]?.hookSet?.[localKindBase(speciesId)] === "self" &&
     offered("turnback_hook") &&
     (kind = "self");
-  if (!kind) return null;
-  let flags = Ln(run.flags) ? run.flags : (run.flags = {}),
-    said = Ln(flags.partWords) ? flags.partWords : (flags.partWords = {});
-  return said[kind] ? null : ((said[kind] = !0), Ca.partLoss?.[kind] || null);
+  return kind;
 }
 function a8(e, t, { hasTrip: n = !1 } = {}) {
   if (!Ln(e)) return e;
@@ -113177,7 +113277,7 @@ function FF(e) {
     return ge && !ap(F.legendWounds) && (F.legendWounds = {}), F.legendWounds || {};
   }
   let ye = (ge) => Math.min(be(), Se()[ge] | 0),
-    se = (ge) => o()?.journal?.[ge]?.caught | 0;
+    se = (ge) => legendGrowthLandings(o(), ge);
   function ne(ge) {
     if (!l() || e.isReplay() || e.species(ge)?.rarity !== "legendary") return 0;
     let k = Se(!0);
@@ -113193,7 +113293,8 @@ function FF(e) {
       reason === "line" && (hunt.lineLesson = true);
       speciesId === MIDNIGHT.legend &&
         loss.zone === MIDNIGHT.water &&
-        noteHerLoss(hunt, reason, Math.max(1, Math.trunc(Number(a()?.evening) || 0)));
+        (noteHerLoss(hunt, reason, Math.max(1, Math.trunc(Number(a()?.evening) || 0))),
+        hunt.landed > 0 || markHerLoss(u(), reason));
     }
     return HER_RIG.order.includes(reason) ? 0 : ne(speciesId);
   }
@@ -134419,7 +134520,7 @@ function Y0e(e) {
               : part === "bunch"
                 ? "bunch"
                 : null;
-    return { ...answer, part, key: part === "lesson" ? `lesson:${taught}` : part, text, swirl };
+    return { ...answer, part, key: part === "lesson" ? `lesson:${taught}` : part, text, swirl, lure, taught };
   }
   // A refusal seen on the water: the big swirl under the rig (the rival's wake at twice the size), and its line once
   // a night for each part (every time on the second evening of the sketch 4 nudge), or, the first time, sketch 4
@@ -134428,6 +134529,17 @@ function Y0e(e) {
     let run = h(),
       record = huntRecordOf(e.state?.meta?.loop);
     if (!answer?.part || answer.part === "gate" || !record || !run) return null;
+    // The part she refused gets the red notch on the rig picture.
+    let loop = e.state?.meta?.loop,
+      refused = {
+        lure: ["lure", answer.lure],
+        depth: ["depth", "cork_float"],
+        bait: ["bait", answer.bait],
+        bunch: ["bait", answer.bait],
+        wire: ["leader", "pike_wire"],
+        lesson: [answer.taught, rigPieceNow(loop, answer.taught)],
+      }[answer.part];
+    refused && markRigPiece(loop, "notch", refused[0], refused[1]);
     let m = midnightFlags(run),
       evening = Math.max(1, Math.trunc(Number(run.evening) || 0)),
       boost = Number(record.nudged?.swirlBoost) || 0,
@@ -135144,7 +135256,7 @@ function Y0e(e) {
     let I = h(),
       Q = e.state?.meta || {},
       Pe = Bt((I?.outing === "descent" ? I?.legendWounds : Q.legendWounds)?.[R], 0),
-      Ke = Array.isArray(Q.records?.legendGrowth?.[R]) ? Q.records.legendGrowth[R].length : 0;
+      Ke = legendGrowthLandings(Q, R);
     return { wounds: Pe, landings: Ke };
   }
   function $e() {
@@ -135325,6 +135437,12 @@ function Y0e(e) {
       qn = !1;
     // One hook-up a night: her time closes for the evening once she is on the line.
     vn && At && Q.id === MIDNIGHT.legend && noteHerHookup(h());
+    // She took this cast herself (answerHerCast, then the bite): its depth and bait are proven right on the picture.
+    if (vn && At && Q.id === MIDNIGHT.legend && i.legendCast === !0) {
+      let loop = e.state?.meta?.loop;
+      markRigPiece(loop, "tick", "depth", i.castLead ? "sounding_lead" : "cork_float");
+      markRigPiece(loop, "tick", "bait", i.castBait || null);
+    }
     if (vn && Q.giant && !At)
       try {
         qn = N()?.takeGiantMark?.(Q.id) === !0;
@@ -136157,14 +136275,24 @@ function Y0e(e) {
     // night for each kind of loss. Words only: the odds behind the loss are unchanged. (Not for a theft: no part
     // of the rig let it go.)
     if (xe() && !Pe && !loss.overCap && !taken) {
-      const partLossText = ordinaryLossWord(e.state?.meta?.loop, h(), R.id, {
-        water: Yt(),
-        leader: i.castLeader ?? null,
-        hook: i.castHook ?? null,
-        lure: !!i.castVisualLure,
-        hardTake: !!i.hardTook,
-      });
+      const lossRig = {
+          water: Yt(),
+          leader: i.castLeader ?? null,
+          hook: i.castHook ?? null,
+          lure: !!i.castVisualLure,
+          hardTake: !!i.hardTook,
+        },
+        lossKind = ordinaryLossKind(e.state?.meta?.loop, R.id, lossRig),
+        partLossText = ordinaryLossWord(e.state?.meta?.loop, h(), R.id, lossRig);
       partLossText && (loss.partLossText = partLossText);
+      // The part the loss names gets the red notch on the rig picture (the default piece: no other was on).
+      lossKind &&
+        markRigPiece(
+          e.state?.meta?.loop,
+          "notch",
+          lossKind === "self" ? "hook" : "leader",
+          lossKind === "self" ? "mere_hook" : "plain_knot",
+        );
     }
     g("fish:escaped", loss);
     if (rival) {
@@ -164538,6 +164666,13 @@ function rigPicture(e, opts = {}, shelf = []) {
   for (let n of nodes) n.groups || (n.groups = [{ head: null, items: n.items }]), n.tray || (n.tray = n.head);
   let order = ["rod", "reel", "line", "depth", "leader", "hook", "bait", "lure"];
   nodes.sort((a, b) => order.indexOf(a.part) - order.indexOf(b.part));
+  // The red notch and the brass tick (rigMarksOf), on the piece fitted now only.
+  let marks = rigMarksOf(s);
+  for (let n of nodes) {
+    let id = `${n.part}:${n.key}`;
+    n.mark =
+      n.key == null ? null : marks.tick.includes(id) ? "tick" : marks.notch.includes(id) ? "notch" : null;
+  }
   return {
     ...m,
     nodes,
@@ -165042,6 +165177,11 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
 .gw-rig-feather { fill: #8f6a8c; stroke: var(--ink); stroke-width: 1; }
 .gw-rig-blade { fill: #d9d4e4; stroke: var(--ink); stroke-width: 1.2; }
 .gw-rig-pointer { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 2 4; }
+.gw-rig-notch { fill: #c4473c; stroke: var(--ink); stroke-width: 1; }
+.gw-rig-tick { fill: none; stroke: #d8b25a; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.gw-rig-notched .gw-rig-name::after, .gw-rig-ticked .gw-rig-name::after { content: ""; display: inline-block; width: 9px; height: 8px; margin-left: 6px; vertical-align: middle; }
+.gw-rig-notched .gw-rig-name::after { background: #c4473c; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.gw-rig-ticked .gw-rig-name::after { width: 9px; height: 5px; border: solid #d8b25a; border-width: 0 0 2.5px 2.5px; transform: rotate(-45deg) translateY(-2px); }
 .gw-rig-dot { fill: var(--ink-dim); }
 .gw-rig-hit { fill: transparent; stroke: none; pointer-events: all; cursor: pointer; }
 .gw-rig-node { position: absolute; left: 0; width: calc(146 / 360 * 100%); min-height: 48px; transform: translateY(-50%); display: flex; flex-direction: column;
@@ -165798,8 +165938,16 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       pointers = model.nodes
         .map((nd, k) => {
           let p = slice.anchors[nd.part === "lure" ? "bait" : nd.part];
+          // A notch is a small red wedge cut in beside the part; a tick is a short brass check.
+          let mark = !p
+            ? ""
+            : nd.mark === "notch"
+              ? `<path class="gw-rig-notch" data-part="${nd.part}" d="M${p[0] + 7} ${p[1] - 11} L${p[0] + 12} ${p[1] - 2} L${p[0] + 17} ${p[1] - 11} Z"/>`
+              : nd.mark === "tick"
+                ? `<path class="gw-rig-tick" data-part="${nd.part}" d="M${p[0] + 7} ${p[1] - 7} L${p[0] + 11} ${p[1] - 3} L${p[0] + 19} ${p[1] - 13}"/>`
+                : "";
           return p
-            ? `<path class="gw-rig-pointer" d="M${labelX} ${ys[k]} L${p[0]} ${p[1]}"/><circle class="gw-rig-dot" cx="${p[0]}" cy="${p[1]}" r="2.4"/>`
+            ? `<path class="gw-rig-pointer" d="M${labelX} ${ys[k]} L${p[0]} ${p[1]}"/><circle class="gw-rig-dot" cx="${p[0]}" cy="${p[1]}" r="2.4"/>${mark}`
             : "";
         })
         .join("");
@@ -165810,8 +165958,14 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         (b.dataset.part = nd.part),
         (b.dataset.key = nd.key ?? ""),
         b.setAttribute("aria-haspopup", "dialog"),
-        b.setAttribute("aria-label", `${nd.head}: ${nd.name}`),
+        b.setAttribute(
+          "aria-label",
+          [`${nd.head}: ${nd.name}`, nd.mark ? n()?.TEXT_LOOP?.rig?.marks?.[nd.mark] : null]
+            .filter(Boolean)
+            .join(". "),
+        ),
         (b.style.top = `${((ys[k] / h) * 100).toFixed(2)}%`);
+      nd.mark && (b.classList.add(`gw-rig-${nd.mark}ed`), (b.dataset.mark = nd.mark));
       let kind = a("span", "gw-rig-kind"),
         name = a("span", "gw-rig-name");
       (kind.textContent = nd.head), (name.textContent = nd.name), b.appendChild(kind), b.appendChild(name);
@@ -180392,7 +180546,7 @@ function tj(e) {
             let Xe = n("p", `gw-leave-line${Ne}`);
             return (Xe.textContent = J), le.appendChild(Xe), Xe;
           };
-          Ye(ne.stays || ""), Ye(ne.keeps || "", " gw-leave-keeps");
+          Ye(ne.stays || ""), ne.bounty && Ye(ne.bounty), Ye(ne.keeps || "", " gw-leave-keeps");
           let ee = Z.carry || {},
             pe = n("p", "gw-leave-carry");
           // The carried stats, shown only when there are any. Nothing is carried to a new lake now, so this row
@@ -183212,8 +183366,12 @@ ms &&
       atHome: Ba.atHome(),
       fresh: Ba.loopFresh(),
       sailPlace: li?.sailPlace ?? null,
+      // The check that refused the last sail call: sailing, flow, savedTrip, closed, tow, secret or trip.
+      sailRefused: li?.sailRefused ?? null,
       lift: li?.liftState?.() ?? null,
     }),
+    // Forces a stall for a test: "flag" (the sailing flag set, nothing in flight) or "trip" (the next trip refuses).
+    sailStall: (e) => (li?.debugSailStall?.(e), $t.debug.loop.homeState()),
     own(e = "all") {
       let t = Cd()?.state?.();
       if (!t || typeof t != "object") return null;

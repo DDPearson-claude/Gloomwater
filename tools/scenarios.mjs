@@ -738,6 +738,28 @@ async function rigScreen(session) {
   });
 }
 const closeTackle = (session) => session.eval(() => window.__gw.ui.loop.tackle.closeScreen());
+// The rig picture's marks where it is open (`sel`: the tackle screen's picture, or a RIG_HOST): each marked part's
+// label as "part:key:mark", and the parts the picture draws a red notch or a brass tick beside.
+const rigMarksShown = (session, sel = ".gw-rig") =>
+  session.eval((s) => {
+    const host = document.querySelector(s);
+    if (!host) return null;
+    const drawn = (cls) => [...host.querySelectorAll(cls)].map((p) => p.dataset.part).sort();
+    return {
+      labels: [...host.querySelectorAll(".gw-rig-node[data-mark]")]
+        .map((b) => `${b.dataset.part}:${b.dataset.key}:${b.dataset.mark}`)
+        .sort(),
+      notch: drawn(".gw-rig-notch"),
+      tick: drawn(".gw-rig-tick"),
+    };
+  }, sel);
+// The marks on the tackle screen's picture (opened from the rack, then closed).
+async function rigScreenMarks(session) {
+  await rigScreen(session);
+  const marks = await rigMarksShown(session);
+  await closeTackle(session);
+  return marks;
+}
 
 // The saved rigs' tabs on the tackle screen (opened from the rack): each one's label, name, whether it is pressed,
 // whether its bait has none left and whether its bait icon is greyed. Leaves the screen open.
@@ -2779,18 +2801,35 @@ const SCENARIOS = [
   },
 
   {
-    name: "hunt rules: on Waxed Silk she can be landed",
+    name: "hunt rules: on Waxed Silk she can be landed; after the landing her Odds row is the fight's own chance, and neither grows",
     fixture: "legend-sold",
     debug: true,
+    timeoutMs: 420_000,
     async run(session) {
       await session.toHome();
       await buyAtHome(session, ["line:1", "line:2"]);
       await fitHerParts(session);
       await session.sail();
+      // Her landing chance as the Odds page and the Journal read it (the same engine and count).
+      const oddsNow = () => session.eval((id) => window.__gw.debug.odds(id)?.odds?.legend ?? null, LEGEND_ID);
+      const before = await oddsNow();
       const landed = await hookAndPlayOut(session, LEGEND_ID, "land");
       check(landed.p > 0 && landed.p <= LANDING_CAP, `landing chance on Waxed Silk is ${landed.p}`);
       check(landed.landed === LEGEND_ID, `she was not landed: ${JSON.stringify(landed)}`);
-      return `landed at p ${landed.p.toFixed(3)}`;
+      await session.clickButton(/^\d?(Keep|Let go)\b/);
+      await session.pause(800);
+      await session.closeGuides(5000);
+      // Landed once more: the Journal counts her catch, but the fight does not grow, and the Odds row says so.
+      const after = await oddsNow();
+      const shown = await journalOdds(session);
+      const again = await hookAndPlayOut(session, LEGEND_ID, "land");
+      const pct = `${Math.floor(again.p * 100 + 1e-9)}%`;
+      check(
+        near(before, landed.p, 1e-9) && near(after, again.p, 1e-9) && near(again.p, landed.p, 1e-9),
+        `odds ${before} then ${after}; the fight ${landed.p} then ${again.p}`,
+      );
+      check(shown.includes(pct), `the Journal's odds read "${shown}", the fight plays ${pct}`);
+      return `the Odds row and the fight both ${landed.p.toFixed(4)} before and after the landing (${pct})`;
     },
   },
 
@@ -3712,6 +3751,72 @@ const SCENARIOS = [
         [...document.querySelectorAll(".gw-chart-hit")].map((h) => h.dataset.id),
       );
       return `the list (${before.list} rows) while the art loaded, then ${ids.length} tap areas: ${ids.join(" ")}`;
+    },
+  },
+
+  {
+    name: "sail: a trip refused after the sail-out glide brings the jetty back; with the sailing flag left set and nothing in flight, Sail from the chart still reaches the water",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.toHome();
+      const chartSail = () =>
+        session.eval((murkButton) => {
+          const button = (text) =>
+            [...document.querySelectorAll("button")].find(
+              (b) => b.getBoundingClientRect().width > 0 && b.textContent.trim() === text,
+            );
+          const murk = document.querySelector(murkButton);
+          if (murk) return murk.click(), "hear Murk";
+          if (button("Got it")) return button("Got it").click(), "close guide";
+          if (button("Sail")) return button("Sail").click(), "sail";
+          if (button("Chart") && !window.__gw.ui.isBlocking()) return button("Chart").click(), "chart";
+          return "wait";
+        }, MURK_BOX_BUTTON);
+      const home = () => session.eval(() => window.__gw.debug.loop.homeState());
+      // A refused trip: the next trip will not start. Chart, Sail, the glide out, then the jetty is back.
+      const armed = await session.eval(() => window.__gw.debug.loop.sailStall("trip"));
+      check(armed?.flow === "home" && !armed.sailing, `before the refused trip: ${JSON.stringify(armed)}`);
+      let pressed = null;
+      for (const end = Date.now() + 60_000 * SLOW; Date.now() < end && pressed !== "sail"; ) {
+        pressed = await chartSail();
+        await session.pause(500);
+      }
+      check(pressed === "sail", "the chart's Sail button never showed");
+      await session.waitFor(
+        "the refused trip",
+        60_000,
+        () => window.__gw.debug.loop.homeState().sailRefused === "trip",
+      );
+      await session.waitFor(
+        "the jetty back after the refused trip",
+        20_000,
+        () =>
+          !!document.querySelector('[data-loop="jetty"]') &&
+          [...document.querySelectorAll("button")].some(
+            (b) => b.getBoundingClientRect().width > 0 && b.textContent.trim() === "Chart",
+          ),
+      );
+      const refused = await home();
+      check(
+        refused.flow === "home" && !refused.sailing && !refused.glide,
+        `after the refused trip: ${JSON.stringify(refused)}`,
+      );
+      // The stuck state: the sailing flag set, no glide and no tow in flight. Sail from the chart still sails.
+      const stuck = await session.eval(() => window.__gw.debug.loop.sailStall("flag"));
+      check(stuck?.sailing === true && stuck.glide === null, `the stuck state: ${JSON.stringify(stuck)}`);
+      const actions = await session.sail();
+      const out = await session.eval(() => ({
+        flow: window.__gw.flow,
+        outing: window.__gw.state.run?.outing ?? null,
+        home: window.__gw.debug.loop.homeState(),
+      }));
+      check(
+        out.flow === "playing" && out.outing === "trip" && !out.home.sailing && out.home.sailRefused === null,
+        `after Sail with the flag stuck: ${JSON.stringify(out)}`,
+      );
+      return `refused: ${refused.sailRefused}, jetty back; stuck flag: ${actions}`;
     },
   },
 
@@ -6221,6 +6326,131 @@ const SCENARIOS = [
         `Sporewood's bait tray: ${JSON.stringify(bait)}`,
       );
       return `${r.limit.text}`;
+    },
+  },
+
+  {
+    name: "rig picture: a red notch and a brass tick show on the piece they were made on, on the tackle screen, the Sheet and Murk's Tackle tab, and not once that part is changed",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 360_000,
+    editSave: (save) => {
+      RIG_PARTS_SAVE(save);
+      withParts(["sounding_lead", "pike_wire", "turnback_hook"], {
+        depth: "lead",
+        leader: "plain_knot",
+        hook: "turnback_hook",
+      })(save);
+      save.meta.loop.rigMarks = {
+        notch: ["leader:plain_knot", "depth:cork_float"],
+        tick: ["hook:turnback_hook"],
+      };
+    },
+    async run(session) {
+      await session.toHome();
+      const want = '["hook:turnback_hook:tick","leader:plain_knot:notch"]';
+      const screen = await rigScreenMarks(session);
+      check(
+        JSON.stringify(screen?.labels) === want &&
+          JSON.stringify(screen.notch) === '["leader"]' &&
+          JSON.stringify(screen.tick) === '["hook"]',
+        `the tackle screen: ${JSON.stringify(screen)}`,
+      );
+      for (const where of ["sheet", "shop"]) {
+        await openRigHost(session, where);
+        const shown = await rigMarksShown(session, RIG_HOST[where]);
+        await backToJetty(session);
+        check(JSON.stringify(shown?.labels) === want, `${where}: ${JSON.stringify(shown)}`);
+      }
+      // A changed part loses its mark: Pike Wire on, then the float back on (the cork carries its own notch).
+      await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        loop.fitPart("leader", "pike_wire");
+        loop.fitDepth("float");
+      });
+      const changed = await rigScreenMarks(session);
+      check(
+        JSON.stringify(changed?.labels) === '["depth:cork_float:notch","hook:turnback_hook:tick"]',
+        `after the changes: ${JSON.stringify(changed)}`,
+      );
+      return `${JSON.parse(want).join(", ")} on all three; then ${changed.labels.join(", ")}`;
+    },
+  },
+
+  {
+    name: "rig picture: her losses notch the part that broke and tick the parts that held before it; landing her ticks all three and clears every notch",
+    fixture: "legend-sold",
+    // Her hunt is not over: she has never been landed in this copy of the save.
+    editSave: unsold(),
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session) {
+      await session.toHome();
+      await buyAtHome(session, ["line:1"]);
+      await fitHerParts(session, { hook: "mere_hook", leader: "plain_knot", depth: "lead" });
+      await session.sail();
+      const line = await session.eval(() => window.__gw.progression.loop.state().tackle.line);
+      check(line === 1, `the line is tier ${line}, expected Braided Gut (1)`);
+      const steps = [
+        { rig: { hook: "mere_hook", leader: "plain_knot" }, part: "hook", marks: ["hook:mere_hook:notch"] },
+        {
+          rig: { hook: "turnback_hook", leader: "plain_knot" },
+          part: "leader",
+          marks: ["hook:turnback_hook:tick", "leader:plain_knot:notch"],
+        },
+        {
+          rig: { hook: "turnback_hook", leader: "chafe_gut" },
+          part: "line",
+          marks: ["hook:turnback_hook:tick", "leader:chafe_gut:tick", "line:"],
+        },
+      ];
+      for (const step of steps) {
+        await herRig(session, step.rig);
+        const hooked = await hookAndPlayOut(session, LEGEND_ID, "land");
+        check(
+          hooked.escape?.legendLossReason === step.part,
+          `${step.part}: ${JSON.stringify({ p: hooked.p, escape: hooked.escape })}`,
+        );
+        await session.closeGuides(3000);
+        const shown = await rigScreenMarks(session);
+        const ok =
+          shown?.labels.length === step.marks.length &&
+          step.marks.every((m, k) =>
+            m.endsWith(":")
+              ? shown.labels[k].startsWith(m) && shown.labels[k].endsWith(":notch")
+              : shown.labels[k] === m,
+          );
+        check(ok, `after the ${step.part} loss: ${JSON.stringify(shown)}`);
+        check(
+          shown.notch.includes(step.part),
+          `no notch drawn on the ${step.part}: ${JSON.stringify(shown)}`,
+        );
+      }
+      // Waxed Silk on, and she is landed: all three held, so all three are ticked and no notch is left.
+      await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        s.tackle.line = 2;
+        s.fit && delete s.fit.line;
+      });
+      const landed = await hookAndPlayOut(session, LEGEND_ID, "land");
+      check(landed.landed === LEGEND_ID, `she was not landed: ${JSON.stringify(landed)}`);
+      await session.clickButton(/^\d?(Keep|Let go)\b/);
+      await session.pause(800);
+      await session.closeGuides(5000);
+      const end = await rigScreenMarks(session);
+      check(
+        end?.labels.length === 3 &&
+          end.labels.every((l) => l.endsWith(":tick")) &&
+          JSON.stringify(end.tick) === '["hook","leader","line"]' &&
+          !end.notch.length,
+        `after the landing: ${JSON.stringify(end)}`,
+      );
+      const saved = JSON.parse(await session.saved()).meta.loop.rigMarks;
+      check(
+        saved?.tick?.length >= 3 && saved.notch.length === 0,
+        `the written save: ${JSON.stringify(saved)}`,
+      );
+      return `notched hook, leader, line in turn; landed: ${end.labels.join(", ")}`;
     },
   },
 

@@ -1,5 +1,7 @@
 # Legend encounter map (key: legend)
 
+> **Out of date.** This map describes the game of 21 November 2026. Mossmere's legend is now the Bellhead Catfish, hunted through the notepad's five sketches; she takes a Live Minnow or a Worm Bunch (no longer Heartmoss) on the bottom, only in her time after the midnight bell, and is measured and released for the 900 bounty and Hob's Lamp. See `docs/design/decisions.md` (it wins over this file) and `docs/design/mossmere-hunt-2.md`.
+
 Scope: The Belled Matriarch (Mossmere) and The Drifting Grove (Sporewood), end to end; The Glass Sovereign and The Pale Leviathan / Lantern Swallower briefly.
 
 Conventions. Every claim carries a search anchor that works in both the HTML and the reading copy (`reading/game.pretty.js`), then `~L<n>` (reading-copy line, convenience only). **[read]** = read directly in code. **[inferred]** = my deduction from code I read, not executed. **[ran]** = observed in a Playwright run of `smoke/main-fixed.html`. "Live" means current relaxed-fishing play: `LOOP_ENABLED === true` (observed true [ran]) and a session with `run.outing === "trip"` (created by `outing: "trip"` in `startTrip`, ~L50867). The predicate the fishing code uses for this is `xe = () => X && h()?.outing === "trip"` (~L127865).

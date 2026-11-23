@@ -76,7 +76,7 @@ These counts come from a script (appendix A2). "Fit" is judged against the rules
 | Journal and Odds sheet | 36 + 30 inline | 194 | rewrite | stat names, ×, → and +; "log" versus "Journal" |
 | Chart, tabs, buttons | 18 | 23 | already fits | |
 | Wick choice | 15 | 95 | small edits | the short lines fit; the exact lines are sums in symbols |
-| Settings and reset | 15 | 86 | small edits | fits, except the page description, which says "survival roguelite" |
+| Settings and reset | 15 | 86 | small edits | fits. The page description no longer says "survival roguelite" (fixed in d425596) |
 | Title and new-game screens | 30 | 98 | rewrite | "descent", "trials", "Shrine", "Waystone" |
 | 3D field guide page | 45 | 412 | rewrite | the same lore as the journal; it must change in step |
 

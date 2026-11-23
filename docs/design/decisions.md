@@ -116,6 +116,7 @@ The designer asked for Mossmere's environment graphics to be made as good as the
 `tools/playthrough.mjs` plays from New Game, evening after evening, and prints one line an evening. It lands fish with the debug calls, but only kinds the game's own bite roll gives at that spot, hour, bait and depth, and it never hands out clams or parts. One run of 13 evenings was made. It did not reach the landing: it stopped while saving for the Waxed Silk.
 
 - **Measured.** Every clue was in by evening 8 (the first hook-up, lost to the line, which draws sketch 5). Tallies averaged about 24 clams an evening for a player who fishes the set-out spot, keeps a hold of 3 ordinary fish and buys only the hunt's parts. Braided Gut did not raise that. No game errors.
+- **Clams at the tally of evenings 2, 5 and 10:** 18, 30 and 18. The run's thirteen tallies were 17, 18, 17, 18, 30, 32, 44, 18, 17, 18, 30, 18 and 30.
 - **Projected, not measured.** The Waxed Silk about evening 34 and the landing about evening 36. That is later than the "about evening 24" given for a casual player in the ruling above. A player who keeps bigger fish, fills orders or buys a creel earns more; that was not measured.
 - **From evening 9 nothing new points forward.** Murk has no new line, Hob only greets, and the notepad's foot does not change.
 - **No practice order was posted.** A practice order needs the Order Board, and nothing in the hunt points a new player to it.
