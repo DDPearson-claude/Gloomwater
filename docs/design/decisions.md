@@ -96,6 +96,14 @@ Details are in `mossmere-review-addendum.md`.
 - **The rig picture replaces the old tackle rows** on Taper's Sheet (Tackle page) and at Murk's (Tackle tab), as the gear design said. Gaps filled during the build: at Murk's a Leader or Hook part shows as soon as he sells one, so the first can be bought from its tray; a tray buy takes one tap; Murk's Tackle chapter is one scrolling page.
 - **Murk speaks in a speech box like Hob's** for his story lines, gifts and new orders (asked for by the designer on 22 November 2026: "way more in your face and obvious").
 
+## Rulings on the lake's look, 23 November 2026
+
+The designer asked for Mossmere's environment graphics to be made as good as they can be, keeping its own look (a calm, low-light, mossy lake at evening, low-poly with dark outlines).
+
+- **The rocks get moss green** on their tops and near the waterline. Approved.
+- **The early evening is clearly lighter and warmer than night**, so the lake visibly darkens as the evening goes on. Approved. (The lake lies in a cavern: the warm light falls through the openings in the roof.)
+- The work is in three parts: light, sky, fog and tone; the water; and the shore, rocks, plants, props, the mist, the Bell Pool bell and Veilback Brook. Before-and-after pictures come from `tools/scenery-shots.mjs`. Each part goes to the designer as pictures to approve, as the "Look and feel" list in `mossmere-100.md` asks.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.
