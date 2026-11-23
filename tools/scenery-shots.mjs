@@ -7,7 +7,7 @@
 //        either may add --page <path/to/built.html> to use another build than the repo's own
 //
 // Default: the game's best quality setting ("high") at 1280x720, device scale 1.
-// --speed: at 480x270 on low quality, prints the average time of 60 frames at the set-out spot and in the
+// --speed: at 480x270 on low quality (or --quality), prints the average time of 60 frames at the set-out spot and in the
 // Lily Maze (wall-clock time between animation frames; builders use it to check the low setting is no slower).
 //
 // How each view is made the same every time:
@@ -82,6 +82,11 @@ const PLACES = {
   shore: { at: { x: -24.5, z: 10 }, look: { x: -30, z: 14 } }, // close under Mossbell Isle's shore and reeds
   brook: { at: { x: 56, z: 3.8 }, look: { x: 68.5, z: 5 } }, // the last leg of the brook's glide in (its place data)
   mistview: { at: { x: -27, z: 14 }, look: { x: -29.5, z: 0.5 } },
+  // the reed areas: Elder Sister's ring of reeds seen from the north with a line cast into them; Mossbell Isle's
+  // northern reeds from open water; the north-west shore's reed bed (its arc 120-135 degrees), the raft off it
+  sister: { at: { x: -30, z: -9.5 }, look: { x: -30, z: -24 } },
+  isleNorth: { at: { x: -31, z: 26 }, look: { x: -30, z: 14 } },
+  nwShore: { at: { x: -27, z: 38 }, look: { x: -34, z: 45 } },
 };
 
 // The views, in the order they are taken. `session` names the save they need; `at` a place above or "setout" (the
@@ -108,6 +113,17 @@ const VIEWS = [
   { name: "bell-close-night", session: "found", at: "bellpool", hour: "night", frame: "bell_pool" },
   { name: "veilback-brook-arrival", session: "found", at: "brook", hour: "setout", frame: "veilback_brook" },
   { name: "shore-reeds-dusk", session: "found", at: "shore", hour: "dusk" },
+  // a low camera close along the north-west shore's reed bed (`cam`: the landmark camera's framing, held on it)
+  {
+    name: "reed-bed-low-dusk",
+    session: "found",
+    at: "nwShore",
+    hour: "dusk",
+    cam: { x: -34.5, y: 0.7, z: 44, side: [0.55, -0.85], elev: 5, dist: 7.5 },
+  },
+  // the normal fishing camera with the line cast 9 m ahead into Elder Sister's reeds
+  { name: "reed-line-out-day", session: "found", at: "sister", hour: "day", act: "cast" },
+  { name: "reed-isle-night", session: "found", at: "isleNorth", hour: "night" },
   { name: "raft-line-out-dusk", session: "found", at: "setout", hour: "dusk", act: "cast" },
   { name: "hooked-fight-dusk", session: "found", at: "setout", hour: "dusk", act: "hook" },
   { name: "mist-locked-dusk", session: "locked", at: "mistview", hour: "dusk" },
@@ -285,7 +301,9 @@ async function stage(s, view, setout) {
   );
   await frames(s, 10);
   await s.closeGuides(1500);
-  if (view.frame) {
+  if (view.cam) {
+    await s.eval((cam) => window.__gw.render.frameLandmark(cam, { dur: 600 }), view.cam);
+  } else if (view.frame) {
     // The place's landmark camera (the one the mist lift and the reveal use), held on it.
     await s.eval((id) => {
       const g = window.__gw,
@@ -388,7 +406,9 @@ async function speed() {
   try {
     // Low unless --quality is given, so the dearer settings can be compared too.
     const q = args.includes("--quality") ? QUALITY : "low";
-    const { s, setout } = await openSession(browser, foundSave("low"));
+    // The scenery is built for the quality the save names when the lake loads (low or not, and medium or high for
+    // some pieces), so the save carries the measured quality: a change of setting alone does not rebuild it.
+    const { s, setout } = await openSession(browser, foundSave(q));
     await setQuality(s, q);
     const measure = () =>
       s.eval(

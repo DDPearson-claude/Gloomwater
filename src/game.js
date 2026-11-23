@@ -76839,7 +76839,48 @@ function gwMossify(geo, amount = 1) {
 // shorter blades bent over, and cattail seed heads on some stems; dark green at the water, paling to straw at the tips. The
 // geometry is in world space (merged with the lake's other fine pieces), and starts at y = -0.12 like the plain stems, so the
 // reeds' sway and their parting round the raft (the vertex code in aN) work on it unchanged.
-const GW_REED = { foot: 0x26341f, mid: 0x4d6634, tip: 0xa89c64, head: 0x4a2f1f };
+const GW_REED = {
+  foot: 0x26341f,
+  mid: 0x4d6634,
+  tip: 0xa89c64,
+  head: 0x4a2f1f,
+  // the reed beds' other plants and finds (gwReedBeds)
+  fluff: 0xcbbd96, // a burst cattail head, and pale seed tips
+  rush: 0x35503f, // bulrush stems: a darker, bluer green
+  rushTip: 0x9a8a5c,
+  spike: 0x5c3a26, // bulrush spikelets
+  dead: 0x8a7850, // broken and fallen straw
+  deadDark: 0x5e4f34,
+  leaf: 0x4f7038, // broad leaves (arrowhead)
+  leafHi: 0x6f8c48,
+  duck: 0x6f8a36, // duckweed
+  duckHi: 0x8c9f4c,
+  flag: 0xcdb65a, // a yellow flag iris, muted
+  flagVein: 0x8f7436,
+  pink: 0xa36a82, // a dusty pink spike (loosestrife)
+  pinkHi: 0xc296a6,
+  bark: 0x3a2f24,
+  wood: 0x8a7652, // cut and broken ends
+  moss: 0x4f6a2e,
+  rope: 0x8b7b58,
+};
+// The bed's colour story: the clumps' greens drift over a few metres from blue-green rush through the old green and olive
+// to russet straw, so a stand of one kind reads as one patch (hashed from where it stands; no random draws). [mid, tip].
+const GW_REED_TONES = [
+  [0x3f5c49, 0x8e9873],
+  [0x4d6634, 0xa89c64],
+  [0x5b6232, 0xb5a066],
+  [0x645a32, 0xb08e5e],
+];
+function gwReedTone(x, z) {
+  const T = GW_REED_TONES,
+    u =
+      Math.max(0, Math.min(0.999, (Sg(x * 0.23 + 11.3, 0.5, z * 0.23 - 4.1, 2) - 0.28) / 0.44)) *
+      (T.length - 1),
+    k = Math.floor(u),
+    f = u - k;
+  return [Jn(Xo(T[k][0]), Xo(T[k + 1][0]), f), Jn(Xo(T[k][1]), Xo(T[k + 1][1]), f)];
+}
 // A lily pad, 0.55 m across like the plain disc it replaces: a notched leaf whose edge turns up into a thin lit rim, with a
 // wine-red lip just at the water (the leaf's underside), dark green at its heart and faint veins out from it. About as many
 // triangles as the old 12-sided disc (low gets the same shape).
@@ -76924,10 +76965,15 @@ function gwLilyFlowerGeo() {
 }
 const gwReedRng = (x, z) =>
   Dr((Math.round(x * 97.3) * 73856093) ^ (Math.round(z * 61.7) * 19349663) ^ 0x2f6b);
-function gwReedClump(out, rnd, x, z, n, h, spread = 0.6) {
-  const foot = Xo(GW_REED.foot),
-    mid = Xo(GW_REED.mid),
-    tip = Xo(GW_REED.tip),
+// `look` (optional): `tone`, the clump's [mid, tip] colours (else the colour patch it stands in, gwReedTone), and
+// `fluff`, a random source for the seed heads that have burst into a pale tuft (else hashed from where it stands).
+// Neither draws on `rnd`, so a clump's shape is the same whatever its colours.
+function gwReedClump(out, rnd, x, z, n, h, spread = 0.6, look = null) {
+  const tone = look?.tone || gwReedTone(x, z),
+    fluffRnd = look?.fluff || gwReedRng(x + 3.1, z - 1.7),
+    foot = Xo(GW_REED.foot),
+    mid = tone[0],
+    tip = tone[1],
     head = Xo(GW_REED.head),
     lean0 = rnd() * Math.PI * 2;
   const blade = (bx, bz, ht, r0, bend, flat, dir, colorAt) => {
@@ -76991,6 +77037,16 @@ function gwReedClump(out, rnd, x, z, n, h, spread = 0.6) {
           new He(1, ax.length(), 1),
         );
       out.push(Gn(new Xn(0.05, 0.045, 1, 5, 1), { matrix: m, color: ko(head, v) }));
+      // now and then the head has burst at its top into a pale tuft that catches the lantern
+      if (fluffRnd() < 0.3) {
+        const q = at(0.92);
+        out.push(
+          Gn(new ii(0.042, 0.1, 5), {
+            matrix: co(q[0], q[1] + 0.02, q[2], 0, fluffRnd() * ao, 0),
+            color: ko(Xo(GW_REED.fluff), 0.9 + fluffRnd() * 0.2),
+          }),
+        );
+      }
     }
   }
   // shorter blades round the foot, some bent well over
@@ -77011,6 +77067,740 @@ function gwReedClump(out, rnd, x, z, n, h, spread = 0.6) {
       (t) => shade(Math.min(1, t * 0.8 + 0.1), v),
     );
   }
+}
+
+// ---- the reed beds (medium and high; low keeps its plain stems) -------------------------------------------------------
+// A tapered three-sided strand along a curve (world space): `path(t)` is its centre for t in 0..1, `rad(t)` its radius,
+// `colorAt(t)` its colour; S rings closed to a point at t = 1. `flat` squeezes the section in the plane of its bend (a
+// blade, wide across); `side` is the direction it leans, which sets the section of a strand that stands straight up.
+function gwStrand(out, path, rad, S, colorAt, flat = 1, side = 0) {
+  const pos = [],
+    idx = [],
+    cols = [],
+    ax = -Math.sin(side),
+    az = Math.cos(side);
+  for (let s = 0; s < S; s++) {
+    const t = s / S,
+      c = path(t),
+      a = path(Math.max(0, t - 0.04)),
+      b = path(Math.min(1, t + 0.04));
+    let tx = b[0] - a[0],
+      ty = b[1] - a[1],
+      tz = b[2] - a[2];
+    const tl = Math.hypot(tx, ty, tz) || 1;
+    (tx /= tl), (ty /= tl), (tz /= tl);
+    // u: level and across the strand (the tangent crossed with up, steadied by the lean's own across)
+    let ux = -tz + ax * 0.3,
+      uz = tx + az * 0.3;
+    const ul = Math.hypot(ux, uz) || 1;
+    (ux /= ul), (uz /= ul);
+    const vx = -uz * ty,
+      vy = uz * tx - ux * tz,
+      vz = ux * ty,
+      r = rad(t),
+      col = colorAt(t);
+    for (let k = 0; k < 3; k++) {
+      const an = (k * Math.PI * 2) / 3,
+        cu = Math.cos(an) * r,
+        sv = Math.sin(an) * r * flat;
+      pos.push(c[0] + ux * cu + vx * sv, c[1] + vy * sv, c[2] + uz * cu + vz * sv);
+      cols.push(col);
+    }
+  }
+  pos.push(...path(1)), cols.push(colorAt(1));
+  for (let s = 0; s + 1 < S; s++)
+    for (let k = 0; k < 3; k++) {
+      const a = s * 3 + k,
+        b = s * 3 + ((k + 1) % 3);
+      idx.push(a, b, b + 3, a, b + 3, a + 3);
+    }
+  const top = S * 3;
+  for (let k = 0; k < 3; k++) idx.push((S - 1) * 3 + k, (S - 1) * 3 + ((k + 1) % 3), top);
+  gwOutward(pos, idx, path(0));
+  const g = new lo();
+  g.setAttribute("position", new eo(pos, 3)), g.setIndex(idx), g.computeVertexNormals();
+  out.push(Gn(g, { colorFn: (_x, _y, _z, _a, _b, _c, i) => cols[i] }));
+}
+// Turns a strand's triangles to face out (its first face is tested against the centre of its foot).
+function gwOutward(pos, idx, c) {
+  const P = (i) => [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]],
+    [p0, p1, p2] = [P(idx[0]), P(idx[1]), P(idx[2])],
+    e1 = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]],
+    e2 = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]],
+    n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]],
+    m = [(p0[0] + p1[0] + p2[0]) / 3 - c[0], 0, (p0[2] + p1[2] + p2[2]) / 3 - c[2]];
+  if (n[0] * m[0] + n[2] * m[2] < 0)
+    for (let i = 0; i < idx.length; i += 3) [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
+}
+// Flat pieces lying on the water (small pads, duckweed, a fallen blade): `pts` are [x, z] and `tris` index them; every
+// normal is straight up, which the reeds' vertex code reads as afloat, so they ride the swell as the lily pads do.
+function gwFlat(out, pts, tris, colorAt, y = 0.014) {
+  const pos = [],
+    nor = [],
+    idx = [];
+  for (const [x, z] of pts) pos.push(x, y, z), nor.push(0, 1, 0);
+  for (let i = 0; i < tris.length; i += 3) {
+    const [a, b, c] = [tris[i], tris[i + 1], tris[i + 2]],
+      up =
+        (pts[b][1] - pts[a][1]) * (pts[c][0] - pts[a][0]) - (pts[b][0] - pts[a][0]) * (pts[c][1] - pts[a][1]);
+    up > 0 ? idx.push(a, b, c) : idx.push(a, c, b);
+  }
+  const g = new lo();
+  g.setAttribute("position", new eo(pos, 3)), g.setAttribute("normal", new eo(nor, 3)), g.setIndex(idx);
+  // (darker than the standing plants: lying flat they face the whole sky and would read as pale paper on the water)
+  out.push(Gn(g, { colorFn: (_x, _y, _z, _a, _b, _c, i) => ko(colorAt(i), 0.58) }));
+}
+// A leaf seen from both sides: points (world space), triangles, a colour per point.
+function gwLeaf(out, pts, tris, cols) {
+  const pos = [],
+    idx = [],
+    n = pts.length;
+  for (const p of pts) pos.push(p[0], p[1], p[2]);
+  for (const p of pts) pos.push(p[0], p[1], p[2]);
+  for (let i = 0; i < tris.length; i += 3)
+    idx.push(tris[i], tris[i + 1], tris[i + 2], tris[i] + n, tris[i + 2] + n, tris[i + 1] + n);
+  const g = new lo();
+  g.setAttribute("position", new eo(pos, 3)), g.setIndex(idx), g.computeVertexNormals();
+  out.push(Gn(g, { colorFn: (_x, _y, _z, _a, _b, _c, i) => cols[i % n] }));
+}
+const gwShade = (foot, mid, tip, t, v, knee = 0.5) =>
+  ko(t < knee ? Jn(foot, mid, t / knee) : Jn(mid, tip, Math.pow((t - knee) / (1 - knee), 1.3)), v);
+// A sedge or rush tuft for the bed's front edge: many narrow blades fountaining from one foot, low and arching out.
+function gwSedgeTuft(out, rnd, x, z, h, tone) {
+  const n = 6 + ((rnd() * 5) | 0),
+    foot = Xo(GW_REED.foot);
+  for (let i = 0; i < n; i++) {
+    const dir = rnd() * ao,
+      ht = h * (0.55 + rnd() * 0.55),
+      bend = 0.35 + rnd() * 0.6,
+      v = 0.8 + rnd() * 0.35,
+      dx = Math.cos(dir),
+      dz = Math.sin(dir),
+      bx = x + dx * 0.05,
+      bz = z + dz * 0.05;
+    gwStrand(
+      out,
+      (t) => [
+        bx + dx * bend * ht * t * t,
+        -0.1 + ht * t * (1 - 0.45 * bend * t * t),
+        bz + dz * bend * ht * t * t,
+      ],
+      (t) => 0.048 * (1 - 0.85 * t),
+      3,
+      (t) => gwShade(foot, tone[0], tone[1], t, v),
+      0.3,
+      dir,
+    );
+  }
+}
+// Bulrushes: tall, round, nearly straight dark stems with a little brown cluster of spikelets jutting out below the tip.
+function gwBulrush(out, rnd, x, z, n, h) {
+  const lean0 = rnd() * ao,
+    foot = Xo(GW_REED.foot),
+    mid = Xo(GW_REED.rush),
+    tip = Xo(GW_REED.rushTip),
+    spike = Xo(GW_REED.spike);
+  for (let i = 0; i < n; i++) {
+    const a = rnd() * ao,
+      d = Math.sqrt(rnd()) * 0.35,
+      bx = x + Math.cos(a) * d,
+      bz = z + Math.sin(a) * d,
+      ht = h * (0.75 + rnd() * 0.45),
+      lean = 0.03 + rnd() * 0.09,
+      dir = lean0 + (rnd() - 0.5) * 1.2,
+      dx = Math.cos(dir),
+      dz = Math.sin(dir),
+      v = 0.8 + rnd() * 0.35,
+      path = (t) => [bx + dx * lean * ht * t, -0.12 + ht * t, bz + dz * lean * ht * t];
+    gwStrand(
+      out,
+      path,
+      (t) => 0.03 * (1 - 0.75 * t),
+      4,
+      (t) => gwShade(foot, mid, tip, t, v, 0.6),
+      1,
+      dir,
+    );
+    if (rnd() < 0.55) {
+      const p = path(0.86),
+        sd = dir + (rnd() - 0.5) * 2;
+      for (let k = 0; k < 2; k++) {
+        const ex = Math.cos(sd + k * 0.9) * 0.09,
+          ez = Math.sin(sd + k * 0.9) * 0.09;
+        gwStrand(
+          out,
+          (t) => [p[0] + ex * t, p[1] + 0.02 * k - 0.04 * t, p[2] + ez * t],
+          (t) => 0.024 * (1 - 0.4 * t),
+          2,
+          () => ko(spike, v),
+          1,
+          sd,
+        );
+      }
+    }
+  }
+}
+// A broken stem: it stands to a kink, then its top hangs over toward the water.
+function gwBrokenStem(out, rnd, x, z, h, tone) {
+  const ht = h * (0.6 + rnd() * 0.5),
+    k = 0.45 + rnd() * 0.25,
+    dir = rnd() * ao,
+    dx = Math.cos(dir),
+    dz = Math.sin(dir),
+    droop = 0.5 + rnd() * 0.7,
+    y0 = -0.12 + ht * k,
+    L = Math.min(ht * (1 - k), (y0 + 0.02) / Math.sin(droop)),
+    foot = Xo(GW_REED.foot),
+    dead = Xo(GW_REED.dead),
+    v = 0.8 + rnd() * 0.3;
+  gwStrand(
+    out,
+    (t) => {
+      if (t <= k) return [x + dx * 0.04 * t, -0.12 + ht * t, z + dz * 0.04 * t];
+      const u = ((t - k) / (1 - k)) * L;
+      return [
+        x + dx * (0.04 * k + Math.cos(droop) * u),
+        y0 - Math.sin(droop) * u,
+        z + dz * (0.04 * k + Math.cos(droop) * u),
+      ];
+    },
+    (t) => 0.04 * (1 - 0.7 * t),
+    6,
+    (t) =>
+      t < k
+        ? gwShade(foot, tone[0], dead, t / k, v)
+        : ko(Jn(dead, Xo(GW_REED.deadDark), (t - k) / (1 - k)), v),
+    1,
+    dir,
+  );
+}
+// A fallen blade or stem lying on the water: a flat ribbon on a slight curve, straw or dead brown.
+function gwFloatBlade(out, rnd, x, z, len) {
+  const dir = rnd() * ao,
+    curl = (rnd() - 0.5) * 0.8,
+    c = Jn(Xo(GW_REED.dead), Xo(GW_REED.deadDark), rnd()),
+    pts = [],
+    tris = [];
+  let px = x - (Math.cos(dir) * len) / 2,
+    pz = z - (Math.sin(dir) * len) / 2;
+  for (let i = 0; i <= 3; i++) {
+    const a = dir + curl * (i / 3),
+      w = 0.045 * (1 - 0.6 * (i / 3)),
+      nx = -Math.sin(a) * w,
+      nz = Math.cos(a) * w;
+    pts.push([px + nx, pz + nz], [px - nx, pz - nz]);
+    (px += (Math.cos(a) * len) / 3), (pz += (Math.sin(a) * len) / 3);
+    if (i) tris.push(i * 2 - 2, i * 2 - 1, i * 2, i * 2 - 1, i * 2 + 1, i * 2);
+  }
+  gwFlat(out, pts, tris, () => c, 0.03);
+}
+// A few small lily pads (a notched fan of 8 triangles each), gathered among the stems.
+function gwMiniPads(out, rnd, x, z, n) {
+  const leaf = Xo(GW_PAD.leaf),
+    rim = Xo(GW_PAD.rim),
+    heart = Xo(GW_PAD.heart);
+  for (let i = 0; i < n; i++) {
+    const r = 0.1 + rnd() * 0.14,
+      cx = x + (rnd() - 0.5) * 0.9,
+      cz = z + (rnd() - 0.5) * 0.9,
+      a0 = rnd() * ao,
+      pts = [[cx, cz]],
+      tris = [],
+      cs = [heart],
+      v = 0.85 + rnd() * 0.3;
+    for (let j = 0; j <= 8; j++) {
+      const a = a0 + 0.3 + ((ao - 0.6) * j) / 8;
+      pts.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]), cs.push(j % 2 ? rim : leaf);
+      if (j) tris.push(0, j, j + 1);
+    }
+    gwFlat(out, pts, tris, (k) => ko(cs[k], v), 0.026 + i * 0.002);
+  }
+}
+// A duckweed patch: a drift of tiny pale-green specks, thicker at its middle.
+function gwDuckweed(out, rnd, x, z, R) {
+  const n = 14 + ((rnd() * 16) | 0),
+    a = Xo(GW_REED.duck),
+    b = Xo(GW_REED.duckHi),
+    pts = [],
+    tris = [],
+    cs = [];
+  for (let i = 0; i < n; i++) {
+    const an = rnd() * ao,
+      d = R * rnd() * rnd() * 1.6,
+      cx = x + Math.cos(an) * d,
+      cz = z + Math.sin(an) * d * 0.7,
+      s = 0.035 + rnd() * 0.045,
+      r0 = rnd() * ao,
+      c = ko(Jn(a, b, rnd()), 0.75 + rnd() * 0.4);
+    for (let k = 0; k < 3; k++)
+      pts.push([cx + Math.cos(r0 + k * 2.1) * s, cz + Math.sin(r0 + k * 2.1) * s]), cs.push(c);
+    tris.push(i * 3, i * 3 + 1, i * 3 + 2);
+  }
+  gwFlat(out, pts, tris, (k) => cs[k], 0.022);
+}
+// Arrowhead: a few stalks leaning out, each with a broad arrow-shaped leaf tipped up from the water.
+function gwBroadLeaf(out, rnd, x, z, h) {
+  const n = 3 + ((rnd() * 3) | 0),
+    stalk = Xo(GW_REED.foot),
+    leaf = Xo(GW_REED.leaf),
+    hi = Xo(GW_REED.leafHi);
+  for (let i = 0; i < n; i++) {
+    const dir = rnd() * ao,
+      dx = Math.cos(dir),
+      dz = Math.sin(dir),
+      ht = h * (0.5 + rnd() * 0.5),
+      lean = 0.15 + rnd() * 0.25,
+      v = 0.85 + rnd() * 0.3,
+      path = (t) => [x + dx * lean * ht * t, -0.1 + ht * t, z + dz * lean * ht * t],
+      top = path(1),
+      L = 0.2 + rnd() * 0.12,
+      W = 0.11 + rnd() * 0.05,
+      pitch = 0.35 + rnd() * 0.5,
+      fx = dx * Math.cos(pitch),
+      fy = Math.sin(pitch),
+      fz = dz * Math.cos(pitch),
+      at = (u, w) => [top[0] + fx * u - dz * w, top[1] + fy * u, top[2] + fz * u + dx * w];
+    gwStrand(
+      out,
+      path,
+      () => 0.016,
+      3,
+      (t) => ko(Jn(stalk, leaf, t), v),
+      1,
+      dir,
+    );
+    gwLeaf(
+      out,
+      [
+        at(0, 0),
+        at(L * 0.45, W * 0.5),
+        at(L, 0),
+        at(L * 0.45, -W * 0.5),
+        at(-L * 0.38, W * 0.5),
+        at(-L * 0.38, -W * 0.5),
+      ],
+      [0, 1, 2, 0, 2, 3, 0, 4, 1, 0, 3, 5],
+      [leaf, hi, hi, hi, leaf, leaf].map((c) => ko(c, v)),
+    );
+  }
+}
+// A yellow flag iris: a fan of stiff sword leaves and one muted yellow flower on a stalk just above them.
+function gwYellowFlag(out, rnd, x, z, h) {
+  const fan = rnd() * ao,
+    n = 4 + ((rnd() * 3) | 0),
+    foot = Xo(GW_REED.foot),
+    mid = Xo(GW_REED.leaf),
+    tip = Xo(GW_REED.leafHi);
+  for (let i = 0; i < n; i++) {
+    const dir = fan + Math.PI / 2 + (rnd() - 0.5) * 0.5,
+      off = (i / (n - 1) - 0.5) * 0.9,
+      dx = Math.cos(fan) * off,
+      dz = Math.sin(fan) * off,
+      ht = h * (0.6 + rnd() * 0.4) * (1 - Math.abs(off) * 0.4),
+      v = 0.85 + rnd() * 0.25;
+    // leaning out of the fan's plane only a little, so the blade's broad side stays in it
+    gwStrand(
+      out,
+      (t) => [
+        x + dx * ht * t * 0.5 + Math.cos(dir) * 0.04 * t,
+        -0.1 + ht * t,
+        z + dz * ht * t * 0.5 + Math.sin(dir) * 0.04 * t,
+      ],
+      (t) => 0.055 * (1 - 0.8 * t),
+      4,
+      (t) => gwShade(foot, mid, tip, t, v),
+      0.22,
+      dir,
+    );
+  }
+  const sh = h * (0.85 + rnd() * 0.2),
+    p = [x, -0.1 + sh, z],
+    yel = Xo(GW_REED.flag),
+    vein = Xo(GW_REED.flagVein),
+    a0 = rnd() * ao;
+  gwStrand(
+    out,
+    (t) => [x, -0.1 + sh * t, z],
+    () => 0.014,
+    3,
+    (t) => Jn(foot, mid, t),
+    1,
+    fan,
+  );
+  for (let k = 0; k < 3; k++) {
+    const a = a0 + (k * ao) / 3,
+      ox = Math.cos(a),
+      oz = Math.sin(a),
+      sx = -oz * 0.035,
+      sz = ox * 0.035,
+      b = a + Math.PI / 3,
+      bx = Math.cos(b) * 0.025,
+      bz = Math.sin(b) * 0.025;
+    // a fall, hanging out and down; and a standard between two falls, upright
+    gwLeaf(
+      out,
+      [
+        p,
+        [p[0] + ox * 0.06 + sx, p[1] + 0.01, p[2] + oz * 0.06 + sz],
+        [p[0] + ox * 0.11, p[1] - 0.05, p[2] + oz * 0.11],
+        [p[0] + ox * 0.06 - sx, p[1] + 0.01, p[2] + oz * 0.06 - sz],
+      ],
+      [0, 1, 2, 0, 2, 3],
+      [vein, yel, yel, yel],
+    );
+    gwLeaf(
+      out,
+      [
+        p,
+        [p[0] + bx - bz * 0.6, p[1] + 0.05, p[2] + bz + bx * 0.6],
+        [p[0] + bx * 1.3, p[1] + 0.09, p[2] + bz * 1.3],
+        [p[0] + bx + bz * 0.6, p[1] + 0.05, p[2] + bz - bx * 0.6],
+      ],
+      [0, 1, 2, 0, 2, 3],
+      [vein, ko(yel, 1.08), ko(yel, 1.12), ko(yel, 1.08)],
+    );
+  }
+}
+// A dusty pink spike (loosestrife): one to three upright stalks, their upper third a thick spike of small flowers.
+function gwPinkSpike(out, rnd, x, z, h) {
+  const n = 1 + ((rnd() * 3) | 0),
+    foot = Xo(GW_REED.foot),
+    green = Xo(GW_REED.leaf),
+    pink = Xo(GW_REED.pink),
+    hi = Xo(GW_REED.pinkHi);
+  for (let i = 0; i < n; i++) {
+    const a = rnd() * ao,
+      d = rnd() * 0.15,
+      bx = x + Math.cos(a) * d,
+      bz = z + Math.sin(a) * d,
+      ht = h * (0.7 + rnd() * 0.4),
+      dir = rnd() * ao,
+      lean = 0.04 + rnd() * 0.08,
+      v = 0.85 + rnd() * 0.3,
+      path = (t) => [
+        bx + Math.cos(dir) * lean * ht * t * t,
+        -0.1 + ht * t,
+        bz + Math.sin(dir) * lean * ht * t * t,
+      ];
+    gwStrand(
+      out,
+      path,
+      (t) => (t < 0.58 ? 0.016 : 0.045 * (1 - ((t - 0.58) / 0.42) * 0.75)),
+      7,
+      (t) => (t < 0.58 ? ko(Jn(foot, green, t / 0.58), v) : ko(Jn(pink, hi, (t - 0.58) / 0.42), v)),
+      1,
+      dir,
+    );
+    // two narrow leaves off the stalk
+    for (let k = 0; k < 2; k++) {
+      const p = path(0.25 + k * 0.18),
+        la = dir + k * Math.PI + (rnd() - 0.5),
+        lx = Math.cos(la),
+        lz = Math.sin(la);
+      gwStrand(
+        out,
+        (t) => [p[0] + lx * 0.16 * t, p[1] + 0.06 * t - 0.03 * t * t, p[2] + lz * 0.16 * t],
+        (t) => 0.028 * (1 - 0.8 * t),
+        2,
+        () => ko(green, v),
+        0.3,
+        la,
+      );
+    }
+  }
+}
+// The bed's own find, one of: a mossy log half sunk at its edge, an old stump, a leaning mooring post with a rope's end
+// trailing in the water, or a root arching out of the water beside a stone. Static (the organics' mesh), no collision.
+function gwReedFind(parts, rnd, kind, x, z, toBank, stoneColor) {
+  const bark = Xo(GW_REED.bark),
+    wood = Xo(GW_REED.wood),
+    moss = Xo(GW_REED.moss),
+    wet = (c, y) => (y < 0.06 ? ko(c, 0.55) : c),
+    mossy = (top) => (px, py, pz, nx, ny) =>
+      wet(
+        ny > top
+          ? Jn(bark, moss, Math.min(1, (ny - top) * 2.2 + 0.25 * Gs(px * 3, py * 3, pz * 3)))
+          : ko(bark, 0.85 + 0.3 * Gs(px * 5, py * 5, pz * 5)),
+        py,
+      );
+  if (kind === "log") {
+    const len = 1.8 + rnd() * 1.2,
+      r = 0.13 + rnd() * 0.07,
+      dir = toBank + Math.PI / 2 + (rnd() - 0.5) * 0.8,
+      pitch = (rnd() - 0.5) * 0.12;
+    parts.org.push(
+      Gn(new Xn(r * 0.85, r, len, 7, 2), {
+        matrix: co(x, -r * 0.35, z, 0, -dir, Math.PI / 2 + pitch),
+        colorFn: (px, py, pz, nx, ny, nz) => {
+          const end = Math.abs(nx * Math.cos(dir) + nz * Math.sin(dir)) > 0.9;
+          return end ? ko(wood, 0.9) : mossy(0.35)(px, py, pz, nx, ny);
+        },
+      }),
+    );
+    // a broken branch stub standing up off it
+    const u = (rnd() - 0.5) * len * 0.6;
+    parts.org.push(
+      Gn(new Xn(0.035, 0.06, 0.4, 5, 1), {
+        matrix: co(
+          x + Math.cos(dir) * u,
+          r * 0.5 + 0.12,
+          z + Math.sin(dir) * u,
+          0.5 * (rnd() - 0.5),
+          rnd() * ao,
+          0.5,
+        ),
+        colorFn: (px, py, pz, nx, ny) => (ny > 0.8 ? wood : bark),
+      }),
+    );
+    return;
+  }
+  if (kind === "stump") {
+    const r = 0.2 + rnd() * 0.08,
+      h = 0.4 + rnd() * 0.25;
+    parts.org.push(
+      Gn(new Xn(r, r * 1.25, h + 0.3, 8, 2), {
+        matrix: co(x, (h + 0.3) / 2 - 0.3, z, (rnd() - 0.5) * 0.15, rnd() * ao, (rnd() - 0.5) * 0.15),
+        colorFn: (px, py, pz, nx, ny) =>
+          ny > 0.9
+            ? Jn(wood, bark, 0.3 + 0.4 * Gs(px * 9, 0, pz * 9))
+            : mossy(0.5)(px, py, pz, nx, ny + (py < 0.2 ? 0.4 : 0)),
+      }),
+    );
+    // splinters standing round its broken top
+    for (let k = 0; k < 3; k++) {
+      const a = rnd() * ao,
+        sx = x + Math.cos(a) * r * 0.75,
+        sz = z + Math.sin(a) * r * 0.75,
+        sh = 0.12 + rnd() * 0.18;
+      gwStrand(
+        parts.org,
+        (t) => [sx, h - 0.04 + sh * t, sz],
+        (t) => 0.045 * (1 - 0.8 * t),
+        2,
+        (t) => Jn(bark, wood, t),
+        1,
+        a,
+      );
+    }
+    return;
+  }
+  if (kind === "post") {
+    const h = 1.3 + rnd() * 0.4,
+      lean = 0.08 + rnd() * 0.1,
+      ld = rnd() * ao;
+    parts.org.push(
+      Gn(new Xn(0.075, 0.095, h + 0.3, 6, 3), {
+        matrix: co(
+          x + Math.cos(ld) * lean * h * 0.5,
+          h / 2 - 0.15,
+          z + Math.sin(ld) * lean * h * 0.5,
+          Math.sin(ld) * lean,
+          0,
+          -Math.cos(ld) * lean,
+        ),
+        colorFn: (px, py, pz, nx, ny) =>
+          ny > 0.9
+            ? ko(wood, 0.8)
+            : py < 0.06
+              ? ko(bark, 0.5)
+              : py < 0.3
+                ? Jn(bark, moss, 0.6)
+                : Jn(ko(wood, 0.62), bark, 0.35 + 0.4 * Gs(px * 4, py * 6, pz * 4)),
+      }),
+    );
+    // a ring of old rope at mid height, its loose end trailing down into the water
+    const ry = h * 0.62,
+      rx = x + Math.cos(ld) * lean * (ry + 0.15),
+      rz = z + Math.sin(ld) * lean * (ry + 0.15),
+      rope = Xo(GW_REED.rope),
+      ta = rnd() * ao;
+    parts.org.push(
+      Gn(new Xn(0.11, 0.11, 0.07, 7, 1), {
+        matrix: co(rx, ry, rz, Math.sin(ld) * lean, 0, -Math.cos(ld) * lean),
+        color: rope,
+      }),
+    );
+    gwStrand(
+      parts.org,
+      (t) => [
+        rx + Math.cos(ta) * (0.1 + 0.55 * t),
+        ry - (ry + 0.08) * Math.pow(t, 0.7),
+        rz + Math.sin(ta) * (0.1 + 0.55 * t),
+      ],
+      () => 0.018,
+      4,
+      (t) => ko(rope, 1 - 0.4 * t),
+      1,
+      ta,
+    );
+    return;
+  }
+  // a root arching out of the water toward the bank, and a stone at its foot
+  const a = toBank + (rnd() - 0.5) * 0.6,
+    dx = Math.cos(a),
+    dz = Math.sin(a),
+    pts = [
+      [-0.2, -0.15],
+      [0.25, 0.22],
+      [0.7, 0.3],
+      [1.1, 0.12],
+      [1.4, -0.15],
+    ].map(([u, y]) => qa(x + dx * u, y, z + dz * u));
+  parts.org.push(
+    Gn(
+      ns(pts, (u) => 0.075 * (1 - 0.45 * u), 5, 10),
+      { colorFn: mossy(0.45) },
+    ),
+  );
+  const ra = 0.18 + rnd() * 0.1;
+  parts.rock.push(
+    Gn(Gd(rnd, { r: ra, h: ra * 0.9, detail: 1, rough: 0.3 }), {
+      matrix: co(x - dz * 0.35, -ra * 0.4, z + dx * 0.35, 0, rnd() * ao, 0),
+      colorFn: stoneColor,
+    }),
+  );
+}
+// Fills each reed area out into a bed (medium and high: `rich` for high, a thinner share on medium). Around the area's
+// own clumps (the lake's list, which also places its fish) it adds tall bulrushes and reeds at the heart and along the
+// bank, sedge tufts at the open edge, broken and fallen stems, duckweed and small pads on the water between, a few
+// flowers at the margin and one find; a slow noise leaves pockets of clear water. Everything stays inside the area
+// (the same test that names the water "reeds"), clear of the places, lanes and posts the clumps keep clear of.
+function gwReedBeds(parts, spots, A, avoid, rich, stoneColor) {
+  const geo = dd,
+    keep = M0.reeds.keep,
+    isl = new Map((A.islands || []).map((c) => [c.name, c])),
+    areas = new Map(),
+    pocket = (x, z) => Sg(x * 0.75 + 31.7, 1.3, z * 0.75 - 12.9, 2) > 0.64,
+    stats = { added: 0, finds: 0 };
+  for (const s of spots) {
+    let ar = null;
+    if (s.where === "shore" && geo.reedArcs?.[s.bed] && typeof A.shoreR == "function") {
+      const [a0, a1] = geo.reedArcs[s.bed],
+        bank = (x, z) => A.shoreR(Math.atan2(z, x)) - Math.hypot(x, z);
+      ar = {
+        key: "shore" + s.bed,
+        bank,
+        reach: geo.reedOff[1],
+        toBank: (x, z) => Math.atan2(z, x),
+        inside: (x, z) => {
+          let a = (Math.atan2(z, x) * 180) / Math.PI;
+          a < 0 && (a += 360);
+          const b = bank(x, z);
+          return a >= a0 && a <= a1 && b >= geo.reedOff[0] && b <= geo.reedOff[1];
+        },
+      };
+    } else {
+      const c = s.island && isl.get(s.island);
+      if (c) {
+        const reed = s.where === "rock",
+          reach = reed ? geo.reedReach.k * c.r + geo.reedReach.plus - c.r : c.r * 0.25,
+          bank = (x, z) => Math.hypot(x - c.x, z - c.z) - c.r;
+        ar = {
+          key: "isle" + c.name,
+          bank,
+          reach,
+          minor: !reed,
+          toBank: (x, z) => Math.atan2(c.z - z, c.x - x),
+          inside: (x, z) => {
+            const b = bank(x, z);
+            return b >= c.r * 0.04 && b <= reach;
+          },
+        };
+      }
+    }
+    if (!ar) continue;
+    areas.has(ar.key) || areas.set(ar.key, { ar, list: [] });
+    areas.get(ar.key).list.push(s);
+  }
+  let gi = 0;
+  for (const { ar, list } of areas.values()) {
+    const rnd = gwReedRng(list[0].x * 1.7 + 5, list[0].z * 1.3 - 9),
+      ok = (x, z, r = 0.15) => ar.inside(x, z) && bk(A, x, z, r) && (!avoid || T1(avoid, x, z) >= keep),
+      edge = (x, z) => Math.max(0, Math.min(1, ar.bank(x, z) / ar.reach)),
+      near = (s, d0, d1) => {
+        const a = rnd() * ao,
+          d = d0 + rnd() * (d1 - d0);
+        return [s.x + Math.cos(a) * d, s.z + Math.sin(a) * d];
+      },
+      left = { flag: rich ? 3 : 1, pink: rich ? 3 : 1, broad: rich ? 5 : 2 };
+    for (const s of list) {
+      const e = edge(s.x, s.z),
+        open = pocket(s.x, s.z);
+      // the heart: more tall stands round the clump, fewest at the open edge, none in a pocket of clear water
+      if (!ar.minor && !open) {
+        const k = Math.round(Math.pow(1 - e, 1.2) * (rich ? 2.8 : 0.5) + rnd() * (rich ? 0.9 : 0.35));
+        for (let i = 0; i < k; i++) {
+          const [x, z] = near(s, 0.45, 1.25);
+          if (!ok(x, z) || pocket(x, z)) continue;
+          const e2 = edge(x, z);
+          if (e2 < 0.45 && rnd() < 0.5) gwBulrush(parts.fine, rnd, x, z, 3 + ((rnd() * 4) | 0), s.h * 1.12);
+          else if (e2 < 0.75)
+            gwReedClump(
+              parts.fine,
+              rnd,
+              x,
+              z,
+              3 + ((rnd() * (rich ? 4 : 2)) | 0),
+              s.h * (1.05 - e2 * 0.35),
+              0.45,
+              { fluff: rnd },
+            );
+          else gwSedgeTuft(parts.fine, rnd, x, z, 0.5 + rnd() * 0.35, gwReedTone(x, z));
+          stats.added++;
+        }
+      }
+      // the front edge (and the stone isles' few reeds): low sedge and rush tufts
+      if (e > 0.45 || ar.minor)
+        for (let i = 0, m = rich ? 1 + (rnd() < 0.5 ? 1 : 0) : rnd() < 0.3 ? 1 : 0; i < m; i++) {
+          const [x, z] = near(s, 0.35, 1.1);
+          ok(x, z) &&
+            (gwSedgeTuft(parts.fine, rnd, x, z, 0.4 + rnd() * 0.4, gwReedTone(x, z)), stats.added++);
+        }
+      // broken stems, and fallen ones lying on the water
+      if (rnd() < (rich ? 0.22 : 0.1)) {
+        const [x, z] = near(s, 0.2, 0.6);
+        ok(x, z) && gwBrokenStem(parts.fine, rnd, x, z, s.h, gwReedTone(x, z));
+      }
+      if (rnd() < (rich ? 0.3 : 0.12)) {
+        const [x, z] = near(s, 0.3, 0.9);
+        ok(x, z, 0) && gwFloatBlade(parts.fine, rnd, x, z, 0.5 + rnd() * 0.7);
+      }
+      // the water between: duckweed and small pads gathered among the stems, most toward the bank and in the pockets
+      if (rnd() < (rich ? 0.5 : 0.22) * (1.15 - e * 0.6) * (open ? 1.5 : 1)) {
+        const [x, z] = near(s, 0.4, 1);
+        ok(x, z, 0) && gwDuckweed(parts.fine, rnd, x, z, 0.25 + rnd() * 0.35);
+      }
+      if (rnd() < (rich ? 0.26 : 0.1) * (open ? 1.6 : 1)) {
+        const [x, z] = near(s, 0.4, 1);
+        ok(x, z, 0) && gwMiniPads(parts.fine, rnd, x, z, 2 + ((rnd() * 3) | 0));
+      }
+      // a few flowers and broad leaves at the margins
+      if (left.flag > 0 && e < 0.45 && rnd() < 0.12) {
+        const [x, z] = near(s, 0.3, 0.8);
+        ok(x, z) && (gwYellowFlag(parts.fine, rnd, x, z, 0.9 + rnd() * 0.3), left.flag--);
+      }
+      if (left.pink > 0 && e > 0.25 && e < 0.8 && rnd() < 0.1) {
+        const [x, z] = near(s, 0.3, 0.8);
+        ok(x, z) && (gwPinkSpike(parts.fine, rnd, x, z, 0.9 + rnd() * 0.35), left.pink--);
+      }
+      if (left.broad > 0 && e > 0.2 && e < 0.75 && rnd() < 0.1) {
+        const [x, z] = near(s, 0.3, 0.9);
+        ok(x, z) && (gwBroadLeaf(parts.fine, rnd, x, z, 0.45 + rnd() * 0.3), left.broad--);
+      }
+    }
+    // something of its own, near the bank
+    if (!ar.minor) {
+      const kind = ["log", "post", "stump", "root"][gi++ % 4];
+      for (let tries = 0; tries < 40; tries++) {
+        const s = list[(rnd() * list.length) | 0],
+          [x, z] = near(s, 0.2, 0.8);
+        if (edge(x, z) > 0.4 || !ok(x, z, 0.45)) continue;
+        gwReedFind(parts, rnd, kind, x, z, ar.toBank(x, z), stoneColor), stats.finds++;
+        break;
+      }
+    }
+  }
+  return stats;
 }
 
 function aN(e, t, n = {}) {
@@ -77166,6 +77956,21 @@ vec2 gwTwitch(vec2 p, float hgt) {
           je === "reeds"
             ? `{ float hgt = clamp(transformed.y + 0.1, 0.0, 2.4);
   vec2 sway = vec2(sin(gwTwT * 0.9 + transformed.x * 0.37 + transformed.z * 0.21), cos(gwTwT * 0.74 + transformed.z * 0.41 + transformed.x * 0.13)) * 0.026 * hgt;
+${
+  g
+    ? ""
+    : `
+  // (medium and high: each clump in its own air: a quicker local flutter whose phase turns every metre or so, so a bed
+  // moves like plants in a light air and never in step; and what floats (flat, facing straight up, at the water) rides
+  // the swell as the lily pads do)
+  float gwPh = dot(transformed.xz, vec2(1.9, 2.7));
+  sway += vec2(sin(gwTwT * 1.7 + gwPh), cos(gwTwT * 1.37 + gwPh * 1.3)) * 0.02 * hgt * hgt;
+  if (normal.y > 0.999 && transformed.y < 0.08) {
+    float wh = 0.0;
+    for (int i = 0; i < 4; i++) { vec4 a = gwWaveA[i]; wh += a.w * sin(a.z * (a.x * transformed.x + a.y * transformed.z) + gwWaveB[i].x * gwWaveT + gwWaveB[i].y); }
+    transformed.y += wh;
+  }`
+}
   transformed.xz += sway + gwTwitch(transformed.xz, hgt) * 0.12;
   // (Lake 1 polish: the reeds part round the raft, bent out from their foot to 1.6 m or more, so none pierces its deck)
   vec2 rd = transformed.xz - gwRaft.xy; float rr = length(rd);
@@ -77190,7 +77995,10 @@ vec2 gwTwitch(vec2 p, float hgt) {
               je === "pads"
                 ? `
 attribute float aBed; uniform vec4 gwWaveA[4]; uniform vec2 gwWaveB[4]; uniform float gwWaveT;`
-                : ""
+                : je === "reeds" && !g
+                  ? `
+uniform vec4 gwWaveA[4]; uniform vec2 gwWaveB[4]; uniform float gwWaveT;`
+                  : ""
             }`,
           )
           .replace(
@@ -77200,7 +78008,7 @@ ${qe}`,
           );
       };
       let te = K.customProgramCacheKey?.() || "gwInkToonFog";
-      return (K.customProgramCacheKey = () => `${te}:wc:${je}`), K;
+      return (K.customProgramCacheKey = () => `${te}:wc:${je}${je === "reeds" && !g ? ":air" : ""}`), K;
     },
     le =
       (H = 1, Ee = !0) =>
@@ -78863,12 +79671,31 @@ ${qe}`,
   }
   if ((x("props"), ne)) {
     let H = jc(((t.artSeed | 0) ^ 388821) >>> 0),
-      Ee = xk(t, H, { low: g, avoid: Ag(t, e.data, o.id || "mossmere") });
+      gwAvoid = Ag(t, e.data, o.id || "mossmere"),
+      Ee = xk(t, H, { low: g, avoid: gwAvoid }),
+      // the best setting gets the full reed beds; medium keeps its clumps as they were (it is what most phones run)
+      gwRich =
+        !g &&
+        (() => {
+          try {
+            return e.render?.getQuality?.();
+          } catch {
+            return null;
+          }
+        })() === "high";
     for (let K of Ee)
       for (let we = 0; we < K.n; we++) {
         if (!g && we === 0) {
           let sr = gwReedRng(K.x, K.z);
-          gwReedClump(se.fine, sr, K.x, K.z, K.n, K.h);
+          // (high: a clump standing in one of the beds' pockets of clear water keeps only a stray stem or two)
+          gwReedClump(
+            se.fine,
+            sr,
+            K.x,
+            K.z,
+            gwRich && Sg(K.x * 0.75 + 31.7, 1.3, K.z * 0.75 - 12.9, 2) > 0.64 ? Math.min(K.n, 2) : K.n,
+            K.h,
+          );
           // (medium and high: now and then a mossy stone or two half in the water among the reeds)
           if (sr() < 0.3)
             for (let k = 0, kn = 1 + (sr() < 0.4 ? 1 : 0); k < kn; k++) {
@@ -78902,6 +79729,10 @@ ${qe}`,
         );
       }
     O.wcReeds = Ee.length;
+    if (gwRich && l === "mossmere") {
+      let st = gwReedBeds(se, Ee, t, gwAvoid, gwRich, le(0.6));
+      (O.wcBedPlants = st.added), (O.wcBedFinds = st.finds);
+    }
     let je = t.notch;
     if (je && l === "mossmere") {
       let K = Dr(((t.artSeed | 0) ^ 323285) >>> 0),
