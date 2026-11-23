@@ -71947,7 +71947,11 @@ vec2 fineGrad(vec2 p, float t) {
 // (water pass) the living surface: slow ripples 1.7-6 m long, their phase warped, that bend and break the mirror. Each
 // train fades out where a pixel spans too much of it (fw: metres per pixel), so far water never shimmers
 vec2 liveGrad(vec2 p, float t, float fw) {
+#ifdef GW_RICH
   vec2 q = p + (vec2(wNoise(p * 0.11 + t * 0.03), wNoise(p * 0.11 + 7.1 - t * 0.025)) - 0.5) * 5.0;
+#else
+  vec2 q = p;
+#endif
   vec4 a = (1.0 - smoothstep(0.2, 0.5, fw / vec4(1.7, 2.6, 3.9, 6.0))) * vec4(0.03, 0.03, 0.026, 0.022);
   vec2 g = cos(dot(q, vec2(3.4, 1.45)) + t * 3.0) * vec2(0.92, 0.39) * a.x;
   g += cos(dot(q, vec2(-1.0, 2.2)) - t * 2.4) * vec2(-0.41, 0.91) * a.y;
@@ -72310,7 +72314,7 @@ void main() {
     float post = 1.0 - step(0.5, o.z);
     shallow = max(shallow, (1.0 - smoothstep(-0.5, mix(4.5, 0.3, post), d)) * (1.0 - 0.8 * post));
     foam += edgeFoam(d, xz, float(i) * 1.37 + 2.0) * smoothstep(-1.6, -0.4, d) * mix(1.0, 0.3 * (1.0 - smoothstep(0.1, 0.3, d)), post);
-#ifdef GW_REFL
+#ifdef GW_RICH
     edgeW = max(edgeW, (1.0 - smoothstep(-0.3, 1.5, d)) * (1.0 - 0.6 * post));
 #endif
   }
@@ -72741,10 +72745,12 @@ void main() {
     {
       float sl = pow(max(dot(reflect(-L, Ng), V), 0.0), 90.0);
       streak += lcol * (floor(lc.w) * 0.01) * smoothstep(0.3, 0.75, sl) * spark * (1.0 - smoothstep(R * 0.45, R * 1.0, d)) * (1.3 - 0.7 * calmW);
+#ifdef GW_RICH
       // (water pass) a broken path: the living ripples that tip the light to the eye, in short dashes across the view
       float sp2 = pow(max(dot(reflect(-L, NL), V), 0.0), 26.0);
       float dashL = smoothstep(0.42, 0.78, wNoise(vec2(dot(xz, vp) * 0.9, dot(xz, vd) * 2.6) + vec2(0.0, uTime * 0.7) + float(i) * 5.3));
       streak += lcol * (floor(lc.w) * 0.006) * smoothstep(0.2, 0.85, sp2) * dashL * (1.0 - smoothstep(R * 0.6, R * 1.6, d));
+#endif
     }
 #else
     // streak: the mirror point sits between the light's foot and the eye
@@ -73164,6 +73170,9 @@ function $ae(e) {
         : { MAX_RIP: Bu, MAX_WAKE: qh, MAX_OBS: Og, MAX_L: yy },
     ),
       Kt ? (($e.GW_LOW = 1), delete $e.GW_REFL, delete $e.GW_SHADOW) : delete $e.GW_LOW,
+      // GW_RICH: the dearer touches of the living surface (its warped phase, each light's broken path) are for the
+      // best setting only; medium, the phone setting, keeps the plain ripples
+      vt === "high" ? ($e.GW_RICH = 1) : delete $e.GW_RICH,
       (p.needsUpdate = !0);
   }
   let E = {
@@ -76769,6 +76778,241 @@ function makeRockWick() {
   return { root, update };
 }
 
+// Mossmere's stone: moss on the tops and on faces that look up, with a ragged edge that wanders with a noise field, bare stone
+// on steep faces, and a dark wet band at the waterline with a fringe of green just above it. It only recolours vertices (the
+// shapes, the outlines and the toon shading are untouched), so it costs nothing per frame.
+const GW_MOSS = { deep: 0x34502a, lit: 0x66853a, dry: 0x8a9046, wet: 0x1c2a1e };
+function gwMossify(geo, amount = 1) {
+  const pos = geo?.attributes?.position,
+    nor = geo?.attributes?.normal,
+    col = geo?.attributes?.color;
+  if (!pos || !nor || !col || amount <= 0) return geo;
+  // (a low-poly top is a few big facets whose corners sit on the rim, where the normals lean out: so the upper part of each
+  // piece counts as a top too, and its moss is not lost to the averaged normals)
+  geo.computeBoundingBox();
+  const y0 = geo.boundingBox.min.y,
+    yh = Math.max(0.3, geo.boundingBox.max.y - y0);
+  const deep = Xo(GW_MOSS.deep),
+    lit = Xo(GW_MOSS.lit),
+    dry = Xo(GW_MOSS.dry),
+    wet = Xo(GW_MOSS.wet),
+    ss = (a, b, v) => {
+      const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    };
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i),
+      y = pos.getY(i),
+      z = pos.getZ(i),
+      nl = Math.hypot(nor.getX(i), nor.getY(i), nor.getZ(i)) || 1,
+      ny = Math.max(
+        nor.getY(i) / nl,
+        nor.getY(i) > -0.15 * nl ? (0.95 * ((pos.getY(i) - y0) / yh - 0.55)) / 0.45 : -1,
+      ),
+      n1 = Sg(x * 0.38 + 17.3, y * 0.38, z * 0.38 - 5.1, 3),
+      n2 = Gs(x * 2.1 + 3.1, y * 2.1 + 9.7, z * 2.1);
+    let c = [col.getX(i), col.getY(i), col.getZ(i)];
+    // moss: on faces that look up, its edge pushed up or down the slope by the noise; patchy, never a hard stripe
+    const lo = 0.26 + (0.5 - n1) * 0.55;
+    let m = ss(lo, lo + 0.4, ny) * ss(0.12, 0.5, n1 * 0.85 + n2 * 0.3) * ss(-0.05, 0.45, y) * amount;
+    if (m > 0) {
+      const tone = Jn(Jn(deep, lit, ss(0.25, 0.85, n2 * 0.6 + ny * 0.4)), dry, ss(0.72, 0.95, n1) * 0.5);
+      c = Jn(c, tone, Math.min(0.95, m));
+    }
+    // the waterline: stone darkened by the wet up to a ragged line, with a band of green just above the water
+    if (y > -3) {
+      const w = 1 - ss(0.02, 0.45 + 0.45 * n2, y);
+      c = Jn(c, ko(Jn(c, wet, 0.5), 0.62), w * 0.85);
+      const g =
+        Math.exp(-Math.pow((y - 0.32 - 0.3 * (n1 - 0.5)) / 0.26, 2)) *
+        ss(-0.55, 0.1, ny) *
+        (0.35 + 0.75 * n2);
+      c = Jn(c, ko(deep, 0.85), Math.min(0.8, g * amount));
+    }
+    col.setXYZ(i, c[0], c[1], c[2]);
+  }
+  col.needsUpdate = true;
+  return geo;
+}
+
+// A clump of reeds (medium and high only; low keeps its plain stems): tall stems that lean and bend from their foot, a few
+// shorter blades bent over, and cattail seed heads on some stems; dark green at the water, paling to straw at the tips. The
+// geometry is in world space (merged with the lake's other fine pieces), and starts at y = -0.12 like the plain stems, so the
+// reeds' sway and their parting round the raft (the vertex code in aN) work on it unchanged.
+const GW_REED = { foot: 0x26341f, mid: 0x4d6634, tip: 0xa89c64, head: 0x4a2f1f };
+// A lily pad, 0.55 m across like the plain disc it replaces: a notched leaf whose edge turns up into a thin lit rim, with a
+// wine-red lip just at the water (the leaf's underside), dark green at its heart and faint veins out from it. About as many
+// triangles as the old 12-sided disc (low gets the same shape).
+const GW_PAD = { heart: 0x2c4428, leaf: 0x48683a, vein: 0x5a7c46, rim: 0x718c4a, under: 0x5e2a26 };
+function gwLilyPadGeo() {
+  const N = 14,
+    a0 = 0.3,
+    span = Math.PI * 2 - 0.6,
+    rings = [
+      [0.0, 0.02],
+      [0.3, 0.024],
+      [0.5, 0.03],
+      [0.555, 0.052],
+      [0.565, -0.02],
+    ],
+    heart = Xo(GW_PAD.heart),
+    leaf = Xo(GW_PAD.leaf),
+    vein = Xo(GW_PAD.vein),
+    rim = Xo(GW_PAD.rim),
+    under = Xo(GW_PAD.under),
+    pos = [],
+    col = [],
+    idx = [];
+  for (let k = 0; k < rings.length; k++)
+    for (let j = 0; j <= N; j++) {
+      const [r, y] = rings[k],
+        a = a0 + (span * j) / N,
+        wob = 1 + 0.03 * Math.sin(j * 2.7 + k);
+      pos.push(Math.cos(a) * r * wob, y, Math.sin(a) * r * wob);
+      const c =
+        k === 0
+          ? heart
+          : k === 1
+            ? j % 2
+              ? vein
+              : leaf
+            : k === 2
+              ? Jn(leaf, rim, 0.25)
+              : k === 3
+                ? rim
+                : under;
+      col.push(c[0], c[1], c[2]);
+    }
+  const W = N + 1;
+  for (let k = 0; k + 1 < rings.length; k++)
+    for (let j = 0; j < N; j++) {
+      const a = k * W + j,
+        b = a + W;
+      idx.push(a, a + 1, b, a + 1, b + 1, b);
+    }
+  const g = new lo();
+  return (
+    g.setAttribute("position", new eo(pos, 3)),
+    g.setAttribute("color", new eo(col, 3)),
+    g.setIndex(idx),
+    g.computeVertexNormals(),
+    g
+  );
+}
+// A small water-lily: two rings of pointed petals, open (white geometry: the material gives its colour).
+function gwLilyFlowerGeo() {
+  const pos = [],
+    idx = [],
+    put = (x, y, z) => (pos.push(x, y, z), pos.length / 3 - 1);
+  for (const [n, len, rise, off] of [
+    [7, 0.15, 0.06, 0],
+    [6, 0.1, 0.11, 0.45],
+  ]) {
+    for (let i = 0; i < n; i++) {
+      const a = ((i + off) / n) * Math.PI * 2,
+        w = Math.PI / n,
+        c = put(0, 0.03, 0),
+        l = put(Math.cos(a - w) * len * 0.45, 0.04 + rise * 0.4, Math.sin(a - w) * len * 0.45),
+        t = put(Math.cos(a) * len, 0.03 + rise, Math.sin(a) * len),
+        r = put(Math.cos(a + w) * len * 0.45, 0.04 + rise * 0.4, Math.sin(a + w) * len * 0.45);
+      idx.push(c, t, l, c, r, t, c, l, t, c, t, r);
+    }
+  }
+  const g = new lo();
+  g.setAttribute("position", new eo(pos, 3)), g.setIndex(idx), g.computeVertexNormals();
+  return g;
+}
+const gwReedRng = (x, z) =>
+  Dr((Math.round(x * 97.3) * 73856093) ^ (Math.round(z * 61.7) * 19349663) ^ 0x2f6b);
+function gwReedClump(out, rnd, x, z, n, h, spread = 0.6) {
+  const foot = Xo(GW_REED.foot),
+    mid = Xo(GW_REED.mid),
+    tip = Xo(GW_REED.tip),
+    head = Xo(GW_REED.head),
+    lean0 = rnd() * Math.PI * 2;
+  const blade = (bx, bz, ht, r0, bend, flat, dir, colorAt) => {
+    const S = 4,
+      pos = [],
+      idx = [],
+      dx = Math.cos(dir),
+      dz = Math.sin(dir),
+      at = (t) => {
+        const off = bend * ht * t * t;
+        return [bx + dx * off, -0.12 + ht * t * (1 - 0.35 * bend * t * t), bz + dz * off];
+      };
+    for (let s = 0; s < S; s++) {
+      const t = s / S,
+        c = at(t),
+        r = r0 * (1 - 0.85 * t);
+      for (let k = 0; k < 3; k++) {
+        const a = dir + Math.PI / 2 + (k * Math.PI * 2) / 3,
+          ca = Math.cos(a) * r,
+          sa = Math.sin(a) * r;
+        // a blade is flattened across its lean; a stem is round
+        pos.push(c[0] + ca * dx * flat - sa * dz, c[1], c[2] + ca * dz * flat + sa * dx);
+      }
+    }
+    pos.push(...at(1));
+    for (let s = 0; s + 1 < S; s++)
+      for (let k = 0; k < 3; k++) {
+        const a = s * 3 + k,
+          b = s * 3 + ((k + 1) % 3);
+        idx.push(a, b, b + 3, a, b + 3, a + 3);
+      }
+    const top = S * 3;
+    for (let k = 0; k < 3; k++) idx.push((S - 1) * 3 + k, (S - 1) * 3 + ((k + 1) % 3), top);
+    const g = new lo();
+    g.setAttribute("position", new eo(pos, 3)), g.setIndex(idx), g.computeVertexNormals();
+    out.push(Gn(g, { colorFn: (px, py) => colorAt(Math.max(0, Math.min(1, (py + 0.12) / ht))) }));
+    return at;
+  };
+  const shade = (t, v) => {
+    const c = t < 0.55 ? Jn(foot, mid, t / 0.55) : Jn(mid, tip, Math.pow((t - 0.55) / 0.45, 1.4));
+    return ko(c, v);
+  };
+  for (let s = 0; s < n; s++) {
+    const a = rnd() * Math.PI * 2,
+      d = Math.sqrt(rnd()) * spread,
+      bx = x + Math.cos(a) * d,
+      bz = z + Math.sin(a) * d,
+      ht = h * (0.55 + rnd() * 0.65),
+      bend = 0.06 + rnd() * rnd() * 0.3,
+      dir = lean0 + (rnd() - 0.5) * 1.6,
+      v = 0.8 + rnd() * 0.4;
+    const at = blade(bx, bz, ht, 0.045, bend, 1, dir, (t) => shade(t, v));
+    if (rnd() < 0.38 && ht > h * 0.8) {
+      // a cattail seed head on the stem, below its tip
+      const p0 = at(0.74),
+        p1 = at(0.88),
+        ax = new He(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]),
+        m = new Lo().compose(
+          new He((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, (p0[2] + p1[2]) / 2),
+          new ea().setFromUnitVectors(new He(0, 1, 0), ax.clone().normalize()),
+          new He(1, ax.length(), 1),
+        );
+      out.push(Gn(new Xn(0.05, 0.045, 1, 5, 1), { matrix: m, color: ko(head, v) }));
+    }
+  }
+  // shorter blades round the foot, some bent well over
+  const nb = 2 + ((rnd() * 3) | 0);
+  for (let s = 0; s < nb; s++) {
+    const a = rnd() * Math.PI * 2,
+      d = Math.sqrt(rnd()) * spread * 0.9,
+      ht = h * (0.3 + rnd() * 0.35),
+      v = 0.75 + rnd() * 0.35;
+    blade(
+      x + Math.cos(a) * d,
+      z + Math.sin(a) * d,
+      ht,
+      0.06,
+      0.35 + rnd() * 0.55,
+      0.35,
+      a + (rnd() - 0.5),
+      (t) => shade(Math.min(1, t * 0.8 + 0.1), v),
+    );
+  }
+}
+
 function aN(e, t, n = {}) {
   let rockAngler = null;
   let o = t.zone || {},
@@ -76840,7 +77084,8 @@ function aN(e, t, n = {}) {
           color: 16777215,
           vertexColors: !0,
           flatShading: !0,
-          rim: 0.32,
+          // (Mossmere: a softer rim, so mossy tops read green and not frosted at the silhouette)
+          rim: l === "mossmere" ? 0.2 : 0.32,
           rimColor: z,
           rimPower: 0.56,
           steps: 3,
@@ -76920,7 +77165,7 @@ vec2 gwTwitch(vec2 p, float hgt) {
         let qe =
           je === "reeds"
             ? `{ float hgt = clamp(transformed.y + 0.1, 0.0, 2.4);
-  vec2 sway = vec2(sin(gwTwT * 1.1 + transformed.x * 0.37 + transformed.z * 0.21), cos(gwTwT * 0.93 + transformed.z * 0.41 + transformed.x * 0.13)) * 0.016 * hgt;
+  vec2 sway = vec2(sin(gwTwT * 0.9 + transformed.x * 0.37 + transformed.z * 0.21), cos(gwTwT * 0.74 + transformed.z * 0.41 + transformed.x * 0.13)) * 0.026 * hgt;
   transformed.xz += sway + gwTwitch(transformed.xz, hgt) * 0.12;
   // (Lake 1 polish: the reeds part round the raft, bent out from their foot to 1.6 m or more, so none pierces its deck)
   vec2 rd = transformed.xz - gwRaft.xy; float rr = length(rd);
@@ -77195,7 +77440,8 @@ ${qe}`,
     Yt.setAttribute("position", new eo(ke, 3)),
       Yt.setAttribute("color", new eo(Ce, 3)),
       Yt.setIndex(qe),
-      Yt.computeVertexNormals();
+      Yt.computeVertexNormals(),
+      l === "mossmere" && gwMossify(Yt, 0.85);
     let Jt = b(
         el(
           {
@@ -77354,7 +77600,8 @@ ${qe}`,
       Oe.setAttribute("color", new Kn(xt, 3)),
       Ut && Oe.setAttribute("aMoss", new Kn(Ut, 1)),
       Oe.setIndex(ue),
-      Oe.computeVertexNormals();
+      Oe.computeVertexNormals(),
+      l === "mossmere" && gwMossify(Oe, 0.7);
     let ut = b(
       el(
         {
@@ -77750,12 +77997,15 @@ ${qe}`,
           j(qe, xt, st, h, 3, 12));
     },
     reeds(H, Ee, je = 5, K = 1.6) {
+      let wc = l === "mossmere" && !g;
+      wc && gwReedClump(se.fine, gwReedRng(H, Ee), H, Ee, je, K, 0.7);
       for (let we = 0; we < je; we++) {
         let te = p() * ao,
           ke = p() * 0.7,
           Ce = K * p.range(0.6, 1.2),
           qe = new ii(0.05, Ce, 4);
-        se.fine.push(
+        // (on medium and high in Mossmere the clump above stands here: the stems' draws are kept so the props after are unmoved)
+        (wc ? [] : se.fine).push(
           Gn(qe, {
             matrix: co(
               H + Math.cos(te) * ke,
@@ -78616,11 +78866,28 @@ ${qe}`,
       Ee = xk(t, H, { low: g, avoid: Ag(t, e.data, o.id || "mossmere") });
     for (let K of Ee)
       for (let we = 0; we < K.n; we++) {
+        if (!g && we === 0) {
+          let sr = gwReedRng(K.x, K.z);
+          gwReedClump(se.fine, sr, K.x, K.z, K.n, K.h);
+          // (medium and high: now and then a mossy stone or two half in the water among the reeds)
+          if (sr() < 0.3)
+            for (let k = 0, kn = 1 + (sr() < 0.4 ? 1 : 0); k < kn; k++) {
+              let ra = sr.range(0.14, 0.28),
+                sa2 = sr() * ao,
+                sd = sr.range(0.2, 0.55);
+              se.rock.push(
+                Gn(Gd(sr, { r: ra, h: ra * sr.range(0.7, 1.2), detail: 1, rough: 0.3 }), {
+                  matrix: co(K.x + Math.cos(sa2) * sd, -ra * 0.45, K.z + Math.sin(sa2) * sd, 0, sr() * ao, 0),
+                  colorFn: le(0.6),
+                }),
+              );
+            }
+        }
         let te = H() * ao,
           ke = H() * 0.6,
           Ce = K.h * H.range(0.6, 1.2),
           qe = new ii(0.045, Ce, 4, 1, !0);
-        se.fine.push(
+        (g ? se.fine : []).push(
           Gn(qe, {
             matrix: co(
               K.x + Math.cos(te) * ke,
@@ -78651,12 +78918,13 @@ ${qe}`,
           Ut = xt * je.sa + Mt * je.ca,
           on = 4 + ((K() * 4) | 0);
         for (let ae = 0; ae < on; ae++) {
+          !g && ae === 0 && gwReedClump(se.fine, gwReedRng(zt, Ut), zt, Ut, on, 1.5, 0.5);
           let Ue = K() * ao,
             U = K() * 0.5,
             ue = K.range(0.9, 1.8),
             Oe = new ii(0.04, ue, 4, 1, !0),
             ut = Ce * K.range(0.05, 0.22);
-          se.fine.push(
+          (g ? se.fine : []).push(
             Gn(Oe, {
               matrix: co(
                 zt + Math.cos(Ue) * U,
@@ -78691,6 +78959,7 @@ ${qe}`,
       }
       return W(ke), Ws(ke, { cast: we }), E.add(ke), Qe.push(ke), ke;
     };
+  if (l === "mossmere") for (let H of se.rock) gwMossify(H);
   Re(se.rock, Z, Se, "rocks"), Re(se.org, D, c ? null : ye, "organics");
   let ge = ne
     ? b(
@@ -78930,12 +79199,11 @@ ${qe}`,
   for (let H of Pt(Gt, 14, (Ee, je) => Ht(Ee, je, 3) && Math.hypot(Ee - t.spawn.x, je - t.spawn.z) > 6))
     Rt([sn, en], H.x, H.z, { halo: ko(u.lamp, 0.8), haloSize: 2.2, haloY: 1, bob: 0.8 });
   if (l === "mossmere") {
-    let H = new Xn(0.55, 0.55, 0.04, 12, 1, !1, 0.3, ao - 0.6);
-    Gn(H, { colorFn: (Mt, zt, Ut) => ko(Jn(i.organic, i.woodHi, 0.2 + 0.5 * Gs(Mt * 3, 0, Ut * 3)), 0.7) });
+    let H = gwLilyPadGeo();
     let Ee = { color: 16777215, vertexColors: !0, rim: 0.18, rimColor: r.far, steps: 3 },
       je = b(ne ? Y(Ee, { fogScale: 0.9 }, "pads") : el(Ee, { fogScale: 0.9 })),
-      K = new ii(0.1, 0.16, 6);
-    K.translate(0.1, 0.1, 0.05), Gn(K, { color: [1, 1, 1] });
+      K = gwLilyFlowerGeo();
+    K.translate(0.12, 0.0, 0.06), Gn(K, { color: [1, 1, 1] });
     let we = b(Jl(r.accent, 2.4)),
       te = g ? 40 : 75,
       ke = ne
@@ -80142,7 +80410,7 @@ function buildHarbourBell() {
     metal = 0x67533e,
     brass = 0xa98a56,
     iron = 0x4b4948,
-    oak = 0x72513c;
+    oak = 0x5c3f2b;
   const add = (g, c) => out.push(zn(g, c));
   function beam(a, b, w, d, col) {
     const start = new He(...a),
@@ -80159,7 +80427,7 @@ function buildHarbourBell() {
   function grain(x, y, z) {
     if (y < 0.12 + 0.04 * Math.sin(x * 16 + z * 9)) return 0x384d42;
     const vein = Math.sin(x * 25 + z * 9 + Math.sin(y * 2 + z * 6) * 1.2);
-    return vein > 0.65 ? 0x89684b : vein < -0.4 ? 0x513e34 : oak;
+    return vein > 0.65 ? 0x7a5a3e : vein < -0.4 ? 0x3e2c22 : oak;
   }
   beam([-1.26, -1.95, -0.14], [-1.43, 2.21, -0.09], 0.34, 0.34, grain);
   beam([1.31, -1.9, 0.1], [1.2, 2.52, 0.04], 0.32, 0.35, grain);
@@ -80232,7 +80500,12 @@ function buildHarbourBell() {
   add(shell, (x, y, z) => {
     const tide = 0.78 + 0.035 * Math.sin(12 * x + z * 8);
     if (y < tide) return y > tide - 0.1 ? 0x769078 : Math.sin(x * 15 + z * 21) > 0.34 ? 0x587769 : 0x416356;
-    return Math.sin(x * 11 + z * 12 + y * 7) > 0.65 ? 0x8a7352 : metal;
+    // verdigris weeping down from the crown in streaks, and the bronze worn bright at the shoulder where hands and ropes rubbed it
+    const streak = Math.sin(Math.atan2(z, x) * 9 + Math.sin(y * 5) * 0.6) * 0.5 + 0.5;
+    if (streak > 0.82 && y > tide + 0.12 * Math.sin(x * 23 + z * 17) + 0.1)
+      return y > 1.25 ? 0x5f8a74 : 0x4f7262;
+    if (y > 1.36) return Math.sin(x * 19 + z * 13) > 0.2 ? 0x6a8c73 : 0x58705a;
+    return Math.sin(x * 11 + z * 12 + y * 7) > 0.65 ? 0x9a7a50 : y < 1.0 ? 0x5e4630 : metal;
   });
   for (const [depth, r] of [
     [0.29, 0.31],
@@ -80314,6 +80587,10 @@ void main() {
   // (an upper layer swells and sags with its own slow billow, so the bank has height and never reads as stacked flat plates; the
   // water-level layer and the curtains stay where they are; the fix pass)
   if (aL.x > 0.3) pp.y += (wpN(position.xz * 0.14 + vec2(aL.x * 3.7, uTime * 0.02)) - 0.35) * (0.35 + 0.5 * aL.x);
+  // (the lift: the bank rises off the water and drifts away on the air as it thins, its upper layers first and furthest)
+  float lr = lf * lf * (3.0 - 2.0 * lf);
+  pp.y += lr * (0.5 + 1.3 * max(aL.x, 0.0)) + lr * (wpN(position.xz * 0.3 + 5.0) - 0.5) * 0.8;
+  pp.xz += lr * vec2(1.4, -0.9) * (1.0 + max(aL.x, 0.0));
   gl_Position = op < 0.002 ? vec4(2.0, 2.0, 2.0, 1.0) : projectionMatrix * viewMatrix * vec4(pp, 1.0);
 }`,
   Iie = `
@@ -81021,7 +81298,18 @@ function pN(
   if (Te?.area?.kind === "disc") {
     const at = fN(Te.area),
       art = buildHarbourBell(),
-      mat = w(sa({ color: 0xffffff, vertexColors: true, side: ca, rim: 0.22, gloss: 0.17, shine: 24 }));
+      // (bronze catches the moon and the lamps: glossier than plain wood, with a soft cool rim; shared by the oak frame)
+      mat = w(
+        sa({
+          color: 0xffffff,
+          vertexColors: true,
+          side: ca,
+          rim: 0.16,
+          rimColor: 0x8c98c8,
+          gloss: 0.3,
+          shine: 30,
+        }),
+      );
     const frame = new An(p(art.frame), mat),
       clapper = new An(p(art.clapper), mat);
     frame.name = "Bell Pool oak frame";
@@ -81488,10 +81776,8 @@ function pN(
         _e.some((ct) => Math.hypot(ct.x - We, ct.z - at) < 0.95) ||
         _e.push({ x: We, z: at, ry: O() * ao, s: 0.7 + O() * 0.75, ph: O() * ao });
     }
-    let Le = new Xn(0.55, 0.55, 0.04, 12, 1, !1, 0.3, ao - 0.6),
-      it = Xo(8019504),
-      Tt = ko(Xo(4864554), 1.4);
-    Gn(Le, { colorFn: (Ct, re, De) => ko(Jn(it, Tt, 0.2 + 0.5 * Gs(Ct * 3 + 9, 0, De * 3)), 0.7) }), p(Le);
+    let Le = gwLilyPadGeo();
+    p(Le);
     let Ft = w(
       el({ color: 16777215, vertexColors: !0, rim: 0.18, rimColor: E, steps: 3 }, { fogScale: 0.9 }),
     );
@@ -81888,7 +82174,7 @@ uniform float uK; uniform vec3 uGlowCol; varying float vGlowW;`,
           ((We = Ct(De.x, De.z) || 0),
           (at = ((Ct(De.x + 0.6, De.z) || 0) - We) * 0.5),
           (ct = ((Ct(De.x, De.z + 0.6) || 0) - We) * 0.5)),
-          F.set(-ct, De.ry, at, "YXZ"),
+          F.set(-ct + 0.05 * Math.sin(De.ph), De.ry, at + 0.04 * Math.cos(De.ph * 1.7), "YXZ"),
           k.setFromEuler(F),
           q.setScalar(De.s),
           N.setMatrixAt(re, ge.compose($.set(De.x, We * 0.4 + 0.01, De.z), k, q));
