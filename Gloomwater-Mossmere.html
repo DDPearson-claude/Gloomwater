@@ -5283,6 +5283,17 @@ vec2 fineGrad(vec2 p, float t) {
   g += cos(dot(q, vec2(1.7, 11.2)) - t * 4.6) * vec2(0.15, 0.99) * 0.45;
   return g;
 }
+// (water pass) the living surface: slow ripples 1.7-6 m long, their phase warped, that bend and break the mirror. Each
+// train fades out where a pixel spans too much of it (fw: metres per pixel), so far water never shimmers
+vec2 liveGrad(vec2 p, float t, float fw) {
+  vec2 q = p + (vec2(wNoise(p * 0.11 + t * 0.03), wNoise(p * 0.11 + 7.1 - t * 0.025)) - 0.5) * 5.0;
+  vec4 a = (1.0 - smoothstep(0.2, 0.5, fw / vec4(1.7, 2.6, 3.9, 6.0))) * vec4(0.03, 0.03, 0.026, 0.022);
+  vec2 g = cos(dot(q, vec2(3.4, 1.45)) + t * 3.0) * vec2(0.92, 0.39) * a.x;
+  g += cos(dot(q, vec2(-1.0, 2.2)) - t * 2.4) * vec2(-0.41, 0.91) * a.y;
+  g += cos(dot(q, vec2(1.45, -0.7)) + t * 2.0) * vec2(0.9, -0.43) * a.z;
+  g += cos(dot(q, vec2(-0.25, -1.02)) - t * 1.6) * vec2(-0.24, -0.97) * a.w;
+  return g;
+}
 #endif
 #ifndef GW_LOW
 float caustic(vec2 p, float t) {
@@ -5573,7 +5584,12 @@ void main() {
     depthAt = texture2D(uDepthTex, xz * uDepthScale + 0.5).r;
     shallow = max(shallow * 0.6, (1.0 - depthAt) * 0.85);
   }
+#ifdef GW_REFL
+  // (water pass: on the mirror the bank's foam is a breath, so the mirrored shore meets the water softly, not on a pale line)
+  if (dShore < 4.0 && dShore > -2.0) foam += edgeFoam(dShore, xz, 0.0) * 0.3 * smoothstep(-2.0, -0.6, dShore);
+#else
   if (dShore < 4.0 && dShore > -2.0) foam += edgeFoam(dShore, xz, 0.0) * 0.8 * smoothstep(-2.0, -0.6, dShore);
+#endif
 #ifdef GW_WC
   // >>> WC-3: the drop-off's shade. Along the shelf's lip (depth 0.35-0.45) the pale margins end on a soft line and the mid water
   // beyond reads a little deeper; at the Bell Pool's rim (5-9 m from her bell) the water falls to ink
@@ -5600,6 +5616,9 @@ void main() {
 
   // ---- obstacle islands / pillars: foam rings, shallows, and inky mirror reflections
   float refl = 0.0;
+#ifdef GW_REFL
+  float edgeW = 1.0 - smoothstep(-0.4, 2.6, dShore);   // (water pass) the soft margin where the water meets a bank, rock or hull
+#endif
   float hc = max(cameraPosition.y - P.y, 0.5);
   for (int i = 0; i < MAX_OBS; i++) {
     if (i >= uObsN) break;
@@ -5630,20 +5649,28 @@ void main() {
     float post = 1.0 - step(0.5, o.z);
     shallow = max(shallow, (1.0 - smoothstep(-0.5, mix(4.5, 0.3, post), d)) * (1.0 - 0.8 * post));
     foam += edgeFoam(d, xz, float(i) * 1.37 + 2.0) * smoothstep(-1.6, -0.4, d) * mix(1.0, 0.3 * (1.0 - smoothstep(0.1, 0.3, d)), post);
+#ifdef GW_REFL
+    edgeW = max(edgeW, (1.0 - smoothstep(-0.3, 1.5, d)) * (1.0 - 0.6 * post));
+#endif
   }
 #ifndef GW_REFL
   // the cliffs ringing the lake mirror as a dark band along the far shore
   refl = max(refl, (1.0 - smoothstep(0.0, 9.0, dShore)) * 0.7);
 #endif
 
-  // ---- raft contact: lapping foam hugging the hull, a soft bow wave when moving
+  // ---- raft contact: lapping foam hugging the hull, a soft bow wave when moving; (water pass) the hull's dark contact
+  float hullK = 0.0;
   if (uRaft.z > 0.0) {
     vec2 dv = xz - uRaft.xy;
     float d = length(dv) - uRaft.z;
     if (d < 2.5) {
       float n = wNoise(xz * 2.2 + uTime * 0.6);
-      foam += (1.0 - smoothstep(-0.2, 0.35 + n * 0.4, d)) * (0.35 + 0.25 * n) * smoothstep(-1.2, -0.2, d);
+      hullK = 1.0 - smoothstep(-0.6, 0.8, d);
+      foam += (1.0 - smoothstep(-0.2, 0.35 + n * 0.4, d)) * (0.2 + 0.2 * n) * smoothstep(-1.2, -0.2, d);
       foam += (1.0 - smoothstep(0.0, 1.6, d)) * smoothstep(0.55, 0.75, n) * 0.25 * (0.4 + max(uRaft.w, 0.0));
+#ifdef GW_REFL
+      edgeW = max(edgeW, 1.0 - smoothstep(-0.3, 0.9, d));
+#endif
     }
   }
 
@@ -5857,13 +5884,28 @@ void main() {
 #ifdef GW_WC
   gFine *= 1.0 - 0.85 * wcSlick;   // (WC-3: the wind lane's slick is glassy)
 #endif
+  // (water pass) the living ripples: nearly still by the raft, fuller out on the lake; a slick calms them
+  float rFar = smoothstep(2.5, 26.0, uRaft.z > 0.0 ? length(xz - uRaft.xy) : camD);
+  vec2 gLive = liveGrad(xz, uTime, fwidth(xz.x) + fwidth(xz.y)) * mix(0.12, 1.0, rFar);
+#ifdef GW_V3
+  gLive *= 1.0 - 0.85 * min(sFlat, 1.0);
+#endif
+#ifdef GW_WC
+  gLive *= 1.0 - 0.7 * wcSlick;
+#endif
+  vec3 NL = normalize(vec3(N.x - gLive.x, N.y, N.z - gLive.y));
+  float ndvL = clamp(dot(NL, V), 0.0, 1.0);
   // (a breath of the air's colour keeps the deepest water off black; the dawn lays a little of its pale mist on the lake)
   vec3 body = mix(base, uSky * 0.72, 0.07 + 0.04 * uMood.x + 0.2 * uMood.y);
   // light on the water itself: the faces of the chop and the fine ripples that lean toward the key light are a little
   // lighter, the faces that lean away a little deeper — the near lake has form, not a flat fill (the long swell takes
   // only a little of it: its straight fronts would lay stripes across the lake)
-  float lean = -dot(g - gSwell * 0.7 + gFine * 0.6, uKeyDir.xz);
+  float lean = -dot(g - gSwell * 0.7 + gFine * 0.6 + gLive * 0.8, uKeyDir.xz);
   body *= (1.0 + clamp(lean * 3.4, -0.2, 0.34) * (0.35 + 0.65 * wsh)) * mix(0.72, 1.0, wsh);
+  // (water pass) shallows a little lighter and greener, open water deep; at a bank, rock or hull the water thins to a
+  // pale green margin and lets go of its mirror, so it meets them softly
+  body *= mix(vec3(1.0), vec3(1.0, 1.2, 0.95), shallow * 0.7);
+  body = mix(body, uShallow * vec3(1.0, 1.25, 0.85) * 1.15, edgeW * edgeW * 0.4);
 #ifdef USE_FOG
   #ifdef FOG_EXP2
   float fogF = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
@@ -5872,14 +5914,20 @@ void main() {
   #endif
   body = mix(body, fogColor, fogF);     // the thin scene air lies on the water's own colour; the mirror image carries its own
 #endif
-  float F = clamp(1.5 * (0.03 + 0.97 * pow(1.0 - ndv, 5.0)) + 0.03, 0.0, 0.9);
+  // (water pass) looking down near the raft the eye sees into deep dark water; toward grazing the lake turns to mirror
+  float F = clamp(1.7 * (0.02 + 0.98 * pow(1.0 - ndvL, 5.0)), 0.0, 0.92);
+  body *= mix(1.0, 0.5, smoothstep(0.3, 0.75, ndvL) * (1.0 - edgeW));
   vec4 rc = uReflMat * vec4(xz.x, 0.0, xz.y, 1.0);
   vec2 ruv = rc.xy / max(rc.w, 1e-4);
   // the ripple slope across / along the view nudges the lookup, taller than wide (reflections smear down the water);
   // a second tap rides the fine ripples, so near water breaks its mirror image into strokes and far water stays a mirror
   vec2 nv = vec2(dot(N.xz, vp), dot(N.xz, vd));
-  vec2 nf = nv - vec2(dot(gFine, vp), dot(gFine, vd)) * 0.5;
+  // (water pass: the fine ripples only nudge it now; at full strength they smeared each mirrored star into a white scratch)
+  vec2 nf = nv - vec2(dot(gFine, vp), dot(gFine, vd)) * 0.14;
   float rk = 0.05 * clamp(20.0 / camD, 0.25, 2.2);
+  // (water pass) the living ripples bend the mirror by about as much near and far (in the image, not on the lake)
+  vec2 nl = -vec2(dot(gLive, vp), dot(gLive, vd)) * vec2(0.5, -1.5) * 0.06;
+  ruv += nl;
   vec3 rcol = texture2D(uReflTex, clamp(ruv + nv * vec2(1.0, -2.2) * rk - uReflBlur.xy, 0.002, 0.998)).rgb;
   rcol = mix(rcol, texture2D(uReflTex, clamp(ruv + nf * vec2(1.3, -3.0) * rk + uReflBlur.xy, 0.002, 0.998)).rgb, max(0.5 - 0.25 * calmW, uReflBlur.z));
   rcol = min(rcol, vec3(1.1));          // a glow's mirror image is a glow, not a hot sheet on the water
@@ -5896,7 +5944,7 @@ void main() {
     rcol *= 1.0 - 0.75 * warmR * smoothstep(0.05, 0.3, rl);
   }
 #endif
-  float reflK = F * (1.0 - 0.8 * clamp(foam, 0.0, 1.0));
+  float reflK = F * (1.0 - 0.8 * clamp(foam, 0.0, 1.0)) * (1.0 - 0.45 * edgeW);
 #ifdef GW_V3
   // where a fish turned, rose or struck the water is stirred and stops mirroring: a sign is a dark break in the mirror
   // (and so do its rings and its slick: on the bright mirrored vault a pale stroke needs dark water under it to read)
@@ -5914,7 +5962,7 @@ void main() {
   // glitter: the fine ripples' own normal, and sparse drifting patches of water where the facets happen to face the eye,
   // so a highlight is always a scatter of short strokes on the wavelets' faces strung toward its light, never a sheet, a
   // blob or a ring
-  vec3 Ng = normalize(vec3(N.x - gFine.x * 1.5, N.y, N.z - gFine.y * 1.5));
+  vec3 Ng = normalize(vec3(NL.x - gFine.x * 1.5, NL.y, NL.z - gFine.y * 1.5));
   float spark = smoothstep(0.3, 0.6, wNoise(xz * 1.7 + vec2(uTime * 0.45, -uTime * 0.3)) * (0.6 + 0.8 * wNoise(xz * 0.6 - vec2(uTime * 0.12, 0.0) + 9.0))) * fineK;
 #ifdef GW_WC
   spark *= 1.0 - 0.9 * wcSlick;   // (WC-3: the slick has no ripples to glitter)
@@ -5933,7 +5981,7 @@ void main() {
   // near the horizon, deepening toward the zenith, so the near water reads deep and the stars show
   float skyUp = smoothstep(0.12, 0.75, reflect(-V, N).y);
   vec3 skyC = uSky * mix(1.0, 0.42, skyUp);
-  vec3 col = mix(base, skyC, clamp(0.1 + fb * 0.85, 0.0, 0.92));
+  vec3 col = mix(base, skyC, clamp(0.03 + fb * 0.9, 0.0, 0.92));
   // mirrored silhouettes show where the surface reflects most (grazing, far water)
   col = mix(col, uDeep * 0.25, refl * clamp(0.18 + fb * 1.4, 0.0, 0.88));
   // painterly mist strokes: long view-perpendicular brush marks where the fresnel lifts
@@ -5980,7 +6028,7 @@ void main() {
     float d = sqrt(d2);
     float att = (h * h) / (d2 + h * h);
     att *= sqrt(att);
-    float cut = 1.0 - smoothstep(R * 0.45, R, d);
+    float cut = 1.0 - smoothstep(R * 0.2, R * 0.9, d);
     float pk = att * cut + cut * 0.035;
     // no reach ring and no band: a light's pool fades smoothly out to where its reach ends (DESIGN §19.1). The old cel
     // banding (a 3-step toon on the pool) drew concentric rings round the raft's lights, which the landing's close-up and
@@ -5991,9 +6039,11 @@ void main() {
     // copper/rose, so the lantern pool would not match the HUD lantern amber
     vec3 lcol = lc.rgb;
     float warmth = clamp((lcol.r - lcol.b) / max(lcol.r, 1e-4) * 1.6 - 0.6, 0.0, 1.0);
-    lcol *= mix(vec3(1.0), vec3(0.9, 1.14, 0.7), warmth);
+    lcol *= mix(vec3(1.0), vec3(1.0, 1.02, 0.55), warmth);
 #ifdef GW_REFL
-    pool += lcol * pk * diff * 0.5;     // (a little more than the analytic water's: the lens no longer veils the pool in bloom)
+    // (water pass) the ripples break the pool: faces turned to the light carry more of it, faces turned away less
+    float pBrk = 0.72 + clamp(dot(gLive * 14.0 + gFine * 0.25, dv / max(d, 1e-3)), -0.4, 0.55);
+    pool += lcol * pk * diff * 0.42 * pBrk;     // (a little more than the analytic water's: the lens no longer veils the pool in bloom)
 #else
     pool += lcol * pk * diff * 0.42;
 #endif
@@ -6030,6 +6080,10 @@ void main() {
     {
       float sl = pow(max(dot(reflect(-L, Ng), V), 0.0), 90.0);
       streak += lcol * (floor(lc.w) * 0.01) * smoothstep(0.3, 0.75, sl) * spark * (1.0 - smoothstep(R * 0.45, R * 1.0, d)) * (1.3 - 0.7 * calmW);
+      // (water pass) a broken path: the living ripples that tip the light to the eye, in short dashes across the view
+      float sp2 = pow(max(dot(reflect(-L, NL), V), 0.0), 26.0);
+      float dashL = smoothstep(0.42, 0.78, wNoise(vec2(dot(xz, vp) * 0.9, dot(xz, vd) * 2.6) + vec2(0.0, uTime * 0.7) + float(i) * 5.3));
+      streak += lcol * (floor(lc.w) * 0.006) * smoothstep(0.2, 0.85, sp2) * dashL * (1.0 - smoothstep(R * 0.6, R * 1.6, d));
     }
 #else
     // streak: the mirror point sits between the light's foot and the eye
@@ -6070,7 +6124,7 @@ void main() {
   // the water's colour and only a little of it drains; drained in full, the lantern's reach read as one tan-gold sheet on the water)
   col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))) * vec3(0.92, 1.08, 0.9), poolK * 0.2);
 #else
-  col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))) * vec3(1.1, 1.0, 0.72), poolK);
+  col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))) * vec3(1.1, 0.95, 0.62), poolK);
 #endif
 
   // ---- starlight: the vault's stars (and its nebula) mirrored in the lake. The lookup mirrors the
@@ -6108,6 +6162,7 @@ void main() {
   col += pool * 0.7;
 #endif
   col += streak;
+  col *= 1.0 - 0.5 * hullK;   // (water pass) the water darkens under and against the hull: the raft sits in it
 
   // ---- glints: sparse twinkling motes of living light on the surface
   vec2 gc = xz * 0.7;
