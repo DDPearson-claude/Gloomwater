@@ -375,7 +375,18 @@ async function main() {
     await page.mouse.move(x, y);
     await page.mouse.down();
     await waitFor(page, "the rod to start charging", 10_000, () => window.__gw.fishing.state === "charging");
-    await page.waitForTimeout(1000);
+    // Hold for a second, and for at least twelve frames: the game counts the hold on its own clock, which moves
+    // frame by frame, so on a slow machine a one-second hold can be a single frame and the release counts as a tap.
+    await page.evaluate(
+      () =>
+        new Promise((done) => {
+          const start = performance.now();
+          let frames = 0;
+          const tick = () =>
+            ++frames >= 12 && performance.now() - start >= 1000 ? done() : requestAnimationFrame(tick);
+          requestAnimationFrame(tick);
+        }),
+    );
     await page.mouse.up();
     await waitFor(
       page,

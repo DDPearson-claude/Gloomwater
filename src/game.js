@@ -61975,6 +61975,10 @@ function KI({ low: e = !1 } = {}) {
       uNeb2: { value: new Ko(0.6, 0.45, -0.6, 0.5) },
       uBandN: { value: new He(0.5, 0.3, 0.8).normalize() },
       uBandCol: { value: new Vt(4406900) },
+      // the early evening's low warm light spilling in round the vault's rim under the key light's bearing
+      // (w = amount; 0, the default, leaves the vault as it was)
+      uSun: { value: new Ko(-0.9, 0.06, -0.4, 0) },
+      uSunCol: { value: new Vt() },
     },
     vertexShader: `
       varying vec3 vDir;
@@ -61982,6 +61986,7 @@ function KI({ low: e = !1 } = {}) {
     fragmentShader: `
       uniform vec3 uHorizon, uMid, uZenith, uCrack, uStarCol, uNeb, uNebV, uBandCol; uniform vec4 uCracks[4];
       uniform float uTime, uBand, uStars, uStarDen, uNebK; uniform vec4 uNeb1, uNeb2; uniform vec3 uBandN;
+      uniform vec4 uSun; uniform vec3 uSunCol;
       varying vec3 vDir;
       ${ty}
       ${Tk}
@@ -61991,6 +61996,13 @@ function KI({ low: e = !1 } = {}) {
         float e = d.y;
         vec3 col = mix(uHorizon, uMid, smoothstep(-0.05, uBand, e));
         col = mix(col, uZenith, smoothstep(uBand * 0.8, 0.85, e));
+        // where the low light comes in: a wide glow hugging the vault's rim under its bearing
+        if (uSun.w > 0.001) {
+          float sk = max(dot(normalize(vec3(d.x, 0.0, d.z) + 1e-5), normalize(vec3(uSun.x, 0.0, uSun.z))), 0.0);
+          float low = 1.0 - smoothstep(-0.04, 0.42, e - uSun.y);
+          float near = 1.0 - smoothstep(0.0, 0.32, abs(e - uSun.y));
+          col += uSunCol * uSun.w * low * (pow(sk, 3.0) * 0.55 + pow(sk, 24.0) * near * 0.9 + 0.12);
+        }
         // faint vault rock only high overhead: the sky stays clean where the camera sees it
         float n = gwN(d * 9.0) * 0.6 + gwN(d * 31.0) * 0.4;
         float rock = smoothstep(0.55, 0.9, e);
@@ -82136,6 +82148,92 @@ var Fie = new Set(["hidden", "sealed", "open"]),
     },
     grade: { tint: 4207742 },
   },
+  // Mossmere's evening, hour by hour (the same day / dusk / night blend Sporewood's air.lights use). Day is the
+  // first, brightest hour: low warm light through the vault's west openings, a rose-gold horizon, lighter water, long shadows and
+  // lamps barely needed. Dusk keeps the lake's own violet. Night is darker and bluer: cold moonlight through the vault's
+  // openings, the stars out, the lantern and lamps carrying the scene. sun, zen, crack, shaft and the two colours are
+  // Mossmere's own extras (the vault's rim glow, its lit zenith, the openings' glow and the light shafts).
+  mossHours = Object.freeze({
+    day: Object.freeze({
+      fog: 0x765872,
+      horizon: 0xf0aa7c,
+      key: 0xffbc80,
+      keyI: 2.8,
+      amb: 0xa08ca8,
+      ambI: 0.95,
+      water: 0x56447a,
+      deep: 0x181234,
+      tint: 0x5a4472,
+      tintAmt: 0.06,
+      exposure: 1.26,
+      sat: 1.06,
+      stars: 0.05,
+      neb: 0.35,
+      glow: 0.55,
+      elev: 0.42,
+      leaf: 1,
+      sun: 0.9,
+      sunCol: 0xffa868,
+      zen: 0.3,
+      warmAmt: 0.14,
+      crack: 1.3,
+      crackCol: 0xffc890,
+      shaft: 1.25,
+      fogK: 0.9,
+    }),
+    dusk: Object.freeze({
+      fog: 0x382c68,
+      horizon: 0xa8708e,
+      key: 0xe0b4d4,
+      keyI: 1.9,
+      amb: 0x524690,
+      ambI: 0.7,
+      water: 0x2e2664,
+      deep: 0x0a081e,
+      tint: 0x40347e,
+      tintAmt: 0.2,
+      exposure: 1.02,
+      sat: 1.04,
+      stars: 0.7,
+      neb: 1,
+      glow: 0.9,
+      elev: 0.62,
+      leaf: 1,
+      sun: 0.35,
+      sunCol: 0xc8607a,
+      zen: 0.08,
+      warmAmt: 0.04,
+      crack: 1,
+      crackCol: 0xe8b4cc,
+      shaft: 0.9,
+      fogK: 1.05,
+    }),
+    night: Object.freeze({
+      fog: 0x161c40,
+      horizon: 0x2a3462,
+      key: 0x8ea4e4,
+      keyI: 1.1,
+      amb: 0x2a3a6c,
+      ambI: 0.5,
+      water: 0x1c2250,
+      deep: 0x05071c,
+      tint: 0x1e2a5e,
+      tintAmt: 0.27,
+      exposure: 0.94,
+      sat: 0.92,
+      stars: 1.4,
+      neb: 1.15,
+      glow: 1.1,
+      elev: 1,
+      leaf: 1,
+      crack: 1.4,
+      crackCol: 0xc4d4ff,
+      shaft: 0.45,
+      fogK: 1.12,
+    }),
+  }),
+  hourExtras = ["sun", "zen", "crack", "shaft", "warmAmt"],
+  hourExtraColors = ["sunCol", "crackCol"],
   Bie = 0.15,
   Die = 0.3,
   cA = [0.3, 0, 0.75],
@@ -82198,7 +82296,9 @@ function qie(e) {
         o.color.copy(ie("key", Ye.key)).lerp(be, De * 0.3),
         (o.intensity = Te("keyI") * (1 + 0.15 * De));
       let Pn = Te("elev");
-      Math.abs(Pn - 1) > 0.001 && ((a.toLight.y *= Pn), a.toLight.normalize());
+      Math.abs(Pn - 1) > 0.001 && ((a.toLight.y *= Pn), a.toLight.normalize()),
+        // Mossmere: the light from below is the lake's own colour at the hour, not a fixed ink
+        _.own && n.groundColor.copy(ie("water", a.floor)).multiplyScalar(0.55);
     }
     let ct = a.toLight,
       Lt = e.render && !e.render.isStub ? e.render.clarity : null,
@@ -82313,16 +82413,19 @@ function qie(e) {
     X = {},
     _ = null,
     W = ["fog", "horizon", "key", "amb", "water", "deep", "tint"],
-    C = ["keyI", "ambI", "tintAmt", "exposure", "sat", "stars", "neb", "glow", "elev", "leaf"];
+    C = ["keyI", "ambI", "tintAmt", "exposure", "sat", "stars", "neb", "glow", "elev", "leaf", "fogK"];
   function Y(re) {
-    let De = Pg(e.data, re?.id)?.air?.lights;
+    let De = Pg(e.data, re?.id)?.air?.lights ?? ((re?.id ?? "mossmere") === "mossmere" ? mossHours : null);
     if (!De || !De.day || !De.dusk || !De.night) return null;
-    let We = { w: [1, 0, 0] };
+    let We = { w: [1, 0, 0], own: De === mossHours };
     for (let at of ["day", "dusk", "night"]) {
       let ct = De[at],
         Lt = {};
       for (let St of W) Lt[St] = new Vt(ct[St] ?? 0);
       for (let St of C) Lt[St] = Number.isFinite(ct[St]) ? ct[St] : 1;
+      // the extras only Mossmere's hours set (0 where a table leaves them out: that lake's sky is unchanged)
+      for (let St of hourExtras) Lt[St] = Number.isFinite(ct[St]) ? ct[St] : 0;
+      for (let St of hourExtraColors) Lt[St] = new Vt(ct[St] ?? 0);
       We[at] = Lt;
     }
     return We;
@@ -82344,7 +82447,15 @@ function qie(e) {
       );
     },
     Te = (re) => _.day[re] * _.w[0] + _.dusk[re] * _.w[1] + _.night[re] * _.w[2],
-    Ye = { fog: new Vt(), horizon: new Vt(), key: new Vt(), amb: new Vt(), tint: new Vt() },
+    Ye = {
+      fog: new Vt(),
+      horizon: new Vt(),
+      key: new Vt(),
+      amb: new Vt(),
+      tint: new Vt(),
+      sunCol: new Vt(),
+      crackCol: new Vt(),
+    },
     ee = () => {
       let re = e.data?.ZONES;
       return Array.isArray(re) && re.length ? re : [d3];
@@ -82599,7 +82710,7 @@ function qie(e) {
         .lerp(P.dawnFog, at * 0.55),
       _ && (le(), P.fog.copy(ie("fog", Ye.fog)).lerp(P.dawnFog, at * 0.4)),
       (E = Math.max(0, E - re * 1.4));
-    let ct = X.fogDensity * (1 + Bie * We + Die * at) * (1 + E);
+    let ct = X.fogDensity * (1 + Bie * We + Die * at) * (1 + E) * (_ ? Te("fogK") : 1);
     (S.night = We),
       (S.warm = at),
       S.fog.copy(P.fog),
@@ -82617,7 +82728,14 @@ function qie(e) {
       (S.dusk = _ ? Dn(A.dusk) : 0),
       (S.horizon = _ ? ie("horizon", Ye.horizon) : null),
       (S.leafK = _ ? Te("leaf") : 1),
-      _ && (S.glowK = Te("glow") * (Lt ? 1.1 : 1));
+      _ && (S.glowK = Te("glow") * (Lt ? 1.1 : 1)),
+      _?.own &&
+        ((S.shaftK = Te("shaft") * (1 + 0.35 * at) * (Lt ? 1.2 : 1)),
+        (S.sun = Te("sun") * (1 - 0.5 * at)),
+        (S.zen = Te("zen")),
+        (S.crack = Te("crack")),
+        ie("sunCol", Ye.sunCol),
+        ie("crackCol", Ye.crackCol));
     let St = Number.isFinite(X.stars) ? X.stars : 1;
     (S.starK = St * (_ ? Te("stars") : 0.8 + 0.6 * We) * (1 - 0.7 * at) * (Lt ? 1.1 : 1)),
       (S.starDen = (0.65 + 0.35 * St) * (1 + 0.28 * We) * (1 - 0.3 * at) * jie),
@@ -82629,10 +82747,25 @@ function qie(e) {
       "density" in gn.fog && (gn.fog.density = ct)),
       s(We, at, X, Ze()),
       c?.applyMood(S),
+      _?.own && Ke(),
       (O -= re),
       (T -= re),
       (De || O <= 0) && ((O = 0.25), q(De)),
       (De || T <= 0) && ((T = 0.3), de());
+  }
+  // Mossmere's vault by the hour, over what the arena's mood just set: the low warm light round the rim under the
+  // key light's bearing, a lighter vault overhead in the early evening, and the roof openings' glow (warm gold early,
+  // cold moonlight at night).
+  let Ue = { of: null, u: null };
+  function Ke() {
+    if (Ue.of !== c) (Ue.of = c), (Ue.u = c?.group?.getObjectByName?.("vault")?.material?.uniforms ?? null);
+    let re = Ue.u;
+    if (!re?.uSun) return;
+    let De = c.keyDir;
+    re.uSun.value.set(De?.x ?? -0.75, 0.04, De?.z ?? -0.3, S.sun),
+      re.uSunCol.value.copy(Ye.sunCol),
+      re.uZenith.value.lerp(S.fog, S.zen),
+      re.uCrack.value.copy(Ye.crackCol).multiplyScalar(S.crack * (0.8 * S.shaftK + 0.1));
   }
   function q(re) {
     let De = l?.grade || {},
@@ -82660,7 +82793,8 @@ function qie(e) {
     _ &&
       ((ct.exposure = Te("exposure") * (1 + 0.1 * at)),
       (ct.tintAmount = Te("tintAmt")),
-      (ct.saturation = Te("sat") * (1 + 0.08 * at)));
+      (ct.saturation = Te("sat") * (1 + 0.08 * at)),
+      _.own && (ct.warmAmount += Te("warmAmt")));
     let Lt = re;
     for (let St in ct)
       !Lt && Math.abs((M[St] ?? -99) - ct[St]) > (St === "tint" || St === "warm" ? 0 : 0.004) && (Lt = !0);
