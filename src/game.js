@@ -76927,6 +76927,92 @@ function gwMossify(geo, amount = 1) {
   return geo;
 }
 
+// Mossmere's weathered timber for a mooring post `h` m above the water: dark and wet below the waterline, a ragged band of
+// weed green just above it, grey-brown grain up the shaft, and a pale, worn top where ropes and weather have bleached it.
+function gwPostTone(K, h) {
+  const wet = Xo(GW_MOSS.wet),
+    weed = Jn(Xo(GW_MOSS.deep), Xo(GW_MOSS.lit), 0.5),
+    hi = K.woodHi || K.wood,
+    worn = Jn(hi, K.bone, 0.8);
+  return (x, y, z) => {
+    const n = Gs(x * 7.3, y * 1.4, z * 7.3),
+      g = Gs(x * 23.1, y * 0.6, z * 23.1);
+    let c = Jn(Jn(K.wood, hi, 0.75 + 0.25 * g), K.stone, 0.42);
+    if (y > h - 0.6) c = Jn(c, worn, Math.min(1, (y - h + 0.6) / 0.35) * 0.85);
+    const band = 1 - Math.max(0, Math.min(1, (y - 0.12 - 0.35 * n) / 0.25));
+    c = Jn(c, weed, band * 0.7);
+    if (y < 0.05) c = Jn(ko(c, 0.6), wet, Math.min(0.8, 0.4 + (0.05 - y) * 0.6));
+    return c;
+  };
+}
+
+// Mossmere's buoy (local y from -0.5 to 1.2): a weed-dark hull under the water, a fringe of green at the waterline, a
+// weathered timber collar, and the iron cage rusted where the wet reaches up it.
+function gwBuoyTone(K) {
+  const wet = Xo(GW_MOSS.wet),
+    weed = Xo(GW_MOSS.deep),
+    rust = Xo(9063226),
+    hi = K.woodHi || K.wood;
+  return (x, y, z) => {
+    const n = Gs(x * 9.1, y * 5.3, z * 9.1);
+    if (y < -0.04) return Jn(ko(K.wood, 0.7), wet, 0.65);
+    if (y < 0.08 + 0.06 * n) return Jn(K.wood, weed, 0.75);
+    if (y < 0.2) return Jn(Jn(K.wood, hi, 0.5 + 0.4 * n), K.bone, y > 0.16 ? 0.3 : 0.05);
+    return Jn(K.iron, rust, Math.max(0, 0.55 - (y - 0.2) * 0.7) * (0.6 + 0.4 * n));
+  };
+}
+
+// Moss over a rock's tops: faces that look up, above the wet band, take the lake's moss in patches of deep, lit and dry
+// green (gwMossify's tones) with bare stone showing only at a few ragged holes; the sides are left to gwMossify.
+function gwMossTop(geo, amount = 0.9) {
+  const pos = geo?.attributes?.position,
+    nor = geo?.attributes?.normal,
+    col = geo?.attributes?.color;
+  if (!pos || !nor || !col) return geo;
+  const deep = Xo(GW_MOSS.deep),
+    lit = Xo(GW_MOSS.lit),
+    dry = Xo(GW_MOSS.dry);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i),
+      y = pos.getY(i),
+      z = pos.getZ(i),
+      ny = nor.getY(i) / (Math.hypot(nor.getX(i), nor.getY(i), nor.getZ(i)) || 1);
+    if (ny < 0.35 || y < 0.6) continue;
+    const n1 = Sg(x * 0.5 + 3.3, y * 0.5, z * 0.5 - 1.7, 3),
+      n2 = Gs(x * 2.6, y * 2.6 + 4.1, z * 2.6),
+      hole = n2 > 0.82 ? 0.35 : 1,
+      k = Math.min(1, (ny - 0.35) / 0.3) * Math.min(1, (y - 0.6) / 0.4) * amount * hole;
+    const tone = Jn(Jn(deep, lit, Math.min(1, n1 * 1.2)), dry, Math.max(0, n2 - 0.6) * 0.8);
+    const c = Jn([col.getX(i), col.getY(i), col.getZ(i)], tone, k);
+    col.setXYZ(i, c[0], c[1], c[2]);
+  }
+  col.needsUpdate = true;
+  return geo;
+}
+
+// Stone wet with a waterfall's spray: darker and a little greener toward the fall at (x, z), strongest low down and within r m.
+function gwWetNear(geo, x, z, r, amount = 1) {
+  const pos = geo?.attributes?.position,
+    col = geo?.attributes?.color;
+  if (!pos || !col) return geo;
+  const wet = Xo(GW_MOSS.wet);
+  for (let i = 0; i < pos.count; i++) {
+    const d = Math.hypot(pos.getX(i) - x, pos.getZ(i) - z) / r;
+    if (d >= 1) continue;
+    const y = pos.getY(i),
+      k =
+        (1 - d * d) *
+        (1 - Math.max(0, Math.min(1, (y - 1.2) / 3.5))) *
+        amount *
+        (0.75 + 0.25 * Gs(pos.getX(i) * 3.1, y * 3.1, pos.getZ(i) * 3.1));
+    if (k <= 0) continue;
+    const c = Jn([col.getX(i), col.getY(i), col.getZ(i)], wet, Math.min(0.85, k));
+    col.setXYZ(i, c[0], c[1], c[2]);
+  }
+  col.needsUpdate = true;
+  return geo;
+}
+
 // A clump of reeds (medium and high only; low keeps its plain stems): tall stems that lean and bend from their foot, a few
 // shorter blades bent over, and cattail seed heads on some stems; dark green at the water, paling to straw at the tips. The
 // geometry is in world space (merged with the lake's other fine pieces), and starts at y = -0.12 like the plain stems, so the
@@ -78502,7 +78588,8 @@ $1`,
       Yt.setAttribute("color", new eo(Ce, 3)),
       Yt.setIndex(qe),
       Yt.computeVertexNormals(),
-      l === "mossmere" && gwMossify(Yt, 0.85);
+      l === "mossmere" && gwMossify(Yt, 0.85),
+      Ut && gwWetNear(Yt, (Ut.end - 0.55) * Ut.ca, (Ut.end - 0.55) * Ut.sa, 6, 0.75);
     let Jt = b(
         el(
           {
@@ -78945,7 +79032,14 @@ $1`,
     se.org.push(
       Gn(te, {
         matrix: co(H, Ee, je, 0, K, 0),
-        colorFn: (xt, Mt) => Jn(wt, i.iron, Mt - Ee < 0.25 ? 0.6 : Mt - Ee > 0.94 ? 0.1 : 0.3),
+        // (rust streaked down the iron, and on Mossmere a collar of moss where the base meets the stone)
+        colorFn: (xt, Mt, Ut) => {
+          let on = Jn(wt, i.iron, Mt - Ee < 0.25 ? 0.6 : Mt - Ee > 0.94 ? 0.1 : 0.3);
+          return (
+            (on = Jn(on, wt, 0.35 * Math.max(0, Gs(xt * 14, Mt * 1.5, Ut * 14) - 0.45))),
+            l === "mossmere" && Mt - Ee < 0.16 ? Jn(on, Xo(GW_MOSS.deep), 0.6) : on
+          );
+        },
       }),
     ),
       se.org.push(
@@ -79450,8 +79544,19 @@ $1`,
           P.add(H, Ee + te + 0.08 * K, je, ko(u.candle, 0.5), 0.9 * K));
     },
   };
+  let gwIsleFrom = 0;
   for (let H of t.islands)
-    if ((H.outline || N(H, l === "paleabyss" ? 0.6 : 1), l === "mossmere")) {
+    if (
+      (H.outline ||
+        ((gwIsleFrom = se.rock.length),
+        N(H, l === "paleabyss" ? 0.6 : 1),
+        // (Hob's rock: its broad flat top took the pale violet of the stone's lit tops; it is the lake's moss now, the
+        // places' second pass)
+        l === "mossmere" &&
+          H.name === "Mossbell Isle" &&
+          se.rock.slice(gwIsleFrom).forEach((g) => gwMossTop(g))),
+      l === "mossmere")
+    ) {
       if (H.big) {
         let je = H.x + H.r * 0.25,
           K = H.z - H.r * 0.1,
@@ -79715,25 +79820,29 @@ $1`,
   for (let H of t.docks)
     for (let Ee of H.posts) {
       let je = p.range(1.8, 2.4),
-        K = new Xn(0.16, 0.2, je + 0.8, 7, 2);
-      _l(K, 0.02, 3, Ee.x),
-        se.org.push(
-          Gn(K, {
-            matrix: co(
-              Ee.x,
-              (je + 0.8) / 2 - 0.8,
-              Ee.z,
-              p.range(-0.08, 0.08),
-              p() * ao,
-              p.range(-0.08, 0.08),
-            ),
-            colorFn: (we, te) => Jn(i.wood, i.moss, te < 0.4 ? 0.5 : 0),
-          }),
-        ),
+        K = new Xn(0.16, 0.2, je + 0.8, 7, l === "mossmere" && !g ? 4 : 2);
+      _l(K, 0.02, 3, Ee.x);
+      let we = p.range(-0.08, 0.08),
+        te = p.range(-0.08, 0.08);
+      se.org.push(
+        Gn(K, {
+          matrix: co(Ee.x, (je + 0.8) / 2 - 0.8, Ee.z, we, p() * ao, te),
+          colorFn: l === "mossmere" ? gwPostTone(i, je) : (ke, Ce) => Jn(i.wood, i.moss, Ce < 0.4 ? 0.5 : 0),
+        }),
+      ),
         se.org.push(
           Gn(new aa(0.2, 0.05, 4, 10), {
             matrix: co(Ee.x, je * 0.6, Ee.z, Math.PI / 2, 0, 0),
             color: Jn(i.wood, i.bone, 0.4),
+          }),
+        );
+      // (Mossmere: a second turn of rope low on the post, tied on a slant; not on low, which keeps its triangle count)
+      l === "mossmere" &&
+        !g &&
+        se.org.push(
+          Gn(new aa(0.19, 0.04, 4, 10), {
+            matrix: co(Ee.x, je * 0.32, Ee.z, Math.PI / 2 + 0.1, 0, 0.12),
+            color: Jn(i.wood, i.bone, 0.3),
           }),
         );
     }
@@ -80215,7 +80324,9 @@ $1`,
       ],
       8,
     );
-  Gn(Wt, { colorFn: (H, Ee) => (Ee < 0.2 ? Jn(i.wood, i.rockHi, 0.3) : i.iron) });
+  Gn(Wt, {
+    colorFn: l === "mossmere" ? gwBuoyTone(i) : (H, Ee) => (Ee < 0.2 ? Jn(i.wood, i.rockHi, 0.3) : i.iron),
+  });
   let rn = new Sf(0.16, 0);
   rn.scale(1, 1.5, 1), rn.translate(0, 1, 0), Gn(rn, { color: [1, 1, 1] });
   let cn = b(
@@ -80798,6 +80909,13 @@ $1`,
       re.uniforms.uColor.value.copy(H.fog).lerp(Mn, 0.22 - 0.12 * Ee),
       (re.uniforms.uAmt.value = 0.55 + 0.5 * Ee),
       (P.uniforms.uBright.value = H.glowK),
+      // (Mossmere's lamp glass glows with the hour: a paler, quieter glass in the early evening's light, full and warm at night)
+      l === "mossmere" &&
+        (be.color.setRGB(0.8 + 0.3 * Ee, 0.78 + 0.28 * Ee, 0.74 + 0.22 * Ee),
+        Nt.color
+          .set(r.lamp)
+          .lerp(gwHueT.set(r.candle), 0.4 * (1 - Ee))
+          .multiplyScalar(2.2 * (0.72 + 0.4 * Ee))),
       Se.color.set(gl).lerp(H.fog, 0.1 + 0.2 * Ee),
       ye.color.copy(Se.color);
     for (let te of We) te.uniforms.uBright.value = H.partK;
@@ -81639,6 +81757,14 @@ function rA(e, t, n, o = 0.8) {
   let a = Math.max(0, n) / Math.max(0.001, o);
   return e < t ? Math.min(t, e + a) : Math.max(t, e - a);
 }
+// The hour's hue at another colour's brightness: the mist over a locked place takes the fog's colour (warm early in the evening,
+// violet at dusk, blue-grey at night) without being darkened to the fog's own depth, so it stays pale lake mist.
+const gwHueT = new Vt();
+function gwHourHue(out, hue, ref) {
+  const lum = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  const k = lum(ref) / Math.max(1e-4, lum(hue));
+  return out.setRGB(Math.min(1.4, hue.r * k), Math.min(1.4, hue.g * k), Math.min(1.4, hue.b * k));
+}
 function Lie({ lifted: e = !1, inside: t = !1, insideK: n = 0.35 } = {}) {
   return e ? 0 : t ? n : 1;
 }
@@ -81670,8 +81796,16 @@ void main() {
   Iie = `
 uniform float uTime, uAmt, uFeather, uInner;
 uniform vec3 uLit, uShade;
+uniform vec3 uWarm; uniform vec3 uRaft;   // the raft lantern's colour; the raft's x, z and how much its lantern warms the mist
 varying vec2 vXZ; varying vec4 vS1; varying vec4 vS2; varying vec3 vL; varying float vOp; varying vec3 vK; varying float vY; varying float vLift;
 ${c3}
+// (the raft's lantern warms the mist near it, most where the mist is lit, so a bank the raft sails beside reads as lake mist
+// taking the lantern's light, not a grey wall: the places' second pass)
+vec3 gwLantern(vec3 c, float lit) {
+  vec2 dr = vXZ - uRaft.xy;
+  float w = uRaft.z * exp(-dot(dr, dr) / 45.0) * (0.55 + 0.45 * lit);
+  return mix(c, c * uWarm, clamp(w, 0.0, 0.85));
+}
 float footSdf(vec2 p) {
   if (vS1.x < 0.5) return length(p - vS1.yz) - vS1.w;
   if (vS1.x < 1.5) { vec2 a = vS1.yz, b = vS2.xy, pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h) - vS1.w; }
@@ -81704,7 +81838,8 @@ void main() {
     float gaps = smoothstep(0.42, 0.8, nc) * smoothstep(0.25, 0.6, wpN(vec2(along * 0.35 + 7.0, uTime * 0.02)));
     float ac = cover * vL.y * (1.0 - smoothstep(0.0, top, hk)) * pow(1.0 - hk, 0.6) * gaps * 1.4 * vOp * uAmt * (1.0 - vLift) * (1.0 - vLift);   // (the curtains go first in a lift: never a standing wall)
     if (ac < 0.003) discard;
-    gl_FragColor = vec4(mix(uShade, uLit, clamp(0.35 + hk * 0.5 + nc * 0.3, 0.0, 1.0)), min(ac, 0.85));
+    float lk = clamp(0.35 + hk * 0.5 + nc * 0.3, 0.0, 1.0);
+    gl_FragColor = vec4(gwLantern(mix(uShade, uLit, lk), lk), min(ac, 0.85));
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
     return;
@@ -81718,7 +81853,8 @@ void main() {
   float a = cover * vL.y * mix(0.5, 1.25, clump) * wisp * vOp * uAmt;
   if (a < 0.003) discard;
   // (its foot in shade, its tops lit: a lit pale foot on the water was the plate)
-  vec3 col = mix(uShade, uLit, clamp(vL.x * 0.42 + clump * 0.38 + n * 0.2 - 0.12, 0.0, 1.0));
+  float lk = clamp(vL.x * 0.42 + clump * 0.38 + n * 0.2 - 0.12, 0.0, 1.0);
+  vec3 col = gwLantern(mix(uShade, uLit, lk), lk);
   gl_FragColor = vec4(col, min(a, 0.84));
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -81971,6 +82107,8 @@ function pN(
           uInner: { value: $h.inner },
           uLit: { value: new Vt(13156588) },
           uShade: { value: new Vt(7235236) },
+          uWarm: { value: new Vt(1.6, 1.18, 0.72) },
+          uRaft: { value: new He(0, 0, 0) },
         },
         We = w(
           new Wo({
@@ -81996,9 +82134,11 @@ function pN(
     Z = (ht) =>
       z.push({ y: 0.03, rot: 0, kind: 0, ink: 0, depth: 0.4, seed: O(), night: 0, g: Xo(b), ...ht }),
     D = {
-      stone: Xo(9079976),
-      stoneHi: Xo(11842760),
-      moss: ko(Xo(3814998), 1.6),
+      // (on Mossmere the places' stone is the lake's own: its blue-grey rock and moss green, never the pale ledge stone that
+      // stood out against the mossy rocks beside it; the places' second pass)
+      stone: i ? Jn(Xo(9079976), ko(Xo(aA.mossmere.rockHi), tN.rockHi), 0.62) : Xo(9079976),
+      stoneHi: i ? Jn(Xo(11842760), ko(Xo(aA.mossmere.rockHi), tN.rockHi), 0.5) : Xo(11842760),
+      moss: i ? Xo(GW_MOSS.deep) : ko(Xo(3814998), 1.6),
       iron: Xo(1118754),
       rust: Xo(9063226),
       wood: ko(Xo(3023899), 1.4),
@@ -82544,6 +82684,66 @@ function pN(
         ke = ht.r0 + te * (ht.end - ht.r0),
         Ce = Ql(ht, te) + 0.45;
       we(K(Ce, 0.4, 1.2, 0, 1.05, 0.3, 1), ke), we(K(Ce, 0.4, 1.2, 2.25, Math.PI, 0.3, 1), ke);
+      // The arrival (the places' second pass): light from behind the fall and through the arches (three halos in the lake's
+      // existing glow batch: no new draw call), and on the best setting a little spray drifting up where the water lands.
+      {
+        let at = (al, lc) => [al * ht.ca - lc * ht.sa, al * ht.sa + lc * ht.ca],
+          [bx, bz] = at(ht.end + 0.5, 0),
+          [ax, az] = at(ke + 0.2, 0),
+          [fx, fz] = at(ht.end - 0.75, 0);
+        n?.halos?.add(bx, 1.1, bz, ko(Jn(Xo(b), Xo(L), 0.2), 0.48), 3.6, 3.1);
+        n?.halos?.add(ax, 2.3, az, ko(Jn(Xo(L), Xo(b), 0.4), 0.26), 6, 5.3);
+        n?.halos?.add(fx, 0.2, fz, ko(Xo(L), 0.28), 3.2, 7.7);
+        if (s === "high") {
+          let sn = 44,
+            pos = new Float32Array(sn * 3),
+            ph = new Float32Array(sn);
+          for (let q = 0; q < sn; q++) {
+            let [qx, qz] = at(ht.end - 0.45 - 1.3 * Y(q, 1.7), (Y(q, 3.1) - 0.5) * 1.9);
+            (pos[q * 3] = qx), (pos[q * 3 + 1] = 0.05), (pos[q * 3 + 2] = qz), (ph[q] = Y(q, 5.3));
+          }
+          let sg = p(new lo());
+          sg.setAttribute("position", new Kn(pos, 3)), sg.setAttribute("aPh", new Kn(ph, 1));
+          let sm = w(
+            new Wo({
+              uniforms: {
+                uTime: ze.uTime,
+                uCol: ze.uCol,
+                uViewH: { value: 720 },
+                uAway: { value: new He(-ht.ca, 0, -ht.sa) },
+              },
+              vertexShader: `attribute float aPh; uniform float uTime, uViewH; uniform vec3 uAway; varying float vA;
+          void main(){
+            float life = fract(uTime * (0.16 + 0.1 * aPh) + aPh * 7.3);
+            vec3 p = position + vec3(0.0, life * (0.9 + 0.8 * aPh), 0.0) + uAway * life * (0.6 + 1.4 * fract(aPh * 13.1));
+            p.x += sin(uTime * 0.7 + aPh * 40.0) * 0.18 * life; p.z += cos(uTime * 0.6 + aPh * 31.0) * 0.18 * life;
+            vec4 mv = modelViewMatrix * vec4(p, 1.0);
+            float z = max(0.5, -mv.z);
+            vA = sin(3.14159 * life) * smoothstep(2.5, 6.0, z);
+            gl_PointSize = min(160.0, (0.38 + 0.62 * life) * projectionMatrix[1][1] * uViewH * 0.5 / z);
+            gl_Position = projectionMatrix * mv;
+          }`,
+              fragmentShader: `uniform vec3 uCol; varying float vA;
+          void main(){
+            float d = length(gl_PointCoord - 0.5) * 2.0;
+            float a = pow(max(0.0, 1.0 - d), 2.0) * vA * 0.22;
+            if (a < 0.004) discard;
+            gl_FragColor = vec4(uCol * 1.05, a);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }`,
+              transparent: !0,
+              depthWrite: !1,
+              fog: !1,
+            }),
+          );
+          let sp = new cs(sg, sm);
+          (sp.name = "brookSpray"), (sp.frustumCulled = !1), (sp.renderOrder = 5), f.add(sp);
+          sp.onBeforeRender = (rr) => {
+            sm.uniforms.uViewH.value = rr.domElement.height || 720;
+          };
+        }
+      }
     }
     if (c && Number.isFinite(c.x)) {
       let Ee = ac(c.face, 0),
@@ -82792,6 +82992,14 @@ function pN(
   lt.add(Ne, !0), lt.add(Xe, !1);
   let Ze = lt.setCut,
     xe = be.concat(pe);
+  if (i) {
+    // (Mossmere's place stone takes the lake's moss on its tops and its wet band at the waterline, and the stone round the brook's
+    // fall is dark with its spray; vertex colours only, so it costs nothing per frame)
+    let fall = t?.notch
+      ? { x: (t.notch.end - 0.55) * t.notch.ca, z: (t.notch.end - 0.55) * t.notch.sa }
+      : null;
+    for (let g of xe) gwMossify(g, 0.75), fall && gwWetNear(g, fall.x, fall.z, 6.5, 0.8);
+  }
   if (xe.length) {
     let ht = p(ml(xe));
     if (((J = new An(ht, Ne)), (J.name = "placeStone"), (J.onBeforeRender = Ze), !u)) {
@@ -83224,11 +83432,13 @@ uniform float uK; uniform vec3 uGlowCol; varying float vGlowW;`,
     let Ft = qt.fog && qt.fog.isColor ? qt.fog : null;
     if (
       (de.copy(S ? S.lit : mt).lerp(S ? S.litN : Ge, it),
-      Ft && de.lerp(Ft, 0.12),
+      Ft && de.lerp(gwHourHue(gwHueT, Ft, de), 0.5),
       Be.copy(S ? S.shade : V).lerp(S ? S.shadeN : Je, it),
-      Ft && Be.lerp(Ft, 0.2),
+      Ft && Be.lerp(gwHourHue(gwHueT, Ft, Be), 0.55).lerp(Ft, 0.15),
       Tt.uLit.value.copy(de),
       Tt.uShade.value.copy(Be),
+      // (the raft's lantern: warmest at night, when it is the brightest light near the mist)
+      Le ? Tt.uRaft.value.set(Le.x, Le.z, 0.42 + 0.4 * it) : (Tt.uRaft.value.z = 0),
       (Tt.uAmt.value = 1 - 0.12 * it),
       wt)
     ) {

@@ -113,6 +113,9 @@ The designer asked for Mossmere's environment graphics to be made as good as the
 
 - **The camera after reeling.** Measured before the fix: after every reel the camera eased out to 15.0 m from the raft, 4.2 m past its usual 10.8 m, and came back in a second move when the raft next moved. Now it makes one eased move of 1.1 to 1.3 seconds to the usual fishing distance (10.5 m) and holds still; when the raft paddles off it eases into the normal camera over 0.8 seconds. The four cases measured were an empty reel-in, a small fish, a big fish and a lost fish. A play test fails if the camera moves out and back, is still moving 3 seconds later, or settles more than 0.5 m from where it was before the cast.
 
+- **Places and props, second pass.** Veilback Brook: a warm light glows behind the fall and through the small end arch, the stone round the fall is wet and dark, a soft spray drifts up where the water lands (best setting only), and the arches and ledge stones take the lake's blue-grey mossy stone; their shapes are unchanged. Under the Span's stones are dark and mossy too. The mist over locked places takes the hour's colour from the fog, and the raft's lantern warms it nearby. Lamp glass and buoy lamps are dimmer and warmer early in the evening and full at night. Island lamp posts have rust and moss at the foot; buoys have a weed-hung hull, a timber collar and rusted iron; mooring posts are weathered, with a weed band at the waterline and a second turn of rope. Murk's barge was left as it is. The lowest setting draws the same number of triangles as before; the best setting has one more draw call (the spray).
+  - Not checked in a picture: the moss on the top of Hob's rock on Mossbell Isle.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.

@@ -127,6 +127,8 @@ const VIEWS = [
   { name: "raft-line-out-dusk", session: "found", at: "setout", hour: "dusk", act: "cast" },
   { name: "hooked-fight-dusk", session: "found", at: "setout", hour: "dusk", act: "hook" },
   { name: "mist-locked-dusk", session: "locked", at: "mistview", hour: "dusk" },
+  // close on a dock that keeps its mooring posts and buoy (the lake's second dock), seen from the open water at dusk
+  { name: "dock-posts-dusk", session: "found", at: "dock", dock: 1, hour: "dusk", dockCam: true },
   { name: "mist-lifting-dusk", session: "locked", at: "mistview", hour: "dusk", act: "liftMist" },
 ];
 
@@ -280,13 +282,22 @@ async function stage(s, view, setout) {
   if (view.at === "setout") place = { x: setout.x, z: setout.z, yaw: setout.yaw };
   else if (view.at === "dock") {
     // The lake's first dock (the world's own list), with the raft 10 m south of it, facing it.
-    const dock = await s.eval(() => {
-      const d = window.__gw.world.getDocks?.()?.[0];
+    const dock = await s.eval((i) => {
+      const d = window.__gw.world.getDocks?.()?.[i];
       return d ? { x: d.position.x, z: d.position.z } : null;
-    });
+    }, view.dock ?? 0);
     if (!dock) throw new Error("the world lists no dock");
     const at = { x: dock.x, z: dock.z + 10 };
     place = { ...at, yaw: facing(at, dock) };
+    if (view.dockCam) {
+      // the landmark camera on the dock, from the lake's middle side: the raft is moved out of the way
+      const k = Math.hypot(dock.x, dock.z) || 1;
+      view = {
+        ...view,
+        cam: { x: dock.x, y: 0.8, z: dock.z, side: [-dock.x / k, -dock.z / k], elev: 12, dist: 7.5 },
+      };
+      place = { x: dock.x * 0.7, z: dock.z * 0.7, yaw: facing({ x: dock.x * 0.7, z: dock.z * 0.7 }, dock) };
+    }
   } else place = { ...PLACES[view.at].at, yaw: facing(PLACES[view.at].at, PLACES[view.at].look) };
   await s.eval(
     ([hour, place]) => {
@@ -433,7 +444,15 @@ async function speed() {
       await stage(s, view, setout);
       await frames(s, 20);
       out[name] = await measure();
-      console.log(`${name}: ${out[name].toFixed(1)} ms a frame (60 frames, 480x270, ${q})`);
+      // the last frame's totals (the game resets the renderer's counts at the start of each frame)
+      const info = await s.eval(() => {
+        const r = window.__gw.render.renderer.info.render;
+        return { calls: r.calls, triangles: r.triangles };
+      });
+      console.log(
+        `${name}: ${out[name].toFixed(1)} ms a frame (60 frames, 480x270, ${q});` +
+          ` ${info.calls} draw calls, ${info.triangles} triangles`,
+      );
     }
     await s.close();
   } finally {
