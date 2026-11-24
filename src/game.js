@@ -72661,8 +72661,19 @@ void main() {
   body *= (1.0 + clamp(lean * 3.4, -0.2, 0.34) * (0.35 + 0.65 * wsh)) * mix(0.72, 1.0, wsh);
   // (water pass) shallows a little lighter and greener, open water deep; at a bank, rock or hull the water thins to a
   // pale green margin and lets go of its mirror, so it meets them softly
+  // (second pass) over the ledges and at a bank, rock or hull the water is clear over dim stone: darker, a little
+  // green-brown, the stone's own mottle faint under it (it was a pale lifted margin that read as a lilac plastic sheet)
+#ifdef GW_LUSH
   body *= mix(vec3(1.0), vec3(1.0, 1.2, 0.95), shallow * 0.7);
   body = mix(body, uShallow * vec3(1.0, 1.25, 0.85) * 1.15, edgeW * edgeW * 0.4);
+#else
+  vec3 stoneW = uShallow * vec3(0.92, 1.04, 0.7) * (0.5 + 0.55 * blot);
+#ifdef GW_RICH
+  stoneW *= 0.8 + 0.4 * wNoise(xz * 0.85 + 3.3);
+#endif
+  body = mix(body, stoneW, shallow * 0.45);
+  body = mix(body, stoneW * 0.75, edgeW * edgeW * 0.35);
+#endif
 #ifdef USE_FOG
   #ifdef FOG_EXP2
   float fogF = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
@@ -72688,6 +72699,16 @@ void main() {
   vec3 rcol = texture2D(uReflTex, clamp(ruv + nv * vec2(1.0, -2.2) * rk - uReflBlur.xy, 0.002, 0.998)).rgb;
   rcol = mix(rcol, texture2D(uReflTex, clamp(ruv + nf * vec2(1.3, -3.0) * rk + uReflBlur.xy, 0.002, 0.998)).rgb, max(0.5 - 0.25 * calmW, uReflBlur.z));
   rcol = min(rcol, vec3(1.1));          // a glow's mirror image is a glow, not a hot sheet on the water
+#ifndef GW_LUSH
+  // (second pass) the short white streaks on the open water were the mirror images of the rocks' and far shore's pale lit
+  // edges (the toon rim light on their silhouettes): a pale, cool mirrored light takes the hour's air and is held down,
+  // so it reads as a dim edge in the reflection, broken by the ripples like the rest of it; warm lamps and windows keep theirs
+  {
+    float rlC = dot(rcol, vec3(0.2126, 0.7152, 0.0722));
+    float coolK = smoothstep(0.14, 0.55, rlC) * (1.0 - clamp((rcol.r - rcol.b) / max(rcol.r, 1e-3) * 1.4 - 0.2, 0.0, 1.0));
+    rcol = mix(rcol, uSky * 1.4 + rcol * 0.25, coolK * 0.85);
+  }
+#endif
   // (the loop: a pale lit face mirrored near the eye is held down, so it never lies on the water as a bright patch)
   rcol /= 1.0 + calmW * 0.9 * max(dot(rcol, vec3(0.2126, 0.7152, 0.0722)) - 0.3, 0.0);
 #ifdef GW_LUSH
@@ -83724,32 +83745,35 @@ var Fie = new Set(["hidden", "sealed", "open"]),
   // openings, the stars out, the lantern and lamps carrying the scene. sun, zen, crack, shaft and the two colours are
   // Mossmere's own extras (the vault's rim glow, its lit zenith, the openings' glow and the light shafts).
   mossHours = Object.freeze({
+    // (second pass: the clearest, warmest hour. The air is a dim warm umber, not a pale mauve, and thinner, so the middle
+    // distance stays clear; the fill is lower and greyer, so the gold key light rakes the rock faces and reed tops and
+    // leaves long soft shadows; the water is a dark olive-brown that takes the gold sky in its mirror)
     day: Object.freeze({
-      fog: 0x765872,
-      horizon: 0xf0aa7c,
-      key: 0xffbc80,
-      keyI: 2.8,
-      amb: 0xa08ca8,
-      ambI: 0.95,
-      water: 0x56447a,
-      deep: 0x181234,
-      tint: 0x5a4472,
-      tintAmt: 0.06,
-      exposure: 1.26,
-      sat: 1.06,
-      stars: 0.05,
-      neb: 0.35,
-      glow: 0.55,
-      elev: 0.42,
+      fog: 0x584640,
+      horizon: 0xf4ae68,
+      key: 0xffb46c,
+      keyI: 3.2,
+      amb: 0x7a7286,
+      ambI: 0.78,
+      water: 0x343a2c,
+      deep: 0x0e1216,
+      tint: 0x4c3c4a,
+      tintAmt: 0.05,
+      exposure: 1.2,
+      sat: 1.12,
+      stars: 0.03,
+      neb: 0.25,
+      glow: 0.5,
+      elev: 0.4,
       leaf: 1,
-      sun: 0.9,
-      sunCol: 0xffa868,
-      zen: 0.3,
-      warmAmt: 0.14,
+      sun: 1.05,
+      sunCol: 0xffa050,
+      zen: 0.26,
+      warmAmt: 0.2,
       crack: 1.3,
-      crackCol: 0xffc890,
-      shaft: 1.25,
-      fogK: 0.9,
+      crackCol: 0xffc480,
+      shaft: 1.3,
+      fogK: 0.62,
     }),
     dusk: Object.freeze({
       fog: 0x382c68,
@@ -84326,7 +84350,7 @@ function qie(e) {
   // Mossmere's vault by the hour, over what the arena's mood just set: the low warm light round the rim under the
   // key light's bearing, a lighter vault overhead in the early evening, and the roof openings' glow (warm gold early,
   // cold moonlight at night).
-  let Ue = { of: null, u: null };
+  let Ue = { of: null, u: null, mid: new Vt() };
   function Ke() {
     if (Ue.of !== c) (Ue.of = c), (Ue.u = c?.group?.getObjectByName?.("vault")?.material?.uniforms ?? null);
     let re = Ue.u;
@@ -84334,6 +84358,9 @@ function qie(e) {
     let De = c.keyDir;
     re.uSun.value.set(De?.x ?? -0.75, 0.04, De?.z ?? -0.3, S.sun),
       re.uSunCol.value.copy(Ye.sunCol),
+      // (second pass) the vault's middle band takes the hour's horizon while the low light is in, so the lake mirrors a
+      // warm sky in the early evening (a pale mauve vault laid a milky sheet on the water)
+      re.uMid.value.lerp(Ue.mid.copy(S.horizon).multiplyScalar(0.42), Math.min(0.6, S.sun * 0.4)),
       re.uZenith.value.lerp(S.fog, S.zen),
       re.uCrack.value.copy(Ye.crackCol).multiplyScalar(S.crack * (0.8 * S.shaftK + 0.1));
   }
