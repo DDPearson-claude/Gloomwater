@@ -148228,7 +148228,8 @@ var hG = `/* ui.css \u2014 GLOOMWATER interface, UI style v2 (CONTRACT \xA79, DE
 .gw-error { padding: 20px; }
 
 /* ---------------------------------------------------------------- tabs: words on the dark */
-.gw-tabs { display: flex; gap: 0; margin: 16px 0 4px; overflow-x: auto; scrollbar-width: none; flex: none; position: relative; justify-content: center; }
+.gw-tabs { display: flex; gap: 0; margin: 16px 0 4px; overflow-x: auto; scrollbar-width: none; flex: none; position: relative; justify-content: center; justify-content: safe center; }
+/* (safe: a row wider than its panel starts at its first tab and scrolls, instead of losing both ends) */
 .gw-tabs::-webkit-scrollbar { display: none; }
 .gw-tabs.gw-tabs--many { justify-content: safe center; }
 .gw-tabs--many .gw-tab { padding: 0 10px 10px; letter-spacing: .09em; gap: 6px; }
@@ -150506,6 +150507,12 @@ var hG = `/* ui.css \u2014 GLOOMWATER interface, UI style v2 (CONTRACT \xA79, DE
 .gw-cc-loop .gw-cc-keep:disabled { opacity: .32; }
 .gw-cc-star { font-style: normal; color: var(--gold); white-space: pre; text-shadow: 0 0 12px rgba(232, 190, 119, .7); }
 .gw-cc-giant .gw-cc-stamp > span { color: var(--gold) !important; border-color: var(--gold) !important; text-shadow: 0 0 10px rgba(232, 190, 119, .45); }
+/* (the measuring card on a short screen: her name on one line and her two lines a little smaller, so the second is not lost under
+   the card's foot) */
+@media (max-height: 500px) {
+  .gw-cc.gw-cc-measured .gw-catch-name { font-size: 34px; }
+  .gw-cc.gw-cc-measured .gw-cc-measured-words .gw-cc-lore { font-size: 15px; line-height: 1.3; margin-top: 2px; }
+}
 
 /* ---------------------------------------------------------------- the Journal under the loop: the list first, its notches, a rule */
 .gw-jr-card.gw-jr-listed { position: relative; }
@@ -167681,6 +167688,13 @@ var Cb = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' widt
 .gw-mb-page--rig .gw-mb-body { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
 .gw-mb-page--rig .gw-mb-body::-webkit-scrollbar { display: none; }
 .gw-mb-page--rig .gw-rig-host { flex: none; padding-top: 6px; }
+/* a narrow page (the book on a phone): each part's label keeps to one line, so a two-word name does not run into the label below it */
+.gw-mb-page--rig .gw-rig-host { container-type: inline-size; }
+@container (max-width: 300px) {
+  .gw-rig-node { width: auto; max-width: 52%; min-height: 40px; }
+  .gw-rig-node .gw-rig-kind { font-size: 12px; }
+  .gw-rig-node .gw-rig-name { font-size: 15px; white-space: nowrap; }
+}
 .gw-mb-foot { display: flex; justify-content: center; align-items: center; min-height: 34px; padding: 0; flex: none; font: 500 16px/1 var(--f-body); color: var(--cat-ink-2); letter-spacing: .1em; }
 .gw-mb-foot::before, .gw-mb-foot::after { content: '\\2014'; margin: 0 8px; color: var(--cat-faint); }
 .gw-mb-foot:empty::before, .gw-mb-foot:empty::after { content: none; }
@@ -170957,6 +170971,9 @@ const NOTEPAD_CSS = `
 .gw-pad-close { position: sticky; bottom: calc(var(--sab, 0px) + 10px); z-index: 5; display: block; margin: 16px auto 0; min-width: 160px; min-height: 48px;
   border-radius: 999px; background: rgba(10, 12, 25, .9); box-shadow: 0 6px 18px rgba(4, 5, 12, .6); }
 .gw-journal-pad { padding: 14px 16px 24px; }
+/* (in the Journal on a wide screen the notepad scrolls in its own column, as a fish's page does, so its last sketches stay in reach
+   above Close instead of running off the foot of the screen) */
+.gw-loop-on .gw-p-catalogue .gw-journal-pad { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(174, 172, 208, .26) transparent; }
 `;
 // The speech box (Hob's look, shared with Murk). While Murk speaks at the jetty, the jetty's own copy of his line
 // steps back, so his words are not on screen twice; it is there again when he is done.
@@ -174962,6 +174979,16 @@ function YV(e) {
         }),
         ke.appendChild(qe);
     }
+    // A row wider than its panel scrolls: the chosen tab is brought into view, so a last tab (the Giants star) is not
+    // chosen off screen.
+    requestAnimationFrame(() => {
+      try {
+        let on = ke.querySelector(".gw-tab.gw-on");
+        on &&
+          ke.scrollWidth > ke.clientWidth + 1 &&
+          (ke.scrollLeft = Math.max(0, on.offsetLeft + on.offsetWidth / 2 - ke.clientWidth / 2));
+      } catch {}
+    });
     return ke;
   }
   let E = (K, we, te, ke) => (Ce) => {
@@ -180761,7 +180788,19 @@ function tj(e) {
 .gw-p-leave .gw-leave-fig i { display: inline-flex; width: 24px; height: 24px; }
 .gw-p-leave .gw-leave-fig i svg { width: 100%; height: 100%; }
 .gw-p-leave .gw-leave-foot { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
-.gw-p-leave .gw-leave-foot .gw-btn { min-width: 132px; min-height: 48px; }`),
+.gw-p-leave .gw-leave-foot .gw-btn { min-width: 132px; min-height: 48px; }
+/* a short screen (a phone held sideways): the lines scroll above the two buttons instead of running under them */
+.gw-p-leave .gw-pc { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(174, 172, 208, .26) transparent; }
+@media (max-height: 499px) {
+  .gw-p-leave { padding-bottom: 40px; }
+  .gw-p-leave .gw-ph .gw-pdiv { display: none; }
+  .gw-p-leave .gw-ph { padding: 0 4px; }
+  .gw-p-leave .gw-ph h2 { font-size: 26px; letter-spacing: .12em; }
+  .gw-p-leave .gw-pc { margin-top: 6px; }
+  .gw-p-leave .gw-leave-art { height: 44px; margin: 0 auto 4px; }
+  .gw-p-leave .gw-leave-line { margin: 4px auto; }
+  .gw-p-leave .gw-pf { margin-top: 10px; }
+}`),
       document.head.appendChild(z);
   }
   function f({ water: z = "mossmere", opening: Z = !1, onTap: D = null } = {}) {
