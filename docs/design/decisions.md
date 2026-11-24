@@ -215,6 +215,18 @@ The designer found the strike too quick when spinning a lure.
 - **At a phone tap's pace** (about 0.45 s after the take) nearly every strike already hooked; now "Hook set" lands about twice as often (36 to 59% from 12 to 26%), and a slow press (0.7 s) hooks almost always (from 84 to 96%).
 - **No shown words changed.** No line states the strike's length, and the rods' "more time to strike" lines stay true.
 
+## Sporewood's tackle and signs, built 24 November 2026
+
+Step 3b of the Sporewood plan: its rig grows from 3 parts to 8, as Mossmere's did.
+
+- **Brass Trace** (leader, 230): +4 Grip on toothy fish (both puffers, the mackerel, the Mildew Angler) and rough ones (both catfish, both eels, the Velvet Ray, the Nightbloom Carp). Shy fish (Hushcap Koi, Falsesmile Barb, Netcloud Fry, Sleepspore Jelly) bite 0.7 times as often.
+- **Mossthread Snood** (leader, 230): the same shy fish bite 1.4 times as often, and toothy fish lose 4 Grip. On the Plain Knot they never shy, so the snood raises bites to be worth its price.
+- **Burl Hook** (hook, 150), on bait only: a self-setter's struck strike or hard take is clean; a quick nibbler's clean strike is struck. Its shelf line says only what it does: nothing crushes a hook until Sporewood's hunt is built.
+- **They arrive one a tally**, on tallies with no gift, in the order Burl Hook, Brass Trace, Mossthread Snood. The trace comes sooner after the first toothy fish, the hook after a self-setter runs off a struck hook. A comment names the hunt beats that will bring them later (Burr's almanac, the first cracked pod).
+- **Practice orders:** the Burl Hook names the Cindertail Catfish or the Threadling Eel; the snood the Falsesmile Barb or the Hushcap Koi.
+- **Signs on the water:** Sporewood has its own (rises, swirls, ruffles, spray, strikes, bubble trails, tiny rings, silt clouds, knocks at the stems), each weighted by its makers' share of the bites at that spot and hour. Ten kinds can be sighted. As in Mossmere, signs carry no words.
+- **Mossmere is unchanged:** its 34 related checks give the same results, and a seeded run of its signs matches.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.

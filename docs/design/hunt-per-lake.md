@@ -35,8 +35,14 @@ Mossmere's entry is the only one. Sporewood has none yet. The save keeps one hun
 
 ## Other per-lake tables the hunt leans on
 
-- `wo.arrivals[water]`: the tackle that reaches Murk's shelf with the story (order, parts, beats).
+- `wo.arrivals[water]`: the tackle that reaches Murk's shelf with the story (order, parts, beats: `fish`, `runs`,
+  `quiet`), what a quiet tally waits for (`quietAfter`) and what Murk says when an arrival brings one part of several
+  (`alone`). The hunt's own beats name an arrival (`beats.map`, `theft`, `ring`). Sporewood's three (the Burl Hook,
+  the Brass Trace, the Mossthread Snood) come on quiet tallies until its hunt supplies Burr's almanac and the first
+  cracked pod as their beats.
 - `wo.orders.practice[water]`: practice orders (first, after, max, parts). No entry: no practice orders.
+- `bs[water]`: the lake's bite tables, among them the rig parts' tags (`leader`, `hookSet`), the parts a loss on the
+  Plain Knot or the Mere Hook names (`lossParts`), and its signs on the water (`tells`, `sight`).
 - `Ca.legendAway[legend]`: why she got away, by legend (it was already per legend).
 
 ## Still Mossmere's alone, reached through its entry

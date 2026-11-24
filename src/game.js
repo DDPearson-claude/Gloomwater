@@ -32240,33 +32240,41 @@ bs.mossmere.hookSet = {
   rosefleck_trout: "quick",
   rainglass_darter: "quick",
 };
+// The parts an ordinary fish lost on the Plain Knot or the Mere Hook names (ordinaryLossKind): the leader for
+// teeth, the leader for rough lips, the hook for a fish that grabs and runs.
+bs.mossmere.lossParts = { toothy: "pike_wire", rough: "chafe_gut", self: "turnback_hook" };
 // The tags a fish carries on a leader, as a list (empty for the Plain Knot, an untagged fish or a water without
 // leaders). A null water is the home lake, as in Ih().
 function leaderTags(speciesId, leader, water) {
   let tag = (water == null ? y0 : bs[water])?.leader?.[localKindBase(speciesId)]?.[leader];
   return tag == null ? [] : Array.isArray(tag) ? tag : [tag];
 }
+// What a tag does on this leader: the leader's own effect for it (wo.rig.parts[leader].fx: Sporewood's Mossthread
+// Snood, which wary fish do not shy from), else the tag's effect on any leader (wo.leaderFx).
+var leaderTagFx = (leader, tag) => wo?.rig?.parts?.[leader]?.fx?.[tag] ?? wo?.leaderFx?.[tag];
 // How much more or less often a species bites on this rig: the Depth part's multiplier times the fitted leader's.
 // With a leader the product never falls below wo.rigBiteFloor (the lead's 0.5 times a leader's 0.7), so no part
 // stops a fish. With no leader (the Plain Knot) it is the Depth multiplier exactly, as before.
 function rigBiteMult(speciesId, depth, leader, water) {
   let mult = depth ? depthBiteMult(speciesId, depth, water) : 1;
   if (!leader) return mult;
-  for (let tag of leaderTags(speciesId, leader, water)) mult *= ka(wo?.leaderFx?.[tag]?.bite, 1);
+  for (let tag of leaderTags(speciesId, leader, water)) mult *= ka(leaderTagFx(leader, tag)?.bite, 1);
   return Math.max(ka(wo?.rigBiteFloor, 0.35), mult);
 }
 // The Grip a fitted leader adds when landing a fish it suits (a toothy fish on Pike Wire, a rough mouth on Chafe
-// Gut). The catch odds never call it for a legend: her leader is a gate, built with her hunt.
+// Gut), or takes away (teeth on the Mossthread Snood). The catch odds never call it for a legend: her leader is a
+// gate, built with her hunt.
 function leaderGrip(speciesId, leader, water) {
   let grip = 0;
-  for (let tag of leaderTags(speciesId, leader, water)) grip += ka(wo?.leaderFx?.[tag]?.hold, 0);
+  for (let tag of leaderTags(speciesId, leader, water)) grip += ka(leaderTagFx(leader, tag)?.hold, 0);
   return grip;
 }
-// The strike grade on the hook a bait or bare cast fishes. On the Turnback Hook a fish that sets itself is hooked
+// The strike grade on the hook a bait or bare cast fishes. On a hook that sets itself (wo.rig.parts[hook].sets:
+// Mossmere's Turnback Hook, Sporewood's Burl Hook) a fish that sets itself (the water's hookSet table) is hooked
 // clean where it would be struck (a hard take included), and a quick nibbler is struck where it would be clean.
 // Early, late and every other hook are left as they are.
 function turnbackStrike(grade, speciesId, hook, water) {
-  if (hook !== "turnback_hook") return grade;
+  if (!hook || wo?.rig?.parts?.[hook]?.sets !== !0) return grade;
   let tag = (water == null ? y0 : bs[water])?.hookSet?.[localKindBase(speciesId)];
   return tag === "self" && grade === "struck"
     ? "clean"
@@ -32379,9 +32387,30 @@ bs.sporewood.factors = {
     hushcap_koi: 0.6,
   },
 };
+// Sporewood's signs on the water (Mossmere's `tells` and the sighted fish), its own fish only. A sign's weight
+// where it would show is its makers' share of the bites there and then (the sign pool: the area or place, the
+// light, and the bait on for the fish that take only one), so every sign is true to when and where its makers
+// bite. The forms, their areas and their makers follow each fish's habits and where it was measured to bite
+// most (the sign pool over a grid of the lake by light, 24 November 2026):
+//   Netcloud Fry, everywhere shallow at any hour: sips, a ruffle as the shoal flees, the shimmer of tiny rings.
+//   Falsesmile Barb, by day and at dusk, most on the pads, the lane and the inflow: sips, "a plop and a ring"
+//     (a splash) under the caps, and knocks at the lily stems.
+//   Sporebelly Puffer, by day and at dusk, most in the Lullaby: tiny rings and knocks under the lily rafts.
+//   Plumgill Perch, at dusk and at night, most at the Gill Harp and on the stones: splashes, sprays and strikes.
+//   Threadling Eel, all over the bottom: a thin bubble trail, a puff of silt, a swirl in the reeds.
+//   Cindertail Catfish, on the stones, the drop-off and the Gill Harp: a bubble trail, then nervous water.
+//   Velvet Ray, most in the Lullaby: a bubble trail, a puff of silt, a swirl.
+//   Lostsea Mackerel, by day and at dusk in open water: a fast splash at the top, sprays and strikes.
+//   Downcast Catfish, by day and at dusk in the deep: a slow wide roll at dusk and a swirl.
+//   Mildew Angler, at night only: a strike from below, a spray of fry, a swirl.
+//   Hushcap Koi, at night only, most in the Veilwater: sips, a slow roll, knocks at the stems, a swirl.
+//   Nightbloom Carp, at night only, in the Veilwater: a slow roll and a swirl.
+//   Capshell Crayfish, most on the stones: a puff of silt.
+//   Sleepspore Jelly, in the Lullaby by day and at dusk, only with Amber Larvae on: the tiny rings.
+// The giants and the legend make no signs (the sign roll leaves them out).
 {
-  let e = ["lullaby", "gill_harp", "veilwater", "mothers_cup"];
-  (bs.sporewood.tells = {
+  let places = ["lullaby", "gill_harp", "veilwater", "mothers_cup"];
+  bs.sporewood.tells = {
     rise: {
       hours: { day: 3, dusk: 3.2, night: 1.6 },
       cap: 3,
@@ -32389,23 +32418,24 @@ bs.sporewood.factors = {
       waitMult: 0.5,
       forms: {
         sip: {
-          makers: ["netcloud_fry", "falsesmile_barb"],
-          areas: ["margin", "reeds", "pads", "lane", "open", "lullaby"],
+          makers: ["netcloud_fry", "falsesmile_barb", "hushcap_koi"],
+          areas: ["margin", "reeds", "pads", "lane", "open", "inflow", "lullaby", "veilwater"],
           within: 2.5,
           after: 3,
           respond: "riseAgain",
         },
         splash: {
-          makers: ["lostsea_mackerel", "cindertail_catfish"],
-          areas: ["stones", "dropoff", "lane", "open", "inflow", "outflow"],
+          makers: ["falsesmile_barb", "plumgill_perch", "lostsea_mackerel"],
+          areas: ["stones", "reeds", "pads", "lane", "open", "inflow", "outflow", "gill_harp"],
           within: 3,
           after: 2,
           respond: "slapAgain",
         },
         roll: {
-          phases: ["dusk"],
-          makers: ["downcast_catfish"],
-          areas: ["dropoff", "open", "deep"],
+          should: !0,
+          phases: ["dusk", "night"],
+          makers: ["downcast_catfish", "hushcap_koi", "nightbloom_carp"],
+          areas: ["dropoff", "open", "deep", "pads", "lullaby", "veilwater", "mothers_cup"],
           within: 2.5,
           after: 3,
           respond: "riseAgain",
@@ -32418,8 +32448,17 @@ bs.sporewood.factors = {
       take: "swirl",
       waitMult: 0.65,
       prizePlus: !0,
-      makers: ["cindertail_catfish", "lostsea_mackerel", "downcast_catfish", "velvet_ray", "falsesmile_barb"],
-      areas: ["reeds", "pads", "stones", "dropoff", "deep", ...e],
+      makers: [
+        "cindertail_catfish",
+        "downcast_catfish",
+        "lostsea_mackerel",
+        "velvet_ray",
+        "threadling_eel",
+        "mildew_angler",
+        "hushcap_koi",
+        "nightbloom_carp",
+      ],
+      areas: ["reeds", "pads", "stones", "dropoff", "deep", ...places],
       within: 3,
       after: 8,
       respond: "bowWave",
@@ -32432,16 +32471,16 @@ bs.sporewood.factors = {
         ruffle: {
           hours: { day: 1.2, dusk: 1.4, night: 0.8 },
           makers: { day: ["netcloud_fry"], dusk: ["netcloud_fry"], night: ["netcloud_fry"] },
-          areas: ["margin", "reeds", "pads", "lane", "open"],
+          areas: ["margin", "reeds", "pads", "lane", "open", "inflow"],
           edge: !0,
           after: 10,
           spookInside: !0,
           respond: "ruffleDrift",
         },
         spray: {
-          hours: { day: 1.8, dusk: 1.4, night: 0.4 },
-          makers: ["lostsea_mackerel", "cindertail_catfish", "mildew_angler"],
-          areas: ["margin", "reeds", "pads", "lane", "open", "inflow", "outflow"],
+          hours: { day: 1.8, dusk: 1.4, night: 0.6 },
+          makers: ["lostsea_mackerel", "cindertail_catfish", "plumgill_perch", "mildew_angler"],
+          areas: ["margin", "reeds", "pads", "lane", "open", "inflow", "outflow", "gill_harp"],
           minnowRaw: 1,
           ring: [0.55, 1.6],
           spookInside: !0,
@@ -32456,8 +32495,8 @@ bs.sporewood.factors = {
       waitMult: 0.65,
       tilt: 3,
       favour: 0.6,
-      makers: ["lostsea_mackerel", "cindertail_catfish", "mildew_angler"],
-      areas: ["reeds", "pads", "stones", "dropoff", "outflow"],
+      makers: ["plumgill_perch", "lostsea_mackerel", "cindertail_catfish", "mildew_angler"],
+      areas: ["reeds", "pads", "stones", "dropoff", "outflow", "lane", "gill_harp", "lullaby", "mothers_cup"],
       within: 4,
       after: 10,
       respond: "bowWave",
@@ -32468,10 +32507,21 @@ bs.sporewood.factors = {
       waitMult: 0.65,
       tilt: 3,
       favour: 0.2,
-      makers: ["cindertail_catfish", "downcast_catfish"],
-      areas: ["margin", "reeds", "pads", "open", "deep"],
+      makers: ["velvet_ray", "threadling_eel", "cindertail_catfish"],
+      areas: ["margin", "reeds", "pads", "open", "deep", "lullaby", "gill_harp", "mothers_cup"],
       head: 2,
       respond: "fizzTurn",
+    },
+    pinprick: {
+      hours: { day: 1.2, dusk: 1.4, night: 0.4 },
+      cap: 2,
+      waitMult: 0.65,
+      tilt: 3,
+      favour: 0.2,
+      makers: ["netcloud_fry", "sporebelly_puffer", "sleepspore_jelly"],
+      areas: ["pads", "lullaby"],
+      within: 1.5,
+      respond: "thicken",
     },
     cloud: {
       hours: { day: 1.2, dusk: 1, night: 0 },
@@ -32479,8 +32529,8 @@ bs.sporewood.factors = {
       waitMult: 0.65,
       tilt: 3,
       favour: 0.2,
-      makers: ["velvet_ray", "capshell_crayfish"],
-      areas: ["margin", "open", "inflow"],
+      makers: ["velvet_ray", "capshell_crayfish", "threadling_eel"],
+      areas: ["margin", "open", "inflow", "stones", "outflow", "lullaby"],
       edge: 2,
       after: 15,
       spookInside: !0,
@@ -32491,9 +32541,8 @@ bs.sporewood.factors = {
       cap: 2,
       waitMult: 0.65,
       tilt: 3,
-      makers: ["falsesmile_barb"],
-      byArea: {},
-      areas: ["pads", "reeds", "lullaby"],
+      makers: ["falsesmile_barb", "sporebelly_puffer", "hushcap_koi"],
+      areas: ["pads", "reeds", "lullaby", "veilwater"],
       edge: 2.5,
       after: 8,
       spookInside: !0,
@@ -32509,28 +32558,29 @@ bs.sporewood.factors = {
     glow: { retired: !0 },
     alive: { day: [2, 4], dusk: [2, 4], night: [2, 3], max: 6 },
     preyRaw: MS(A7.netcloud_fry),
-  }),
-    (bs.sporewood.sight = {
-      ...y0.sight,
-      areas: ["margin", "pads", "inflow", "stones", "reeds", "lullaby"],
-      bodies: {
-        deep: ["falsesmile_barb", "mildew_angler", "nightbloom_carp"],
-        torpedo: ["cindertail_catfish"],
-        shoal: ["netcloud_fry"],
-        claw: ["capshell_crayfish"],
-      },
-      nightOnly: ["mildew_angler", "nightbloom_carp", "capshell_crayfish"],
-      exclude: [
-        "harpstring_eel",
-        "festival_puffer",
-        "drifting_grove",
-        "sleepspore_jelly",
-        "threadling_eel",
-        "velvet_ray",
-        "lostsea_mackerel",
-        "downcast_catfish",
-      ],
-    });
+  };
+  // Fish seen in the water (the sighted fish): each one's shape, the kinds seen only at night (they bite only
+  // then), the kinds never seen (the giants, the legend, the jelly, the eel that lives in the mud, the ray and
+  // the deep catfish), and the shallow areas and places they show in. The sighting reads these directly.
+  bs.sporewood.sight = {
+    areas: ["margin", "pads", "stones", "inflow", "reeds", "lullaby", "veilwater"],
+    bodies: {
+      deep: ["falsesmile_barb", "sporebelly_puffer", "hushcap_koi", "nightbloom_carp", "mildew_angler"],
+      torpedo: ["plumgill_perch", "cindertail_catfish", "lostsea_mackerel"],
+      shoal: ["netcloud_fry"],
+      claw: ["capshell_crayfish"],
+    },
+    nightOnly: ["mildew_angler", "hushcap_koi", "nightbloom_carp"],
+    exclude: [
+      "harpstring_eel",
+      "festival_puffer",
+      "drifting_grove",
+      "sleepspore_jelly",
+      "threadling_eel",
+      "velvet_ray",
+      "downcast_catfish",
+    ],
+  };
 }
 function id(e) {
   return e === "dusk" ? "dusk" : e === "gloomtide" || e === "night" ? "night" : "day";
@@ -47740,10 +47790,13 @@ wo.rigBiteFloor = 0.35;
 //   pike_wire: the first Reedjaw Pike landed or lost. Pike Wire alone.
 //   leaders: Hob's map drawn (sketches.map, which carries his worn line end). Chafe Gut never comes sooner.
 // By lake: a lake with no entry gets no arrivals. Its entry supplies `order` and, for each arrival, its `parts`
-// and its beats (`runs`, `fish`, `quiet`); the hunt's own beats for them are its `beats` (wo.hunts).
+// and its beats (`runs`, `fish`, `quiet`); the hunt's own beats for them are its `beats` (wo.hunts). `quietAfter`
+// is what a quiet tally waits for, `alone` what Murk says when an arrival brings one part of several.
 wo.arrivals = {
   mossmere: {
     order: ["turnback_hook", "pike_wire", "leaders"],
+    quietAfter: ["minnow_tin"],
+    alone: { chafe_gut: "gutOnly" },
     turnback_hook: {
       parts: ["turnback_hook"],
       runs: [
@@ -47959,6 +48012,155 @@ Object.assign(Ca.shelf, {
   pike_wire: "Sharp teeth cannot cut through wire.",
   chafe_gut: "Thick gut won't wear through on rough lips.",
 });
+// ---- Sporewood's Leader and Hook parts (sporewood-plan.md "Tackle") -------------------------------------------
+// The Brass Trace (as Pike Wire), the Mossthread Snood (as Chafe Gut) and the Burl Hook (as the Turnback Hook),
+// through the same systems as Mossmere's: the water's leader and hookSet tables, wo.leaderFx, turnbackStrike,
+// wo.arrivals and the practice orders. The Plain Knot and the Mere Hook are everyone's, here as in Mossmere.
+// Prices are before wo.cost.factor (2): 230, 230 and 150 on the shelf.
+Object.assign(wo.rig.parts, {
+  brass_trace: { slot: "leader", price: 115, water: "sporewood" },
+  // Shy fish come to its soft thread (wary and delicate fish bite more often on it, where they shy from brass),
+  // and teeth cut it (toothy fish land less often on it).
+  mossthread_snood: {
+    slot: "leader",
+    price: 115,
+    water: "sporewood",
+    fx: { wary: { bite: 1.4 }, delicate: { bite: 1.4 }, toothy: { hold: -4 } },
+  },
+  burl_hook: { slot: "hook", price: 75, water: "sporewood", sets: !0 },
+});
+// The Turnback Hook sets itself too (turnbackStrike reads the flag).
+wo.rig.parts.turnback_hook.sets = !0;
+// Sporewood's fish on its two leaders, from their lore and teeth (a fish missing is neutral; the legend is left
+// out). On the Brass Trace, "toothy" (beaks, needle teeth) and "rough" (catfish pads, eel and ray mouths, carp
+// lips) land more often, and "wary" and "delicate" fish bite less often. On the Mossthread Snood those same shy
+// fish bite more often, and "toothy" fish land less often. The two giants take only lures, so their tags
+// matter on a lure cast.
+bs.sporewood.leader = {
+  sporebelly_puffer: { brass_trace: "toothy", mossthread_snood: "toothy" },
+  lostsea_mackerel: { brass_trace: "toothy", mossthread_snood: "toothy" },
+  mildew_angler: { brass_trace: "toothy", mossthread_snood: "toothy" },
+  festival_puffer: { brass_trace: "toothy", mossthread_snood: "toothy" },
+  threadling_eel: { brass_trace: "rough" },
+  cindertail_catfish: { brass_trace: "rough" },
+  downcast_catfish: { brass_trace: "rough" },
+  velvet_ray: { brass_trace: "rough" },
+  nightbloom_carp: { brass_trace: "rough" },
+  harpstring_eel: { brass_trace: "rough" },
+  hushcap_koi: { brass_trace: "wary", mossthread_snood: "wary" },
+  falsesmile_barb: { brass_trace: "wary", mossthread_snood: "wary" },
+  netcloud_fry: { brass_trace: "delicate", mossthread_snood: "delicate" },
+  sleepspore_jelly: { brass_trace: "delicate", mossthread_snood: "delicate" },
+};
+// How each fish takes a hook, read on the Burl Hook: "self" fish grab and run and set it themselves (catfish,
+// eels, the ray, the mackerel, the angler, koi and carp), "quick" nibblers are struck at best (fry, barbs,
+// puffers, the perch, the crayfish, the jelly). The two giants take only lures, so they have no tag.
+bs.sporewood.hookSet = {
+  cindertail_catfish: "self",
+  downcast_catfish: "self",
+  threadling_eel: "self",
+  velvet_ray: "self",
+  lostsea_mackerel: "self",
+  mildew_angler: "self",
+  hushcap_koi: "self",
+  nightbloom_carp: "self",
+  netcloud_fry: "quick",
+  falsesmile_barb: "quick",
+  sporebelly_puffer: "quick",
+  plumgill_perch: "quick",
+  capshell_crayfish: "quick",
+  sleepspore_jelly: "quick",
+};
+// An ordinary fish lost on the Plain Knot or the Mere Hook names the part that would have kept it: the Brass
+// Trace for teeth and for rough lips, the Burl Hook for a fish that grabs and runs.
+bs.sporewood.lossParts = { toothy: "brass_trace", rough: "brass_trace", self: "burl_hook" };
+// One new piece a tally, by Mossmere's rules (wo.arrivals): an arrival whose beat has come first, else, on a
+// quiet tally, the first still waiting in this order, so with no beats the Burl Hook, the Brass Trace and the
+// Mossthread Snood come on three tallies in a row. A quiet tally waits for Murk's two gifts here, the Drift Float
+// and then the Seed Pouch (a part the game does not have yet is not waited for).
+//   burl_hook: one of `runs` lost after it ran before the hook was set. The hunt's beat for it, when the hunt is
+//     built, is the first cracked pod seen (as Mossmere's first ring of scrapes: the hunt's beats.ring).
+//   brass_trace: the first toothy fish landed or lost (`fish`), as Pike Wire's first pike. Alone.
+//   mossthread_snood: a quiet tally for now. The hunt's beat for the leaders, when it is built, is Burr's almanac
+//     (as Hob's map is Mossmere's: the hunt's beats.map); give it an arrival of both leaders then, with `alone`.
+wo.arrivals.sporewood ??= { order: [] };
+Object.assign(wo.arrivals.sporewood, {
+  quietAfter: ["drift_float", "seed_pouch"],
+  burl_hook: {
+    parts: ["burl_hook"],
+    runs: [
+      "cindertail_catfish",
+      "downcast_catfish",
+      "threadling_eel",
+      "velvet_ray",
+      "lostsea_mackerel",
+      "mildew_angler",
+      "hushcap_koi",
+      "nightbloom_carp",
+    ],
+    quiet: !0,
+  },
+  brass_trace: {
+    parts: ["brass_trace"],
+    fish: ["sporebelly_puffer", "lostsea_mackerel", "mildew_angler"],
+    quiet: !0,
+  },
+  mossthread_snood: { parts: ["mossthread_snood"], quiet: !0 },
+});
+wo.arrivals.sporewood.order.push("burl_hook", "brass_trace", "mossthread_snood");
+// Practice orders for the Burl Hook and the Mossthread Snood (wo.orders.practice), as Mossmere's Turnback Hook
+// and Chafe Gut: a fish the part truly helps. The catfish grabs and runs, so the Burl Hook hooks it clean; the
+// barb and the koi are shy, so they bite more often on the snood. Each fish takes bait.
+wo.orders.practice.sporewood ??= { first: 0.5, after: 1 / 6, max: 1, parts: {} };
+Object.assign(wo.orders.practice.sporewood.parts, {
+  burl_hook: { rig: { hook: "burl_hook" }, fish: ["cindertail_catfish", "threadling_eel"] },
+  mossthread_snood: { rig: { leader: "mossthread_snood" }, fish: ["falsesmile_barb", "hushcap_koi"] },
+});
+Object.assign(Ca.orderWords.rig, {
+  burl_hook: "caught on the Burl Hook",
+  mossthread_snood: "caught on the Mossthread Snood",
+});
+// The words: the tackle screen's rows and the rig picture's lines (good for, costs you), the shelf lines,
+// Murk's tally line as each arrives, and the ordinary loss words in Sporewood.
+Object.assign(Ca.leader.names, { brass_trace: "Brass Trace", mossthread_snood: "Mossthread Snood" });
+Object.assign(Ca.leader.good, {
+  brass_trace: "Fish with sharp teeth or rough lips, such as puffers and catfish, land more often.",
+  mossthread_snood: "Shy fish, such as koi, barbs and fry, bite more often.",
+});
+Object.assign(Ca.leader.cost, {
+  brass_trace: "Shy fish, such as koi, barbs and fry, bite less often.",
+  mossthread_snood: "Sharp teeth cut thread, so puffers and mackerel land less often.",
+});
+Object.assign(Ca.hook.names, { burl_hook: "Burl Hook" });
+Object.assign(Ca.hook.good, {
+  burl_hook: "Fish that grab and run, such as catfish, eels and koi, are always hooked clean.",
+});
+Object.assign(Ca.hook.cost, {
+  burl_hook: "Quick nibblers, such as fry, barbs and puffers, are never hooked clean.",
+});
+Object.assign(Ca.shelf, {
+  brass_trace: "Teeth can't cut it, and rough lips can't wear it through.",
+  mossthread_snood: "Soft moss thread. Shy fish bite more often on it.",
+  // What it does today. Nothing crushes a hook yet: the hunt's builder may add "it won't crush" with her losses.
+  burl_hook: "This thick hook sets itself in fish that grab and run.",
+});
+Object.assign(Ca.arrivals.names, {
+  burl_hook: "Burl Hook",
+  brass_trace: "Brass Trace",
+  mossthread_snood: "Mossthread Snood",
+});
+Object.assign(Ca.arrivals.lines, {
+  burl_hook: "Catfish grab and run here. There's a hook on the shelf that sets itself.",
+  brass_trace: "Puffer beaks cut line. The Brass Trace is on the shelf now.",
+  mossthread_snood: "Shy fish come to soft thread. The Mossthread Snood is on the shelf now.",
+});
+Ca.partLossAt = {
+  sporewood: {
+    toothy: "Bitten through. A Brass Trace stops teeth.",
+    rough: "Worn through on its lips. A Brass Trace won't wear.",
+    self: "It ran before the hook was set. A Burl Hook sets itself.",
+  },
+};
 // ---- The monster hunts, one per lake (docs/design/hunt-per-lake.md) ---------------------------------------------
 // A lake's hunt rules, by the water's id (its words are in Ca.hunts). A lake with no entry has no hunt (Sporewood,
 // for now), and every hunt check there says no. A new lake's entry supplies legend, hidden, taleEvening,
@@ -107656,7 +107858,14 @@ function $H(e, t, n = []) {
         level: null,
         partId: g,
         water: p.water,
-        art: { turnback_hook: "hook", pike_wire: "line", chafe_gut: "gut" }[g] || "hook",
+        art:
+          {
+            turnback_hook: "hook",
+            pike_wire: "line",
+            chafe_gut: "gut",
+            brass_trace: "line",
+            mossthread_snood: "gut",
+          }[g] || "hook",
         name: s.leader?.names?.[g] || s.hook?.names?.[g] || g,
         goalName: s.leader?.names?.[g] || s.hook?.names?.[g] || g,
         line: s.shelf?.[g] ?? "",
@@ -109539,8 +109748,14 @@ function savedRigsModel(loop, D, { run = null } = {}) {
           bs[water]?.depth && !rig.lure
             ? `${words.depth?.[rig.depth] || ""}${words.join || " "}${what}`
             : what,
-        leader = bs[water]?.leader && !wo.rig.parts[rig.leader]?.start ? rig.leader : null,
-        hook = bs[water]?.hookSet && !rig.lure && !wo.rig.parts[rig.hook]?.start ? rig.hook : null;
+        leader =
+          bs[water]?.leader && !wo.rig.parts[rig.leader]?.start && rigPartOfWater(rig.leader, water)
+            ? rig.leader
+            : null,
+        hook =
+          bs[water]?.hookSet && !rig.lure && !wo.rig.parts[rig.hook]?.start && rigPartOfWater(rig.hook, water)
+            ? rig.hook
+            : null;
       return {
         n: i + 1,
         label: Ab(words.tab || "", { n: i + 1 }),
@@ -110400,8 +110615,10 @@ function yF(e) {
     rigs: [plainRig(e), plainRig(e), plainRig(e)],
     activeRig: 0,
     // Rig parts reaching Murk's shelf with the story (wo.arrivals): each beat's number in the order they came
-    // (0 while it has not), the last number given, and the parts on the shelf.
-    arrivals: { seq: 0, beats: { turnback_hook: 0, pike_wire: 0, leaders: 0 }, shelved: [] },
+    // (0 while it has not), the last number given, and the parts on the shelf. Every lake's beats are kept here
+    // by their own names (Mossmere's turnback_hook, pike_wire and leaders; Sporewood's burl_hook, brass_trace and
+    // mossthread_snood), so an old save gains a lake's new beats at 0.
+    arrivals: { seq: 0, beats: freshArrivalBeats(), shelved: [] },
     bait: t.bait,
     maps: { lakes: [il(e)], places: [] },
     raft: { oars: 0, keel: 0, lantern: 0 },
@@ -110843,14 +111060,22 @@ function soundingLeadFishes(loop, water, lure) {
   );
 }
 // The leader or hook a rig fishes in a water (slot "leader" or "hook"), or null for the default part (the Plain
-// Knot, the Mere Hook) and in a water without that part (Sporewood). A hook is null under a lure, which carries
-// its own.
+// Knot, the Mere Hook), in a water without that part, and for another lake's part (an older save's rig parts were
+// once shared by both lakes). A hook is null under a lure, which carries its own.
 function rigPartFishes(loop, slot, water, lure) {
   let id = loop?.fitted?.[slot],
     part = wo?.rig?.parts?.[id];
   if (!part || part.slot !== slot || part.start || !Sr(loop.parts).includes(id)) return null;
   if (typeof water != "string" || !bs[water]?.[slot === "hook" ? "hookSet" : "leader"]) return null;
+  if (!rigPartOfWater(id, water)) return null;
   return slot === "hook" && lure ? null : id;
+}
+// Whether a rig part belongs to a water: everyone's parts (the Cork Float, the Plain Knot, the Mere Hook), the
+// parts of no lake (the Sounding Lead, the tin), and the lake's own. Another lake's Leader or Hook is left off its
+// rows and never fishes there.
+function rigPartOfWater(id, water) {
+  let part = wo?.rig?.parts?.[id];
+  return !!part && (part.start === !0 || part.water == null || part.water === water);
 }
 // Notes that an arrival's beat has happened (wo.arrivals), numbering beats in the order they come. Only the first
 // time counts. Returns whether it was new.
@@ -110859,19 +111084,27 @@ function noteArrivalBeat(loop, key) {
   if (!Ln(arrivals) || !Ln(arrivals.beats) || ha(arrivals.beats[key]) > 0) return !1;
   return (arrivals.seq = ha(arrivals.seq) + 1), (arrivals.beats[key] = arrivals.seq), !0;
 }
-// The beats an ordinary fish's landing or loss can bring (wo.arrivals): the first Reedjaw Pike either way, and a
-// fish that grabs and runs lost after it ran before the hook was set (struck, or a hard take, which is struck).
-// Only in a water with hooks and leaders, and only while the part is not on the shelf yet.
+// The beats an ordinary fish's landing or loss can bring (wo.arrivals): an arrival's `fish` landed or lost
+// (Mossmere's first Reedjaw Pike), and one of its `runs`, a fish that grabs and runs, lost after it ran before the
+// hook was set (struck, or a hard take, which is struck). The `fish` beats are noted before the `runs` beats, so a
+// fish that is both numbers them in that order. Only in a water with hooks and leaders, and only while the part
+// is not on the shelf yet.
 function noteFishArrivalBeats(loop, water, speciesId, { lost = !1, grade = null } = {}) {
   let rule = typeof water == "string" ? wo.arrivals?.[water] : null,
     shelved = (key) => Sr(rule[key]?.parts).every((id) => Sr(loop?.arrivals?.shelved).includes(id));
   if (typeof water != "string" || !bs[water]?.hookSet || !speciesId || !rule) return;
-  Sr(rule.pike_wire?.fish).includes(speciesId) && !shelved("pike_wire") && noteArrivalBeat(loop, "pike_wire");
-  lost &&
-    grade === "struck" &&
-    Sr(rule.turnback_hook?.runs).includes(speciesId) &&
-    !shelved("turnback_hook") &&
-    noteArrivalBeat(loop, "turnback_hook");
+  let keys = Sr(rule.order);
+  for (let key of keys)
+    Sr(rule[key]?.fish).includes(speciesId) && !shelved(key) && noteArrivalBeat(loop, key);
+  if (lost && grade === "struck")
+    for (let key of keys)
+      Sr(rule[key]?.runs).includes(speciesId) && !shelved(key) && noteArrivalBeat(loop, key);
+}
+// A new game's arrival beats: every lake's arrivals (wo.arrivals[lake].order), none come yet.
+function freshArrivalBeats() {
+  let beats = {};
+  for (let lake of Object.values(wo?.arrivals || {})) for (let key of Sr(lake?.order)) beats[key] = 0;
+  return beats;
 }
 // Every lake's practice-order parts in one table (wo.orders.practice is by lake): what a tally notes.
 function practicePartsAll(practice = wo.orders?.practice) {
@@ -110900,9 +111133,12 @@ function notePracticeTally(loop, fills, rule = { parts: practicePartsAll() }) {
   );
 }
 // What reaches Murk's shelf at this tally (mossmere-review-addendum.md section 2), called only on a tally with no
-// gift from Murk: { gift, giftSay } with gift "turnback_hook", "pike_wire" or "leaders", or null. Puts the parts on
-// the shelf. Hob's map drawn before this tally is the leaders' beat; a map Murk passes on at this tally counts from
-// the next. With nothing due, a tally after the tin's brings the Turnback Hook anyway (a quiet tally).
+// gift from Murk: { gift, giftSay } with gift one of the lake's arrivals (Mossmere's "turnback_hook", "pike_wire"
+// or "leaders"), or null. Puts the parts on the shelf. Hob's map drawn before this tally is the leaders' beat; a
+// map Murk passes on at this tally counts from the next. With nothing due, a quiet tally brings the first arrival
+// in `order` that comes on one (`quiet`), once the lake's `quietAfter` parts are owned (Mossmere: the Turnback
+// Hook, after the tin's tally). A `quietAfter` part the game does not have yet is not waited for. When an arrival
+// of several parts brings only one, the lake's `alone` may name what Murk says (Mossmere: "gutOnly", Chafe Gut).
 function rigArrivalAtTally(loop, water, rule = typeof water == "string" ? wo.arrivals?.[water] : null) {
   let arrivals = loop?.arrivals;
   if (
@@ -110925,17 +111161,20 @@ function rigArrivalAtTally(loop, water, rule = typeof water == "string" ? wo.arr
       .sort((a, b) => ha(arrivals.beats[a]) - ha(arrivals.beats[b]) || order.indexOf(a) - order.indexOf(b)),
     gift = due[0] ?? null,
     giftSay = "beat";
-  !gift &&
-    rule.turnback_hook?.quiet &&
-    Sr(loop.parts).includes("minnow_tin") &&
-    waiting("turnback_hook").length &&
-    ((gift = "turnback_hook"), (giftSay = "quiet"));
+  if (
+    !gift &&
+    Sr(rule.quietAfter)
+      .filter((id) => Ln(wo?.rig?.parts?.[id]))
+      .every((id) => Sr(loop.parts).includes(id))
+  )
+    (gift = order.find((key) => rule[key]?.quiet && waiting(key).length) ?? null),
+      gift && (giftSay = "quiet");
   if (!gift) return null;
   let parts = waiting(gift);
   arrivals.shelved.push(...parts);
-  gift === "leaders" && parts.length === 1 && parts[0] === "chafe_gut" && (giftSay = "gutOnly");
+  gift !== parts[0] && parts.length === 1 && rule.alone?.[parts[0]] && (giftSay = rule.alone[parts[0]]);
   // Brought by the theft that found her water, or after the ring of scrapes has been seen: Murk's hunt line.
-  gift === "turnback_hook" &&
+  (gift === hunt?.beats?.theft || gift === hunt?.beats?.ring) &&
     giftSay === "beat" &&
     (record?.hookByTheft === !0 || ha(record?.marks?.ring) > 0) &&
     (giftSay = "hunt");
@@ -110956,30 +111195,32 @@ function ordinaryLossWord(
   if (!kind) return null;
   let flags = Ln(run.flags) ? run.flags : (run.flags = {}),
     said = Ln(flags.partWords) ? flags.partWords : (flags.partWords = {});
-  return said[kind] ? null : ((said[kind] = !0), Ca.partLoss?.[kind] || null);
+  return said[kind]
+    ? null
+    : ((said[kind] = !0), Ca.partLossAt?.[water]?.[kind] || Ca.partLoss?.[kind] || null);
 }
-// The kind of loss an ordinary fish lost on a default part names, once Murk has the part that would have kept it:
-// "toothy" or "rough" (the leader), "self" (the hook), or null.
+// The kind of loss an ordinary fish lost on a default part names, once Murk has the part that would have kept it
+// (the water's lossParts: Mossmere's Pike Wire for teeth, Chafe Gut for rough lips, the Turnback Hook for a fish
+// that grabs and runs): "toothy" or "rough" (the leader), "self" (the hook), or null.
 function ordinaryLossKind(
   loop,
   speciesId,
   { water = null, leader = null, hook = null, lure = !1, hardTake = !1 } = {},
 ) {
-  let offered = (id) => Sr(loop?.parts).includes(id) || Sr(loop?.arrivals?.shelved).includes(id),
+  let offered = (id) => !!id && (Sr(loop?.parts).includes(id) || Sr(loop?.arrivals?.shelved).includes(id)),
+    by = bs[water]?.lossParts || {},
     kind = null;
   if (typeof water != "string") return null;
   !leader &&
-    (leaderTags(speciesId, "pike_wire", water).includes("toothy") && offered("pike_wire")
+    (leaderTags(speciesId, by.toothy, water).includes("toothy") && offered(by.toothy)
       ? (kind = "toothy")
-      : leaderTags(speciesId, "chafe_gut", water).includes("rough") &&
-        offered("chafe_gut") &&
-        (kind = "rough"));
+      : leaderTags(speciesId, by.rough, water).includes("rough") && offered(by.rough) && (kind = "rough"));
   !kind &&
     !hook &&
     !lure &&
     hardTake &&
     bs[water]?.hookSet?.[localKindBase(speciesId)] === "self" &&
-    offered("turnback_hook") &&
+    offered(by.self) &&
     (kind = "self");
   return kind;
 }
@@ -133370,32 +133611,29 @@ var tD = {
     "thousandcast_pike",
     "hullkiss_lamprey",
   ]),
-  I0e = Object.freeze({
-    mossmere: tD,
-    sporewood: Object.freeze({
-      falsesmile_barb: "deep",
-      mildew_angler: "deep",
-      nightbloom_carp: "deep",
-      cindertail_catfish: "torpedo",
-      netcloud_fry: "shoal",
-      capshell_crayfish: "claw",
-    }),
-  }),
-  O0e = Object.freeze({
-    mossmere: nD,
-    sporewood: new Set([
-      "harpstring_eel",
-      "festival_puffer",
-      "drifting_grove",
-      "sleepspore_jelly",
-      "threadling_eel",
-      "velvet_ray",
-      "lostsea_mackerel",
-      "downcast_catfish",
-    ]),
-  }),
-  N0e = { sporewood: new Set(["mildew_angler", "nightbloom_carp", "capshell_crayfish"]) },
-  H0e = new Set(["margin", "pads", "stones", "inflow", "reeds", "lily_maze", "lullaby"]),
+  // Sighted fish by water: Mossmere's shapes are the tables above; another lake's come from its own sight table
+  // (bs[water].sight: bodies by shape, the kinds seen only at night, the kinds never seen, the areas they show in).
+  sightOf = (water) => (Ln(bs?.[water]?.sight) ? bs[water].sight : {}),
+  sightBodiesOf = (water) =>
+    Object.freeze(
+      Object.fromEntries(
+        Object.entries(sightOf(water).bodies || {}).flatMap(([shape, ids]) =>
+          Sr(ids).map((id) => [id, shape]),
+        ),
+      ),
+    ),
+  I0e = Object.freeze({ mossmere: tD, sporewood: sightBodiesOf("sporewood") }),
+  O0e = Object.freeze({ mossmere: nD, sporewood: new Set(Sr(sightOf("sporewood").exclude)) }),
+  N0e = { sporewood: new Set(Sr(sightOf("sporewood").nightOnly)) },
+  H0e = new Set([
+    "margin",
+    "pads",
+    "stones",
+    "inflow",
+    "reeds",
+    "lily_maze",
+    ...Sr(sightOf("sporewood").areas).filter((a) => !hg.includes(a)),
+  ]),
   ab = (e) => (e === "dusk" ? "dusk" : e === "gloomtide" || e === "night" ? "night" : "day"),
   wM = ({ stub: e = !1, level: t = 0 } = {}, n = Ss) =>
     ta(n.lantern.r, 8) *
@@ -142373,6 +142611,20 @@ function Y0e(e) {
                   : null,
               };
             }),
+          // The pool the signs on the water draw their makers from at a point (the raft's, else x, z): its area or
+          // place, the light, and each kind's share there and then, as a natural sign there would read it.
+          fishSignPool: ({ x: px = null, z: pz = null } = {}) => {
+            let at = Number.isFinite(px) && Number.isFinite(pz) ? { x: px, z: pz } : P(),
+              w = Nt(at.x, at.z);
+            if (w.mist) return { area: null, mist: !0, light: XB(j()), pool: {} };
+            let area = Xb(at.x, at.z, w);
+            return {
+              area,
+              place: w.place?.id ?? null,
+              light: XB(j()),
+              pool: area ? Object.fromEntries(Bj(I4(area, j(), w.place?.id ?? null))) : {},
+            };
+          },
           fishClock: () => i.clock,
           ceremony: () => {
             let I = i.show && i.show.phase !== "reveal" ? i.show : null;
@@ -166161,7 +166413,7 @@ function khe(e, { metaLoop: t = null, run: n = null, line: o = null, canChange: 
   // them. With a lure on, the Hook row says the lure carries its own hook instead of offering a choice.
   for (let slot of ["leader", "hook"]) {
     let text = i0(e?.TEXT_LOOP?.[slot]) ? e.TEXT_LOOP[slot] : {},
-      owned = Ed(s.parts).filter((z) => e?.LOOP?.rig?.parts?.[z]?.slot === slot);
+      owned = Ed(s.parts).filter((z) => e?.LOOP?.rig?.parts?.[z]?.slot === slot && rigPartOfWater(z, c));
     if (!bs[c]?.[slot === "hook" ? "hookSet" : "leader"] || owned.length < 2) continue;
     let fitted = owned.includes(s.fitted?.[slot])
         ? s.fitted[slot]
@@ -166322,7 +166574,9 @@ function rigPicture(e, opts = {}, shelf = []) {
       )
         continue;
       let text = i0(tx[slot]) ? tx[slot] : {},
-        owned = Ed(s.parts).filter((z) => e?.LOOP?.rig?.parts?.[z]?.slot === slot),
+        owned = Ed(s.parts).filter(
+          (z) => e?.LOOP?.rig?.parts?.[z]?.slot === slot && rigPartOfWater(z, water),
+        ),
         fitted = owned.includes(s.fitted?.[slot])
           ? s.fitted[slot]
           : owned.find((z) => e.LOOP.rig.parts[z].start) || owned[0],
@@ -166516,17 +166770,24 @@ function rigSliceSvg(draw = {}) {
     anchors.bait = [end.x - 8, end.y + 16];
   } else {
     let { x, y } = end,
-      turn = draw.hook === "turnback_hook";
-    out.push(
-      `<path class="gw-rig-hook" d="${
-        end.upright
-          ? turn
-            ? `M${x} ${y} V${y + 14} C${x} ${y + 28} ${x - 18} ${y + 30} ${x - 18} ${y + 18} C${x - 18} ${y + 10} ${x - 10} ${y + 9} ${x - 7} ${y + 14}`
+      turn = draw.hook === "turnback_hook",
+      // Sporewood's Burl Hook: a short, thick, dark J with a knot of burl on its shank.
+      burl = draw.hook === "burl_hook",
+      hookD = end.upright
+        ? turn
+          ? `M${x} ${y} V${y + 14} C${x} ${y + 28} ${x - 18} ${y + 30} ${x - 18} ${y + 18} C${x - 18} ${y + 10} ${x - 10} ${y + 9} ${x - 7} ${y + 14}`
+          : burl
+            ? `M${x} ${y} V${y + 16} C${x} ${y + 27} ${x - 15} ${y + 27} ${x - 15} ${y + 17} L${x - 11} ${y + 12}`
             : `M${x} ${y} V${y + 18} C${x} ${y + 28} ${x - 14} ${y + 28} ${x - 14} ${y + 18} L${x - 11} ${y + 13}`
-          : turn
-            ? `M${x} ${y} H${x - 14} C${x - 26} ${y} ${x - 28} ${y - 12} ${x - 18} ${y - 13} C${x - 13} ${y - 13} ${x - 12} ${y - 8} ${x - 15} ${y - 6}`
-            : `M${x} ${y} H${x - 18} C${x - 26} ${y} ${x - 26} ${y - 10} ${x - 18} ${y - 10} L${x - 14} ${y - 7}`
-      }"/>`,
+        : turn
+          ? `M${x} ${y} H${x - 14} C${x - 26} ${y} ${x - 28} ${y - 12} ${x - 18} ${y - 13} C${x - 13} ${y - 13} ${x - 12} ${y - 8} ${x - 15} ${y - 6}`
+          : burl
+            ? `M${x} ${y} H${x - 16} C${x - 25} ${y} ${x - 25} ${y - 11} ${x - 17} ${y - 11} L${x - 13} ${y - 7}`
+            : `M${x} ${y} H${x - 18} C${x - 26} ${y} ${x - 26} ${y - 10} ${x - 18} ${y - 10} L${x - 14} ${y - 7}`;
+    out.push(
+      burl
+        ? `<path class="gw-rig-burl-edge" d="${hookD}"/><path class="gw-rig-burl" d="${hookD}"/><ellipse class="gw-rig-burl-knot" cx="${end.upright ? x : x - 6}" cy="${end.upright ? y + 6 : y}" rx="${end.upright ? 3.4 : 4.2}" ry="${end.upright ? 4.2 : 3.4}"/>`
+        : `<path class="gw-rig-hook" d="${hookD}"/>`,
     );
     let bx = end.upright ? x - 7 : x - 22,
       by = end.upright ? y + 26 : y - 6;
@@ -166552,6 +166813,30 @@ function rigLeaderPath(id, d, x, y, lying, len) {
     return `<path class="gw-rig-wire" d="M${pts.join(" L")}"/>`;
   }
   if (id === "chafe_gut") return `<path class="gw-rig-gut" d="${d}"/>`;
+  // Sporewood's: a straight brass trace, its two strands twisted, a crimp at each end; and a soft green snood
+  // that waves a little, tied on with a small loop.
+  if (id === "brass_trace") {
+    let at = (s, o) => (lying ? `${Zt(x - s)} ${Zt(y + o)}` : `${Zt(x + o)} ${Zt(y + s)}`),
+      crimp = (s) =>
+        lying
+          ? `<rect class="gw-rig-crimp" x="${Zt(x - s - 2.5)}" y="${Zt(y - 2)}" width="5" height="4" rx="1"/>`
+          : `<rect class="gw-rig-crimp" x="${Zt(x - 2)}" y="${Zt(y + s - 2.5)}" width="4" height="5" rx="1"/>`,
+      twist = [];
+    for (let s = 5; s <= len - 5; s += 3.5) twist.push(`M${at(s - 1.5, -1.8)} L${at(s + 1.5, 1.8)}`);
+    return `<path class="gw-rig-trace" d="M${at(0, 0)} L${at(len, 0)}"/><path class="gw-rig-twist" d="${twist.join(" ")}"/>${crimp(2.5)}${crimp(len - 2.5)}`;
+  }
+  if (id === "mossthread_snood") {
+    let at = (s, o) => (lying ? `${Zt(x - s)} ${Zt(y + o)}` : `${Zt(x + o)} ${Zt(y + s)}`),
+      wave = [`M${at(4, 0)}`];
+    for (let i = 1; i <= 4; i++)
+      wave.push(
+        `Q${at(4 + (i - 0.5) * ((len - 4) / 4), i % 2 ? 2.6 : -2.6)} ${at(4 + i * ((len - 4) / 4), 0)}`,
+      );
+    let loop = lying
+      ? `<ellipse class="gw-rig-snood-loop" cx="${Zt(x - 2)}" cy="${Zt(y)}" rx="2.6" ry="2"/>`
+      : `<ellipse class="gw-rig-snood-loop" cx="${Zt(x)}" cy="${Zt(y + 2)}" rx="2" ry="2.6"/>`;
+    return `${loop}<path class="gw-rig-snood" d="${wave.join(" ")}"/>`;
+  }
   let kx = lying ? x - len / 2 : x,
     ky = lying ? y : y + len / 2;
   return `<path class="gw-rig-line" d="${d}"/><ellipse class="gw-rig-knot" cx="${Zt(kx)}" cy="${Zt(ky)}" rx="${lying ? 4 : 3}" ry="${lying ? 3 : 4}"/>`;
@@ -166603,7 +166888,12 @@ function rigTabIcons(rig) {
   rig.leader && out.push(icon("0 0 32 32", rigLeaderPath(rig.leader, "M16 4 V28", 16, 4, 0, 24)));
   rig.hook &&
     out.push(
-      icon("0 0 32 32", `<path class="gw-rig-hook" d="M20 2 V14 C20 28 2 30 2 18 C2 10 10 9 13 14"/>`),
+      rig.hook === "burl_hook"
+        ? icon(
+            "0 0 32 32",
+            `<path class="gw-rig-burl-edge" d="M20 3 V18 C20 29 6 29 6 19 L10 14"/><path class="gw-rig-burl" d="M20 3 V18 C20 29 6 29 6 19 L10 14"/><ellipse class="gw-rig-burl-knot" cx="20" cy="9" rx="3.4" ry="4.2"/>`,
+          )
+        : icon("0 0 32 32", `<path class="gw-rig-hook" d="M20 2 V14 C20 28 2 30 2 18 C2 10 10 9 13 14"/>`),
     );
   return out.join("");
 }
@@ -166639,6 +166929,14 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
       '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="106" cy="12" r="6" stroke-width="3.4"/><path d="M106 18V90C106 114 92 124 78 124C64 124 56 114 56 100V92L70 106" stroke-width="5"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     turnback_hook:
       '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="112" cy="12" r="6" stroke-width="3.4"/><path d="M112 18V66C112 104 92 124 72 122C52 120 46 98 54 84C62 70 80 70 90 80" stroke-width="5"/><path d="M90 80L86 70" stroke-width="3.4"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    // Sporewood's Leader parts (a brass trace, two strands twisted between two crimps; a soft snood of moss
+    // thread, tied on with a loop) and its Burl Hook (a short thick J with a knot of burl on the shank).
+    brass_trace:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V26" stroke-width="2.4"/><circle cx="100" cy="31" r="5" stroke-width="3"/><path d="M94 38H106V46H94Z" stroke-width="2.6"/><path d="M98 46C106 52 106 58 98 64C90 70 90 76 98 82C106 88 104 92 100 94" stroke-width="2.6"/><path d="M102 46C94 52 94 58 102 64C110 70 110 76 102 82C94 88 96 92 100 94" stroke-width="2.6"/><path d="M94 94H106V102H94Z" stroke-width="2.6"/><path d="M100 102V110C100 122 92 127 84 122L80 115" stroke-width="3.6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    mossthread_snood:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V30" stroke-width="2.4"/><ellipse cx="100" cy="37" rx="6" ry="8" stroke-width="3"/><path d="M100 45C108 53 92 61 100 69C108 77 92 85 100 93C104 97 100 100 100 102" stroke-width="4.4"/><path d="M95 52L91 55M105 66L109 69M95 80L91 83" stroke-width="1.8" stroke-opacity=".6"/><path d="M100 102V110C100 122 92 127 84 122L80 115" stroke-width="3.6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    burl_hook:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="108" cy="12" r="6" stroke-width="3.4"/><path d="M108 18V84C108 110 94 120 80 120C66 120 58 110 58 98V90L72 102" stroke-width="7"/><path d="M100 40C100 32 116 32 116 40V52C116 60 100 60 100 52Z" stroke-width="3.6"/><path d="M104 44C106 42 110 42 112 45" stroke-width="1.8" stroke-opacity=".6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     // The Live Minnow (a small fish hooked through the lip) and Murk's minnow tin, in the same style.
     live_minnow:
       '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M66 6V62C66 72 58 77 51 71L47 65" stroke-width="3.2"/><path d="M56 78C68 62 98 58 126 68L150 56V100L126 88C98 98 68 94 56 78Z" stroke-width="5"/><circle cx="73" cy="74" r="3.4" stroke-width="2.6"/><path d="M96 66C100 72 100 84 96 90" stroke-width="2.4" stroke-opacity=".6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
@@ -166865,6 +167163,14 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
 .gw-rig-brass { fill: #c9a44a; stroke: var(--ink); stroke-width: 1.2; }
 .gw-rig-wire { stroke: #d8b25a; stroke-width: 2; }
 .gw-rig-gut { stroke: #c08a3c; stroke-width: 5; }
+.gw-rig-trace { stroke: #b98a34; stroke-width: 3.2; }
+.gw-rig-twist { stroke: #f0d58a; stroke-width: 1.1; }
+.gw-rig-crimp { fill: #8c6a2c; stroke: var(--ink); stroke-width: .9; }
+.gw-rig-snood { stroke: #6f9e52; stroke-width: 3; }
+.gw-rig-snood-loop { fill: none; stroke: #6f9e52; stroke-width: 1.8; }
+.gw-rig-burl-edge { stroke: var(--ink); stroke-width: 5.6; }
+.gw-rig-burl { stroke: #4a3121; stroke-width: 3.4; }
+.gw-rig-burl-knot { fill: #5b3d27; stroke: var(--ink); stroke-width: 1.2; }
 .gw-rig-worm { stroke: #c98c86; stroke-width: 3.4; }
 .gw-rig-fish { fill: #9aa6b8; stroke: var(--ink); stroke-width: 1.2; }
 .gw-rig-moss { fill: #5f8a5a; stroke: var(--ink); stroke-width: 1.2; }

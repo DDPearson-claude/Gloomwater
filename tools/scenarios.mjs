@@ -1254,6 +1254,68 @@ const LOSS_TEETH = "Bitten through. Pike Wire stops teeth.";
 const LOSS_LIPS = "Worn through on its lips. Chafe Gut won't wear.";
 const LOSS_RAN = "It ran before the hook was set. A Turnback Hook sets itself.";
 
+// ---- Sporewood's Leader and Hook parts (sporewood-plan.md "Tackle") ----------------------------------------
+const SPORE_PARTS = ["brass_trace", "mossthread_snood", "burl_hook"];
+// Sporewood's shy fish (wary or delicate on both leaders), its toothy ones, its rough ones.
+const SPORE_SHY = ["hushcap_koi", "falsesmile_barb", "netcloud_fry", "sleepspore_jelly"];
+const SPORE_TOOTHY = ["sporebelly_puffer", "lostsea_mackerel", "mildew_angler", "festival_puffer"];
+const SPORE_ROUGH = [
+  "threadling_eel",
+  "cindertail_catfish",
+  "downcast_catfish",
+  "velvet_ray",
+  "nightbloom_carp",
+  "harpstring_eel",
+];
+const TRACE_LINES = [
+  "Fish with sharp teeth or rough lips, such as puffers and catfish, land more often.",
+  "Shy fish, such as koi, barbs and fry, bite less often.",
+];
+const SNOOD_LINES = [
+  "Shy fish, such as koi, barbs and fry, bite more often.",
+  "Sharp teeth cut thread, so puffers and mackerel land less often.",
+];
+const BURL_LINES = [
+  "Fish that grab and run, such as catfish, eels and koi, are always hooked clean.",
+  "Quick nibblers, such as fry, barbs and puffers, are never hooked clean.",
+];
+const BURL_ARRIVAL = "Catfish grab and run here. There's a hook on the shelf that sets itself.";
+const TRACE_ARRIVAL = "Puffer beaks cut line. The Brass Trace is on the shelf now.";
+const SNOOD_ARRIVAL = "Shy fish come to soft thread. The Mossthread Snood is on the shelf now.";
+const SPORE_LOSS_TEETH = "Bitten through. A Brass Trace stops teeth.";
+const SPORE_LOSS_LIPS = "Worn through on its lips. A Brass Trace won't wear.";
+const SPORE_LOSS_RAN = "It ran before the hook was set. A Burl Hook sets itself.";
+// Gives a Sporewood save rig parts as if bought, the Spore Moth for lure casts, and optionally fits parts.
+const withSporeParts =
+  (parts, fitted = {}) =>
+  (save) => {
+    const loop = save.meta.loop;
+    loop.parts = [...new Set([...(loop.parts || ["cork_float", "plain_knot", "mere_hook"]), ...parts])];
+    loop.lures = [...new Set([...(loop.lures || []), "spore_moth"])];
+    loop.fitted = { ...loop.fitted, ...fitted };
+  };
+// Each kind's share of a roll on `leader` over its share on the Plain Knot, against an untagged kind's (`base`):
+// what the leader does to how often it bites. Checks each against want(id); returns how many moved.
+function leaderRatios(rolls, leader, base, want, label) {
+  const plain = rolls.plain_knot.shares,
+    on = rolls[leader].shares,
+    ref = on[base] / plain[base];
+  check(plain[base] > 0, `${label}: no ${base} to compare against`);
+  let moved = 0;
+  for (const id of Object.keys(plain).filter((id) => plain[id] > 0)) {
+    check(on[id] > 0, `${label}: ${id} bites on the Plain Knot but not on ${leader}`);
+    const ratio = on[id] / plain[id] / ref,
+      expect = want(id);
+    check(
+      near(ratio, expect, 1e-6),
+      `${label}: ${id} ${ratio.toFixed(4)} times as often, expected ${expect}`,
+    );
+    expect !== 1 && moved++;
+  }
+  check(moved > 0, `${label}: no tagged fish here, so this proves nothing`);
+  return moved;
+}
+
 // Gives a save rig parts as if bought (on top of whatever the loader adds), the Feather Fly for lure casts, and
 // optionally fits parts.
 const withParts =
@@ -2834,8 +2896,9 @@ const SCENARIOS = [
       await session.catchFish("netcloud_fry");
       const gift = await tallyAndGift(session);
       const after = await leadRecord(session);
+      // Murk's tally there may shelve one of Sporewood's own Leader and Hook parts (its tackle arrivals), never a tin.
       check(
-        gift === null && !after.parts.includes(TIN),
+        (gift === null || gift.text.includes("Burl Hook")) && !after.parts.includes(TIN),
         `Sporewood's tally: ${JSON.stringify({ gift, after })}`,
       );
       return "no tin, no gift";
@@ -5198,7 +5261,7 @@ const SCENARIOS = [
         l = loop();
         l.arrivals.beats = { turnback_hook: 4, pike_wire: 4, leaders: 4 };
         out.tie = tallies(l, 3);
-        // Sporewood: nothing.
+        // Sporewood: its own Burl Hook on a quiet tally, never Mossmere's Turnback Hook.
         l = loop(["cork_float", "plain_knot", "mere_hook", "minnow_tin"]);
         beat(l, "turnback_hook");
         out.sporewood = arrive(l, "sporewood");
@@ -5226,7 +5289,7 @@ const SCENARIOS = [
       );
       check(key(r.gutAfterMap) === "leaders:gutOnly", `the gut after the map: ${key(r.gutAfterMap)}`);
       check(seq(r.tie) === '["turnback_hook:beat","pike_wire:beat","leaders:gutOnly"]', `tie: ${seq(r.tie)}`);
-      check(r.sporewood === null, `Sporewood: ${key(r.sporewood)}`);
+      check(key(r.sporewood) === "burl_hook:quiet", `Sporewood: ${key(r.sporewood)}`);
       return "one a tally in beat order, a tie to the hook, the quiet hook after the tin, Chafe Gut only after the map";
     },
   },
@@ -5406,6 +5469,676 @@ const SCENARIOS = [
       const lost = await loseSmallFish(session, "reedjaw_pike");
       check(lost?.partLossText === LOSS_TEETH && !lost.overCap, `the pike's loss: ${JSON.stringify(lost)}`);
       return "each once a night, only with the part on the shelf, never on the better part or a lure";
+    },
+  },
+  // ---- Sporewood's Leader and Hook parts (sporewood-plan.md "Tackle") ------------------------------------
+
+  {
+    name: "Sporewood's leaders: the Brass Trace and the Mossthread Snood shift bites by their tags on bait, on lures and in sign and sight takes, never to zero, and change Grip on toothy and rough fish; the Plain Knot's losses name the Brass Trace",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withSporeParts(["brass_trace", "mossthread_snood"]),
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      const LEADERS = ["plain_knot", "brass_trace", "mossthread_snood"];
+      // 1. Pool rows, bait, by day: shy fish x0.7 on the trace and x1.4 on the snood; toothy and rough fish bite as
+      // on the Plain Knot (their tags are Grip only). The crayfish has no tag.
+      await session.eval(() => window.__gw.debug.setPhase("calm"));
+      const bait = await rollLeaders(session, LEADERS, { bait: "spore_cake" });
+      check(
+        bait.brass_trace.leader === "brass_trace" && bait.plain_knot.leader === null,
+        `the leader did not fish: ${bait.brass_trace.leader}`,
+      );
+      const shy = (mult) => (id) => (SPORE_SHY.includes(id) ? mult : 1);
+      const onTrace = leaderRatios(bait, "brass_trace", "capshell_crayfish", shy(0.7), "bait, Brass Trace");
+      const onSnood = leaderRatios(bait, "mossthread_snood", "capshell_crayfish", shy(1.4), "bait, Snood");
+      // 2. Sign and sight takes: a prerolled barb takes 0.7 times as surely on the trace and 1.4 times on the snood
+      // (raised, never past 0.9); an untagged crayfish's take does not move.
+      const takes = await session.eval((LEADERS) => {
+        const loop = window.__gw.progression.loop,
+          d = window.__gw.debug,
+          take = (sp) =>
+            d.fishPoolRoll(1, { bait: "spore_cake", preroll: { speciesId: sp, base: 0.45 } }).preroll,
+          out = {};
+        for (const id of LEADERS) {
+          loop.fitPart("leader", id);
+          out[id] = { barb: take("falsesmile_barb"), cray: take("capshell_crayfish") };
+        }
+        loop.fitPart("leader", "plain_knot");
+        return out;
+      }, LEADERS);
+      const p0 = takes.plain_knot;
+      check(
+        p0.barb > 0 &&
+          near(takes.brass_trace.barb, p0.barb * 0.7, 1e-9) &&
+          near(takes.mossthread_snood.barb, Math.min(0.9, p0.barb * 1.4), 1e-9) &&
+          near(takes.brass_trace.cray, p0.cray, 1e-9) &&
+          near(takes.mossthread_snood.cray, p0.cray, 1e-9),
+        `sign takes: ${JSON.stringify(takes)}`,
+      );
+      // 3. A lure cast at dusk (the Spore Moth): the leader still counts. The Plumgill Perch has no leader tag.
+      await session.eval(() => {
+        window.__gw.debug.setPhase("dusk");
+        window.__gw.progression.loop.changeHook({ lure: "spore_moth" });
+      });
+      const lure = await rollLeaders(session, LEADERS, {});
+      await session.eval(() => window.__gw.progression.loop.changeHook({ lure: null, bait: "spore_cake" }));
+      const lureTrace = leaderRatios(lure, "brass_trace", "plumgill_perch", shy(0.7), "lure, Brass Trace");
+      leaderRatios(lure, "mossthread_snood", "plumgill_perch", shy(1.4), "lure, Snood");
+      // 4. Grip when landing: +4 for toothy and rough fish on the trace, -4 for toothy fish on the snood.
+      const grip = await session.eval(() => {
+        const parts = (id, leader) =>
+          window.__gw.data.catchParts(
+            id,
+            "keeper",
+            { hold: { rod: 5, line: 5, reel: 5 } },
+            { strike: "clean", lake: "sporewood", leader },
+          );
+        const gain = (id, leader) => parts(id, leader).hold - parts(id, null).hold;
+        return {
+          puffTrace: gain("sporebelly_puffer", "brass_trace"),
+          puffSnood: gain("sporebelly_puffer", "mossthread_snood"),
+          catTrace: gain("cindertail_catfish", "brass_trace"),
+          catSnood: gain("cindertail_catfish", "mossthread_snood"),
+          eelTrace: gain("threadling_eel", "brass_trace"),
+          barbTrace: gain("falsesmile_barb", "brass_trace"),
+          barbSnood: gain("falsesmile_barb", "mossthread_snood"),
+          crayTrace: gain("capshell_crayfish", "brass_trace"),
+          puffP: ["mossthread_snood", null, "brass_trace"].map((l) => parts("sporebelly_puffer", l).p),
+        };
+      });
+      check(
+        grip.puffTrace === 4 &&
+          grip.puffSnood === -4 &&
+          grip.catTrace === 4 &&
+          grip.catSnood === 0 &&
+          grip.eelTrace === 4 &&
+          grip.barbTrace === 0 &&
+          grip.barbSnood === 0 &&
+          grip.crayTrace === 0 &&
+          grip.puffP[0] < grip.puffP[1] &&
+          grip.puffP[1] < grip.puffP[2],
+        `Grip: ${JSON.stringify(grip)}`,
+      );
+      // 5. On the Plain Knot, with the Brass Trace owned, a puffer and a catfish lost say so, once a night each;
+      // on the trace or the snood nothing is said.
+      const words = await session.eval(() => {
+        const g = window.__gw,
+          loop = g.progression.loop,
+          word = (speciesId) => g.debug.fishLossWord({ speciesId });
+        const out = {
+          knot: [word("sporebelly_puffer"), word("cindertail_catfish"), word("lostsea_mackerel")],
+        };
+        (g.state.run.flags ||= {}).partWords = {};
+        loop.fitPart("leader", "mossthread_snood");
+        out.snood = [word("sporebelly_puffer"), word("cindertail_catfish")];
+        loop.fitPart("leader", "plain_knot");
+        out.cray = word("capshell_crayfish");
+        (g.state.run.flags ||= {}).partWords = {};
+        return out;
+      });
+      check(
+        sameJson(words.knot, [SPORE_LOSS_TEETH, SPORE_LOSS_LIPS, null]) &&
+          sameJson(words.snood, [null, null]) &&
+          words.cray === null,
+        `loss words: ${JSON.stringify(words)}`,
+      );
+      return `bait: ${onTrace} shy kinds x0.7 on the trace, ${onSnood} x1.4 on the snood; takes ${p0.barb} -> ${takes.brass_trace.barb} / ${takes.mossthread_snood.barb}; lure ${lureTrace} kinds; Grip +4 / -4`;
+    },
+  },
+
+  {
+    name: "Burl Hook: in Sporewood a self-setter's struck strike is clean (a hard take too) and a quick nibbler's clean is struck, on bait only; a hard take lost on the Mere Hook names it",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withSporeParts(["burl_hook"], { hook: "burl_hook" }),
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      const grades = await session.eval(() => {
+        const loop = window.__gw.progression.loop,
+          d = window.__gw.debug,
+          set = (grade, speciesId) => d.fishHookSet({ grade, speciesId });
+        const out = {
+          catStruck: set("struck", "cindertail_catfish"),
+          eelStruck: set("struck", "threadling_eel"),
+          koiStruck: set("struck", "hushcap_koi"),
+          catClean: set("clean", "cindertail_catfish"),
+          catEarly: set("early", "cindertail_catfish"),
+          fryClean: set("clean", "netcloud_fry"),
+          puffClean: set("clean", "sporebelly_puffer"),
+          fryStruck: set("struck", "netcloud_fry"),
+          giantStruck: set("struck", "festival_puffer"),
+        };
+        loop.fitPart("hook", "mere_hook");
+        out.mereCat = set("struck", "cindertail_catfish");
+        out.mereFry = set("clean", "netcloud_fry");
+        loop.fitPart("hook", "burl_hook");
+        loop.changeHook({ lure: "spore_moth" });
+        out.lureCat = set("struck", "cindertail_catfish");
+        out.lureFry = set("clean", "netcloud_fry");
+        loop.changeHook({ lure: null, bait: "spore_cake" });
+        return out;
+      });
+      const want = {
+        catStruck: ["clean", "burl_hook"],
+        eelStruck: ["clean", "burl_hook"],
+        koiStruck: ["clean", "burl_hook"],
+        catClean: ["clean", "burl_hook"],
+        catEarly: ["early", "burl_hook"],
+        fryClean: ["struck", "burl_hook"],
+        puffClean: ["struck", "burl_hook"],
+        fryStruck: ["struck", "burl_hook"],
+        giantStruck: ["struck", "burl_hook"],
+        mereCat: ["struck", null],
+        mereFry: ["clean", null],
+        lureCat: ["struck", null],
+        lureFry: ["clean", null],
+      };
+      for (const [k, [grade, hook]] of Object.entries(want))
+        check(
+          grades[k]?.grade === grade && grades[k]?.hook === hook,
+          `${k}: ${JSON.stringify(grades[k])}, expected ${grade} on ${hook}`,
+        );
+      // At the real strike (the debug hook strikes "struck", as a hard take does), a catfish's strike becomes
+      // clean on the Burl Hook, with the word "Set itself".
+      await session.eval(() => {
+        window.__setItself = 0;
+        window.__gw.bus.on("fishing:setItself", () => window.__setItself++);
+      });
+      const cat = await loseSmallFish(session, "cindertail_catfish");
+      const seen = await session.eval(() => window.__setItself);
+      check(
+        cat?.grade === "clean" && seen === 1,
+        `the catfish: ${JSON.stringify({ grade: cat?.grade, seen })}`,
+      );
+      // On the Mere Hook, with the Burl Hook owned, a hard take that ran says so, once a night.
+      const ran = await session.eval(() => {
+        const g = window.__gw;
+        (g.state.run.flags ||= {}).partWords = {};
+        g.progression.loop.fitPart("hook", "mere_hook");
+        const out = [
+          g.debug.fishLossWord({ speciesId: "downcast_catfish", hardTake: true }),
+          g.debug.fishLossWord({ speciesId: "velvet_ray", hardTake: true }),
+          g.debug.fishLossWord({ speciesId: "netcloud_fry", hardTake: true }),
+        ];
+        g.progression.loop.fitPart("hook", "burl_hook");
+        return out;
+      });
+      check(sameJson(ran, [SPORE_LOSS_RAN, null, null]), `the loss words: ${JSON.stringify(ran)}`);
+      return "struck -> clean for catfish, eel and koi, clean -> struck for fry and puffer, nothing on the Mere Hook or a lure; a real strike clean";
+    },
+  },
+
+  {
+    name: "tackle arrival in Sporewood: one piece a tally, the Burl Hook, the Brass Trace and the Mossthread Snood on quiet tallies in that order; a toothy fish brings the trace sooner and a catfish that ran the hook; never Mossmere's parts",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 420_000,
+    async run(session) {
+      await session.boot();
+      const r = await session.eval(() => {
+        const g = window.__gw.data,
+          arrive = g.rigArrivalAtTally,
+          beat = g.noteArrivalBeat,
+          loop = (parts = []) => ({
+            parts: ["cork_float", "plain_knot", "mere_hook", ...parts],
+            arrivals: { seq: 0, beats: {}, shelved: [] },
+            hunt: {},
+          }),
+          tallies = (l, n, water = "sporewood") => Array.from({ length: n }, () => arrive(l, water));
+        const out = {};
+        let l = loop();
+        out.quiet = tallies(l, 4);
+        out.shelf = [...l.arrivals.shelved];
+        // A toothy fish first: the trace, then the hook and the snood.
+        l = loop();
+        beat(l, "brass_trace");
+        out.traceFirst = tallies(l, 4);
+        // A catfish ran, then a puffer: the hook, then the trace (their beats' order), then the snood.
+        l = loop();
+        beat(l, "burl_hook");
+        beat(l, "brass_trace");
+        out.beats = tallies(l, 4);
+        // One owned already is skipped.
+        l = loop(["brass_trace"]);
+        out.owned = tallies(l, 3);
+        // Mossmere's beats bring nothing here, and Sporewood's nothing to Mossmere.
+        l = loop();
+        beat(l, "turnback_hook");
+        beat(l, "pike_wire");
+        out.mossBeats = arrive(l, "sporewood");
+        l = loop(["minnow_tin"]);
+        beat(l, "brass_trace");
+        out.inMossmere = tallies(l, 2, "mossmere");
+        out.mossShelf = [...l.arrivals.shelved];
+        // A new game's record has every lake's beats.
+        out.fresh = Object.keys(window.__gw.progression.loop.state().arrivals.beats);
+        return out;
+      });
+      const key = (a) => (a ? `${a.gift}:${a.giftSay}` : null);
+      const seq = (list) => JSON.stringify(list.map(key));
+      check(
+        seq(r.quiet) === '["burl_hook:quiet","brass_trace:quiet","mossthread_snood:quiet",null]' &&
+          sameJson(r.shelf, ["burl_hook", "brass_trace", "mossthread_snood"]),
+        `quiet: ${seq(r.quiet)}, shelf ${r.shelf}`,
+      );
+      check(
+        seq(r.traceFirst) === '["brass_trace:beat","burl_hook:quiet","mossthread_snood:quiet",null]',
+        `a toothy fish first: ${seq(r.traceFirst)}`,
+      );
+      check(
+        seq(r.beats) === '["burl_hook:beat","brass_trace:beat","mossthread_snood:quiet",null]',
+        `two beats: ${seq(r.beats)}`,
+      );
+      check(seq(r.owned) === '["burl_hook:quiet","mossthread_snood:quiet",null]', `owned: ${seq(r.owned)}`);
+      check(key(r.mossBeats) === "burl_hook:quiet", `Mossmere's beats in Sporewood: ${key(r.mossBeats)}`);
+      check(
+        seq(r.inMossmere) === '["turnback_hook:quiet",null]' && sameJson(r.mossShelf, ["turnback_hook"]),
+        `Sporewood's beat in Mossmere: ${seq(r.inMossmere)}, ${r.mossShelf}`,
+      );
+      check(
+        sameJson(r.fresh, [
+          "turnback_hook",
+          "pike_wire",
+          "leaders",
+          "burl_hook",
+          "brass_trace",
+          "mossthread_snood",
+        ]),
+        `a new game's beats: ${r.fresh}`,
+      );
+      // On the water: a Sporebelly Puffer landed is the trace's beat, a catfish that ran before the hook was set
+      // (struck, on the Mere Hook) the hook's.
+      await session.sail(SLOW_SAIL);
+      await session.catchFish("sporebelly_puffer");
+      await loseSmallFish(session, "cindertail_catfish");
+      const beats = await session.eval(() => ({ ...window.__gw.progression.loop.state().arrivals.beats }));
+      check(
+        beats.brass_trace > 0 && beats.burl_hook > beats.brass_trace && !beats.mossthread_snood,
+        `the beats on the water: ${JSON.stringify(beats)}`,
+      );
+      return "quiet: hook, trace, snood; a beat first goes first; Mossmere's and Sporewood's beats stay in their own lake";
+    },
+  },
+
+  {
+    name: "tackle arrival at a Sporewood tally: the Brass Trace after a puffer with Murk's line, the Burl Hook on the next quiet tally, then the Mossthread Snood; on the shelf at 230, 150 and 230, and kept after a reload",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 900_000,
+    async run(session, { page, browser }) {
+      await session.sail(SLOW_SAIL);
+      await session.catchFish("sporebelly_puffer");
+      const first = await tallyAndGift(session);
+      check(
+        first?.text.includes(TRACE_ARRIVAL) && first.text.includes("Brass Trace"),
+        `the first tally: ${JSON.stringify(first)}`,
+      );
+      await session.sail(SLOW_SAIL);
+      await session.catchFish("netcloud_fry");
+      const second = await tallyAndGift(session);
+      check(
+        second?.text.includes(BURL_ARRIVAL) && second.text.includes("Burl Hook"),
+        `the second tally: ${JSON.stringify(second)}`,
+      );
+      await session.sail(SLOW_SAIL);
+      await session.catchFish("netcloud_fry");
+      const third = await tallyAndGift(session);
+      check(
+        third?.text.includes(SNOOD_ARRIVAL) && third.text.includes("Mossthread Snood"),
+        `the third tally: ${JSON.stringify(third)}`,
+      );
+      const shelf = (s) =>
+        s.eval(() =>
+          (window.__gw.progression.loop.shelf().tabs.find((t) => t.id === "tackle")?.items || [])
+            .filter((c) => c.id.startsWith("part:"))
+            .map((c) => `${c.id}:${c.price}:${c.bought}`),
+        );
+      const cards = await shelf(session);
+      check(
+        sameJson(cards, [
+          "part:brass_trace:230:false",
+          "part:burl_hook:150:false",
+          "part:mossthread_snood:230:false",
+        ]),
+        `the shelf: ${JSON.stringify(cards)}`,
+      );
+      // A fourth tally brings nothing new.
+      await session.sail(SLOW_SAIL);
+      await session.catchFish("netcloud_fry");
+      const fourth = await tallyAndGift(session);
+      check(fourth === null, `the fourth tally: ${JSON.stringify(fourth)}`);
+      const saved = await session.saved();
+      const again = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await again.boot();
+        await again.toHome();
+        const kept = await shelf(again);
+        check(sameJson(kept, cards), `after a reload: ${JSON.stringify(kept)}`);
+        await again.collectGameErrors();
+        check(!again.errors.length, `errors after reloading: ${again.errors.join("; ")}`);
+      } finally {
+        await again.close();
+      }
+      return `"${TRACE_ARRIVAL}", "${BURL_ARRIVAL}", "${SNOOD_ARRIVAL}"; ${cards.length} parts on the shelf, kept after a reload`;
+    },
+  },
+
+  {
+    name: "tackle screen in Sporewood: the Leader and Hook rows show once there is a choice, fitting works, a bought part is fitted, and the rig picture draws the brass trace, the green snood and the dark burl hook",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: (save) => {
+      withSporeParts([])(save);
+      save.meta.loop.arrivals = { seq: 0, beats: {}, shelved: [...SPORE_PARTS] };
+    },
+    async run(session) {
+      await session.toHome();
+      check(
+        (await partRow(session, "leader")) === null && (await partRow(session, "hook")) === null,
+        "a row with no choice",
+      );
+      await closeTackle(session);
+      const buy = (id) =>
+        session.eval((id) => {
+          const loop = window.__gw.progression.loop;
+          window.__gw.debug.loop.giveClams(500);
+          const r = loop.buy(`part:${id}`);
+          return { ok: r?.ok === true, fitted: { ...loop.state().fitted }, parts: [...loop.state().parts] };
+        }, id);
+      // The rig picture's end tackle: which looks it draws.
+      const looks = async () => {
+        await rigScreen(session);
+        const drawn = await session.eval(() => {
+          const card = document.querySelector(".gw-rig");
+          const has = (sel) => !!card?.querySelector(sel);
+          return {
+            trace: has(".gw-rig-trace") && has(".gw-rig-crimp"),
+            snood: has(".gw-rig-snood"),
+            burl: has(".gw-rig-burl") && has(".gw-rig-burl-knot"),
+            wire: has(".gw-rig-wire"),
+            gut: has(".gw-rig-gut"),
+            knot: has(".gw-rig-knot"),
+          };
+        });
+        await closeTackle(session);
+        return drawn;
+      };
+      const trace = await buy("brass_trace");
+      check(trace.ok && trace.fitted.leader === "brass_trace", `buying the trace: ${JSON.stringify(trace)}`);
+      const row = await partRow(session, "leader");
+      check(
+        sameJson(row?.chips, [
+          { key: "plain_knot", on: false },
+          { key: "brass_trace", on: true },
+        ]) && sameJson(row.lines, TRACE_LINES),
+        `the Leader row: ${JSON.stringify(row)}`,
+      );
+      await closeTackle(session);
+      const drawnTrace = await looks();
+      check(
+        drawnTrace.trace && !drawnTrace.snood && !drawnTrace.wire && !drawnTrace.gut && !drawnTrace.knot,
+        `the trace drawn: ${JSON.stringify(drawnTrace)}`,
+      );
+      const snood = await buy("mossthread_snood");
+      const row2 = await partRow(session, "leader");
+      check(
+        snood.fitted.leader === "mossthread_snood" &&
+          row2?.chips.length === 3 &&
+          row2.chips[2].on &&
+          sameJson(row2.lines, SNOOD_LINES),
+        `the snood: ${JSON.stringify({ snood, row2 })}`,
+      );
+      await closeTackle(session);
+      const drawnSnood = await looks();
+      check(drawnSnood.snood && !drawnSnood.trace, `the snood drawn: ${JSON.stringify(drawnSnood)}`);
+      const burl = await buy("burl_hook");
+      const hookRow = await partRow(session, "hook");
+      check(
+        burl.fitted.hook === "burl_hook" &&
+          sameJson(hookRow?.chips, [
+            { key: "mere_hook", on: false },
+            { key: "burl_hook", on: true },
+          ]) &&
+          sameJson(hookRow.lines, BURL_LINES),
+        `the Hook row: ${JSON.stringify({ burl, hookRow })}`,
+      );
+      await closeTackle(session);
+      const drawnBurl = await looks();
+      check(drawnBurl.burl && drawnBurl.snood, `the burl hook drawn: ${JSON.stringify(drawnBurl)}`);
+      // Pressing the Mere Hook and the Plain Knot fits them, and the plain look comes back.
+      await partRow(session, "hook");
+      await session.eval(() =>
+        document.querySelector('.gw-rig-tray[data-part="hook"] .gw-rig-opt[data-key="mere_hook"]').click(),
+      );
+      await session.pause(800);
+      await closeTackle(session);
+      await partRow(session, "leader");
+      await session.eval(() =>
+        document.querySelector('.gw-rig-tray[data-part="leader"] .gw-rig-opt[data-key="plain_knot"]').click(),
+      );
+      await session.pause(800);
+      await closeTackle(session);
+      const fitted = await session.eval(() => ({ ...window.__gw.progression.loop.state().fitted }));
+      const plain = await looks();
+      check(
+        fitted.hook === "mere_hook" &&
+          fitted.leader === "plain_knot" &&
+          plain.knot &&
+          !plain.burl &&
+          !plain.snood,
+        `back to plain: ${JSON.stringify({ fitted, plain })}`,
+      );
+      // With a lure on, the Hook merges into the lure.
+      await session.eval(() => window.__gw.progression.loop.changeHook({ lure: "seedpod_twirl" }));
+      const hookUnderLure = await partRow(session, "hook");
+      const lureRow = await rigTray(session, "lure");
+      await closeTackle(session);
+      check(
+        hookUnderLure === null && lureRow?.notes.includes("Lures carry their own hooks."),
+        `with a lure: ${JSON.stringify({ hookUnderLure, lureRow })}`,
+      );
+      return "no rows with one option; each bought part fitted with its lines and its own look; a press fits; one line under a lure";
+    },
+  },
+
+  {
+    name: "practice orders in Sporewood: its board posts only its own parts' orders, the Burl Hook's and the Mossthread Snood's, naming a fish each truly helps, in Murk's words; the right fish on the part fills it and pays double",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 600_000,
+    editSave(save) {
+      withSporeParts(["burl_hook", "mossthread_snood"], { hook: "burl_hook" })(save);
+      save.meta.loop.home.orders = 1;
+      save.meta.loop.practice = { filled: [], ready: ["burl_hook", "mossthread_snood"] };
+    },
+    async run(session) {
+      await session.boot();
+      await practiceKit(session);
+      const r = await session.eval(
+        (ALL) => {
+          const P = window.__practice,
+            D = P.D,
+            seeded = P.rng(777),
+            posted = {},
+            texts = new Set();
+          let rig = 0;
+          for (let k = 0; k < 300; k++) {
+            const l = P.loop({ board: 1, parts: ALL });
+            P.refill(l, seeded, "sporewood");
+            for (const o of l.orders.filter((o) => o.kind === "rig")) {
+              rig++;
+              posted[`${o.part}:${o.speciesId}`] = (posted[`${o.part}:${o.speciesId}`] || 0) + 1;
+              texts.add(D.orderLine(D, [o]).line);
+              texts.add(D.orderBoardText(D, o));
+            }
+          }
+          return { rig, posted, texts: [...texts].sort() };
+        },
+        [...PRACTICE_PARTS, "burl_hook", "mossthread_snood"],
+      );
+      const allowed = new Set([
+        "burl_hook:cindertail_catfish",
+        "burl_hook:threadling_eel",
+        "mossthread_snood:falsesmile_barb",
+        "mossthread_snood:hushcap_koi",
+      ]);
+      check(
+        r.rig > 60 && r.rig < 240 && Object.keys(r.posted).every((k) => allowed.has(k)),
+        `Sporewood's practice orders: ${JSON.stringify(r)}`,
+      );
+      check(
+        Object.keys(r.posted).some((k) => k.startsWith("burl_hook:")) &&
+          Object.keys(r.posted).some((k) => k.startsWith("mossthread_snood:")),
+        `both parts post: ${JSON.stringify(r.posted)}`,
+      );
+      const WORDS = [
+        "A Cindertail Catfish, caught on the Burl Hook.",
+        "Bring me a Cindertail Catfish, caught on the Burl Hook.",
+        "A Falsesmile Barb, caught on the Mossthread Snood.",
+        "Bring me a Falsesmile Barb, caught on the Mossthread Snood.",
+      ];
+      for (const w of WORDS) check(r.texts.includes(w), `"${w}" is not said: ${JSON.stringify(r.texts)}`);
+      // On the water: the board holds the Burl Hook's order; a catfish on the Burl Hook fills it at the tally.
+      await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        s.orders = [
+          {
+            id: "ord_practice_cat",
+            speciesId: "cindertail_catfish",
+            kind: "rig",
+            n: 1,
+            have: 0,
+            part: "burl_hook",
+            rig: { hook: "burl_hook" },
+            water: "sporewood",
+            said: true,
+          },
+        ];
+      });
+      await session.sail(SLOW_SAIL);
+      const landed = await hookAndPlayOut(session, "cindertail_catfish", "land", { z: 0 });
+      check(landed.landed === "cindertail_catfish", `the catfish was not landed: ${JSON.stringify(landed)}`);
+      check(await session.clickButton(/^\d?Keep\b/), "no Keep on the catfish's card");
+      await session.pause(800);
+      await session.closeGuides(8000);
+      const rec = await session.eval(() =>
+        window.__gw.state.run.creel.find((f) => f.speciesId === "cindertail_catfish"),
+      );
+      check(rec?.castRig?.hook === "burl_hook", `the catfish's record: ${JSON.stringify(rec?.castRig)}`);
+      await session.goHomeAndTally();
+      const after = await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        return {
+          line: s.lastTrip.lines.find((l) => l.speciesId === "cindertail_catfish"),
+          filled: [...s.practice.filled],
+          board: s.orders.map((o) => o.id),
+        };
+      });
+      check(
+        after.line?.order &&
+          after.line.clams === after.line.base * 2 &&
+          sameJson(after.filled, ["burl_hook"]),
+        `after the tally: ${JSON.stringify(after)}`,
+      );
+      return `${r.rig} practice orders in 300 refills: ${Object.keys(r.posted).join(", ")}; paid ${after.line.clams} for ${after.line.base}`;
+    },
+  },
+
+  {
+    name: "signs on the water in Sporewood: rises, swirls, nervous water and sighted fish come up by day, at dusk and at night, each made only by a Sporewood fish that bites there and then",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      await session.eval(() => {
+        const g = window.__gw,
+          loop = g.progression.loop;
+        g.debug.loop.giveClams(9000);
+        loop.buy("place:veilwater");
+        loop.markLifted("veilwater");
+      });
+      const r = {};
+      for (const phase of ["calm", "dusk", "gloomtide"])
+        r[phase] = await session.eval((phase) => {
+          const d = window.__gw.debug,
+            SPORE = new Set(
+              window.__gw.data.SPECIES.filter((sp) => sp.zone === "sporewood").map((sp) => sp.id),
+            );
+          d.setPhase(phase);
+          d.fishSeed(1124);
+          const out = { forms: {}, makers: {}, sighted: {}, bad: [], n: 0 };
+          for (let x = -108; x <= 108; x += 8)
+            for (let z = -66; z <= 66; z += 8) {
+              const at = d.fishSignPool({ x, z });
+              if (!at?.area) continue;
+              const s = d.sign(null, { x, z });
+              if (!s) continue;
+              out.n++;
+              const form = `${s.kind}/${s.form}`;
+              out.forms[form] = (out.forms[form] || 0) + 1;
+              const pre = d.fishSigns().find((f) => f.id === s.id)?.preroll?.speciesId ?? null;
+              const live = (s.makers || []).filter((id) => at.pool[id] > 0);
+              for (const id of pre ? [pre] : live) out.makers[id] = (out.makers[id] || 0) + 1;
+              const notOurs = (s.makers || []).filter((id) => !SPORE.has(id));
+              if (s.kind !== "gas" && (!live.length || notOurs.length || (pre && !(at.pool[pre] > 0))))
+                out.bad.push({ form, area: at.area, makers: s.makers, pre });
+              if (["margin", "pads", "stones", "reeds", "inflow", "lullaby"].includes(at.area)) {
+                const f = d.sight(null, { x, z });
+                if (f) {
+                  out.sighted[f.speciesId] = (out.sighted[f.speciesId] || 0) + 1;
+                  (!SPORE.has(f.speciesId) || !(at.pool[f.speciesId] > 0)) &&
+                    out.bad.push({ sight: f.speciesId, area: at.area });
+                }
+                d.sightClear();
+              }
+            }
+          return out;
+        }, phase);
+      for (const [phase, v] of Object.entries(r)) check(!v.bad.length, `${phase}: ${JSON.stringify(v.bad)}`);
+      const has = (phase, ids) => ids.every((id) => r[phase].makers[id] > 0);
+      const never = (phase, ids) => ids.every((id) => !r[phase].makers[id] && !r[phase].sighted[id]);
+      check(
+        has("calm", ["netcloud_fry", "falsesmile_barb", "cindertail_catfish", "velvet_ray"]) &&
+          never("calm", ["plumgill_perch", "hushcap_koi", "mildew_angler", "nightbloom_carp"]),
+        `by day: ${JSON.stringify(r.calm)}`,
+      );
+      check(
+        has("dusk", ["netcloud_fry", "falsesmile_barb", "plumgill_perch", "downcast_catfish"]) &&
+          never("dusk", ["hushcap_koi", "mildew_angler", "nightbloom_carp"]),
+        `at dusk: ${JSON.stringify(r.dusk)}`,
+      );
+      check(
+        has("gloomtide", ["netcloud_fry", "plumgill_perch", "hushcap_koi", "mildew_angler"]) &&
+          never("gloomtide", [
+            "falsesmile_barb",
+            "sporebelly_puffer",
+            "lostsea_mackerel",
+            "downcast_catfish",
+          ]),
+        `at night: ${JSON.stringify(r.gloomtide)}`,
+      );
+      check(
+        r.calm.sighted.netcloud_fry > 0 &&
+          r.calm.sighted.falsesmile_barb > 0 &&
+          r.calm.sighted.capshell_crayfish > 0 &&
+          r.gloomtide.sighted.plumgill_perch > 0,
+        `sighted fish: ${JSON.stringify({ day: r.calm.sighted, night: r.gloomtide.sighted })}`,
+      );
+      for (const phase of ["calm", "dusk", "gloomtide"])
+        check(
+          Object.keys(r[phase].forms).length >= 7,
+          `${phase}: few kinds of sign: ${JSON.stringify(r[phase].forms)}`,
+        );
+      return Object.entries(r)
+        .map(
+          ([p, v]) =>
+            `${p}: ${v.n} signs of ${Object.keys(v.forms).length} kinds by ${Object.keys(v.makers).length} fish, ${Object.keys(v.sighted).length} kinds sighted`,
+        )
+        .join("; ");
     },
   },
   // ---- the thief's tries, refusals and losses (mossmere-hunt-2.md section 2, B3) -------------------------
@@ -6883,7 +7616,7 @@ const SCENARIOS = [
   },
 
   {
-    name: "rig picture: Sporewood's tackle screen still works, with no Depth, Leader or Hook",
+    name: "rig picture: Sporewood's tackle screen still works, with no Depth, and Mossmere's Leader and Hook parts never on it",
     fixture: "sporewood-crossed",
     debug: true,
     editSave: (save) => {
@@ -8259,7 +8992,7 @@ const SCENARIOS = [
   },
 
   {
-    name: "practice orders: Sporewood's board is unchanged, with every part owned and ready",
+    name: "practice orders: Sporewood's board is unchanged by Mossmere's parts, every one owned and ready (its own parts' orders are checked with its tackle)",
     fixture: "sporewood-crossed",
     async run(session) {
       await session.boot();
@@ -9198,12 +9931,14 @@ const SCENARIOS = [
   },
 
   {
-    name: "rig picture in Sporewood: the Sheet and Murk's Tackle tab show the tackle screen's picture, with no Depth, Leader or Hook",
+    name: "rig picture in Sporewood: the Sheet and Murk's Tackle tab show the tackle screen's picture, with Sporewood's own Leader and Hook and no Depth; at Murk's a Leader or Hook with goods carries its chip and its tray reaches its last option",
     fixture: "sporewood-crossed",
     debug: true,
     editSave: (save) => {
       RIG_PARTS_SAVE(save);
       withParts(["sounding_lead", "pike_wire", "chafe_gut", "turnback_hook"])(save);
+      withSporeParts(["brass_trace", "burl_hook"], { leader: "brass_trace", hook: "burl_hook" })(save);
+      save.meta.loop.arrivals.shelved.push("mossthread_snood");
     },
     async run(session) {
       await session.toHome();
@@ -9215,12 +9950,67 @@ const SCENARIOS = [
       const shop = await openRigHost(session, "shop");
       const want = screen.nodes.map((n) => `${n.part}:${n.key}`);
       check(
-        JSON.stringify(sheet?.nodes) === JSON.stringify(want) &&
-          JSON.stringify(shop?.nodes) === JSON.stringify(want) &&
-          !want.some((n) => /^(depth|leader|hook):/.test(n)),
+        sameJson(want, [
+          "rod:willow_switch",
+          "reel:wooden_winch",
+          "line:twine",
+          "leader:brass_trace",
+          "hook:burl_hook",
+          "bait:spore_cake",
+        ]) &&
+          sameJson(sheet?.nodes, want) &&
+          sameJson(shop?.nodes, want),
         `the tackle screen ${JSON.stringify(want)}, the Sheet ${JSON.stringify(sheet?.nodes)}, Murk's ${JSON.stringify(shop?.nodes)}`,
       );
-      return want.join(", ");
+      // At Murk's: the Leader sells the snood ("Leader · 1 for sale"); the Hook has nothing for sale here.
+      const chips = await session.eval(
+        (sel) =>
+          Object.fromEntries(
+            [...document.querySelectorAll(`${sel} .gw-rig-node`)].map((b) => [
+              b.dataset.part,
+              b.querySelector(".gw-rig-sale")?.textContent ?? null,
+            ]),
+          ),
+        RIG_HOST.shop,
+      );
+      check(
+        chips.leader === "Leader · 1 for sale" && chips.hook === null,
+        `the chips at Murk's: ${JSON.stringify(chips)}`,
+      );
+      const tray = await rigHostTray(session, "shop", "leader");
+      check(
+        // (the owned ones in the save's order: the loader adds the Plain Knot after the bought parts)
+        sameJson(tray?.owned.map((o) => `${o.key}:${o.on}`).sort(), [
+          "brass_trace:true",
+          "plain_knot:false",
+        ]) &&
+          tray.shop.length === 1 &&
+          tray.shop[0].id === "part:mossthread_snood" &&
+          tray.shop[0].price === 230,
+        `the Leader's tray at Murk's: ${JSON.stringify(tray)}`,
+      );
+      // The tray's list scrolled to its end shows its last option whole, under the tray's name.
+      const last = await session.eval((sel) => {
+        const host = document.querySelector(sel),
+          list = host?.querySelector(".gw-rig-tray .gw-rig-opts"),
+          opts = [...(list?.querySelectorAll(".gw-rig-opt") || [])],
+          end = opts[opts.length - 1];
+        if (!end) return null;
+        list.scrollTop = list.scrollHeight;
+        const lr = end.getBoundingClientRect(),
+          vr = list.getBoundingClientRect(),
+          pr = host.closest(".gw-mb-page").getBoundingClientRect();
+        return {
+          id: end.dataset.buy ?? null,
+          inView: lr.top >= Math.max(vr.top, pr.top) - 1 && lr.bottom <= Math.min(vr.bottom, pr.bottom) + 1,
+        };
+      }, RIG_HOST.shop);
+      check(
+        last?.id === "part:mossthread_snood" && last.inView,
+        `the tray's last option: ${JSON.stringify(last)}`,
+      );
+      await rigHostBack(session, "shop");
+      return `${want.join(", ")}; ${chips.leader}`;
     },
   },
 
