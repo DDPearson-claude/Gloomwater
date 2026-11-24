@@ -152,7 +152,7 @@ The designer's rulings for the second lake, given as yes or no.
 - **Yes: reading the spore drift is Sporewood's own skill.** The player casts up-current and lets the float ride the ribbon of spores.
 - **Yes: Burr the seed-keeper is the lake's new character,** as Hob is Mossmere's.
 - **Yes: the fish grow from 14 kinds to about 24,** starting with the three Sporewood fish that were left out.
-- **The legend is renamed in the manner of River Monsters.** "The Drifting Grove" goes. By ruling 4 she is a real kind of fish plus a descriptor; the name is with the designer.
+- **The legend is the Meadowback Pacu.** "The Drifting Grove" goes. By ruling 4 she is a real kind of fish plus a descriptor: a pacu, the fish of River Monsters' "The Mutilator", which cracks nuts and seeds with teeth like a person's. That is the seed-pod clue in the line-up and the reason she crushes ordinary hooks. Around the lake she is called "the wandering island", as the Bellhead Catfish is "the thief".
 - Ruling 5 holds here too: about 1 cast in 3 once every condition is right. Today she takes every cast.
 
 ## Still open
