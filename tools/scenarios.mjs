@@ -17,6 +17,7 @@
 //   editSave (save) => { ... }: changes the parsed fixture before it is loaded, for a kind of save no
 //            fixture holds
 //   timeoutMs a longer time limit than SCENARIO_TIMEOUT_MS, for a scenario that opens many screens
+//   open     more options for GameSession.open: viewport, scale (pixel ratio), init scripts, gesture: false
 //   run      async (session, { fixture, page, browser }) => { ... }: throw an Error to fail. `session` is a
 //            GameSession (tools/game-driver.mjs) that has booted to the title; `fixture` is the parsed save;
 //            `browser` opens a second session (a reload of a saved string).
@@ -1759,6 +1760,254 @@ async function reloadToHome(session) {
   await session.boot();
   await session.clickButton(/^Continue$/);
   await session.waitFor("home", 60_000, () => window.__gw.flow === "home");
+}
+
+// ---- a controller alone, and a screen of another refresh rate (the Lenovo Legion Go and Go S) -----------------
+
+// A standard-mapping gamepad (the Xbox layout) behind navigator.getGamepads, as the browser shows one once it is
+// used. window.__padConnect() plugs it in and fires gamepadconnected; __padSet(button, down) presses a button by
+// the standard mapping's number (PAD) and __padAxes([lx, ly, rx, ry]) moves the sticks.
+const GAMEPAD_INIT = () => {
+  const buttons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
+  const pad = {
+    id: "Xbox 360 Controller (XInput STANDARD GAMEPAD)",
+    index: 0,
+    connected: true,
+    mapping: "standard",
+    timestamp: 0,
+    axes: [0, 0, 0, 0],
+    buttons,
+    vibrationActuator: { type: "dual-rumble", playEffect: () => Promise.resolve("complete") },
+  };
+  let on = false;
+  Object.defineProperty(Navigator.prototype, "getGamepads", {
+    configurable: true,
+    value: () => (on ? [pad, null, null, null] : [null, null, null, null]),
+  });
+  window.__padConnect = () => {
+    on = true;
+    pad.timestamp = performance.now();
+    const e = new Event("gamepadconnected");
+    e.gamepad = pad;
+    window.dispatchEvent(e);
+  };
+  window.__padSet = (i, down) => {
+    Object.assign(buttons[i], { pressed: !!down, touched: !!down, value: down ? 1 : 0 });
+    pad.timestamp = performance.now();
+  };
+  window.__padAxes = (a) => {
+    pad.axes = a.slice();
+    pad.timestamp = performance.now();
+  };
+};
+const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, START: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+
+const gameFrame = (session) => session.eval(() => window.__gw.time.frame);
+async function waitFrames(session, n) {
+  const until = (await gameFrame(session)) + n;
+  for (const end = Date.now() + 120_000 * SLOW; Date.now() < end; await session.pause(20))
+    if ((await gameFrame(session)) >= until) return;
+  throw new Error(`${n} frames did not pass`);
+}
+
+// One press of a controller button: down for two frames (the game reads the pad once a frame), then up for two.
+async function padPress(session, name, frames = 2) {
+  await session.eval((i) => window.__padSet(i, true), PAD[name]);
+  await waitFrames(session, frames);
+  await session.eval((i) => window.__padSet(i, false), PAD[name]);
+  await waitFrames(session, 2);
+}
+
+// What a controller player sees: the screen on top, the focused control and whether it is drawn on screen, the
+// A and B glyphs shown, the sound card, and the sound's state.
+const padView = (session) =>
+  session.eval(() => {
+    const g = window.__gw;
+    const open = [...document.querySelectorAll(".gw-modal-layer > .gw-modal")].filter(
+      (m) => !m.classList.contains("gw-out") && !m.dataset.held,
+    );
+    const f = document.querySelector(".gw-padfocus");
+    const r = f?.getBoundingClientRect();
+    return {
+      flow: g.flow,
+      fishing: g.fishing?.state ?? null,
+      top: open.at(-1)?.dataset.modal ?? null,
+      mode: g.debug.pad?.()?.mode ?? null,
+      focus: f
+        ? (f.getAttribute("aria-label") || f.textContent).trim().replace(/\s+/g, " ").slice(0, 40)
+        : null,
+      focusShown: !!r && r.width > 1 && r.height > 1 && r.bottom > 0 && r.top < innerHeight,
+      glyphs: [...document.querySelectorAll(".gw-padg.gw-on")].map((c) => c.textContent),
+      hush: !!document.querySelector(".gw-hush:not(.gw-out)"),
+      sound: g.debug.audio?.()?.state ?? null,
+      tab: [...(open.at(-1)?.querySelectorAll("[role=tab][aria-selected=true]") ?? [])]
+        .map((t) => t.textContent.trim())
+        .join(","),
+    };
+  });
+
+// The page's clock for a test of real time: performance.now, Date.now, the timers and requestAnimationFrame all
+// follow one clock, and the screen refreshes `hz` times a second of it however long a frame really takes here.
+// Frames come as fast as the machine allows, so the game sees a perfect display at that rate.
+const VIRTUAL_CLOCK = (hz) => {
+  const step = 1000 / hz;
+  const realTimeout = window.setTimeout.bind(window);
+  const dateBase = Date.now() - performance.now();
+  let now = performance.now();
+  let nextId = 1;
+  const timers = new Map();
+  let frames = [];
+  performance.now = () => now;
+  Date.now = () => Math.floor(dateBase + now);
+  window.setTimeout = (fn, ms = 0, ...args) => {
+    timers.set(nextId, { due: now + Math.max(0, Number(ms) || 0), fn, args, every: 0 });
+    return nextId++;
+  };
+  window.setInterval = (fn, ms = 0, ...args) => {
+    const every = Math.max(1, Number(ms) || 0);
+    timers.set(nextId, { due: now + every, fn, args, every });
+    return nextId++;
+  };
+  window.clearTimeout = window.clearInterval = (id) => timers.delete(id);
+  window.requestAnimationFrame = (cb) => (frames.push({ id: nextId, cb }), nextId++);
+  window.cancelAnimationFrame = (id) => (frames = frames.filter((f) => f.id !== id));
+  window.requestIdleCallback = (cb) =>
+    window.setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 5 }), 1);
+  window.cancelIdleCallback = (id) => timers.delete(id);
+  const channel = new MessageChannel();
+  channel.port1.onmessage = () => {
+    const target = now + step;
+    for (let guard = 0; guard < 10000; guard++) {
+      let next = null;
+      for (const entry of timers)
+        if (entry[1].due <= target && (!next || entry[1].due < next[1].due)) next = entry;
+      if (!next) break;
+      const [id, t] = next;
+      now = Math.max(now, t.due);
+      t.every ? (t.due += t.every) : timers.delete(id);
+      try {
+        t.fn(...t.args);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    now = target;
+    const due = frames;
+    frames = [];
+    for (const f of due)
+      try {
+        f.cb(now);
+      } catch (e) {
+        console.error(e);
+      }
+    window.__onFrame?.(now);
+    realTimeout(() => channel.port2.postMessage(0), 0);
+  };
+  channel.port2.postMessage(0);
+};
+
+// On the water from mid-Mossmere, with the page on VIRTUAL_CLOCK: how long things take in the page's real time,
+// counted only while nothing holds the game (a card, a guide box, the pause), so the moments a test takes to press
+// a box away do not count. Returns { hz, dusk, window, fight, landing, sail } in milliseconds (sail in m/s).
+async function timeRealPlay(session) {
+  await session.eval(() => (window.__gw.render.render = () => {})); // the CPU-drawn picture only slows the test
+  await session.sail();
+  await session.eval(() => {
+    const g = window.__gw;
+    const rec = (window.__real = {
+      states: [],
+      phases: [],
+      raft: [],
+      free: 0,
+      first: performance.now(),
+      last: performance.now(),
+      frames: 0,
+    });
+    let state = null;
+    g.bus.on("phase:change", (e) => rec.phases.push([rec.free, e?.phase ?? null]));
+    window.__onFrame = (t) => {
+      const held = g.ui.isBlocking?.() === true || g.paused || g.flow !== "playing";
+      held || (rec.free += t - rec.last);
+      (rec.last = t), rec.frames++;
+      g.fishing.state !== state && rec.states.push([rec.free, (state = g.fishing.state)]);
+      rec.raftOn && rec.raft.push([rec.free, g.player.position.x, g.player.position.z]);
+    };
+  });
+  const free = () => session.eval(() => window.__real.free);
+  const waitFree = async (ms) => {
+    const until = (await free()) + ms;
+    for (const end = Date.now() + 240_000 * SLOW; (await free()) < until; await session.pause(40))
+      if (Date.now() > end) throw new Error(`${ms} ms of play did not pass`);
+  };
+  const waitState = async (ok, what) => {
+    for (const end = Date.now() + 240_000 * SLOW; ; await session.pause(30)) {
+      if (ok(await session.eval(() => window.__gw.fishing.state))) return;
+      if (Date.now() > end) throw new Error(`no ${what}; ${JSON.stringify(await session.state())}`);
+      if (await session.eval(() => window.__gw.ui.isBlocking?.() === true))
+        await session.clickButton(/^(Got it|Next)$/);
+    }
+  };
+  const out = {};
+  // The dusk: one whole part of the evening, between two changes of the light, with nothing pressed.
+  for (const end = Date.now() + 600_000 * SLOW; ; await session.pause(500)) {
+    const phases = await session.eval(() => window.__real.phases.slice());
+    if (phases.length >= 2) {
+      out.dusk = phases[1][0] - phases[0][0];
+      break;
+    }
+    if (Date.now() > end) throw new Error(`the light did not change twice: ${JSON.stringify(phases)}`);
+  }
+  // The strike window: a bite left alone, from the float going under until the fish is gone.
+  await session.eval(() => {
+    window.__gw.debug.fishSeed(7);
+    window.__real.states.length = 0;
+    window.__gw.debug.forceBite("mossback_perch");
+  });
+  await waitState((st) => st === "bite", "bite");
+  await waitState((st) => st !== "bite", "end of the bite");
+  const states = await session.eval(() => window.__real.states.slice());
+  const bite = states.findIndex((s) => s[1] === "bite");
+  out.window = states[bite + 1][0] - states[bite][0];
+  await session.closeGuides(3000);
+  // A fight: the same fish, seed and outcome; from the hook to the landing, and the landing to the card.
+  await session.eval(() => {
+    const g = window.__gw;
+    g.debug.fishSeed(11);
+    g.debug.fishOutcome("land");
+    window.__real.states.length = 0;
+    g.debug.fishHook("mossback_perch", { z: 1 });
+  });
+  await waitState((st) => !["reeling", "landing", "hooked"].includes(st), "end of the fight");
+  const fight = await session.eval(() => window.__real.states.slice());
+  const at = (name) => fight.find((s) => s[1] === name)?.[0];
+  out.fight = at("landing") - (at("reeling") ?? 0);
+  out.landing = fight.find((s, i) => i > 0 && !["reeling", "landing"].includes(s[1]))[0] - at("landing");
+  for (let i = 0; i < 30 && !(await session.clickButton(/^\d?Let go\b/)); i++) {
+    await session.clickButton(/^Got it$/);
+    await session.pause(300);
+  }
+  await session.closeGuides(4000);
+  // Sailing: the left stick held forward; the raft's speed over the last two of three seconds.
+  await session.eval(() => {
+    window.__padConnect();
+    window.__real.raftOn = true;
+    window.__padAxes([0, -1, 0, 0]);
+  });
+  await waitFree(3000);
+  const raft = await session.eval(() => {
+    window.__padAxes([0, 0, 0, 0]);
+    window.__real.raftOn = false;
+    return window.__real.raft.slice();
+  });
+  const span = raft.filter((r) => r[0] >= raft.at(-1)[0] - 2000);
+  let metres = 0;
+  for (let i = 1; i < span.length; i++)
+    metres += Math.hypot(span[i][1] - span[i - 1][1], span[i][2] - span[i - 1][2]);
+  out.sail = (metres / (span.at(-1)[0] - span[0][0])) * 1000;
+  out.hz = await session.eval(
+    () => (window.__real.frames / (window.__real.last - window.__real.first)) * 1000,
+  );
+  return out;
 }
 
 const SCENARIOS = [
@@ -9267,6 +9516,438 @@ const SCENARIOS = [
       return `out from ${after[0].dist.toFixed(2)} m to ${final.toFixed(2)} m (resting ${restDist.toFixed(2)} m) in one move, still after 3 s`;
     },
   },
+  {
+    name: "lure strike: a take on the Bent Spoon gives about 40% more time to strike than a bite on worms, and a press after a worm bite's time is up, but inside the spoon's, sets the hook",
+    fixture: "fresh-first-evening",
+    debug: true,
+    timeoutMs: 480_000,
+    async run(session) {
+      await session.sail(SLOW_SAIL);
+      // In this page only: every second of the spoon's swim back rolls a take, and no take is a hard take
+      // (which sets itself), so a take that needs a press comes at once. Fights end at once as escapes.
+      const table = await session.eval(() => {
+        const g = window.__gw,
+          s = g.data.AUTOFISH.strike;
+        g.data.LOOP.lureCast.strike = 1;
+        g.data.LOOP.hardTake.chance = 0;
+        return { window: { ...s.window }, clamp: [...s.clamp], late: s.lateGrace, comp: s.latencyComp.mouse };
+      });
+      // One cast (worms, or the spoon), watched frame by frame: the gauge as the bite shows it, then a mouse
+      // press `after` s past the time a worm bite of the take's size would end on this rod (`old`: the rod's
+      // factor and the table; no press for null), and the strike's grade or the miss.
+      const castAndPress = (lure, old) =>
+        session.eval(
+          ([lure, old]) =>
+            new Promise((resolve) => {
+              const g = window.__gw,
+                rec = { gauge: null, pressedAt: null, grade: null, miss: null, hard: false };
+              const oldEnd = (cls) =>
+                Math.min(old.table.clamp[1], Math.max(old.table.clamp[0], old.table.window[cls] * old.rodK)) +
+                old.table.late;
+              let pressAt = null;
+              // Fitted as from the tin: the spoon takes the worms off, and worms take the spoon off.
+              const loop = g.progression.loop;
+              rec.fitted = lure
+                ? loop.changeHook({ lure })?.ok === true
+                : loop.changeHook({ lure: null, bait: "mireworm" })?.ok === true;
+              g.debug.fishOutcome("lose");
+              const offs = [
+                g.bus.on("fishing:strike", (e) => (rec.grade = e.grade)),
+                g.bus.on("fishing:miss", (e) => (rec.miss = e.reason || "miss")),
+                g.bus.on("fishing:bite", (e) => ((rec.hard = !!e.hardTake), (rec.cls = e.sizeClass))),
+              ];
+              const p = g.player.position,
+                yaw = g.render.getYaw(),
+                t0 = performance.now();
+              rec.cast = g.debug.castAt(p.x - Math.sin(yaw) * 11, p.z - Math.cos(yaw) * 11, 0.7);
+              let forced = false;
+              const tick = () => {
+                const st = g.fishing.state,
+                  v = g.fishing.view;
+                // A guide card (the tin's, at the first lure) holds the game: closed as a player would.
+                if (g.ui.isBlocking?.() === true)
+                  [...document.querySelectorAll("button")]
+                    .find((b) => b.getBoundingClientRect().width > 0 && b.textContent.trim() === "Got it")
+                    ?.click();
+                // Worms: the bite is brought on 1.2 s after the float settles, nibbles and all.
+                if (!lure && st === "waiting" && !forced) forced = g.debug.forceBite({ wait: 1.2 }) !== false;
+                if (st === "bite" && v.strikeGauge) {
+                  rec.gauge ||= { ...v.strikeGauge };
+                  if (old && pressAt == null && rec.cls) pressAt = oldEnd(rec.cls) + old.after;
+                  if (pressAt != null && rec.pressedAt == null && v.strikeGauge.t >= pressAt) {
+                    rec.pressedAt = v.strikeGauge.t;
+                    g.fishing.onPointerDown({ input: "mouse" });
+                  }
+                }
+                // Back in with nothing (the spoon swam home untaken): done as well.
+                rec.waited ||= st === "waiting";
+                const done = rec.grade || rec.miss || rec.hard || !rec.cast || (rec.waited && st === "idle");
+                if (done || performance.now() - t0 > 150_000) {
+                  g.fishing.state === "reeling" && g.debug.fishPlayTo(0.995);
+                  offs.forEach((off) => off());
+                  resolve({ ...rec, state: g.fishing.state });
+                  return;
+                }
+                requestAnimationFrame(tick);
+              };
+              requestAnimationFrame(tick);
+            }),
+          [lure, old],
+        );
+      const settle = async () => {
+        for (const end = Date.now() + 60_000 * SLOW; Date.now() < end; ) {
+          const st = await session.eval(() => window.__gw.fishing.state);
+          if (st === "idle") return;
+          st === "reeling" && (await session.eval(() => window.__gw.debug.fishPlayTo(0.995)));
+          await session.clickButton(/^Got it$/);
+          await session.pause(400);
+        }
+        throw new Error(`the line did not come back in; ${JSON.stringify(await session.state())}`);
+      };
+      const clamp = (x) => Math.min(table.clamp[1], Math.max(table.clamp[0], x));
+      // A bite on worms keeps the old time: its window is the size's window times the rod's, and after it
+      // the late grace. The rod's factor read from it gives the old time for any size.
+      let worm = null;
+      for (let tries = 0; tries < 3 && !(worm?.gauge && table.window[worm.cls]); tries++) {
+        await settle();
+        await session.closeGuides(2000);
+        worm = await castAndPress(null, null);
+      }
+      check(
+        worm.fitted && worm.gauge && table.window[worm.cls] && worm.miss === "passed",
+        `a worm bite left alone did not pass: ${JSON.stringify(worm)}`,
+      );
+      const rodK = worm.gauge.win / table.window[worm.cls];
+      check(
+        Math.abs(worm.gauge.end - worm.gauge.win - table.late) < 1e-6 && Math.abs(rodK - 1) < 0.02,
+        `a worm bite's time is not the size's window on the Willow Switch plus ${table.late} s: ${JSON.stringify(worm.gauge)} (${worm.cls})`,
+      );
+      // The spoon: a take shows the gauge, about 40% longer in every part; a press after a worm bite of the
+      // same size would have been let go, but before the spoon's late grace ends, sets the hook.
+      let spoon = null;
+      for (let tries = 0; tries < 4 && !spoon?.gauge; tries++) {
+        await settle();
+        await session.closeGuides(2000);
+        spoon = await castAndPress("bent_spoon", { table, rodK, after: table.comp + 0.08 });
+      }
+      check(
+        spoon?.fitted && spoon.gauge && spoon.cls,
+        `no take on the spoon in four casts: ${JSON.stringify(spoon)}`,
+      );
+      const g = spoon.gauge,
+        oldWin = clamp(table.window[spoon.cls] * rodK),
+        oldEnd = oldWin + table.late;
+      // First what a player meets: the late press sets the hook (on the old time the fish had gone by then).
+      check(
+        (spoon.grade === "late" || spoon.grade === "struck") && !spoon.miss,
+        `the late press did not set the hook: ${JSON.stringify(spoon)}`,
+      );
+      check(
+        spoon.pressedAt - table.comp > oldEnd && spoon.pressedAt < g.end,
+        `the press at ${spoon.pressedAt} s was not after the worm bite's end (${oldEnd.toFixed(3)} s) and inside the spoon's (${g.end.toFixed(3)} s)`,
+      );
+      check(
+        g.win / oldWin > 1.35 && g.win / oldWin < 1.45 && g.end / oldEnd > 1.35 && g.end / oldEnd < 1.45,
+        `the spoon's ${spoon.cls} take is not about 40% longer than a worm bite's (${oldWin.toFixed(3)} s, ending ${oldEnd.toFixed(3)} s): ${JSON.stringify(g)}`,
+      );
+      check(
+        Math.abs(g.from / g.win - worm.gauge.from / worm.gauge.win) < 1e-6 &&
+          Math.abs(g.to / g.win - worm.gauge.to / worm.gauge.win) < 1e-6,
+        `the bright notch moved on the gauge: ${JSON.stringify({ spoon: g, worm: worm.gauge })}`,
+      );
+      return `worms (${worm.cls}): window ${worm.gauge.win.toFixed(2)} s, ends ${worm.gauge.end.toFixed(2)} s; spoon (${spoon.cls}): window ${g.win.toFixed(2)} s, ends ${g.end.toFixed(2)} s; a press at ${spoon.pressedAt.toFixed(2)} s, after ${oldEnd.toFixed(2)} s, is ${spoon.grade}`;
+    },
+  },
+  {
+    name: "controller alone at 1280 x 800, ratio 2 (a Legion Go): the sound card on the first press, a Wick, the film, the tow, a cast, a strike, the fight, the card, B for home, the tally, Murk's tabs, the chart, the Journal, Settings and Sail again, every screen with its focus shown and A and B letters",
+    fixture: null,
+    open: { viewport: { width: 1280, height: 800 }, scale: 2, init: [GAMEPAD_INIT], gesture: false },
+    timeoutMs: 900_000,
+    async run(session) {
+      // The CPU-drawn 3D picture is skipped (seconds a frame at this size here); the game, its screens and the
+      // controller all run as they do for a player.
+      await session.eval(() => (window.__gw.render.render = () => {}));
+      await session.eval(() => window.__padConnect());
+      const seen = [];
+      let v;
+      const look = async () => {
+        v = await padView(session);
+        const where = `${v.flow}/${v.top ?? "-"}`;
+        seen[seen.length - 1] !== where && seen.push(where);
+        return v;
+      };
+      // The focus is drawn within a few frames of a screen opening.
+      const shown = async (what) => {
+        for (let i = 0; i < 15 && !(await look()).focusShown; i++) await session.pause(200);
+        check(v.focusShown, `${what}: no focus shown (${JSON.stringify(v)}); screens ${seen.join(" > ")}`);
+      };
+      // Presses A (or another button) while a screen is up until `ok` holds: through the tow, the guide's boxes
+      // and Murk's tally. With no screen up it only waits: A on the water would cast.
+      const pressTo = async (ok, what, button = "A", limit = 40) => {
+        for (let i = 0, waits = 0; i < limit && waits < 200; ) {
+          if (ok(await look())) return;
+          if (v.top) await padPress(session, button), i++;
+          else waits++;
+          await session.pause(300);
+        }
+        throw new Error(`did not reach ${what}: ${JSON.stringify(v)}; screens ${seen.join(" > ")}`);
+      };
+      // A screen and then any guide's box that comes up over it a moment later, closed with A.
+      const settle = async (top, what) => {
+        await pressTo((x) => x.top === top, what);
+        await session.pause(1500);
+        await pressTo((x) => x.top === top, what);
+      };
+      const moveTo = async (label, button, limit = 8) => {
+        const path = [];
+        for (let i = 0; i < limit && !new RegExp(label).test((await look()).focus ?? ""); i++)
+          path.push(v.focus), await padPress(session, button);
+        check(
+          new RegExp(label).test(v.focus ?? ""),
+          `the d-pad did not reach ${label}: ${path.join(" > ")}; ${JSON.stringify(v)}`,
+        );
+      };
+
+      // The first press: no tap or key yet, so the browser keeps the sound off and the card says so.
+      await padPress(session, "DOWN");
+      await look();
+      check(v.hush && v.sound !== "running", `no sound card on a controller start: ${JSON.stringify(v)}`);
+      const card = await visibleText(session, ".gw-hush");
+      check(
+        /Tap the screen to begin\..*Sound starts when you tap or press a key\..*Press A to play without it\./.test(
+          card,
+        ),
+        `the sound card reads "${card}"`,
+      );
+      await padPress(session, "A");
+      check(
+        !(await look()).hush && v.top === "title",
+        `A did not play on from the sound card: ${JSON.stringify(v)}`,
+      );
+
+      // The title and a Wick: down from the chosen card reaches the buttons under the cards.
+      await padPress(session, "A");
+      check((await look()).top === "newdescent", `A on the title opened ${v.top}`);
+      await padPress(session, "UP");
+      await padPress(session, "A");
+      await padPress(session, "DOWN");
+      check(
+        /^(Start|Back)$/.test((await look()).focus ?? ""),
+        `down from the chosen Wick went to ${v.focus}`,
+      );
+      v.focus === "Back" && (await padPress(session, "RIGHT"));
+      await look();
+      await shown("the Wicks");
+      check(
+        v.focus === "Start" && v.glyphs.includes("A") && v.glyphs.includes("B"),
+        `on the Wicks: focus ${v.focus}, letters ${v.glyphs}`,
+      );
+      await padPress(session, "A");
+      await session.waitFor("the film", 30_000, () => window.__gw.flow !== "title");
+      (await look()).flow === "intro" && (await padPress(session, "B"));
+
+      // The tow and the welcome, then the chart's box and Sail.
+      // A closes the guide's box over the chart, then waits: A on the chart itself would sail.
+      await pressTo((x) => x.top === "chart", "the chart");
+      await moveTo("^Sail$", "DOWN", 3);
+      await shown("the chart");
+      await padPress(session, "A");
+      await pressTo((x) => x.flow === "playing" && x.top === "guide", "the cast box on the water");
+      const castBox = await visibleText(session, ".gw-m-guide");
+      check(
+        /Sail with the left stick/.test(castBox) && /press A and let go/.test(castBox),
+        `the cast box reads "${castBox}"`,
+      );
+      await padPress(session, "A");
+      await session.waitFor("the cast tip", 30_000, () =>
+        document.body.innerText.includes("Press A. Let go to cast."),
+      );
+      const hints = await session.eval(() =>
+        [...document.querySelectorAll("kbd")]
+          .filter((k) => k.getBoundingClientRect().width > 0 && getComputedStyle(k).display !== "none")
+          .map((k) => getComputedStyle(k, "::after").content.replace(/"/g, "") || k.textContent),
+      );
+      check(
+        hints.includes("X") && hints.includes("B") && hints.length === 2,
+        `key hints on the water: ${hints}`,
+      );
+
+      // Cast with A, wait for the bite (A closes the guide's boxes), strike with A, and the fight plays.
+      let landed = false;
+      for (let cast = 0; cast < 6 && !landed; cast++) {
+        await pressTo(
+          (x) => x.top === null && x.fishing === "idle" && x.mode === "water",
+          "the water, free to cast",
+        );
+        await session.eval(() => window.__padSet(0, true));
+        await waitFrames(session, 40);
+        await session.eval(() => window.__padSet(0, false));
+        for (const end = Date.now() + 240_000 * SLOW; Date.now() < end; await session.pause(25)) {
+          await look();
+          if (v.top === "guide") await padPress(session, "A");
+          else if (v.fishing === "bite") await padPress(session, "A", 1);
+          else if (v.top === "catch") break;
+          else if (v.fishing === "idle" && v.top === null) break;
+        }
+        landed = v.top === "catch";
+      }
+      check(landed, `no fish landed in six casts; screens ${seen.join(" > ")}`);
+      await session.pause(1500);
+      await pressTo((x) => x.top === "catch", "the catch card, its guide box closed");
+      await shown("the catch card");
+      check(
+        v.glyphs.includes("A") && v.glyphs.includes("B"),
+        `the catch card shows ${v.glyphs}, not A and B`,
+      );
+      const digits = await session.eval(
+        () =>
+          [...document.querySelectorAll(".gw-modal:not(.gw-out) kbd")].filter(
+            (k) => getComputedStyle(k).display !== "none",
+          ).length,
+      );
+      check(digits === 0, `${digits} keyboard keys show on the catch card while the controller is in use`);
+      await pressTo((x) => x.top !== "catch", "Keep", "A");
+      await pressTo(
+        (x) => x.top === null && x.mode === "water" && x.fishing === "idle",
+        "the water after the card",
+      );
+
+      // Home with B held, then the tally and Murk's boxes with A.
+      // A guide box can come up a moment after the card (B then closes it): hold B again once it has gone.
+      for (let tries = 0; tries < 8 && (await look()).flow !== "home"; tries++) {
+        await session.pause(2000);
+        await pressTo(
+          (x) => x.top === null && x.mode === "water" && x.fishing === "idle",
+          "the water, to go home",
+        );
+        await session.eval(() => window.__padSet(1, true));
+        await session.waitFor("home", 8_000, () => window.__gw.flow === "home").catch(() => null);
+        await session.eval(() => window.__padSet(1, false));
+        await waitFrames(session, 3);
+      }
+      check(
+        v.flow === "home" || (await look()).flow === "home",
+        `B held did not sail home: ${JSON.stringify(v)}`,
+      );
+      await pressTo((x) => x.top === "tally", "the tally");
+      await pressTo((x) => x.top === "jetty", "the barge's menu");
+      await session.pause(2000); // Murk's box or the guide's comes a moment after the menu
+      await pressTo((x) => x.top === "jetty", "the barge's menu");
+      await shown("the barge's menu");
+
+      // Murk: the bumpers turn his book a spread at a time, both ways, and B closes it.
+      await moveTo("^Murk$", "RIGHT");
+      await padPress(session, "A");
+      await pressTo((x) => x.top === "shelf", "Murk's book", "A", 4);
+      await session.pause(1500); // the book opens
+      const firstTab = (await look()).tab;
+      await shown("Murk's book");
+      const tabs = [firstTab];
+      for (const b of ["RB", "RB", "LB", "LB"]) {
+        await padPress(session, b);
+        await session.pause(1500); // the page turns
+        tabs.push((await look()).tab);
+      }
+      check(
+        tabs[1] !== tabs[0] && tabs[2] !== tabs[1] && tabs[3] === tabs[1] && tabs[4] === tabs[0],
+        `Murk's tabs by the bumpers: ${tabs.join(" > ")}`,
+      );
+      await pressTo((x) => x.top === "jetty", "the barge's menu, Murk's book closed by B", "B", 4);
+
+      // The chart, then the Journal and its tabs.
+      await moveTo("^Chart$", "LEFT");
+      await padPress(session, "A");
+      await settle("chart", "the chart");
+      await padPress(session, "UP");
+      check((await look()).top === "chart", `the chart did not stay open: ${v.top}`);
+      await shown("a place on the chart");
+      await pressTo((x) => x.top === "jetty", "the barge's menu, the chart closed by B", "B", 4);
+      await moveTo("^Journal$", "RIGHT");
+      await padPress(session, "A");
+      await settle("journal", "the Journal");
+      const page = (await look()).tab;
+      await padPress(session, "RB");
+      await session.pause(600);
+      check((await look()).tab !== page, `RB did not turn the Journal's page from ${page}`);
+      await padPress(session, "LB");
+      await session.pause(600);
+      check((await look()).tab === page, `LB did not turn back to ${page}: ${v.tab}`);
+      await shown("the Journal");
+      await pressTo((x) => x.top === "jetty", "the barge's menu, the Journal closed by B", "B", 4);
+
+      // Settings from the barge's menu: Full screen, pressed from the controller, asks for a tap.
+      await padPress(session, "B");
+      check((await look()).top === "homepause", `B on the barge's menu opened ${v.top}`);
+      await moveTo("^Settings$", "DOWN");
+      await padPress(session, "A");
+      await settle("settings", "Settings");
+      if (await session.eval(() => !!document.fullscreenEnabled)) {
+        // Up from Done reaches the Quality row (the centred button sits under it), then right to High, above the
+        // column of switches, and down to Full screen.
+        await moveTo("^(Auto|Low|Medium|High)$", "UP", 4);
+        await moveTo("^High$", "RIGHT", 4);
+        await moveTo("^Full screen$", "DOWN", 3);
+        await padPress(session, "A");
+        await session.waitFor("the full-screen line", 10_000, () =>
+          document.body.innerText.includes("Tap the switch to fill the screen."),
+        );
+      }
+      await padPress(session, "B");
+      await padPress(session, "B");
+
+      // And back out on the water.
+      await moveTo("^Chart$", "LEFT");
+      await padPress(session, "A");
+      await pressTo((x) => x.top === "chart" && x.focus === "Sail", "Sail", "DOWN");
+      await padPress(session, "A");
+      await session.waitFor("the water", 120_000, () => window.__gw.flow === "playing");
+      check((await look()).sound !== "running", "the sound started with no tap or key");
+      return `screens ${seen.join(" > ")}`;
+    },
+  },
+  {
+    name: "real time at 144 Hz: on a 144 Hz screen the dusk, a strike window, a fight, its landing and the raft's sailing speed take the same real time as at 60 Hz",
+    fixture: "mid-mossmere",
+    debug: true,
+    open: { init: [[VIRTUAL_CLOCK, 144], GAMEPAD_INIT] },
+    timeoutMs: 900_000,
+    async run(session, { browser }) {
+      const fast = await timeRealPlay(session);
+      const other = await GameSession.open(browser, {
+        page: PAGE,
+        save: readFileSync(join(FIXTURES_DIR, "mid-mossmere.json"), "utf8"),
+        debug: true,
+        viewport: VIEWPORT,
+        init: [[VIRTUAL_CLOCK, 60], GAMEPAD_INIT],
+      });
+      let slow;
+      try {
+        await other.boot();
+        slow = await timeRealPlay(other);
+        await other.collectGameErrors();
+        check(!other.errors.length, `the 60 Hz game: ${other.errors.join("; ")}`);
+      } finally {
+        await other.close();
+      }
+      check(
+        Math.abs(fast.hz - 144) < 1 && Math.abs(slow.hz - 60) < 1,
+        `frame rates ${fast.hz} and ${slow.hz}`,
+      );
+      // Within two frames of the slower screen (a state is seen at the first frame after it changes).
+      const frames2 = 2000 / 60;
+      for (const k of ["dusk", "window", "fight", "landing"])
+        check(
+          Math.abs(fast[k] - slow[k]) <= frames2,
+          `${k}: ${fast[k].toFixed(1)} ms at 144 Hz against ${slow[k].toFixed(1)} ms at 60 Hz`,
+        );
+      check(
+        Math.abs(fast.sail / slow.sail - 1) < 0.01,
+        `sailing ${fast.sail.toFixed(3)} against ${slow.sail.toFixed(3)} m/s`,
+      );
+      const ms = (x) => `${Math.round(x)}`;
+      return `144 against 60 Hz: dusk ${ms(fast.dusk)}/${ms(slow.dusk)} ms, strike window ${ms(fast.window)}/${ms(slow.window)}, fight ${ms(fast.fight)}/${ms(slow.fight)}, landing ${ms(fast.landing)}/${ms(slow.landing)}, sailing ${fast.sail.toFixed(2)}/${slow.sail.toFixed(2)} m/s`;
+    },
+  },
 ];
 
 // The local kinds, their base fish and homes, as in wo.localKinds.
@@ -9332,6 +10013,7 @@ async function runScenario(browser, scenario) {
         save: fixture,
         debug: !!scenario.debug,
         viewport: VIEWPORT,
+        ...scenario.open,
       });
       await session.boot();
       const detail = await scenario.run(session, context);

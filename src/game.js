@@ -44162,6 +44162,10 @@ var pP = {
       cleanMin: 0.3,
       earlyGrace: 0.3,
       lateGrace: 0.3,
+      // A take on a lure swimming back comes with no nibble or tell to warn of it, so its strike lasts this
+      // many times as long as a bite on bait: the window, its limits and the late grace all stretch alike and
+      // the gauge keeps its shape. The rod's and the parts' bonuses still multiply on top (strikeTimeScale).
+      lure: 1.4,
       lastDip: 0.25,
       latencyComp: { touch: 0.07, mouse: 0.03, key: 0.02 },
       priority: "bite",
@@ -47504,6 +47508,12 @@ Ca.guide = {
   touch: {
     cast: "Sail with the stick, bottom left, to reeds, lilies or stones, where fish gather. To cast, press on the water and let go as the swinging aim reaches your spot.",
   },
+  // While a controller is in use: its buttons by the letters on it.
+  pad: {
+    cast: "Sail with the left stick to reeds, lily pads or stones, where fish gather. To cast, press A and let go as the swinging aim reaches your spot.",
+    bite: "Wait through small twitches. When the float goes right under, press A once: stop the swinging needle in the bright notch for a clean strike, and the fish holds better.",
+    home: "Your hold is full. Press B to sail home and sell your catch to Murk. Next time, hold B to head back early.",
+  },
   settings: {
     group: "Guide",
     tips: "Guide tips",
@@ -47648,6 +47658,20 @@ Ca.gearNames = {
 };
 Ca.murk.firstSmall = "Small ones make good bait. Press and hold \u201CLet go\u201D.";
 Ca.castTip = "Press on the water. Let go to cast.";
+// The cast tip and the first strike tip while a controller is in use.
+Ca.castTipPad = "Press A. Let go to cast.";
+Ca.strikeTipPad = { float: "It's under. Press A now.", lead: "The rod tip pulls round. Press A now." };
+// The card a game started from a controller shows while the browser keeps the sound off ({A} is the A button).
+Ca.hush = {
+  title: "Tap the screen to begin.",
+  line: "Sound starts when you tap or press a key.",
+  pad: "Press {A} to play without it.",
+  full: "Full screen",
+};
+// Settings, Picture: full screen where the browser allows it. The line shows when a controller press was refused.
+Ca.fullScreen = { label: "Full screen", tap: "Tap the switch to fill the screen." };
+// The Journal's 3D field guide opens in a new tab, which a controller press cannot open.
+Ca.fieldGuideTap = "Tap 3D field guide to open it in a new tab.";
 Ca.orderWords = {
   a: "a",
   an: "an",
@@ -63797,7 +63821,9 @@ function p9(e) {
     if (w.haptics === !1 || w.vibration === !1 || w.screenShake === !1) return !1;
     try {
       let y = globalThis.navigator;
-      if (y && typeof y.vibrate == "function") return y.vibrate(p), !0;
+      // Before any tap or key the browser refuses vibrate and says so in the console (a start from a controller).
+      if (y && typeof y.vibrate == "function" && y.userActivation?.hasBeenActive !== !1)
+        return y.vibrate(p), !0;
     } catch {}
     return !1;
   }
@@ -63949,7 +63975,9 @@ var Nu = (e, t = 0) => (typeof e == "number" && Number.isFinite(e) ? e : t),
   b9 = 0,
   z1 = 1,
   Pk = 2,
-  iy = 3;
+  iy = 3,
+  // The A and B glyphs beside the focus: 24 px rings with a 13 px letter, the smallest text a handheld shows.
+  PAD_CHIP_PX = 24;
 function g9(e, t, n = AE, o = { x: 0, y: 0 }) {
   let a = Nu(e),
     s = -Nu(t),
@@ -64018,8 +64046,11 @@ function Coe(e, t, n, o = -1) {
       u = n === z1 || n === iy,
       h = u ? (n === z1 ? d - a : a - d) : n === Pk ? f - s : s - f;
     if (h <= 1) continue;
-    let m = Math.max(0, u ? (n === z1 ? c.l - e.r : e.l - c.r) : n === Pk ? c.t - e.b : e.t - c.b),
-      g = u ? Math.max(0, c.t - e.b, e.t - c.b) : Math.max(0, c.l - e.r, e.l - c.r),
+    let m = Math.max(0, u ? (n === z1 ? c.l - e.r : e.l - c.r) : n === Pk ? c.t - e.b : e.t - c.b);
+    // A neighbour in the same row (or column), set off by a few pixels, is not in that direction: the chosen
+    // Wick card rises and a focused tab slides out, and the d-pad went sideways instead of down.
+    if (m === 0 && h < Math.min(u ? e.r - e.l : e.b - e.t, u ? c.r - c.l : c.b - c.t) * 0.25) continue;
+    let g = u ? Math.max(0, c.t - e.b, e.t - c.b) : Math.max(0, c.l - e.r, e.l - c.r),
       p = m + h * 0.1 + g * 5;
     p < l && ((l = p), (r = i));
   }
@@ -64095,12 +64126,32 @@ var w9 = ".gw-x, .gw-book-close, .gw-loop-back",
   },
   Ioe = `
 .gw-pad-on .gw-joyzone { display: none !important; }
-.gw-padg { position: fixed; left: 0; top: 0; z-index: 2147483000; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%;
+.gw-padg { position: fixed; left: 0; top: 0; z-index: 2147483000; width: 24px; height: 24px; box-sizing: border-box; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .14s;
-  font: 600 11px/1 var(--f-body, Georgia, serif); letter-spacing: 0; color: var(--ink-hi, #f8f7fe); background: rgba(10, 12, 25, .86);
+  font: 600 13px/1 var(--f-body, Georgia, serif); letter-spacing: 0; color: var(--ink-hi, #f8f7fe); background: rgba(10, 12, 25, .86);
   box-shadow: 0 0 0 1px rgba(174, 172, 208, .62), 0 0 10px rgba(160, 150, 240, .34); text-shadow: none; }
 .gw-padg.gw-on { opacity: 1; }
 .gw-padg[data-b] { color: var(--ink-dim, #aeacd0); }
+.gw-hush { position: fixed; inset: 0; z-index: 2147482000; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(6, 7, 16, .62); cursor: pointer; touch-action: none; transition: opacity .25s; }
+.gw-hush.gw-out { opacity: 0; pointer-events: none; }
+.gw-hush-card { max-width: 440px; padding: 22px 26px 20px; border-radius: 14px; text-align: center; background: rgba(16, 18, 38, .94);
+  box-shadow: 0 0 0 1px rgba(174, 172, 208, .28), 0 18px 48px rgba(0, 0, 0, .6); color: var(--ink-hi, #f8f7fe); }
+.gw-hush-h { margin: 0 0 10px; font: 400 26px/1.2 var(--f-display, Georgia, serif); letter-spacing: .04em; }
+.gw-hush-p { margin: 0; font: 400 17px/1.45 var(--f-body, Georgia, serif); color: var(--ink-dim, #aeacd0); }
+.gw-hush-a { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: 0 2px; border-radius: 50%;
+  vertical-align: -5px; font: normal 600 13px/1 var(--f-body, Georgia, serif); color: var(--ink-hi, #f8f7fe); background: rgba(10, 12, 25, .86);
+  box-shadow: 0 0 0 1px rgba(174, 172, 208, .62); }
+.gw-hush-fs { margin-top: 16px; min-height: 44px; padding: 0 22px; border: 0; border-radius: 999px; cursor: pointer; color: var(--ink-hi, #f8f7fe);
+  background: rgba(126, 129, 180, .26); font: 400 16px/1 var(--f-display, Georgia, serif); letter-spacing: .16em; text-transform: uppercase; }
+/* Key hints while a controller is in use: a key with a controller button (data-xbox) shows that button's letter in
+   a ring, and every other key hint is hidden (the A and B glyphs beside the focus take their place). */
+html.gw-pad-on kbd:not([data-xbox]) { display: none !important; }
+html.gw-pad-on kbd[data-xbox] { font-size: 0 !important; letter-spacing: 0 !important; }
+html.gw-pad-on .gw-touch.gw-hints kbd[data-xbox] { display: inline !important; }
+html.gw-pad-on kbd[data-xbox]::after { content: attr(data-xbox); display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+  border-radius: 50%; box-sizing: border-box; vertical-align: middle; font: normal 600 13px/1 var(--f-body, Georgia, serif); letter-spacing: 0; color: var(--ink-hi, #f8f7fe);
+  background: rgba(10, 12, 25, .86); box-shadow: 0 0 0 1px rgba(174, 172, 208, .62); text-shadow: none; }
 html.gw-pad-on :is(.gw-pf, .gw-lu-foot, .gw-death-btns, .gw-pause-menu, .gw-fish-acts, .gw-title-menu):has(.gw-btn:hover) .gw-btn.gw-padfocus { color: var(--ink-hi); text-shadow: 0 0 18px var(--glow), 0 0 2px rgba(160, 150, 240, .35), var(--ink-shadow); }
 html.gw-pad-on :is(.gw-pf, .gw-lu-foot, .gw-death-btns, .gw-pause-menu, .gw-fish-acts, .gw-title-menu):has(.gw-btn:hover) .gw-btn.gw-padfocus .gw-hk { opacity: 1; }
 html.gw-pad-on :is(.gw-pf, .gw-lu-foot, .gw-death-btns, .gw-pause-menu, .gw-fish-acts, .gw-title-menu):has(.gw-btn:hover) .gw-btn.gw-padfocus .gw-hk path { stroke-dashoffset: 0; }
@@ -64108,6 +64159,38 @@ html.gw-pad-on :is(.gw-pf, .gw-lu-foot, .gw-death-btns, .gw-pause-menu, .gw-fish
 html.gw-pad-on :is(.gw-pf, .gw-lu-foot, .gw-death-btns, .gw-pause-menu, .gw-fish-acts, .gw-title-menu):has(.gw-btn.gw-padfocus) .gw-btn:not(.gw-padfocus) .gw-hk { opacity: 0; }
 html.gw-pad-on :is(.gw-pf, .gw-lu-foot, .gw-death-btns, .gw-pause-menu, .gw-fish-acts, .gw-title-menu):has(.gw-btn.gw-padfocus) .gw-btn:not(.gw-padfocus) .gw-hk path { stroke-dashoffset: 100; }
 `;
+// Full screen where the browser allows it, and never an error where it does not: it needs a tap, a click or a key
+// press just before (a controller press does not count). Resolves to whether the page is in full screen after.
+var gwCanFullscreen = () => {
+  try {
+    let e = globalThis.document,
+      t = e.documentElement;
+    return (
+      !!(e.fullscreenEnabled || e.webkitFullscreenEnabled) &&
+      !!(t.requestFullscreen || t.webkitRequestFullscreen)
+    );
+  } catch {
+    return !1;
+  }
+};
+function gwFullscreen(e) {
+  let t = globalThis.document,
+    n = () => !!(t?.fullscreenElement || t?.webkitFullscreenElement);
+  try {
+    if (!!e === n()) return Promise.resolve(n());
+    let o = t.documentElement,
+      a = e
+        ? o.requestFullscreen
+          ? o.requestFullscreen({ navigationUI: "hide" })
+          : o.webkitRequestFullscreen?.()
+        : t.exitFullscreen
+          ? t.exitFullscreen()
+          : t.webkitExitFullscreen?.();
+    return Promise.resolve(a).then(n, n);
+  } catch {
+    return Promise.resolve(n());
+  }
+}
 function x9(
   e,
   {
@@ -64152,6 +64235,11 @@ function x9(
       lastPad: !1,
       rIdx: 0,
       rumbles: 0,
+      bHome: !1,
+      hush: null,
+      hushKey: null,
+      hushShown: !1,
+      hushAt: 0,
     },
     v = () => e.state?.meta?.settings || {},
     b = () => s?.documentElement || null,
@@ -64164,7 +64252,59 @@ function x9(
   } catch {}
   function E(pe) {
     y.active !== pe &&
-      ((y.active = pe), pe && O(), b()?.classList?.toggle("gw-pad-on", pe), pe || (Z(null, !1), ne(!1)));
+      ((y.active = pe),
+      (i.padActive = pe),
+      pe && (O(), hushOpen()),
+      b()?.classList?.toggle("gw-pad-on", pe),
+      pe || (Z(null, !1), ne(!1)));
+  }
+  // The browser keeps sound (and full screen) locked until a tap, a click or a key: a controller press does not
+  // count. A game started from a controller would be silent with no word why, so the first time the controller is
+  // used before any of those, a card asks once for a tap. A tap anywhere (or a key) starts the sound and closes it;
+  // its Full screen button also fills the screen where the browser allows it; A, B or Start plays on without sound,
+  // and the sound then starts with the first tap or key later (the audio engine listens for both).
+  function hushOpen() {
+    if (y.hushShown || r?.userActivation?.hasBeenActive !== !1 || !s?.body || !s.createElement) return;
+    (y.hushShown = !0), (y.hushAt = y.tick);
+    let pe = e.data?.TEXT_LOOP?.hush || {},
+      Ne = gwCanFullscreen(),
+      Xe = (xe) =>
+        String(xe ?? "").replace(
+          /[&<>"]/g,
+          (N) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[N],
+        ),
+      lt = Xe(pe.pad || "Press {A} to play without it.").replace("{A}", '<i class="gw-hush-a">A</i>');
+    try {
+      let xe = (y.hush = s.createElement("div"));
+      (xe.className = "gw-hush"),
+        xe.setAttribute("role", "dialog"),
+        xe.setAttribute("aria-modal", "true"),
+        (xe.innerHTML = `<div class="gw-hush-card"><p class="gw-hush-h">${Xe(pe.title || "Tap the screen to begin.")}</p><p class="gw-hush-p">${Xe(pe.line || "")}</p><p class="gw-hush-p">${lt}</p>${Ne ? `<button class="gw-hush-fs" type="button">${Xe(pe.full || "Full screen")}</button>` : ""}</div>`);
+      let N = (_e) => {
+        if (!_e.isTrusted) return;
+        let rt = _e.type === "pointerdown" && _e.target?.closest?.(".gw-hush-fs");
+        _e.preventDefault(), _e.stopPropagation(), rt && gwFullscreen(!0), hushClose();
+      };
+      xe.addEventListener("pointerdown", N),
+        (y.hushKey = (_e) => {
+          !_e.isTrusted ||
+            /^(Shift|Control|Alt|Meta)/.test(_e.code || "") ||
+            (_e.stopImmediatePropagation(), N(_e));
+        }),
+        a.addEventListener?.("keydown", y.hushKey, { capture: !0 }),
+        s.body.appendChild(xe);
+    } catch (xe) {
+      l("hush", xe), hushClose();
+    }
+  }
+  function hushClose() {
+    let pe = y.hush;
+    (y.hush = null),
+      y.hushKey && (a.removeEventListener?.("keydown", y.hushKey, { capture: !0 }), (y.hushKey = null));
+    if (pe)
+      try {
+        pe.classList.add("gw-out"), a.setTimeout?.(() => pe.remove(), 300);
+      } catch {}
   }
   function O() {
     if (!(y.css || !s?.createElement)) {
@@ -64207,11 +64347,11 @@ function x9(
       } else lt.cssRules && lt.media && x(lt.cssRules, J, `@media ${lt.media.mediaText}`);
     }
   }
-  function M(pe, J = a) {
+  function M(pe, J = a, types = ["keydown", "keyup"]) {
     let Ne = a.KeyboardEvent;
     y.synth = !0;
     try {
-      for (let Xe of ["keydown", "keyup"]) {
+      for (let Xe of types) {
         let lt = { code: pe, key: Poe[pe] || pe, bubbles: !0, cancelable: !0 };
         J.dispatchEvent(Ne ? new Ne(Xe, lt) : Object.assign(new a.Event(Xe, lt), lt));
       }
@@ -64360,6 +64500,13 @@ function x9(
     }
   }
   function ye(pe, J) {
+    // In a book (Murk's goods) the bumpers turn its pages a spread at a time, as its corner arrows do. Two
+    // chapters can share a spread, so a step along the tabs could stay on the same spread or skip one.
+    let turn = pe.querySelector(J > 0 ? ".gw-mb-turn--next" : ".gw-mb-turn--prev");
+    if (turn) {
+      B(turn) && S(turn);
+      return;
+    }
     let Ne = [...pe.querySelectorAll("[role=tab], .gw-tab")].filter((Ze) => B(Ze));
     if (Ne.length < 2) return;
     let Xe = Ne.findIndex(
@@ -64402,7 +64549,7 @@ function x9(
         Xe &&
         _oe(
           { l: Xe.left, t: Xe.top, r: Xe.right, b: Xe.bottom },
-          20,
+          PAD_CHIP_PX,
           a.innerWidth,
           a.innerHeight,
           Loe(s, J, Xe, y.scope),
@@ -64506,7 +64653,7 @@ function x9(
         l("release", pe);
       }
     }
-    c.on = !1;
+    y.bHome && ((y.bHome = !1), M("KeyH", a, ["keyup"])), (c.on = !1);
   }
   function ie(pe) {
     let J = g.x + (d[Qs.RIGHT] - d[Qs.LEFT]),
@@ -64543,7 +64690,10 @@ function x9(
       }
       c.on = !1;
     }
-    u[Qs.START] ? M("KeyP") : u[Qs.Y] ? M("KeyJ") : u[Qs.X] && M("KeyB");
+    // B is the HOME pill, as H is on a keyboard: press it, or hold it to head back early.
+    u[Qs.B] && !y.bHome && ((y.bHome = !0), M("KeyH", a, ["keydown"])),
+      h[Qs.B] && y.bHome && ((y.bHome = !1), M("KeyH", a, ["keyup"])),
+      u[Qs.START] ? M("KeyP") : u[Qs.Y] ? M("KeyJ") : u[Qs.X] && M("KeyB");
   }
   function Te(pe) {
     let J = P();
@@ -64643,6 +64793,13 @@ function x9(
     (y.lastPad = !0), (y.rIdx = Ne), y.seen || ((y.seen = !0), (i.padSeen = !0));
     let Xe = m9(d, f, u, h);
     g9(m[0], m[1], AE, g), g9(m[2], m[3], AE, p), (Xe || g.x || g.y || p.x || p.y) && E(!0), y.tick++;
+    if (y.hush) {
+      // The sound card takes the controller's presses: A, B or Start plays on without sound (not the press that
+      // brought the card up).
+      let at = u[Qs.A] || u[Qs.B] || u[Qs.START];
+      y.hush.isConnected && (!at || y.tick <= y.hushAt + 1) ? ne(!1) : hushClose();
+      return;
+    }
     let lt = Y();
     if ((lt !== y.mode && (y.mode === "water" && le(), (y.mode = lt)), lt === "intro")) {
       (u[Qs.A] || u[Qs.B] || u[Qs.START]) && M("Escape"), ne(!1);
@@ -68970,6 +69127,24 @@ function hd(e, t, n, o) {
     l = (e.v + n * r) * o;
   return (e.v = (e.v - n * l) * s), (e.x = t + (r + l) * s), e.x;
 }
+// A handheld PC (a Lenovo Legion Go or Go S): a touchscreen of at most 1280 x 800 CSS pixels at a pixel ratio of 1.5
+// or more. Its browser is a desktop one, so isMobile is false, but its built-in graphics suit the middle setting
+// first, as a tablet's do; "auto" still steps down from there if the frame rate is low. A ratio-1 screen is never one.
+function gwHandheldScreen() {
+  try {
+    let e = globalThis.screen,
+      t = Math.max(e.width, e.height),
+      n = Math.min(e.width, e.height);
+    return (
+      (globalThis.navigator?.maxTouchPoints || 0) > 0 &&
+      (globalThis.devicePixelRatio || 1) >= 1.5 &&
+      t <= 1280 &&
+      n <= 800
+    );
+  } catch {
+    return !1;
+  }
+}
 function Lae(e) {
   let t = e.data?.V3_ENABLED === !0,
     n = t ? eO(e.data?.BALANCE?.cameras, $E) : null,
@@ -69087,7 +69262,7 @@ uniform float uBloomClamp;`,
       (M.warm = 1.5);
   }
   function j() {
-    if (!e.isMobile) return "high";
+    if (!e.isMobile && !gwHandheldScreen()) return "high";
     let $e = navigator.hardwareConcurrency || 4,
       Fe = navigator.deviceMemory || 4;
     return $e <= 2 || Fe <= 2 ? "low" : "medium";
@@ -119132,7 +119307,7 @@ function rce(e) {
     return (et && (kt.CHARACTER_BY_ID?.[et] || (kt.CHARACTERS || []).find((It) => It.id === et))) || null;
   }
   function ve(Ie) {
-    if (e.isMobile)
+    if (e.isMobile && navigator.userActivation?.hasBeenActive !== !1)
       try {
         navigator.vibrate?.(Ie);
       } catch {}
@@ -136343,23 +136518,27 @@ function Y0e(e) {
         (s.biteTell = i.tell)),
       pe())
     ) {
+      // A take on a lure stretches the size's window and its limits (strikeTimeScale); the rod's and the
+      // parts' bonuses multiply on top in the same order as on bait.
       let bn = J().strike || {},
         vn = i.cast?.place || null,
+        lureK = strikeTimeScale(),
         qn =
           Bt(bn.window?.[ut()], 0.7) *
+            lureK *
             Math.max(0.1, S("hookWindow", 1)) *
             (1 + Se(i.castBait, "hookWindow")) *
             Bt(vn?.hookWindowMult, 1) +
           Bt(vn?.hookWindowAdd, 0);
       Q.rarity === "legendary" && Kt(Q.id).wounds > 0 && (qn += Bt(I.windowBonus, 0.1)),
-        (i.window = Dn(qn, Bt(bn.clamp?.[0], 0.35), Bt(bn.clamp?.[1], 1.4)));
+        (i.window = Dn(qn, Bt(bn.clamp?.[0], 0.35) * lureK, Bt(bn.clamp?.[1], 1.4) * lureK));
       let Qn = bn.notch;
       (i.cleanFrom = Qn ? Dn(Bt(Qn.at, 0.22), 0, 1) * i.window : 0),
         (i.cleanPart = Math.min(
           i.window,
           Qn
             ? i.cleanFrom + Dn(Bt(Qn.width, 0.2), 0.02, 1) * i.window
-            : Math.max(Bt(bn.cleanMin, 0.3), Bt(bn.cleanFrac, 0.4) * i.window),
+            : Math.max(Bt(bn.cleanMin, 0.3) * lureK, Bt(bn.cleanFrac, 0.4) * i.window),
         ));
     }
     let tn = c.bob.x,
@@ -136747,8 +136926,17 @@ function Y0e(e) {
       win: i.window,
       from: i.cleanFrom,
       to: i.cleanPart,
-      end: i.window + Bt(J().strike?.lateGrace, 0.3),
+      end: i.window + strikeLateGrace(),
     };
+  }
+  // How many times as long this take's strike lasts as a bite on bait: a lure swimming back (spinning) gets
+  // AUTOFISH.strike.lure; bait, the lead and every other take get 1.
+  function strikeTimeScale() {
+    return i.spinContact ? Math.max(1, Bt(J().strike?.lure, 1)) : 1;
+  }
+  // How long after the window a press still sets the hook (a late strike), stretched with the window.
+  function strikeLateGrace() {
+    return Bt(J().strike?.lateGrace, 0.3) * strikeTimeScale();
   }
   function Fe() {
     let R = J().play?.inputs?.hurry;
@@ -137931,7 +138119,7 @@ function Y0e(e) {
         )
           return;
         let I = globalThis.navigator;
-        I && typeof I.vibrate == "function" && I.vibrate(R);
+        I && typeof I.vibrate == "function" && I.userActivation?.hasBeenActive !== !1 && I.vibrate(R);
       } catch {}
   }
   let $n = (R) => {
@@ -138217,7 +138405,7 @@ function Y0e(e) {
               width: 0.05,
               alpha: 0.8,
             })),
-          e.isMobile && p(() => navigator.vibrate?.(25));
+          e.isMobile && navigator.userActivation?.hasBeenActive !== !1 && p(() => navigator.vibrate?.(25));
         break;
       case "surge":
         g("fishing:surge", { strength: I.strength, kind: I.kind }), ia(I.kind, I.duration);
@@ -141469,7 +141657,7 @@ function Y0e(e) {
         (c.tmp.set(c.bob.x, Q - (i.spinContact ? 0.1 : Bt(n("bite").plunge, 0.25)), c.bob.z),
         O(!0, c.tmp, i.spinContact ? "floating" : "bite"),
         E(!0, c.tmp, 0.4, 0.1),
-        i.stateT > i.window + Bt(J().strike?.lateGrace, 0.3))
+        i.stateT > i.window + strikeLateGrace())
       ) {
         let Pe = U();
         g("fishing:miss", { reason: "passed", refunded: Pe, favour: i.letPass?.value ?? 0, lingers: !1 }),
@@ -151564,7 +151752,7 @@ var hG = `/* ui.css \u2014 GLOOMWATER interface, UI style v2 (CONTRACT \xA79, DE
 /* a caught base fish's "Local kinds" strip under its card: a small picture and the name of each one caught, "?" for one not yet */
 .gw-loop-on .gw-cat-cell { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
 .gw-loop-on .gw-cat-locals { display: flex; flex-direction: column; align-items: center; gap: 1px; margin: -4px 4px 8px; padding: 4px 0 0; border-top: 1px solid rgba(174, 172, 208, .22); }
-.gw-loop-on .gw-cat-locals-head { font: 400 12px/1.2 var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+.gw-loop-on .gw-cat-locals-head { font: 400 13px/1.2 var(--f-display); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-dim); }
 .gw-loop-on .gw-cat-local { display: flex; align-items: center; gap: 5px; max-width: 100%; min-height: 30px; padding: 2px 4px; border: none; background: none; color: var(--ink); font: 400 14px/1.15 var(--f-body);
   text-align: left; overflow-wrap: break-word; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .gw-loop-on .gw-cat-local canvas { flex: none; display: block; }
@@ -166888,7 +167076,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
           "aria-label",
           `${r().tin}: ${_e.name}${_e.count != null ? ` ${_e.count}` : ""} \xB7 ${rt.name}`,
         ),
-        (h.innerHTML = `${The}<span class="gw-tk-cell gw-tk-cell--bait${_e.id ? "" : " gw-tk-empty"}">${hC(_e.glyph)}${_e.id ? `<b class="gw-tk-c">${Ze.count ?? 0}</b>` : ""}</span><span class="gw-tk-cell gw-tk-cell--lure${rt.id ? "" : " gw-tk-empty"}">${hC(rt.glyph)}</span><kbd>B</kbd>`);
+        (h.innerHTML = `${The}<span class="gw-tk-cell gw-tk-cell--bait${_e.id ? "" : " gw-tk-empty"}">${hC(_e.glyph)}${_e.id ? `<b class="gw-tk-c">${Ze.count ?? 0}</b>` : ""}</span><span class="gw-tk-cell gw-tk-cell--lure${rt.id ? "" : " gw-tk-empty"}">${hC(rt.glyph)}</span><kbd data-xbox="X">B</kbd>`);
     } catch (Ne) {
       o("tackle.paint", Ne);
     }
@@ -172372,7 +172560,7 @@ function WV(e) {
   let A = n(
     "button",
     "gw-pill gw-home",
-    `<span class="gw-home-k" aria-hidden="true"><i class="gw-home-ring"></i>${Sa("hearth")}</span><span class="gw-pill-label"></span><kbd>H</kbd>`,
+    `<span class="gw-home-k" aria-hidden="true"><i class="gw-home-ring"></i>${Sa("hearth")}</span><span class="gw-pill-label"></span><kbd data-xbox="B">H</kbd>`,
   );
   (A.type = "button"),
     (A.dataset.loop = "home"),
@@ -173879,7 +174067,10 @@ function WV(e) {
       )
         return;
       // "It's under." is said of a float; on the Sounding Lead the tip pulls round instead.
-      let _t = bite?.onLead ? f().depth?.strike || Khe(o(), e.isTouch) : Khe(o(), e.isTouch);
+      let padTip = t.input?.padActive === !0 ? o().TEXT_LOOP?.strikeTipPad : null,
+        _t = bite?.onLead
+          ? padTip?.lead || f().depth?.strike || Khe(o(), e.isTouch)
+          : padTip?.float || Khe(o(), e.isTouch);
       _t && (ne("fe_strike"), (ye.strikeEl = he(_t, { low: !0 })));
     }),
     en("fishing:strike", () => X("strikeEl")),
@@ -173961,7 +174152,7 @@ function WV(e) {
         shown: !!ye.castEl,
       }) && !e.hasBlocking())
     ) {
-      let Tt = o().FIRST_EVENING?.tips?.fe_cast;
+      let Tt = (t.input?.padActive === !0 && o().TEXT_LOOP?.castTipPad) || o().FIRST_EVENING?.tips?.fe_cast;
       Tt && (ne("fe_cast"), (ye.castEl = he(Tt)));
     }
     if (!J) {
@@ -178406,6 +178597,11 @@ function YV(e) {
     return art;
   }
   function openCatchGuide(lake) {
+    // A controller press is no tap or click to the browser, so it keeps the new tab shut: say how to open it.
+    if (navigator.userActivation?.isActive === !1) {
+      e.toast(d().TEXT_LOOP?.fieldGuideTap || "Tap 3D field guide to open it in a new tab.");
+      return;
+    }
     const guide = window.open("", "_blank");
     if (!guide) {
       e.toast("Allow the guide to open in a new tab.");
@@ -179589,10 +179785,38 @@ function YV(e) {
             }),
             ae.appendChild(ue);
         }
+        if ((on.appendChild(ae), st.appendChild(on), gwCanFullscreen())) {
+          // Full screen, where the browser allows it. It is not saved: a page can only ask for it after a tap.
+          let fs = d().TEXT_LOOP?.fullScreen || {},
+            fsLabel = fs.label || "Full screen",
+            fsRow = n("div", "gw-set-row"),
+            fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+          fsRow.innerHTML = `<span class="gw-set-label">${o(fsLabel)}<small style="display:none">${o(fs.tap || "")}</small></span>`;
+          let fsSw = n("button", `gw-toggle${fsOn() ? " gw-on" : ""}`, "<i></i>"),
+            fsSync = () => {
+              if (!fsSw.isConnected) return document.removeEventListener("fullscreenchange", fsSync);
+              fsSw.classList.toggle("gw-on", fsOn()),
+                fsSw.setAttribute("aria-checked", fsOn() ? "true" : "false");
+            };
+          (fsSw.type = "button"),
+            fsSw.setAttribute("role", "switch"),
+            fsSw.setAttribute("aria-checked", fsOn() ? "true" : "false"),
+            fsSw.setAttribute("aria-label", fsLabel),
+            fsSw.addEventListener("click", () => {
+              let want = !fsOn();
+              p("ui_click"),
+                gwFullscreen(want).then((got) => {
+                  fsSync();
+                  let small = fsRow.querySelector("small");
+                  got !== want && small && fs.tap && (small.style.display = "");
+                });
+            }),
+            document.addEventListener("fullscreenchange", fsSync),
+            fsRow.appendChild(fsSw),
+            st.appendChild(fsRow);
+        }
         if (
-          (on.appendChild(ae),
-          st.appendChild(on),
-          st.appendChild(Ut("screenShake", "Screen shake", !0)),
+          (st.appendChild(Ut("screenShake", "Screen shake", !0)),
           we || st.appendChild(Ut("damageNumbers", "Damage numbers", !0)),
           st.appendChild(
             Ut("reducedFlashing", "Reduced flashing", !1, we ? we.flashSub : "Softer flares and hit flashes"),
@@ -181137,11 +181361,12 @@ function _C(e) {
   let t = e.guide;
   return typeof t.on != "boolean" && (t.on = !0), Y0(t.seen) || (t.seen = {}), t;
 }
-function Epe(e, t, { touch: n = !1 } = {}) {
+function Epe(e, t, { touch: n = !1, pad: p = !1 } = {}) {
   let o = Y0(e?.TEXT_LOOP?.guide) ? e.TEXT_LOOP.guide : {};
   return {
     text:
       (t === Ad && typeof o.newWater == "string" ? o.newWater : null) ??
+      (p && typeof o.pad?.[t] == "string" ? o.pad[t] : null) ??
       (n && typeof o.touch?.[t] == "string" ? o.touch[t] : typeof o.boxes?.[t] == "string" ? o.boxes[t] : ""),
     // The welcome's second page.
     more: t === "welcome" && typeof o.boxes?.welcome2 == "string" ? o.boxes.welcome2 : "",
@@ -181517,7 +181742,7 @@ function ej(e) {
     }
   }
   function v(E, O = null) {
-    let T = Epe(n(), E, { touch: e.isTouch === !0 });
+    let T = Epe(n(), E, { touch: e.isTouch === !0, pad: t.input?.padActive === !0 });
     if (!T.text) return c.open(E, O), c.close(), !1;
     c.open(E, O), E === "away" && (d.away = !1), (d.id = E);
     let x = e.h;

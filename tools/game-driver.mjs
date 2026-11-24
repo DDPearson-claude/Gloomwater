@@ -44,10 +44,29 @@ export async function launchBrowser() {
 
 export class GameSession {
   // options: page: path to the built HTML; save: a save string, or null for a fresh profile; debug: add ?debug=1.
-  // viewport: { width, height } in CSS pixels; smaller renders faster on the CPU.
-  static async open(browser, { page = DEFAULT_PAGE, save = null, debug = false, viewport = VIEWPORT } = {}) {
+  // viewport: { width, height } in CSS pixels; smaller renders faster on the CPU. scale: the device pixel ratio.
+  // init: scripts run in the page before the game, each a function or [function, argument].
+  // gesture: false to reach the page without a user gesture. Playwright's page.evaluate counts as one, which
+  // unlocks sound and full screen; a session that must see the page as a controller-only player does (no tap or
+  // key yet) sends its calls through the DevTools protocol instead, and must not use page.click or keyboard.
+  static async open(
+    browser,
+    {
+      page = DEFAULT_PAGE,
+      save = null,
+      debug = false,
+      viewport = VIEWPORT,
+      scale = 1,
+      init = [],
+      gesture = true,
+    } = {},
+  ) {
     const session = new GameSession();
-    session.context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+    session.context = await browser.newContext({ viewport, deviceScaleFactor: scale });
+    for (const script of init)
+      await (Array.isArray(script)
+        ? session.context.addInitScript(script[0], script[1])
+        : session.context.addInitScript(script));
     // Hermetic: the page's only outside requests are Google Fonts stylesheets; answer them with nothing.
     await session.context.route(
       (url) => url.protocol !== "file:",
@@ -64,6 +83,7 @@ export class GameSession {
         [SAVE_KEY, save],
       );
     session.page = await session.context.newPage();
+    if (!gesture) session.cdp = await session.context.newCDPSession(session.page);
     session.page.on("console", (m) => {
       if (m.type() !== "error") return;
       const text = m.text();
@@ -75,7 +95,7 @@ export class GameSession {
     );
     session.page.on("crash", () => session.errors.push("the page crashed"));
     const url = pathToFileURL(resolve(page)).href + (debug ? "?debug=1" : "");
-    await session.page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await session.page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 * SLOW });
     return session;
   }
 
@@ -86,20 +106,34 @@ export class GameSession {
 
   // Copies new entries of the game's own error log into `errors`.
   async collectGameErrors() {
-    const list = await this.page.evaluate(() => window.__gw?.errors?.slice() ?? []).catch(() => []);
+    const list = await this.eval(() => window.__gw?.errors?.slice() ?? []).catch(() => []);
     for (const e of list.slice(this.gameErrorsSeen)) this.errors.push(`game error log: ${e}`);
     this.gameErrorsSeen = Math.max(this.gameErrorsSeen, list.length);
     return this.errors;
   }
 
-  eval(fn, arg) {
-    return this.page.evaluate(fn, arg);
+  async eval(fn, arg) {
+    if (!this.cdp) return this.page.evaluate(fn, arg);
+    const r = await this.cdp.send("Runtime.evaluate", {
+      expression: `(${fn})(...${JSON.stringify(arg === undefined ? [] : [arg])})`,
+      returnByValue: true,
+      awaitPromise: true,
+      userGesture: false,
+    });
+    if (r.exceptionDetails)
+      throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text || "page error");
+    return r.result.value;
   }
 
   async waitFor(what, timeoutMs, fn, arg) {
     timeoutMs *= SLOW;
     try {
-      await this.page.waitForFunction(fn, arg, { timeout: timeoutMs, polling: 250 });
+      if (!this.cdp) await this.page.waitForFunction(fn, arg, { timeout: timeoutMs, polling: 250 });
+      else
+        for (const end = Date.now() + timeoutMs; !(await this.eval(fn, arg).catch(() => false)); ) {
+          if (Date.now() > end) throw new Error("timed out");
+          await this.pause(250);
+        }
     } catch {
       throw new Error(
         `timed out after ${timeoutMs / 1000}s waiting for ${what}; ${JSON.stringify(await this.state())}`,
