@@ -10827,6 +10827,18 @@ void main() {
 .gw-loop-on .gw-cat-gcard .gw-cat-name { color: #f3dca8; font-size: 16px; }
 .gw-loop-on .gw-cat-gcard.gw-hatched .gw-cat-name { color: var(--ink-dim); }
 .gw-loop-on .gw-cat-gw { font: italic 400 17px/1 var(--f-body); color: var(--ink-faint); }
+/* a handheld (1280 x 720 and like it): the Journal's tabs all fit in one row whichever is chosen, and both rows of Giants, with
+   their names and lines, fit the panel without scrolling (the cards a little tighter, the pictures a little smaller) */
+@media (min-width: 701px) and (max-width: 1440px) {
+  .gw-loop-on .gw-m-catalogue .gw-tabs .gw-tab { padding-left: 8px; padding-right: 8px; font-size: 16px; letter-spacing: .07em; gap: 5px; }
+}
+@media (min-width: 701px) and (max-height: 820px) {
+  .gw-loop-on .gw-cat-giants { gap: 2px 14px; padding: 2px 4px; }
+  .gw-loop-on .gw-cat-gcard { gap: 3px; padding: 4px 10px 6px; }
+  .gw-loop-on .gw-cat-gframe { padding: 4px 14px; }
+  .gw-loop-on .gw-cat-gframe canvas { width: 160px !important; }
+  .gw-loop-on .gw-cat-gfil--top { margin-bottom: 2px; }
+}
 @media (min-width: 701px) and (max-height: 640px) {
   .gw-loop-on .gw-p-catalogue { padding-top: 2px; padding-bottom: 40px; max-height: calc(100vh - 12px); height: calc(100vh - 12px); }
   .gw-loop-on .gw-p-catalogue .gw-ph .gw-pdiv { display: none; }

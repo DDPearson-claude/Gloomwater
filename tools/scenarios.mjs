@@ -334,7 +334,14 @@ async function backToJetty(session) {
     await session.page.keyboard.press("Escape");
     await session.pause(500);
   }
-  throw new Error(`could not get back to the barge; ${JSON.stringify(await session.state())}`);
+  const open = await session.eval(() =>
+    [...document.querySelectorAll(".gw-modal")]
+      .filter((m) => m.classList.contains("gw-in"))
+      .map((m) => `${m.dataset.modal}${m.classList.contains("gw-covered") ? " (covered)" : ""}`),
+  );
+  throw new Error(
+    `could not get back to the barge; open: ${open.join(", ") || "nothing"}; ${JSON.stringify(await session.state())}`,
+  );
 }
 
 // The field guide opens in a new tab. Pages through every species and returns what each page showed
@@ -4465,7 +4472,9 @@ const SCENARIOS = [
         () => !!document.querySelector(".gw-journal-pad .gw-pad"),
       );
       const pad = await notepadShown(session, ".gw-journal-pad .gw-pad");
-      await session.eval(() => window.__gw.ui.closeAll());
+      // Back to the barge as a player gets there. (closeAll would shut the barge's own menu too, and the Chart
+      // button with it.)
+      await backToJetty(session);
       check(
         JSON.stringify(pad?.drawn) === '["map","taken"]' && pad.words.includes(TAKEN_SELF),
         `the notepad: ${JSON.stringify(pad)}`,
