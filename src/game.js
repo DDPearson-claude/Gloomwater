@@ -44878,7 +44878,7 @@ var pP = {
         with: "With the {item}:",
         strike: "A clean strike helps a little. Too early or too late costs a little.",
         gloomtide: "Gloomtide: a hand slam that lands parts the line.",
-        unseen: "Land or lose one to learn its odds.",
+        unseen: "Land one to learn its odds.",
         marked: "{name}, {class}, near {size}",
       },
       gear: {
@@ -48214,11 +48214,31 @@ function legendLanded(loop, speciesId) {
     (speciesId === "belled_matriarch" && Number(loop?.hunt?.mossmere?.landed) > 0)
   );
 }
-// How many landings make a legend's fight harder (LEGEND growthPerLanding). The fight and the Odds page both
-// read this one count. Today she does not grow, so it is 0: whether she should is with the designer.
+// How many landings make a legend's fight harder (LEGEND growthPerLanding, up to growthCap). The fight, the
+// Journal's odds and the Odds page all read this one count. Only Mossmere's thief grows (the designer's ruling
+// of 24 November 2026): her hunt record counts her landings, so the hunt itself is fought at 0, and each landing
+// makes the next fight one step harder. Every other legend stays at 0.
 function legendGrowthLandings(meta, speciesId) {
-  // To switch growth on, return the landings instead: Number(meta?.journal?.[speciesId]?.caught) | 0.
-  return 0;
+  if (speciesId !== MIDNIGHT.legend) return 0;
+  return ha(huntRecordOf(meta?.loop)?.landings);
+}
+// An older save, written before her landings were counted: the count is her landings so far, taken from the
+// Journal's catches of her (each landing is one), and at least 1 once the hunt is landed.
+function carryHerLandings(loop, meta) {
+  let record = huntRecordOf(loop),
+    id = MIDNIGHT.legend;
+  if (!record) return;
+  let soFar = Math.max(ha(meta?.journal?.[id]?.caught), ha(loop?.legends?.[id]), record.landed > 0 ? 1 : 0);
+  record.landings = Math.max(ha(record.landings), soFar);
+}
+// The counts a legend's fight reads besides the rig: her wounds from escapes (capped as the fight caps them) and
+// her landings (legendGrowthLandings). The Odds page passes them so its row is the fight's own chance.
+function legendFightCounts(meta, speciesId, rule = Wi.legend) {
+  let cap = Math.max(1, Math.round((rule?.woundCap ?? 18) / (rule?.woundPerEscape ?? 6)));
+  return {
+    wounds: Math.min(cap, ha(meta?.legendWounds?.[speciesId])),
+    landings: legendGrowthLandings(meta, speciesId),
+  };
 }
 // The hook-up banner's words for a legend: her name and title, or "Something ancient." while she is the thief.
 function legendBannerWords(meta, data, species) {
@@ -108269,6 +108289,7 @@ function markHerLanded(loop, evening) {
   let record = huntRecordOf(loop);
   if (!record) return !1;
   noteHerLanded(record, evening);
+  record.landings = ha(record.landings) + 1;
   // Landed: every part she pulled against held, and nothing on the rig failed.
   markHerLoss(loop, "fight");
   Ln(loop.rigMarks) && (loop.rigMarks.notch = []);
@@ -109076,7 +109097,11 @@ function hF(
         legend: !0,
         pinned: ne?.speciesId === re,
         share: De,
-        land: { legend: Vy(t, re, "legend", E) },
+        // Her chance as the fight will play it: the rig, her wounds and her landings (legendFightCounts).
+        land: {
+          legend:
+            t?.catchParts?.(re, "legend", E, { strike: "struck", ...legendFightCounts(e, re) })?.p ?? null,
+        },
       });
       continue;
     }
@@ -109750,6 +109775,9 @@ function freshHuntRecord() {
     // rod was found in her water and given back to him (0 until then).
     landed: 0,
     landedBy: "",
+    // How many times she has been landed in all, the hunt's landing included: each makes her next fight harder
+    // (legendGrowthLandings). An older save takes it from her landings so far (carryHerLandings).
+    landings: 0,
     bountyPaid: false,
     rodFound: 0,
     rodReturned: 0,
@@ -110225,6 +110253,7 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
   // Relics: known ids only, each once.
   c.relics = c.relics.filter((g, p, w) => Ln(wo.relics?.[g]) && w.indexOf(g) === p);
   settleOldLanding(c, e, t);
+  carryHerLandings(c, e);
   for (let [g, p] of Object.entries(c.eveningsAt)) c.eveningsAt[g] = Math.max(0, ha(p));
   for (let [g, p] of Object.entries(t?.LOOP?.lostTackle || {}))
     p?.slot === "lure" && Zl(c, g) && !c.lures.includes(g) && c.lures.push(g);
@@ -150358,7 +150387,6 @@ var hG = `/* ui.css \u2014 GLOOMWATER interface, UI style v2 (CONTRACT \xA79, DE
 .gw-tally-gift-fit { margin: 2px 0 0; font: 400 16px/1.3 var(--f-body); color: var(--ink-dim); text-align: center; }
 .gw-tally-hunt { display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 32em; margin: 12px auto 0; opacity: 0; transform: translateY(4px); transition: opacity .5s .3s, transform .5s .3s; }
 .gw-tally-hunt.gw-in { opacity: 1; transform: none; }
-.gw-tally-tale { margin: 0; font: 400 17px/1.38 var(--f-body); color: var(--ink); text-align: center; text-wrap: pretty; }
 .gw-tally-hunt .gw-murk-line { margin: 0; font-size: 19px; }
 .gw-tally-sold { font-size: 23px; transition: opacity .5s, color .3s; }
 .gw-tally-sold.gw-wait { opacity: .38; }
@@ -154862,7 +154890,7 @@ function gU(
         ? `Wounded ${b === 1 ? "once" : b === 2 ? "twice" : `${b} times`}: +${Math.min(xr(e?.CATCH_V3?.legend?.woundCap, 18), b * L)}`
         : "",
     O = f
-      ? [i.unseen || "Land or lose one to learn its odds."]
+      ? [i.unseen || "Land one to learn its odds."]
       : [i.strike || "A clean strike helps a little. Too early or too late costs a little."];
   return (
     !f &&
@@ -170886,7 +170914,7 @@ function notepadElement(h, text, view, { page = "where", animate = [], intro = !
   }
   return el;
 }
-// The hunt's lines at a tally: the tale (the narrator, then Murk), or Murk's word about Hob.
+// The hunt's lines at a tally: the tale (both its lines Murk's), or Murk's word about Hob.
 function tallyHuntBlock(h, text, beat, now) {
   let el = h("div", `gw-tally-hunt${now ? " gw-in" : ""}`),
     add = (cls, words) => {
@@ -170896,7 +170924,7 @@ function tallyHuntBlock(h, text, beat, now) {
     };
   return (
     (el.dataset.loop = "tallyhunt"),
-    beat.tale && (add("gw-tally-tale", text.tale), add("gw-murk-line gw-in", text.murk?.tale)),
+    beat.tale && (add("gw-murk-line gw-in", text.tale), add("gw-murk-line gw-in", text.murk?.tale)),
     beat.murk && add("gw-murk-line gw-in", text.murk?.[beat.murk]),
     beat.lineup && add("gw-murk-line gw-in", text.murk?.lineup),
     // The tally after she is landed: Murk's line as he counts out the bounty.
@@ -172017,6 +172045,11 @@ function WV(e) {
                     ? Ab(f().rig?.saved?.onRig || "", { n: qt.tally.giftRig })
                     : giftText.fit,
                 };
+    // The hunt's moment at this tally (the tale, or Murk's word about Hob), shown like the gift. At the tally
+    // after she is landed his line about her comes first, before Hob's Lamp; at any other it follows the gift.
+    let huntBeat = qt.tally?.hunt,
+      huntEl = huntBeat ? tallyHuntBlock(n, f().hunt || {}, huntBeat, Le.empty) : null;
+    huntBeat?.landed && Tt.querySelector(".gw-tally")?.appendChild(huntEl);
     if (gift && giftShown.line) {
       let g = n("div", `gw-tally-gift${Le.empty ? " gw-in" : ""}`),
         art = gift === "hobs_lamp" ? HOBS_LAMP_ART : dV[gutOnly ? "chafe_gut" : gift] || "";
@@ -172026,12 +172059,10 @@ function WV(e) {
         giftShown.fit && (g.querySelector(".gw-tally-gift-fit").textContent = giftShown.fit),
         Tt.querySelector(".gw-tally")?.appendChild(g);
     }
-    // The hunt's moment at this tally (the tale, or Murk's word about Hob), shown like the gift.
-    let huntBeat = qt.tally?.hunt;
-    huntBeat &&
-      Tt.querySelector(".gw-tally")?.appendChild(tallyHuntBlock(n, f().hunt || {}, huntBeat, Le.empty));
+    huntEl && !huntBeat.landed && Tt.querySelector(".gw-tally")?.appendChild(huntEl);
     // What Murk's box says at this tally: the gift's and the hunt's lines, each its own page, in the order the
-    // card lists them (the gift, where to fit it, the tale, his words). The card keeps them written as they are.
+    // card lists them (the gift, where to fit it, the tale, his words; after the landing, his line, then the
+    // lamp). The card keeps them written as they are.
     qt.murkPages = [
       ...Tt.querySelectorAll(".gw-tally-gift .gw-murk-line, .gw-tally-gift-fit, .gw-tally-hunt > p"),
     ]

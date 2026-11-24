@@ -1408,8 +1408,9 @@ const dropLamp = (session) =>
   });
 
 // The tally as the player sees it: goes home, finishes the count, and returns the hunt block's and the gift
-// block's words, then closes the tally and anything that opens after it (the notepad included).
-async function tallyWords(session) {
+// block's words, then closes the tally and anything that opens after it (the notepad included). With `hear`,
+// it also returns the pages Murk's box speaks over the card (murk) and the order of the two blocks (order).
+async function tallyWords(session, { hear = false } = {}) {
   for (const homeBy = Date.now() + 60_000; !(await session.eval(() => window.__gw.game.goHome())); ) {
     check(Date.now() < homeBy, `the game will not go home; ${JSON.stringify(await session.state())}`);
     await session.closeGuides(3000);
@@ -1421,6 +1422,7 @@ async function tallyWords(session) {
     );
   await session.waitFor("Murk's tally", 90_000, soldVisible);
   await session.clickButton(/^Sold$/);
+  const murk = hear ? (await hearMurk(session)).map((p) => p.text) : null;
   await session.pause(2500);
   const shown = await session.eval(() => {
     const text = (sel) => document.querySelector(sel)?.textContent.replace(/\s+/g, " ").trim() ?? "";
@@ -1428,8 +1430,12 @@ async function tallyWords(session) {
       hunt: text(".gw-tally-hunt"),
       gift: text(".gw-tally-gift"),
       rows: [...document.querySelectorAll(".gw-trow")].map((r) => r.textContent.replace(/\s+/g, " ").trim()),
+      order: [...document.querySelectorAll(".gw-tally-hunt, .gw-tally-gift")].map((el) =>
+        el.classList.contains("gw-tally-hunt") ? "hunt" : "gift",
+      ),
     };
   });
+  if (murk) shown.murk = murk;
   for (const end = Date.now() + 60_000; Date.now() < end && (await session.eval(soldVisible)); )
     await session.clickButton(/^Sold$/), await session.pause(1500);
   for (let i = 0; i < 8; i++) {
@@ -2963,35 +2969,130 @@ const SCENARIOS = [
   },
 
   {
-    name: "hunt rules: on Waxed Silk she can be landed; after the landing her Odds row is the fight's own chance, and neither grows",
+    name: "hunt rules: on Waxed Silk she can be landed; each landing makes her next fight 2 harder, up to 10, and her Odds row and the Journal's odds are the fight's own chance; the save keeps the count",
     fixture: "legend-sold",
     debug: true,
-    timeoutMs: 420_000,
+    timeoutMs: 600_000,
     async run(session) {
       await session.toHome();
       await buyAtHome(session, ["line:1", "line:2"]);
       await fitHerParts(session);
+      // At home, the Odds page's row for her at night in the Bell Pool, against the Journal's chance, at her
+      // count of landings so far and at the top step (five landings).
+      const sheetAt = async (n) => {
+        const kept = await session.eval((n) => {
+          const h = window.__gw.progression.loop.state().hunt.mossmere,
+            was = h.landings;
+          n == null || (h.landings = n);
+          return was;
+        }, n);
+        const sheet = await bellPoolOdds(session);
+        const journal = await session.eval(
+          (id) => window.__gw.debug.odds(id)?.odds?.legend ?? null,
+          LEGEND_ID,
+        );
+        await session.eval(
+          (was) => (window.__gw.progression.loop.state().hunt.mossmere.landings = was),
+          kept,
+        );
+        return { row: sheet.row?.land?.legend ?? null, journal };
+      };
+      const sheetNow = await sheetAt(null),
+        sheetTop = await sheetAt(5);
+      check(
+        near(sheetNow.row, sheetNow.journal, 1e-9) && near(sheetTop.row, sheetTop.journal, 1e-9),
+        `the Odds row and the Journal: ${JSON.stringify({ sheetNow, sheetTop })}`,
+      );
       await session.sail();
-      // Her landing chance as the Odds page and the Journal read it (the same engine and count).
-      const oddsNow = () => session.eval((id) => window.__gw.debug.odds(id)?.odds?.legend ?? null, LEGEND_ID);
-      const before = await oddsNow();
+      // Her landing chance as the Journal reads it, her landings so far, and the fight's own numbers for this rig
+      // at a given count of landings (catchParts, struck, with her wounds).
+      const now = () =>
+        session.eval((id) => {
+          const g = window.__gw,
+            s = g.progression.loop.state(),
+            rig = g.debug.odds(id);
+          return {
+            odds: rig?.odds?.legend ?? null,
+            landings: s.hunt.mossmere.landings,
+            caught: g.state.meta.journal[id]?.caught ?? 0,
+            sold: s.legends[id] ?? 0,
+          };
+        }, LEGEND_ID);
+      const first = await now();
+      // The fixture sold her once before the hunt was written: an old save, counted from her landings so far.
+      check(
+        first.landings === Math.max(1, first.caught, first.sold),
+        `the old save's count: ${JSON.stringify(first)}`,
+      );
       const landed = await hookAndPlayOut(session, LEGEND_ID, "land");
       check(landed.p > 0 && landed.p <= LANDING_CAP, `landing chance on Waxed Silk is ${landed.p}`);
       check(landed.landed === LEGEND_ID, `she was not landed: ${JSON.stringify(landed)}`);
+      check(near(first.odds, landed.p, 1e-9), `the Journal said ${first.odds}, the fight played ${landed.p}`);
       await session.clickButton(/^\d?(Keep|Let go)\b/);
       await session.pause(800);
       await session.closeGuides(5000);
-      // Landed once more: the Journal counts her catch, but the fight does not grow, and the Odds row says so.
-      const after = await oddsNow();
+      // Landed once more: one more landing counted, and her next fight is harder; the Journal and the Odds row
+      // say so before it is fought.
+      const after = await now();
       const shown = await journalOdds(session);
       const again = await hookAndPlayOut(session, LEGEND_ID, "land");
       const pct = `${Math.floor(again.p * 100 + 1e-9)}%`;
+      check(after.landings === first.landings + 1, `the count ${first.landings} then ${after.landings}`);
       check(
-        near(before, landed.p, 1e-9) && near(after, again.p, 1e-9) && near(again.p, landed.p, 1e-9),
-        `odds ${before} then ${after}; the fight ${landed.p} then ${again.p}`,
+        after.odds < first.odds && near(after.odds, again.p, 1e-9),
+        `odds ${first.odds} then ${after.odds}; the fight ${landed.p} then ${again.p}`,
       );
       check(shown.includes(pct), `the Journal's odds read "${shown}", the fight plays ${pct}`);
-      return `the Odds row and the fight both ${landed.p.toFixed(4)} before and after the landing (${pct})`;
+      await session.clickButton(/^\d?(Keep|Let go)\b/);
+      await session.pause(800);
+      await session.closeGuides(5000);
+      // The rule by the fight's own numbers: her fight grows by 2 a landing, up to 10 (five steps), and her first
+      // fight (no landings) is the hunt's. On this rig (the Journal's chance, from the fight's engine) she is still
+      // landable at the top step and past it.
+      const rule = await session.eval((id) => {
+        const g = window.__gw,
+          h = g.progression.loop.state().hunt.mossmere,
+          kept = h.landings,
+          out = { fight: [], p: [] };
+        for (const n of [0, 1, 2, 3, 4, 5, 6, 9]) {
+          h.landings = n;
+          out.fight.push(
+            g.data.catchParts(id, "legend", {}, { strike: "struck", landings: n })?.fight ?? null,
+          );
+          out.p.push(g.debug.odds(id)?.odds?.legend ?? null);
+        }
+        h.landings = kept;
+        return out;
+      }, LEGEND_ID);
+      const ps = rule.p;
+      check(
+        sameJson(rule.fight, [16, 18, 20, 22, 24, 26, 26, 26]),
+        `her fight by landings 0,1,2,3,4,5,6,9: ${JSON.stringify(rule.fight)}`,
+      );
+      check(
+        ps.slice(0, 6).every((p, n) => n === 0 || p < ps[n - 1]) && near(ps[5], ps[6]) && near(ps[5], ps[7]),
+        `her chance by landings 0,1,2,3,4,5,6,9: ${JSON.stringify(ps)}`,
+      );
+      check(ps[5] > 0.01, `at the top step her chance is ${ps[5]}`);
+      // The top step in play: five landings counted, the Journal, the Odds row and the fight agree.
+      await session.eval(() => (window.__gw.progression.loop.state().hunt.mossmere.landings = 5));
+      const top = await now();
+      check(
+        near(top.odds, ps[5], 1e-9) && near(sheetTop.row, top.odds, 1e-9),
+        `at the top step: the Journal ${top.odds}, the rule ${ps[5]}, the Odds row ${sheetTop.row}`,
+      );
+      const last = await hookAndPlayOut(session, LEGEND_ID, "land");
+      check(
+        last.landed === LEGEND_ID && near(last.p, top.odds, 1e-9),
+        `the top step's fight: ${JSON.stringify(last)}`,
+      );
+      await session.eval(() => window.__gw.game.save());
+      const saved = JSON.parse(await session.saved());
+      check(
+        saved.meta.loop.hunt.mossmere.landings === 6,
+        `the save's count: ${saved.meta.loop.hunt.mossmere.landings}`,
+      );
+      return `landings ${first.landings} -> ${after.landings}: odds ${first.odds.toFixed(4)} -> ${after.odds.toFixed(4)} (${pct}); by landings 0-6, 9: ${ps.map((p) => p.toFixed(4)).join(", ")}`;
     },
   },
 
@@ -3367,7 +3468,7 @@ const SCENARIOS = [
   },
 
   {
-    name: "murk speaks at the tally: his box over the card says the lead, where to fit it, the tale and his word, a page each in the card's order; Escape turns a page; the card keeps them; a reload does not speak them again; then the notepad opens by itself",
+    name: "murk speaks at the tally: his box over the card says the lead, where to fit it, the tale and his word, a page each in the card's order, every line of the tale his on the card too; Escape turns a page; the card keeps them; a reload does not speak them again; then the notepad opens by itself",
     fixture: "fresh-first-evening",
     debug: true,
     timeoutMs: 600_000,
@@ -3409,9 +3510,21 @@ const SCENARIOS = [
           open: !!document.querySelector('.gw-modal.gw-in[data-modal="tally"]'),
           gift: text(".gw-tally-gift"),
           hunt: text(".gw-tally-hunt"),
+          // Each line of the tale on the card, and whether it is set as Murk's line (his quoted words).
+          tale: [...document.querySelectorAll(".gw-tally-hunt > p")].map((p) => [
+            p.textContent,
+            p.classList.contains("gw-murk-line"),
+          ]),
           spoken: window.__gw.progression.loop.state().lastTrip?.spoken === true,
         };
       });
+      check(
+        sameJson(card.tale, [
+          [TALE, true],
+          [TALE_MURK, true],
+        ]),
+        `the tale on the card is not all Murk's: ${JSON.stringify(card.tale)}`,
+      );
       check(
         card.open &&
           card.gift.includes(GIFT_LINE) &&
@@ -5739,7 +5852,7 @@ const SCENARIOS = [
   // ---- the end of the hunt (mossmere-hunt-2.md sections 1, 5 and 6, B4 to B6) ----------------------------
 
   {
-    name: "ending: landed, she gets the measuring card with her name and bell and one Let go, is never in the hold, opens Sporewood with no sale; the tally pays 900 once with Murk's line and gives Hob's Lamp",
+    name: "ending: landed, she gets the measuring card with her name and bell and one Let go, is never in the hold, opens Sporewood with no sale; the tally pays 900 once with Murk's line, said before he gives Hob's Lamp",
     fixture: "legend-sold",
     debug: true,
     editSave: unsold(),
@@ -5750,10 +5863,14 @@ const SCENARIOS = [
       await fitHerParts(session, { depth: "lead" });
       const before = await session.eval(() => {
         const loop = window.__gw.progression.loop;
-        return { open: loop.isOpen("sporewood"), lakes: [...loop.state().maps.lakes] };
+        return {
+          open: loop.isOpen("sporewood"),
+          lakes: [...loop.state().maps.lakes],
+          landings: loop.state().hunt.mossmere.landings,
+        };
       });
       check(
-        before.open === false && !before.lakes.includes("sporewood"),
+        before.open === false && !before.lakes.includes("sporewood") && before.landings === 0,
         `before: ${JSON.stringify(before)}`,
       );
       await session.sail();
@@ -5794,6 +5911,7 @@ const SCENARIOS = [
         return {
           creel: (g.state.run.creel || []).map((f) => f.speciesId),
           landed: s.hunt.mossmere.landed,
+          landings: s.hunt.mossmere.landings,
           sold: s.legends[id] | 0,
           open: loop.isOpen("sporewood"),
           clams: s.clams,
@@ -5802,16 +5920,24 @@ const SCENARIOS = [
       const toasts = await toastsSeen(session);
       check(toasts.includes(RELEASE_LINE), `no release line: ${JSON.stringify(toasts)}`);
       check(!after.creel.includes(LEGEND_ID), `she is in the hold: ${after.creel}`);
-      check(after.landed > 0 && after.sold === 0, `landed ${after.landed}, sold ${after.sold}`);
+      check(
+        after.landed > 0 && after.sold === 0 && after.landings === 1,
+        `landed ${after.landed}, sold ${after.sold}, landings ${after.landings}`,
+      );
       check(after.open === true, "Sporewood is not open after the landing");
-      // At the tally: the bounty row and Murk's line, then Hob's Lamp with his line.
-      const tally = await tallyWords(session);
+      // At the tally: the bounty row and Murk's line, then Hob's Lamp with his line. His box says his line about
+      // her first, then the lamp's two lines, and the card lists them in that order.
+      const tally = await tallyWords(session, { hear: true });
       const trip = await session.eval(() => window.__gw.progression.loop.lastTrip());
       const home = await session.eval(() => {
         const s = window.__gw.progression.loop.state();
         return { clams: s.clams, relics: [...s.relics], paid: s.hunt.mossmere.bountyPaid };
       });
       check(tally.hunt.includes(MURK_LANDED), `the tally's hunt words: ${tally.hunt}`);
+      check(
+        sameJson(tally.murk, [MURK_LANDED, MURK_LAMP, LAMP_LINE]) && sameJson(tally.order, ["hunt", "gift"]),
+        `Murk's line is not before the lamp: ${JSON.stringify({ murk: tally.murk, order: tally.order })}`,
+      );
       check(
         tally.gift.includes("Hob's Lamp") && tally.gift.includes(MURK_LAMP) && tally.gift.includes(LAMP_LINE),
         `the tally's gift: ${tally.gift}`,

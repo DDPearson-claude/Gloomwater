@@ -143,6 +143,13 @@ Ten questions were put as yes or no after Mossmere's final checks.
 - **Yes: early evening stays amber-gold near the raft.**
 - **Yes: the handheld is the target size.** On a phone held sideways the rig picture stays a strip that is scrolled.
 
+## Last rulings on Mossmere, 24 November 2026
+
+- **The tale is Murk's.** At the tale's tally both its lines are his: each is a page in his speech box under his name, and on the card behind it both are set as his lines (the first was a narrator's line there). No word changed.
+- **After the landing, Murk speaks first.** At the tally after she is landed his line "You landed the thief. Sit down, I'll count it twice." comes before Hob's Lamp, on the card and in his box. The bounty row and the lamp are as before.
+- **Escapes stay unrecorded.** A fish that gets away on a normal outing does not reach the Journal. The Odds words for a fish not yet met now say "Land one to learn its odds." (they said "Land or lose one"). The Old Rivals page is a separate record and stays.
+- **She fights harder after each landing (built).** The rule half-written in the fight is finished: each landing adds 2 to her fight (16 at the hunt), up to 10 more (five landings). Her hunt record counts her landings and the save keeps it; an older save takes the count from her landings so far. The Journal's odds and the Odds page read the same count, and her wounds, as the fight. Sporewood's legend does not grow.
+
 ## Sporewood: the direction, 24 November 2026
 
 The designer's rulings for the second lake, given as yes or no.
