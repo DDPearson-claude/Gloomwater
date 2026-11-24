@@ -37,7 +37,7 @@ This is a proposal: add, strike or reword anything. Each item has a plain test f
 | ☐   | Arriving at Veilback Brook feels worth it       | You approve the arrival, with the restored arches kept                                                   |
 | ☑  | The camera after reeling                        | It pulls back once, smoothly, and settles at the usual fishing distance, with no bobbing                 |
 | ☐   | The unlock camera                               | You have finished the note "The camera angle when unlocking the …", and it is done as you described      |
-| ☐   | Upgrades are visible                            | Each rod upgrade changes the rod's look, and each raft upgrade visibly changes the raft                  |
+| ☑  | Upgrades are visible                            | Each rod upgrade changes the rod's look, and each raft upgrade visibly changes the raft                  |
 | ☐   | Fishing animation                               | You approve the cast, wait, strike and reel animation on the handheld                                    |
 
 ## Controls, rewards and approvals

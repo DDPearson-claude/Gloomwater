@@ -1988,6 +1988,72 @@ const SCENARIOS = [
     },
   },
   {
+    name: "raft looks: each keel and lantern level draws something different on the raft at once after it is bought, the lantern's frame grows and gains brass, and a reload shows the same raft",
+    fixture: "legend-sold",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session) {
+      await session.toHome();
+      // The raft redraws its parts from the save's levels (it looks twice a second): read through its debug hook
+      // until it shows the level, for at most 3 s after the buy.
+      const look = (want) =>
+        session.eval(async (want) => {
+          const g = window.__gw;
+          let l = null;
+          for (let t = 0; t < 30; t++) {
+            l = g.actors.raftGear.debug();
+            if (!want || l[want[0]] === want[1]) break;
+            await new Promise((done) => setTimeout(done, 100));
+          }
+          return { ...l, saved: JSON.stringify(g.state.meta.loop.raft) };
+        }, want);
+      const sig = (l) => `${l.parts}|${l.frame}|${l.glass}|${l.brass}`;
+      const seen = [{ id: "none", ...(await look()) }];
+      for (const id of ["keel:1", "keel:2", "keel:3", "lantern:1", "lantern:2"]) {
+        const [slot, level] = id.split(":");
+        // Keel III is on the shelf's fourth tier, which no water in this build opens: it is written into the save
+        // as the shelf would write it.
+        if (id === "keel:3")
+          await session.eval(() => {
+            window.__gw.state.meta.loop.raft.keel = 3;
+          });
+        else await buyAtHome(session, [id]);
+        const l = await look([slot, Number(level)]);
+        check(
+          l[slot] === Number(level),
+          `after buying ${id} the raft draws ${slot} ${l[slot]} (the save has ${l.saved})`,
+        );
+        seen.push({ id, ...l });
+      }
+      check(
+        new Set(seen.map(sig)).size === seen.length,
+        `two levels look the same: ${seen.map(sig).join(", ")}`,
+      );
+      for (let i = 1; i < 4; i++)
+        check(seen[i].parts > seen[i - 1].parts, `${seen[i].id} adds nothing to the raft's parts`);
+      for (let i = 4; i < 6; i++) {
+        const [a, b] = [seen[i - 1], seen[i]];
+        check(b.frame > a.frame || b.brass > a.brass, `${b.id} adds nothing to the lantern's frame`);
+        check(b.glass > a.glass, `${b.id}: the glass is ${b.glass}, ${a.glass} before`);
+      }
+      // A reload draws the same raft from the save.
+      await reloadToHome(session);
+      const loaded = await look(["lantern", 2]);
+      check(
+        sig(loaded) === sig(seen[5]),
+        `after a reload the raft draws ${sig(loaded)}, ${sig(seen[5])} before`,
+      );
+      return (
+        seen
+          .map(
+            (l) =>
+              `${l.id}: parts ${l.parts} tris, frame ${l.frame} tris (${l.brass} brass), glass ${l.glass}`,
+          )
+          .join("; ") + `; reloaded ${sig(loaded)}`
+      );
+    },
+  },
+  {
     name: "gear: with the Cork Float fitted, a seeded run of bait casts bites exactly as before the Sounding Lead",
     fixture: "legend-sold",
     debug: true,

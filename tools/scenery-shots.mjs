@@ -3,13 +3,16 @@
 // pictures of the lake's scenery can be laid side by side. It changes nothing in the game.
 //
 // Usage: node tools/scenery-shots.mjs --out <dir> [--only name,name] [--quality high|low] [--size 1280x720]
-//          [--rod <rod id>] [--raft top]
+//          [--rod <rod id>] [--raft top|none|keel:N|lantern:N|oars:N[+...][,...]]
 //        node tools/scenery-shots.mjs --speed
 //        either may add --page <path/to/built.html> to use another build than the repo's own
 //
 // --rod: the "found" save owns and fits that Mossmere rod (willow_switch, ashwood_rod, whalebone_rod, or the found
 // lamp_pole), and each picture's name gains "-<rod id>". --raft top: the save has every raft part at its top level
-// (oars, keel, lantern), and each picture's name gains "-raft-top".
+// (oars, keel, lantern), and each picture's name gains "-raft-top". --raft none: no raft part. --raft keel:2: that
+// level of that part and none of the others (parts joined by "+", e.g. keel:2+lantern:1); the name gains
+// "-raft-keel2". A comma list shoots each view once for each setting in one session: the first is in the save,
+// the others are put in the game's state before their picture (the raft redraws its parts from it at once).
 //
 // Default: the game's best quality setting ("high") at 1280x720, device scale 1.
 // --speed: at 480x270 on low quality (or --quality), prints the average time of 60 frames at the set-out spot and in the
@@ -50,7 +53,19 @@ const PAGE = option("--page", undefined);
 const ROD = option("--rod", null);
 const RAFT = option("--raft", null);
 const MOSSMERE_RODS = ["willow_switch", "ashwood_rod", "whalebone_rod"];
-const SUFFIX = (ROD ? `-${ROD}` : "") + (RAFT === "top" ? "-raft-top" : "");
+const RAFTS = RAFT ? RAFT.split(",").map((r) => r.trim()) : [null];
+const RAFT_OK = /^(top|none|(oars|keel|lantern):\d(\+(oars|keel|lantern):\d)*)$/;
+// the raft's part levels a --raft setting names (null: the save's own)
+const raftLevels = (setting) => {
+  if (!setting) return null;
+  if (setting === "top") return { oars: 2, keel: 3, lantern: 2 };
+  const levels = { oars: 0, keel: 0, lantern: 0 };
+  if (setting !== "none")
+    for (const part of setting.split("+")) levels[part.split(":")[0]] = Number(part.split(":")[1]);
+  return levels;
+};
+const suffix = (setting) =>
+  (ROD ? `-${ROD}` : "") + (setting ? `-raft-${setting.replace(/:/g, "").replace(/\+/g, "-")}` : "");
 const [SHOT_W, SHOT_H] = option("--size", "1280x720").split("x").map(Number);
 if (!SPEED && !OUT) {
   console.error(
@@ -59,8 +74,13 @@ if (!SPEED && !OUT) {
   console.error("       node tools/scenery-shots.mjs --speed");
   process.exit(2);
 }
-if ((ROD && ![...MOSSMERE_RODS, "lamp_pole"].includes(ROD)) || (RAFT && RAFT !== "top")) {
-  console.error(`--rod must be one of ${MOSSMERE_RODS.join(", ")}, lamp_pole; --raft must be top`);
+if (
+  (ROD && ![...MOSSMERE_RODS, "lamp_pole"].includes(ROD)) ||
+  (RAFT && !RAFTS.every((r) => RAFT_OK.test(r)))
+) {
+  console.error(
+    `--rod must be one of ${MOSSMERE_RODS.join(", ")}, lamp_pole; --raft must be top, none or part:level[+part:level]`,
+  );
   process.exit(2);
 }
 if (!["high", "medium", "low"].includes(QUALITY) || !(SHOT_W > 0 && SHOT_H > 0)) {
@@ -245,7 +265,7 @@ function foundSave(quality) {
     loop.tackle.rod = Math.max(loop.tackle.rod || 0, MOSSMERE_RODS.indexOf(ROD));
     loop.fit = { ...loop.fit, rod: ROD };
   }
-  if (RAFT === "top") loop.raft = { oars: 2, keel: 3, lantern: 2 };
+  if (RAFTS[0]) loop.raft = raftLevels(RAFTS[0]);
   return JSON.stringify(save);
 }
 
@@ -396,7 +416,7 @@ async function stage(s, view, setout) {
   }
 }
 
-async function shoot(s, view, dir) {
+async function shoot(s, view, dir, setting = RAFTS[0]) {
   await setStep(s, 50);
   // A hooked fish's fight and the mist lift are moments: they settle for less time.
   const settle = view.act === "hook" ? 30 : view.act === "liftMist" ? 70 : SETTLE_FRAMES;
@@ -411,7 +431,7 @@ async function shoot(s, view, dir) {
       " html,body{background:#000!important}",
   });
   await frames(s, 1);
-  const file = join(dir, `${view.name}${SUFFIX}.png`);
+  const file = join(dir, `${view.name}${suffix(setting)}.png`);
   await s.page.screenshot({ path: file, timeout: 300_000 });
   await s.eval(() =>
     document
@@ -439,18 +459,26 @@ async function shots() {
         kind === "found" ? foundSave(QUALITY) : lockedSave(QUALITY),
       );
       say(`  set-out spot ${setout.x.toFixed(1)}, ${setout.z.toFixed(1)}`);
-      for (const view of mine) {
-        try {
-          await stage(s, view, setout);
-          const file = await shoot(s, view, OUT);
-          say(`  ${view.name}: ${file}`);
-        } catch (e) {
-          failed.push(view.name);
-          say(`  ${view.name}: FAILED ${String(e.message || e).split("\n")[0]}`);
-          await s.page.setViewportSize(SETTLE_SIZE).catch(() => {});
-          await setQuality(s, "low").catch(() => {});
+      for (const view of mine)
+        for (const [i, setting] of RAFTS.entries()) {
+          const name = view.name + suffix(setting);
+          try {
+            // The first setting is the save's and the view is staged for it; the others are put in the game's
+            // state, which the raft reads, with the view left as it is (staging again would move the camera).
+            if (i === 0) await stage(s, view, setout);
+            else if (kind === "found")
+              await s.eval((levels) => {
+                window.__gw.state.meta.loop.raft = levels;
+              }, raftLevels(setting));
+            const file = await shoot(s, view, OUT, setting);
+            say(`  ${name}: ${file}`);
+          } catch (e) {
+            failed.push(name);
+            say(`  ${name}: FAILED ${String(e.message || e).split("\n")[0]}`);
+            await s.page.setViewportSize(SETTLE_SIZE).catch(() => {});
+            await setQuality(s, "low").catch(() => {});
+          }
         }
-      }
       await s.collectGameErrors();
       if (s.errors.length) say(`  page errors: ${s.errors.slice(0, 5).join(" | ")}`);
       await s.close();

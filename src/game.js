@@ -94057,6 +94057,120 @@ function wickwrightHull(deckY) {
   paint(Co(0.018, 0.006, 0.025, [0, y, z], 8, 5), 0xe3c894);
   return out;
 }
+// Mossmere's keel, seen from the fishing camera: a stem post rising at the bow and a stern post (I); a tarred wale
+// and a painted strake along both sides at the waterline, the posts' heads painted to match (II); brass shoes on
+// the hull's four corners and the stem's foot, a brass cap on the stern post and a gilded scroll carved on the stem's
+// head (III). The bow is +z; the hull's side runs at hullSide(z) and its strakes sit 0.14-0.25 above the water.
+function mossmereKeel(level) {
+  const parts = [],
+    timber = 0x8a5d3b,
+    tar = 0x1c1816,
+    paint = 0x8fb89a,
+    brass = 0xe0b46a;
+  const add = (geo, color) => parts.push(zn(geo, color));
+  const hullSide = (z) => {
+    const e = Math.min(1, Math.abs(z / 1.25)) ** 5;
+    return 0.868 * (1 - 0.095 * e) + 0.118 * (1 - 0.13 * e);
+  };
+  const stem = [
+      [0, 0.14, 1.43],
+      [0, 0.5, 1.56],
+      [0, 0.82, 1.58],
+      [0, 1.0, 1.5],
+    ],
+    stern = [
+      [0, 0.14, -1.42],
+      [0, 0.42, -1.5],
+      [0, 0.66, -1.49],
+    ];
+  add(
+    Fo(xa(stem, 7), (k) => 0.056 - 0.02 * k, 5),
+    timber,
+  );
+  add(Fo(xa(stern, 4), 0.048, 5), timber);
+  if (level >= 2) {
+    for (const s of [-1, 1])
+      for (const [y, r, c] of [
+        [0.165, 0.03, tar],
+        [0.218, 0.026, paint],
+      ]) {
+        const pts = [];
+        for (let i = 0; i <= 6; i++) {
+          const z = -1.12 + (2.24 * i) / 6;
+          pts.push(new He(s * (hullSide(z) + 0.018), y + 0.02 * Math.min(1, Math.abs(z / 1.25)) ** 5, z));
+        }
+        add(Fo(pts, r, 4), c);
+      }
+    add(Wn(new Xn(0.047, 0.05, 0.13, 6), { p: [0, 0.86, 1.565], r: [0.12, 0, 0] }), paint);
+    add(Wn(new Xn(0.05, 0.05, 0.1, 6), { p: [0, 0.6, -1.497] }), paint);
+  }
+  if (level >= 3) {
+    for (const s of [-1, 1])
+      for (const z of [-1.15, 1.15])
+        add(
+          Wn(new Eo(0.05, 0.15, 0.32), {
+            p: [s * (hullSide(z) + 0.02), 0.2, z],
+            r: [0, -s * Math.sign(z) * 0.5, 0],
+          }),
+          brass,
+        );
+    add(Wn(new Eo(0.12, 0.24, 0.05), { p: [0, 0.25, 1.49], r: [-0.33, 0, 0] }), brass);
+    add(Wn(new Xn(0.056, 0.056, 0.05, 6), { p: [0, 0.68, -1.49] }), brass);
+    add(
+      Wn(new aa(0.09, 0.028, 4, 10, Math.PI * 1.5), { p: [0, 1.03, 1.42], r: [0, Math.PI / 2, 0.6] }),
+      brass,
+    );
+    add(Co(0.042, 0.042, 0.042, [0, 1.0, 1.5], 6, 4), brass);
+  }
+  return parts;
+}
+
+// The hanging lantern's frame (iron, or brass where the lantern is upgraded), centred on its glass at y = -0.46 under
+// the hook: level 0 is the plain iron frame; I is a larger cage with a brass cap, handle and ring; II larger again,
+// six brass bars, a second ring, a crown of points round the cap and a brass drip pan. The glass inside is scaled
+// to match by lanternScale. One geometry with vertex colours, so the frame stays one draw call.
+var lanternScale = (level) => [1, 1.22, 1.42][level] ?? 1;
+function wickwrightLanternFrame(level = 0) {
+  const iron = 3026996,
+    brass = 0xa87736,
+    chain = [],
+    body = [],
+    fine = level >= 1,
+    finest = level >= 2;
+  const put = (list, geo, color) => list.push(zn(geo, color));
+  for (let k = 0; k < 3; k++)
+    put(
+      chain,
+      Wn(new aa(0.022, 0.006, 4, 8), { p: [0, -0.03 - k * 0.05, 0], r: [0, k % 2 ? Math.PI / 2 : 0, 0] }),
+      iron,
+    );
+  put(body, Wn(new aa(0.04, 0.008, 4, 10), { p: [0, -0.19, 0] }), fine ? brass : iron);
+  put(body, Wn(new ii(0.13, 0.11, 8), { p: [0, -0.26, 0] }), fine ? brass : iron);
+  put(body, Wn(new Xn(0.115, 0.12, 0.025, 8), { p: [0, -0.32, 0] }), fine ? brass : iron);
+  put(body, Wn(new Xn(0.1, 0.115, 0.05, 8), { p: [0, -0.6, 0] }), finest ? brass : iron);
+  const bars = finest ? 6 : 4;
+  for (let k = 0; k < bars; k++) {
+    const a = (k / bars) * Math.PI * 2 + Math.PI / 4;
+    put(
+      body,
+      Wn(new Eo(0.014, 0.27, 0.014), { p: [Math.cos(a) * 0.098, -0.46, Math.sin(a) * 0.098] }),
+      finest ? brass : iron,
+    );
+  }
+  put(body, Wn(new aa(0.1, 0.008, 4, 12), { p: [0, -0.46, 0], r: [Math.PI / 2, 0, 0] }), fine ? brass : iron);
+  if (finest) {
+    put(body, Wn(new aa(0.1, 0.008, 3, 12), { p: [0, -0.37, 0], r: [Math.PI / 2, 0, 0] }), brass);
+    put(body, Wn(new Xn(0.135, 0.06, 0.035, 8), { p: [0, -0.645, 0] }), brass);
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      put(body, Wn(new ii(0.014, 0.05, 4), { p: [Math.cos(a) * 0.112, -0.3, Math.sin(a) * 0.112] }), brass);
+    }
+  }
+  const s = lanternScale(level),
+    shell = mo(body);
+  shell.translate(0, 0.46, 0).scale(s, s, s).translate(0, -0.46, 0);
+  return mo([...chain, shell]);
+}
 function wickwrightGear({ oars = 0, keel = 0, lantern = 0, water = null } = {}) {
   const parts = [],
     spore = water === "sporewood",
@@ -94079,7 +94193,8 @@ function wickwrightGear({ oars = 0, keel = 0, lantern = 0, water = null } = {}) 
           );
       }
     }
-  if (keel > 0)
+  // Sporewood's root keel keeps its rails and iron; Mossmere's keel is drawn below (mossmereKeel).
+  if (keel > 0 && spore)
     for (const s of [-1, 1]) {
       const x = s * 0.875;
       rod(
@@ -94101,7 +94216,7 @@ function wickwrightGear({ oars = 0, keel = 0, lantern = 0, water = null } = {}) 
           add(Wn(new Xn(0.02, 0.022, 0.012, 8), { p: [x + s * 0.063, js + 0.076, z] }), brass);
         }
     }
-  if (keel >= 3) {
+  if (keel >= 3 && spore) {
     for (const s of [-1, 1]) {
       const p = [
         [0, js + 0.08, 1.4],
@@ -94118,6 +94233,7 @@ function wickwrightGear({ oars = 0, keel = 0, lantern = 0, water = null } = {}) 
     }
     add(Wn(new aa(0.082, 0.014, 5, 18), { p: [0, js + 0.185, 1.41] }), brass);
   }
+  if (keel > 0 && !spore) parts.push(...mossmereKeel(keel));
   if (lantern > 0) {
     const x = -0.76,
       z = -0.95;
@@ -94170,7 +94286,7 @@ function UN(e) {
       }),
     ),
     f = n(sa({ color: 2825748, rim: 0.32 })),
-    u = n(sa({ color: 3026996, rim: 0.5, gloss: 0.5, shine: 90 })),
+    u = n(sa({ color: 16777215, vertexColors: !0, rim: 0.5, gloss: 0.5, shine: 90 })),
     h = n(sa({ color: 9205074, rim: 0.3 })),
     m = wickwrightHull(js);
   let p = [...m],
@@ -94220,23 +94336,8 @@ function UN(e) {
   x.position.copy(Bg), s.add(x);
   let M = new fo();
   x.add(M);
-  let A = [];
-  for (let k = 0; k < 3; k++)
-    A.push(
-      Wn(new aa(0.022, 0.006, 4, 8), { p: [0, -0.03 - k * 0.05, 0], r: [0, k % 2 ? Math.PI / 2 : 0, 0] }),
-    );
-  A.push(Wn(new aa(0.04, 0.008, 4, 10), { p: [0, -0.19, 0] }));
-  let S = Wn(new ii(0.13, 0.11, 8), { p: [0, -0.26, 0] }),
-    P = Wn(new Xn(0.115, 0.12, 0.025, 8), { p: [0, -0.32, 0] }),
-    B = Wn(new Xn(0.1, 0.115, 0.05, 8), { p: [0, -0.6, 0] }),
-    j = [];
-  for (let k = 0; k < 4; k++) {
-    let F = (k / 4) * $o + Math.PI / 4;
-    j.push(Wn(new Eo(0.014, 0.27, 0.014), { p: [Math.cos(F) * 0.098, -0.46, Math.sin(F) * 0.098] }));
-  }
-  j.push(Wn(new aa(0.1, 0.008, 4, 12), { p: [0, -0.46, 0], r: [Math.PI / 2, 0, 0] }));
-  let z = mo([...A, S, P, B, ...j]),
-    Z = new An(z, u);
+  // the frame is redrawn for the lantern's level by the raft's gear (YN)
+  let Z = new An(wickwrightLanternFrame(0), u);
   Dg(Z, 0.012), M.add(Z);
   let D = n(
       new ua({
@@ -94583,6 +94684,7 @@ function UN(e) {
     deck: s,
     lantern: M,
     lanternPivot: x,
+    lanternFrame: Z,
     light: se,
     glassMat: D,
     halo: ye,
@@ -94615,7 +94717,6 @@ function UN(e) {
 var zA = 3811608,
   VN = 2759955,
   Ise = 4863008,
-  CA = 12093754,
   Ose = 9205074,
   Nse = 10129012,
   Hse = 9071186,
@@ -94675,19 +94776,7 @@ function Fse({ oars: e = 0, keel: t = 0, water: n = null, lantern: lamp = 0 } = 
       o.push(zn(Wn(new Xn(0.012, 0.024, 0.42, 4), { p: [0.02, -0.38, r], r: [l, 0, 0.3] }), xl(RA)));
     t >= 2 && o.push(zn(Wn(new Ao(0.13, 7, 5), { s: [1, 0.7, 1.3], p: [0, -0.34, 0.2] }), xl(qN, 1.5)));
   }
-  return (
-    t >= 1 &&
-      !a &&
-      (o.push(zn(Wn(new Eo(0.09, 0.34, 2.6), { p: [0, -0.12, 0] }), xl(VN))),
-      o.push(zn(Wn(new Eo(0.1, 0.62, 0.12), { p: [0, js + 0.14, -1.36], r: [-0.12, 0, 0] }), xl(zA))),
-      o.push(zn(Wn(new Eo(0.1, 0.4, 0.12), { p: [0, js + 0.04, 1.36], r: [0.12, 0, 0] }), xl(zA)))),
-    t >= 2 &&
-      !a &&
-      (o.push(zn(Wn(new Eo(0.13, 0.08, 2.7), { p: [0, -0.3, 0] }), xl(CA, 1.3))),
-      o.push(zn(Wn(new Xn(0.075, 0.075, 0.07, 8), { p: [0, js + 0.48, -1.4] }), xl(CA, 1.3))),
-      o.push(zn(Wn(new Xn(0.075, 0.075, 0.07, 8), { p: [0, js + 0.26, 1.39] }), xl(CA, 1.3)))),
-    o
-  );
+  return o;
 }
 function YN(e, t) {
   if (e?.data?.LOOP_ENABLED !== !0 || !t?.deck) return null;
@@ -94723,8 +94812,31 @@ function YN(e, t) {
       h = Gr(u, { thickness: 0.016 });
     u.remove(h), a.add(h), o.add(a);
   }
+  // The hanging lantern follows its level: its frame is redrawn (wickwrightLanternFrame) and its outline with it,
+  // the glass grows with the cage, and the flame sits on the cage's floor. Nothing here changes how far it lights.
+  let frameLevel = 0;
   function c(f) {
-    l && l.scale.set(1 + 0.08 * f, 1 + 0.22 * f, 1 + 0.08 * f);
+    let k = lanternScale(f);
+    l && l.scale.set(k, k * 1.04, k), t.lflame?.group && (t.lflame.group.position.y = -0.46 - 0.1 * k);
+    let F = t.lanternFrame;
+    if (!F || f === frameLevel) return;
+    let q = F.geometry;
+    (F.geometry = wickwrightLanternFrame(f)), q.dispose(), (frameLevel = f);
+    let $ = F.children.find((m) => m.userData?.isOutline);
+    $ && ($.geometry.dispose(), ($.geometry = ur(F.geometry)));
+  }
+  function look() {
+    let tris = (g) => (g ? (g.index ? g.index.count : g.attributes.position.count) / 3 : 0),
+      f = t.lanternFrame?.geometry;
+    return {
+      ...r,
+      parts: tris(a?.geometry),
+      frame: tris(f),
+      glass: l ? Math.round(l.scale.x * 100) / 100 : null,
+      brass: f?.attributes.color
+        ? Array.from(f.attributes.color.array).filter((v, i) => i % 3 === 0 && v > 0.2).length
+        : 0,
+    };
   }
   function d(f = null) {
     let u = f || e.state?.meta?.loop?.raft || {},
@@ -94746,7 +94858,7 @@ function YN(e, t) {
     get mesh() {
       return a;
     },
-    debug: () => ({ ...r, parts: a ? 1 : 0, glass: t.glassMat?.opacity ?? null }),
+    debug: look,
   };
 }
 var Xf = qo.damp,
@@ -104805,9 +104917,11 @@ function qre(e) {
         n.halo.scale.setScalar(2.2 * (0.6 + 0.4 * Math.min(1.5, We)) * (1 + b.boost * 0.8)),
         o)
       ) {
+        // a finer lantern burns brighter and its glow is wider; how far its light counts (lightRadius) is not here
         let Ie = o.levels.lantern;
-        (n.glassMat.opacity = Math.min(0.92, n.glassMat.opacity * (1 + 0.22 * Ie))),
-          n.halo.scale.multiplyScalar(1 + 0.12 * Ie);
+        (n.glassMat.opacity = Math.min(0.92, n.glassMat.opacity * (1 + 0.06 * Ie))),
+          n.halo.scale.multiplyScalar(1 + 0.22 * Ie),
+          (g.intensity *= 1 + 0.2 * Ie);
       }
       (n.lflame.group.visible = De && !N.hidden),
         n.lflame.group.scale.setScalar(0.45 + 0.55 * Ft * (1 + b.boost * 0.5)),
