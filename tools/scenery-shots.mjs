@@ -3,8 +3,13 @@
 // pictures of the lake's scenery can be laid side by side. It changes nothing in the game.
 //
 // Usage: node tools/scenery-shots.mjs --out <dir> [--only name,name] [--quality high|low] [--size 1280x720]
+//          [--rod <rod id>] [--raft top]
 //        node tools/scenery-shots.mjs --speed
 //        either may add --page <path/to/built.html> to use another build than the repo's own
+//
+// --rod: the "found" save owns and fits that Mossmere rod (willow_switch, ashwood_rod, whalebone_rod, or the found
+// lamp_pole), and each picture's name gains "-<rod id>". --raft top: the save has every raft part at its top level
+// (oars, keel, lantern), and each picture's name gains "-raft-top".
 //
 // Default: the game's best quality setting ("high") at 1280x720, device scale 1.
 // --speed: at 480x270 on low quality (or --quality), prints the average time of 60 frames at the set-out spot and in the
@@ -42,12 +47,20 @@ const ONLY = option("--only", null)
 const QUALITY = option("--quality", "high");
 // --page: another built page to shoot (default: the repo's Gloomwater-Mossmere.html), e.g. a trial build
 const PAGE = option("--page", undefined);
+const ROD = option("--rod", null);
+const RAFT = option("--raft", null);
+const MOSSMERE_RODS = ["willow_switch", "ashwood_rod", "whalebone_rod"];
+const SUFFIX = (ROD ? `-${ROD}` : "") + (RAFT === "top" ? "-raft-top" : "");
 const [SHOT_W, SHOT_H] = option("--size", "1280x720").split("x").map(Number);
 if (!SPEED && !OUT) {
   console.error(
     "usage: node tools/scenery-shots.mjs --out <dir> [--only a,b] [--quality high|low] [--size WxH]",
   );
   console.error("       node tools/scenery-shots.mjs --speed");
+  process.exit(2);
+}
+if ((ROD && ![...MOSSMERE_RODS, "lamp_pole"].includes(ROD)) || (RAFT && RAFT !== "top")) {
+  console.error(`--rod must be one of ${MOSSMERE_RODS.join(", ")}, lamp_pole; --raft must be top`);
   process.exit(2);
 }
 if (!["high", "medium", "low"].includes(QUALITY) || !(SHOT_W > 0 && SHOT_H > 0)) {
@@ -125,6 +138,15 @@ const VIEWS = [
   { name: "reed-line-out-day", session: "found", at: "sister", hour: "day", act: "cast" },
   { name: "reed-isle-night", session: "found", at: "isleNorth", hour: "night" },
   { name: "raft-line-out-dusk", session: "found", at: "setout", hour: "dusk", act: "cast" },
+  // close on the angler and the rod from the right side, a little behind, with the line cast 9 m ahead
+  {
+    name: "rod-close-dusk",
+    session: "found",
+    at: "setout",
+    hour: "dusk",
+    act: "cast",
+    close: { side: 0.85, back: 0.5, elev: 12, dist: 3.4, ahead: 0.55, y: 1.05 },
+  },
   { name: "hooked-fight-dusk", session: "found", at: "setout", hour: "dusk", act: "hook" },
   { name: "mist-locked-dusk", session: "locked", at: "mistview", hour: "dusk" },
   // close on a dock that keeps its mooring posts and buoy (the lake's second dock), seen from the open water at dusk
@@ -215,6 +237,15 @@ function foundSave(quality) {
   // Veilback Brook revealed by the Veil Angler's Notebook.
   loop.finds.got.veil_notebook = 1;
   loop.places.revealed.includes("veilback_brook") || loop.places.revealed.push("veilback_brook");
+  // --rod: that rod owned (every shop rod below it too) and fitted; the found pole as a find, fitted.
+  if (ROD === "lamp_pole") {
+    loop.finds.got.lamp_pole = 1;
+    loop.found = { ...loop.found, rod: "lamp_pole" };
+  } else if (ROD) {
+    loop.tackle.rod = Math.max(loop.tackle.rod || 0, MOSSMERE_RODS.indexOf(ROD));
+    loop.fit = { ...loop.fit, rod: ROD };
+  }
+  if (RAFT === "top") loop.raft = { oars: 2, keel: 3, lantern: 2 };
   return JSON.stringify(save);
 }
 
@@ -323,11 +354,32 @@ async function stage(s, view, setout) {
       g.render.frameLandmark(a, { dur: 600 });
     }, view.frame);
   } else if (view.act === "cast") {
-    await s.eval((p) => {
-      const g = window.__gw,
-        d = 9;
-      g.debug.castAt(p.x - Math.sin(p.yaw) * d, p.z - Math.cos(p.yaw) * d, 0.6);
-    }, place);
+    await s.eval(
+      ([p, close]) => {
+        const g = window.__gw,
+          d = 9;
+        g.debug.castAt(p.x - Math.sin(p.yaw) * d, p.z - Math.cos(p.yaw) * d, 0.6);
+        if (!close) return;
+        // The landmark camera held on the angler: aimed a little ahead of the raft's middle, from its right side
+        // and behind (forward is (-sin yaw, -cos yaw), right is (cos yaw, -sin yaw)).
+        const [fx, fz] = [-Math.sin(p.yaw), -Math.cos(p.yaw)],
+          [rx, rz] = [Math.cos(p.yaw), -Math.sin(p.yaw)],
+          at = g.player.position;
+        g.render.frameLandmark(
+          {
+            x: at.x + fx * close.ahead,
+            y: close.y,
+            z: at.z + fz * close.ahead,
+            r: 1,
+            side: [rx * close.side - fx * close.back, rz * close.side - fz * close.back],
+            elev: close.elev,
+            dist: close.dist,
+          },
+          { dur: 600 },
+        );
+      },
+      [place, view.close || null],
+    );
   } else if (view.act === "hook") {
     await s.eval(() => {
       const g = window.__gw;
@@ -359,7 +411,7 @@ async function shoot(s, view, dir) {
       " html,body{background:#000!important}",
   });
   await frames(s, 1);
-  const file = join(dir, `${view.name}.png`);
+  const file = join(dir, `${view.name}${SUFFIX}.png`);
   await s.page.screenshot({ path: file, timeout: 300_000 });
   await s.eval(() =>
     document

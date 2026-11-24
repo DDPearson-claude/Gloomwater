@@ -118,8 +118,12 @@ The designer asked for Mossmere's environment graphics to be made as good as the
   - Not checked in a picture: the moss on the top of Hob's rock on Mossbell Isle.
 
 - **Light and water, second pass.** The early evening is now the warmest, clearest hour: rock tops and moss take gold raking light, the air is a thin warm brown where it was pale mauve, and the water mirrors a warm sky. Dusk stays violet and night stays cold blue, with the raft's lantern the warmest thing in the picture. The white streaks on the water were the mirrored pale edges of the rocks and far shore; a pale, cool mirrored light now takes the hour's air colour and is held down, while lamps and windows keep their reflections. The shallows read as dark amber-brown water over dim stone. Nothing new on the lowest setting; the middle and best settings gain a few cheap steps per water pixel, with no new pass. Sporewood is untouched.
+
   - A choice of look, still the designer's to make: the early-evening water near the raft is a warm amber where it was lilac.
   - Not done: a soft fade on the mirrored far shore, the lily pads' edges, and softer shadow edges.
+
+- **Each rod has its own look on the raft.** Willow Switch: a thin, pale, peeled wand with a twine grip and dark wire guides. Ashwood: darker red-brown oiled wood with a cork grip, red whippings and a red tip. Whalebone: the finest and thickest, cream lacquered bone with teal whippings, brass guides and a gold tip. The Lamplighter's Pole: dark painted green, iron-shod, with brass bands and a lamp hook. The rods differ a little in length (1.94 to 2.22 m); the line still leaves the tip, and a cast reaches exactly as far as before (16, 17.5 and 19 m at full power). The look changes as soon as a rod is fitted and is kept by a save. Each rod is now about 250 to 310 triangles, where the old ones were about 1,200. Sporewood's rods and the later lakes' rods use the same system. From the fishing camera a rod is only a thin line: colour and thickness tell them apart there, but only just; the differences are plain close up.
+  - The raft: oars and corner posts show at once from the fishing camera. The keel cannot be seen and the lantern looks the same at every level; those two are the next job.
 
 ## Still open
 

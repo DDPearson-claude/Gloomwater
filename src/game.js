@@ -95109,100 +95109,242 @@ function wickTackleModel(id) {
     parts.length = 0;
     return geom;
   };
+  // Every rod is one tapered blank whose bands (grip, butt cap, reel seat, thread whippings, ferrules, tip) are
+  // rings of the same tube, coloured flat per band, plus its line guides: about 300 triangles at most, one mesh.
+  // The look grows with the rod's price: the Willow Switch is a peeled wand with a twine grip and wire guides;
+  // the Ashwood is oiled dark wood on cork with red whippings and brass guides; the Whalebone is lacquered bone
+  // on a leather grip, teal silk whippings, five bright brass guides, a brass butt and seat and a gold tip.
+  // `len` is where the line leaves the rod (the actor's tip follows it); casting never reads it.
   const rods = {
-    willow_switch: [0x90734a, 0xb59a63, leather, 0.019, 0.045],
-    ashwood_rod: [0xa15d32, 0xe7a457, 0x60382d, 0.028, -0.03],
-    whalebone_rod: [0xe4d5ac, 0xffedc9, 0x31535c, 0.034, 0.073],
-    stalkwood: [0x746076, 0xc5a8a9, 0x584054, 0.029, -0.055],
-    amberheart: [0x774831, 0xf2a444, 0x493643, 0.034, -0.08],
-    lamp_pole: [0x475c5b, 0xdfb56d, 0x493e38, 0.028, 0.013],
-    glassreed_rod: [0x6fa49a, 0xc3e4c4, 0x395a60, 0.026, -0.043],
-    lantern_spine: [0x81755d, 0xffd37d, 0x4b3840, 0.033, 0.055],
+    willow_switch: {
+      len: 1.94,
+      butt: 0.021,
+      sweep: 0.05,
+      sides: 5,
+      blank: 0xc4ab7c,
+      sheen: 0,
+      knots: [
+        [0.56, 0x7e6646],
+        [1.13, 0x7e6646],
+      ],
+      grip: [-0.13, 0.17, linen, 0.008],
+      cap: [0x9a8258, 0],
+      seat: [0x8c7552, 0.002],
+      bands: [],
+      guides: [[0.52, 1.06, 1.56], 0x3a3834, 0.85],
+      whip: [linen, 0.03],
+      tip: [0.1, 0x9a8460],
+    },
+    ashwood_rod: {
+      len: 2.05,
+      butt: 0.027,
+      sweep: -0.02,
+      sides: 5,
+      blank: 0x6f3f24,
+      sheen: 0.22,
+      grip: [-0.12, 0.18, 0xc79c63, 0.011],
+      cap: [0x4a2a1c, 0.012],
+      seat: [0x3e2418, 0.006],
+      bands: [],
+      guides: [[0.46, 0.92, 1.37, 1.78], gold, 1],
+      whip: [0x9a2d22, 0.036],
+      tip: [0.11, 0xb8362a],
+    },
+    whalebone_rod: {
+      len: 2.16,
+      butt: 0.031,
+      sweep: 0,
+      sides: 5,
+      blank: 0xeadfc2,
+      sheen: 0.38,
+      grip: [-0.12, 0.18, 0x3a2723, 0.012],
+      cap: [0xd09a4e, 0.014],
+      seat: [0xd09a4e, 0.008],
+      bands: [],
+      guides: [[0.42, 1.08, 1.43, 1.72, 1.96], 0xe8b562, 1.2],
+      whip: [0x2b6973, 0.04],
+      tip: [0.15, 0xffcf78],
+    },
+    // Found in the lake: the lamplighter's old painted pole, iron-shod, with a brass lamp hook on its butt.
+    lamp_pole: {
+      len: 2.22,
+      butt: 0.03,
+      sweep: 0.012,
+      sides: 5,
+      blank: 0x465b57,
+      sheen: 0.12,
+      grip: [-0.12, 0.17, 0x6b5a43, 0.01],
+      cap: [iron, 0.012],
+      seat: [iron, 0.007],
+      bands: [[0.74, 0.035, gold, 0.004]],
+      guides: [[0.5, 1.02, 1.6, 1.98], gold, 1],
+      whip: [0x2d3a38, 0.03],
+      tip: [0.12, honey],
+      lamp: true,
+    },
+    // Sporewood's and the later waters' rods, from their names, at the old length.
+    stalkwood: {
+      len: 2.05,
+      butt: 0.027,
+      sweep: -0.055,
+      sides: 5,
+      blank: 0x746076,
+      sheen: 0.1,
+      knots: [0.62, 1.18, 1.72].map((y) => [y, 0xc5a8a9, 0.004, 0.045]),
+      grip: [-0.12, 0.18, 0x584054, 0.01],
+      cap: [0xc5a8a9, 0.01],
+      seat: [0x584054, 0.005],
+      bands: [],
+      guides: [[0.55, 1.1, 1.65], 0xc5a8a9, 1],
+      whip: [0x584054, 0.03],
+      tip: [0.1, 0xc5a8a9],
+    },
+    amberheart: {
+      len: 2.05,
+      butt: 0.031,
+      sweep: -0.08,
+      sides: 5,
+      blank: 0x774831,
+      sheen: 0.2,
+      grip: [-0.12, 0.18, 0x493643, 0.011],
+      cap: [0xf2a444, 0.012],
+      seat: [0x493643, 0.006],
+      bands: [],
+      guides: [[0.42, 0.9, 1.36, 1.76], gold, 1],
+      whip: [0xf2a444, 0.035],
+      tip: [0.12, 0xf2a444],
+      heart: [0.59, 0xffbb63],
+    },
+    glassreed_rod: {
+      len: 2.05,
+      butt: 0.026,
+      sweep: -0.043,
+      sides: 5,
+      blank: 0x6fa49a,
+      sheen: 0.45,
+      knots: [0.7, 1.3].map((y) => [y, 0xc3e4c4, 0.004, 0.025]),
+      grip: [-0.12, 0.18, 0x395a60, 0.01],
+      cap: [0xc3e4c4, 0.01],
+      seat: [0x395a60, 0.005],
+      bands: [],
+      guides: [[0.5, 1.05, 1.62], 0x395a60, 1],
+      whip: [0xc3e4c4, 0.03],
+      tip: [0.11, 0xc3e4c4],
+    },
+    lantern_spine: {
+      len: 2.05,
+      butt: 0.031,
+      sweep: 0.055,
+      sides: 5,
+      blank: 0x81755d,
+      sheen: 0.25,
+      grip: [-0.12, 0.18, 0x4b3840, 0.011],
+      cap: [gold, 0.012],
+      seat: [gold, 0.006],
+      bands: [[0.86, 0.03, 0xffd37d, 0.004]],
+      guides: [[0.42, 0.89, 1.36, 1.76], gold, 1.1],
+      whip: [0xffd37d, 0.035],
+      tip: [0.13, 0xffd37d],
+      heart: [0.59, 0xffbb63],
+    },
   };
-  if (rods[id]) {
-    const [wood, trim, wrap, base, sweep] = rods[id];
-    const axis = (y) => [sweep * Math.sin((Math.PI * Math.max(0, y)) / 2.05), y, 0];
-    const thick = (y) => base * (1 - (0.79 * Math.max(0, y)) / 2.05);
-    const heights = [0, 0.28, 0.5, 0.78, 1.04, 1.31, 1.57, 1.82, 2.05];
-    for (let i = 1; i < heights.length; i++) {
-      const a = heights[i - 1],
-        b = heights[i];
-      tube(
-        [axis(a), axis((a + b) / 2), axis(b)],
-        (t) => thick(a + (b - a) * t),
-        id === "stalkwood" && i % 2 === 0 ? trim : wood,
-        9,
-      );
+  const rod = rods[id];
+  if (rod) {
+    const { len, butt, sweep, sides } = rod,
+      axis = (y) => [sweep * Math.sin((Math.PI * Math.max(0, y)) / len), y, 0],
+      taper = (y) => butt * (1 - (0.79 * Math.min(len, Math.max(0, y))) / len),
+      [g0, g1, gripColor, gripSwell] = rod.grip,
+      [guideYs, ringColor, ringSize] = rod.guides,
+      [whipColor, whipW] = rod.whip,
+      [tipLen, tipColor] = rod.tip,
+      butt0 = g0 - 0.025;
+    // Bands, later ones over earlier: [from, to, colour, radius added]
+    const bands = [
+      [g0, g1, gripColor, gripSwell],
+      [butt0, g0, rod.cap[0], rod.cap[1]],
+      [g1, 0.27, rod.seat[0], rod.seat[1]],
+      ...(rod.knots || []).map(([y, c, r = 0.003, w = 0.03]) => [y - w / 2, y + w / 2, c, r]),
+      ...rod.bands.map(([y, w, c, r]) => [y - w / 2, y + w / 2, c, r]),
+      ...guideYs.map((y) => [y - whipW / 2, y + whipW / 2, whipColor, 0.002]),
+      [len - tipLen, len, tipColor, 0],
+    ];
+    const inBand = (y) => {
+      let hit = null;
+      for (const band of bands) if (y >= band[0] - 1e-6 && y <= band[1] + 1e-6) hit = band;
+      return hit;
+    };
+    const radius = (y) => {
+      let add = 0;
+      for (const band of bands) if (y >= band[0] - 1e-6 && y <= band[1] + 1e-6) add = Math.max(add, band[3]);
+      return Math.max(0.0035, taper(y) + add);
+    };
+    // A ring at each band's edges, and a second one just outside where the band stands proud of its neighbour.
+    const stations = new Set([butt0, len]);
+    for (const [a, b] of bands) {
+      stations.add(a), stations.add(b);
+      if (a > butt0 && radius(a - 0.004) < radius(a) - 0.004) stations.add(a - 0.004);
+      if (b < len && radius(b + 0.004) < radius(b) - 0.004) stations.add(b + 0.004);
     }
-    band(0.028, base + 0.013, 0.31, wrap);
-    for (const y of [-0.132, 0.192, 0.329])
-      band(y, thick(y) + 0.016, 0.02, id === "willow_switch" ? linen : trim, axis(y)[0]);
-    const spiral = Array.from({ length: 48 }, (_, i) => {
-      const f = i / 47,
-        a = f * 2 * Math.PI * 7;
-      return [(base + 0.014) * Math.cos(a), -0.107 + 0.275 * f, (base + 0.014) * Math.sin(a)];
-    });
-    tube(spiral, 0.004, id === "whalebone_rod" ? 0x59818a : id === "willow_switch" ? 0x957658 : trim, 5);
-    const nodes = id === "stalkwood" ? [0.43, 0.67, 0.96, 1.23, 1.53, 1.77] : [0.51, 0.94, 1.42, 1.82];
-    for (const y of nodes) {
-      const x = axis(y)[0],
-        r = thick(y);
-      band(y, r * (id === "stalkwood" ? 1.7 : 1.32), id === "stalkwood" ? 0.052 : 0.027, trim, x);
-      if (id === "amberheart" || id === "whalebone_rod") {
-        for (const side of [-1, 1])
-          tube(
-            [
-              [x, y - 0.13, 0],
-              [x + side * (r + 0.016), y - 0.035, 0.002],
-              [x, y + 0.085, 0],
-            ],
-            (t) => 0.003 + 0.006 * Math.sin(Math.PI * t),
-            trim,
-          );
-      }
+    const ys = [...stations].filter((y) => y >= butt0 && y <= len).sort((a, b) => a - b);
+    // the plain blank keeps a ring at least every quarter of its length, so it bends smoothly
+    for (let i = 1; i < ys.length; i++)
+      if (ys[i] - ys[i - 1] > len / 4) ys.splice(i, 0, (ys[i] + ys[i - 1]) / 2), i--;
+    const blankGeo = Fo(
+      ys.map((y) => new He(...axis(y))),
+      (t) => radius(ys[Math.round(t * (ys.length - 1))]),
+      sides,
+      { capStart: true },
+    ).toNonIndexed();
+    // Flat colour per band; a lacquered or oiled blank shows a pale streak on its faces toward the light.
+    const pos = blankGeo.attributes.position,
+      col = new Float32Array(pos.count * 3),
+      c = new Vt(),
+      white = new Vt(0xfff4dc),
+      a = new He(),
+      b = new He(),
+      n = new He(),
+      light = new He(-0.45, 0.35, 0.82).normalize();
+    for (let i = 0; i < pos.count; i += 3) {
+      a.fromBufferAttribute(pos, i + 1).sub(b.fromBufferAttribute(pos, i));
+      n.fromBufferAttribute(pos, i + 2).sub(b);
+      n.crossVectors(a, n).normalize();
+      const y = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3,
+        band = inBand(y);
+      c.set(band ? band[2] : rod.blank);
+      if (!band && rod.sheen) c.lerp(white, rod.sheen * Math.pow(Math.max(0, n.dot(light)), 3));
+      for (let k = 0; k < 3; k++) col.set([c.r, c.g, c.b], (i + k) * 3);
     }
-    if (id === "whalebone_rod" || id === "amberheart" || id === "lantern_spine") {
-      const y0 = 0.36;
-      for (const side of [-1, 1])
-        tube(
-          [
-            [axis(y0)[0], y0, 0],
-            [axis(0.49)[0] + side * 0.067, 0.49, 0],
-            [axis(0.65)[0] + side * 0.063, 0.65, 0.009],
-            [axis(0.84)[0], 0.84, 0],
-          ],
-          (t) => 0.008 + 0.009 * Math.sin(Math.PI * t),
-          id === "whalebone_rod" ? wood : trim,
-          8,
-        );
-      add(Co(0.026, 0.057, 0.024, axis(0.59), 8, 6), id === "whalebone_rod" ? wrap : 0xffbb63);
-    }
-    if (id === "lamp_pole") {
-      for (const side of [-1, 1])
-        tube(
-          [
-            [axis(0.39)[0], 0.39, 0],
-            [side * 0.058, 0.46, 0],
-            [side * 0.054, 0.56, 0],
-            [axis(0.63)[0], 0.63, 0],
-          ],
-          0.009,
-          gold,
-        );
-      add(Co(0.032, 0.064, 0.025, axis(0.506), 8, 6), honey);
-    }
-    // Guides sit on the lake-facing edge. The last guide ends at the line socket.
-    for (const y of [0.42, 0.89, 1.36, 1.76, 2.035]) {
-      const f = y / 2.05,
-        r = 0.024 - 0.016 * f,
-        c = axis(y),
-        z = thick(y) + r * 0.8;
+    blankGeo.setAttribute("color", new Kn(col, 3));
+    parts.push(blankGeo);
+    // Guides on the lake-facing edge, at the middle of their whippings.
+    for (const y of guideYs) {
+      const f = y / len,
+        r = (0.021 - 0.011 * f) * ringSize,
+        p = axis(y);
       add(
-        Wn(new aa(r, 0.0045 - 0.002 * f, 5, 10), { r: [Math.PI / 2, 0, 0], p: [c[0], y, z] }),
-        id === "willow_switch" ? leather : trim,
+        Wn(new aa(r, 0.0035 + 0.001 * ringSize, 3, 4), {
+          r: [Math.PI / 2, 0, 0],
+          p: [p[0], y, taper(y) + r * 0.85],
+        }),
+        ringColor,
       );
     }
-    return { shaft: merge() };
+    if (rod.heart) add(Co(0.024, 0.05, 0.022, [axis(rod.heart[0])[0], rod.heart[0], 0], 5, 3), rod.heart[1]);
+    if (rod.lamp) {
+      // the brass lamp hook beside the grip
+      tube(
+        [
+          [0, 0.3, 0],
+          [-0.05, 0.33, 0],
+          [-0.058, 0.4, 0],
+          [-0.03, 0.43, 0],
+        ],
+        0.006,
+        gold,
+        4,
+      );
+    }
+    return { shaft: merge(), length: len };
   }
   const specs = {
     wooden_winch: [0.068, 0x926844, 0x593b2d, linen, 4],
@@ -95271,7 +95413,8 @@ function wickTackleModel(id) {
   return { housing, wheel: merge() };
 }
 
-function mountWickTackle(ctx, held, stowed, bendMaterial, plainMaterial) {
+// onLength(len) hears the fitted rod's length, where the line leaves it.
+function mountWickTackle(ctx, held, stowed, bendMaterial, plainMaterial, onLength) {
   const sockets = {};
   function pair(name, axle) {
     const a = new An(undefined, axle ? plainMaterial : bendMaterial),
@@ -95290,7 +95433,8 @@ function mountWickTackle(ctx, held, stowed, bendMaterial, plainMaterial) {
   sockets.wheel = pair("reel-wheel", true);
   let rodId, reelId;
   function install(id) {
-    const batch = wickTackleModel(id);
+    const { length, ...batch } = wickTackleModel(id);
+    if (length) onLength?.(length);
     for (const [part, geometry] of Object.entries(batch)) {
       const [a, b] = sockets[part],
         old = a.geometry;
@@ -95327,6 +95471,24 @@ function mountWickTackle(ctx, held, stowed, bendMaterial, plainMaterial) {
   sync();
   return {
     sync,
+    // For tests and the shot tool: the fitted rod's model, its length and its blank's own marks; given an id,
+    // that rod's triangle count and length, built and thrown away.
+    look(id) {
+      if (id) {
+        const { shaft, length } = wickTackleModel(id);
+        const n = shaft ? shaft.attributes.position.count / 3 : 0;
+        shaft?.dispose();
+        return { rod: id, triangles: n, length };
+      }
+      const blank = sockets.shaft[0].geometry;
+      blank.computeBoundingBox();
+      return {
+        rod: sockets.shaft[0].userData.tackleId,
+        reel: sockets.wheel[0].userData.tackleId,
+        top: blank.boundingBox.max.y,
+        triangles: blank.attributes.position.count / 3,
+      };
+    },
     spin(angle) {
       sockets.wheel[0].rotation.x = angle;
       sockets.wheel[1].rotation.x = angle;
@@ -95701,9 +95863,12 @@ function XN(e, { raftDeck: t, deckY: n = 0.24 }) {
   Xe.add(rt), o.push(rt.material);
   let dt = new fo();
   (dt.name = "rodStowed"), dt.position.set(0.78, n, 0.98), dt.rotation.set(0.55, 0, -0.25);
-  const tackle = mountWickTackle(e, Xe, dt, pe, w);
   let G = new ui();
   G.position.set(0, le, 0), dt.add(G), t.add(dt);
+  // The fitted rod's length moves the tip the line leaves from, on the held and the stowed rod alike.
+  const tackle = mountWickTackle(e, Xe, dt, pe, w, (len) => {
+    (le = len), (ie.uLen.value = len), xe.set(0, len, 0), G.position.set(0, len, 0);
+  });
   let Ve = m([
       u(Wn(new Xn(0.016, 0.016, 1.5, 6), { r: [0, 0, Math.PI / 2] }), c.WOOD),
       u(Co(0.13, 0.012, 0.06, [0.8, 0, 0], 10, 6), c.WOOD),
@@ -96905,6 +97070,9 @@ function XN(e, { raftDeck: t, deckY: n = 0.24 }) {
       },
       get rodLength() {
         return le;
+      },
+      rodLook(id) {
+        return id ? tackle.look(id) : { ...tackle.look(), length: le };
       },
       get rodButt() {
         return Fe;
@@ -104754,6 +104922,10 @@ function qre(e) {
     },
     getRodTip() {
       return a.getRodTip(new He());
+    },
+    // For tests: the fitted rod's look (model id, length, the blank's top and triangle count).
+    rodLook(id) {
+      return a.rodLook?.(id) ?? null;
     },
     // For tests: the Sounding Lead on the water (float hidden, the Tip Bell, the tip's load, the lead's sink).
     leadDebug() {

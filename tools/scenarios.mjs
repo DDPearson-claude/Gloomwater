@@ -1899,6 +1899,95 @@ const SCENARIOS = [
     },
   },
   {
+    name: "rod looks: fitting each Mossmere rod changes the rod drawn on the raft at once, its blank ends at the tip the line leaves, a reload shows the fitted rod, and a seeded real cast reaches as far as before",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session) {
+      // The reach each rod's cast had before rods had their own looks: the shop rods' casts in the kit data.
+      const REACH = { willow_switch: 16, ashwood_rod: 17.5, whalebone_rod: 19 };
+      await session.toHome();
+      await buyAtHome(session, ["rod:1", "rod:2"]);
+      await session.sail();
+      await session.closeGuides(3000);
+      const looks = [];
+      for (const id of Object.keys(REACH)) {
+        await session.closeGuides(2000);
+        const r = await session.eval(async (id) => {
+          const g = window.__gw;
+          g.progression.loop.fitTackle("rod", id);
+          await new Promise((done) => setTimeout(done, 1200));
+          const look = g.actors.rodLook(),
+            reach = g.progression.loop.holdOf().cast - (g.progression.loop.state().carry?.cast || 0);
+          // (the blank's last ring leans with its sweep, so its top sits within 5 mm of the tip)
+          // A real cast: the press starts the meter, the release lets it go. The seed fixes the cast's own rolls.
+          g.debug.fishSeed(4242);
+          const seen = [];
+          const off = g.bus.on("fishing:cast", (e) => seen.push(e));
+          // A press can meet a card or a moving raft and come to nothing: then it is tried again.
+          for (let tries = 0; tries < 8 && !seen.length; tries++) {
+            g.fishing.onPointerDown({ input: "mouse" });
+            await new Promise((done) => setTimeout(done, 700));
+            g.fishing.onPointerUp();
+            await new Promise((done) => setTimeout(done, 400 + 800 * tries));
+          }
+          typeof off == "function" && off();
+          const p = g.player.position,
+            cast = seen[0],
+            dist = cast ? Math.hypot(cast.target.x - p.x, cast.target.z - p.z) : null;
+          const minDist = g.data?.LOOP?.cast?.minDist ?? 3;
+          // Reeled in again for the next rod: a press while it waits brings the line in.
+          for (let k = 0; k < 40 && g.fishing.state === "casting"; k++)
+            await new Promise((done) => setTimeout(done, 100));
+          if (g.fishing.state === "waiting")
+            g.fishing.onPointerDown({ input: "mouse" }), g.fishing.onPointerUp();
+          for (let k = 0; k < 40 && g.fishing.state !== "idle"; k++)
+            await new Promise((done) => setTimeout(done, 250));
+          return { look, reach, power: cast?.power ?? null, dist, minDist };
+        }, id);
+        check(r.look?.rod === id, `the rod drawn is ${r.look?.rod} with ${id} fitted`);
+        check(
+          Math.abs(r.look.top - r.look.length) < 0.005,
+          `${id}: the blank ends at ${r.look.top}, the tip at ${r.look.length}`,
+        );
+        check(r.look.triangles <= 320, `${id}: ${r.look.triangles} triangles`);
+        check(Math.abs(r.reach - REACH[id]) < 1e-9, `${id} reaches ${r.reach} m, ${REACH[id]} m before`);
+        check(r.dist !== null, `${id}: no cast went out`);
+        const want = Math.max(r.minDist, r.power * REACH[id]);
+        check(
+          Math.abs(r.dist - want) < 0.51,
+          `${id}: the cast at ${r.power.toFixed(3)} power went ${r.dist.toFixed(2)} m, ${want.toFixed(2)} m before`,
+        );
+        looks.push(r);
+      }
+      const marks = looks.map((r) => `${r.look.rod}@${r.look.length}`);
+      // Every rod the system draws, the found pole and the other lakes' rods too, stays near 300 triangles.
+      const counts = await session.eval(() =>
+        ["lamp_pole", "stalkwood", "amberheart", "glassreed_rod", "lantern_spine"].map((id) =>
+          window.__gw.actors.rodLook(id),
+        ),
+      );
+      const heavy = counts.filter((c) => !(c.triangles > 0 && c.triangles <= 320));
+      check(!heavy.length, `over 320 triangles: ${heavy.map((c) => `${c.rod} ${c.triangles}`).join(", ")}`);
+      check(new Set(marks).size === 3, `three rod looks: ${marks}`);
+      // The save remembers the fitted rod: home, the save written, and the page loaded again.
+      await session.goHomeAndTally();
+      await reloadToHome(session);
+      await session.sail();
+      const loaded = await session.eval(() => window.__gw.actors.rodLook());
+      check(loaded?.rod === "whalebone_rod", `after a reload the raft shows ${loaded?.rod}`);
+      return (
+        looks
+          .map(
+            (r) =>
+              `${r.look.rod} ${r.look.length} m, ${r.look.triangles} tris, cast ${r.dist.toFixed(2)} m at ${r.power.toFixed(2)}`,
+          )
+          .join("; ") +
+        `; ${counts.map((c) => `${c.rod} ${c.triangles} tris`).join(", ")}; reloaded: ${loaded.rod}`
+      );
+    },
+  },
+  {
     name: "gear: with the Cork Float fitted, a seeded run of bait casts bites exactly as before the Sounding Lead",
     fixture: "legend-sold",
     debug: true,
