@@ -47884,6 +47884,25 @@ Ca.rig.saved = {
   out: "You have none of this bait left.",
   onRig: "It is on Rig {n} now.",
 };
+// Murk's Tackle tab: a part with something on his shelf carries a chip, a label naming what he sells for it and how
+// many ("Lures · 4 for sale"; `what` is [one, many]), and the line over the picture shows until a part's tray has been
+// opened there once. `keys` follows the line where keys or a controller are in use.
+Ca.rig.sale = {
+  chip: "{what} · {n} for sale",
+  what: {
+    rod: ["Rod", "Rods"],
+    reel: ["Reel", "Reels"],
+    line: ["Line", "Lines"],
+    depth: ["Float", "Floats"],
+    leader: ["Leader", "Leaders"],
+    hook: ["Hook", "Hooks"],
+    bait: ["Bait", "Bait"],
+    lure: ["Lure", "Lures"],
+    both: ["Bait and lures", "Bait and lures"],
+  },
+  hint: "Press a part of your rig to see what Murk sells for it.",
+  keys: "Pick one with the arrow keys or the left stick.",
+};
 Ca.partLoss = {
   toothy: "Bitten through. Pike Wire stops teeth.",
   rough: "Worn through on its lips. Chafe Gut won't wear.",
@@ -166526,6 +166545,30 @@ div.gw-rig-shop { cursor: default; opacity: .8; }
 .gw-rig-paper .gw-rig-node:hover, .gw-rig-paper .gw-rig-node:focus-visible, .gw-rig-paper button.gw-rig-opt:hover, .gw-rig-paper button.gw-rig-opt:focus-visible,
   .gw-rig-paper .gw-rig-tab:hover, .gw-rig-paper .gw-rig-tab:focus-visible { background-color: rgba(38, 29, 44, .08); }
 .gw-rig-paper .gw-rig-back { color: var(--cat-ink, rgb(38, 29, 44)); }
+/* A tray's list while some of it is hidden: its edge fades (below, and above once scrolled), a small arrow under it
+   while there is more below, and a focused option is brought in clear of the fade. */
+.gw-rig-opts { scroll-padding: 24px 0 40px; }
+.gw-rig-tray[data-more~=below] .gw-rig-opts { -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 44px), transparent); mask-image: linear-gradient(180deg, #000 calc(100% - 44px), transparent); }
+.gw-rig-tray[data-more~=above] .gw-rig-opts { -webkit-mask-image: linear-gradient(180deg, transparent, #000 24px); mask-image: linear-gradient(180deg, transparent, #000 24px); }
+.gw-rig-tray[data-more~=above][data-more~=below] .gw-rig-opts { -webkit-mask-image: linear-gradient(180deg, transparent, #000 24px, #000 calc(100% - 44px), transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 24px, #000 calc(100% - 44px), transparent); }
+.gw-rig-tray::after { content: ''; position: absolute; left: 50%; bottom: 10px; width: 11px; height: 11px; margin-left: -6px; border: solid var(--ink-dim); border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg); opacity: 0; pointer-events: none; transition: opacity .2s; }
+.gw-rig-tray[data-more~=below]::after { opacity: .85; animation: gwRigMore 1.8s ease-in-out infinite; }
+@keyframes gwRigMore { 0%, 100% { transform: translateY(-2px) rotate(45deg); } 50% { transform: translateY(2px) rotate(45deg); } }
+/* Murk's Tackle tab (rigPanel's marks): a part with something on his shelf shows, in place of its kind, a chip saying
+   what he sells for it and how many, ringed as a button; until a tray has been opened there once the chips glow softly
+   and a line over the picture says to press a part. Only the labels change: the drawing is as it was. */
+.gw-rig-sale { display: inline-block; margin: 0 0 2px; padding: 1px 9px 2px; border: 1.5px solid var(--cat-stamp, rgb(150, 58, 42)); border-radius: 12px;
+  background: rgba(255, 251, 240, .7); font: 600 15px/1.2 var(--f-body); color: var(--cat-stamp, rgb(150, 58, 42)); white-space: nowrap; }
+.gw-rig-node.gw-rig-forsale:hover .gw-rig-sale, .gw-rig-node.gw-rig-forsale:focus-visible .gw-rig-sale { background: var(--cat-stamp, rgb(150, 58, 42)); color: rgb(255, 246, 232); }
+.gw-rig-learn .gw-rig-sale { animation: gwRigCall 2.4s ease-in-out infinite; }
+@keyframes gwRigCall { 0%, 100% { box-shadow: 0 0 0 0 rgba(168, 96, 22, 0); } 50% { box-shadow: 0 0 0 3px rgba(168, 96, 22, .22), 0 0 16px 3px rgba(168, 96, 22, .42); } }
+.gw-rig-hint { margin: 2px 2px 8px; font: italic 400 17px/1.3 var(--f-body); color: var(--ink); }
+@media (prefers-reduced-motion: reduce) {
+  .gw-rig-learn .gw-rig-sale { animation: none; box-shadow: 0 0 0 3px rgba(168, 96, 22, .2), 0 0 12px 2px rgba(168, 96, 22, .34); }
+  .gw-rig-tray[data-more~=below]::after { animation: none; }
+}
 .gw-rig-opt.gw-dear .gw-rig-price, .gw-rig-opt.gw-dear .gw-rig-oname { opacity: .55; }
 .gw-rig-stamp { color: var(--cat-stamp, rgb(150, 58, 42)); font-family: var(--f-fell, inherit); letter-spacing: .08em; text-transform: uppercase; }
 .gw-rig-stamp.gw-press { display: inline-block; animation: gwRigStamp .42s cubic-bezier(.2, .9, .3, 1.2) both; }
@@ -166543,6 +166586,9 @@ div.gw-rig-shop { cursor: default; opacity: .8; }
   .gw-p-trippause .gw-mbtn, .gw-p-homepause .gw-mbtn { min-height: 44px; }
 }
 `;
+// The seenTips key (in the save's meta, so one for the player across lakes) set once a part's tray has been opened
+// on Murk's Tackle tab: from then its parts stop glowing and the line over the picture is gone.
+var RIG_TRAY_TIP = "rig_tray";
 function pV({ K: e, L: t, D: n, report: o = () => {} }) {
   let a = e.h,
     s = e.ctx;
@@ -167130,7 +167176,76 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       );
     }
     tray.appendChild(list);
+    // While part of the list is hidden below (or above) its edge fades, and a small arrow shows below.
+    let edges = () => {
+      let more = [
+        list.scrollTop > 2 ? "above" : "",
+        list.scrollTop + list.clientHeight < list.scrollHeight - 2 ? "below" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      tray.dataset.more !== more && (tray.dataset.more = more);
+    };
+    list.addEventListener("scroll", edges, { passive: !0 });
+    try {
+      typeof ResizeObserver == "function" && new ResizeObserver(edges).observe(list);
+      requestAnimationFrame(edges);
+    } catch {}
     return tray;
+  }
+  // A key on a page that embeds the rig picture (Murk's Tackle tab): up and down move between the rig tabs and the
+  // parts, or, in an open tray, between Back and its options, each brought into view. Returns true when handled.
+  function rigKey(root, code) {
+    let dir = { ArrowUp: -1, KeyW: -1, ArrowDown: 1, KeyS: 1 }[code];
+    if (!dir || !root?.isConnected) return !1;
+    let trayEl = root.querySelector(".gw-rig-tray"),
+      rows = (
+        trayEl
+          ? [
+              [...trayEl.querySelectorAll(".gw-rig-back")],
+              ...[...trayEl.querySelectorAll("button.gw-rig-opt")].map((b) => [b]),
+            ]
+          : [
+              [...root.querySelectorAll(".gw-rig-tab")],
+              ...[...root.querySelectorAll(".gw-rig-node")].map((b) => [b]),
+            ]
+      ).filter((r) => r.length);
+    if (!rows.length) return !1;
+    let now = document.activeElement,
+      at = rows.findIndex((r) => r.includes(now)),
+      to = null;
+    // Nothing focused yet: in a tray the first option in view (a tray at Murk's opens at his goods), else the
+    // first part.
+    let shown = trayEl?.querySelector(".gw-rig-opts")?.getBoundingClientRect();
+    if (at < 0)
+      to = trayEl
+        ? rows
+            .slice(1)
+            .map((r) => r[0])
+            .find((b) => {
+              let br = b.getBoundingClientRect();
+              return shown && br.top >= shown.top - 1 && br.bottom <= shown.bottom + 1;
+            }) || (rows[1] || rows[0])[0]
+        : root.querySelector(".gw-rig-node") || rows[0][0];
+    else {
+      let next = Math.max(0, Math.min(rows.length - 1, at + dir));
+      if (next !== at) {
+        let r = now.getBoundingClientRect(),
+          mid = r.left + r.width / 2;
+        to = rows[next].reduce((best, b) => {
+          let br = b.getBoundingClientRect(),
+            d = Math.abs(br.left + br.width / 2 - mid);
+          return !best || d < best.d ? { b, d } : best;
+        }, null)?.b;
+      }
+    }
+    if (to && to !== now) {
+      try {
+        to.focus({ preventScroll: !0 }), to.scrollIntoView({ block: "nearest", inline: "nearest" });
+      } catch {}
+      l("ui_hover", { volume: 0.3 });
+    }
+    return !0;
   }
   // The three saved rigs as tabs over the picture (mossmere-gear.md B6 "Saved rigs"): each its number, its name, its
   // bait or lure drawn small (greyed when none is left) and a small leader or hook when it is not the plain one.
@@ -167216,22 +167331,29 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         .join("");
     card.innerHTML = slice.svg.replace("</g></svg>", `${pointers}</g></svg>`);
     model.nodes.forEach((nd, k) => {
-      let b = a("button", "gw-rig-node");
+      let b = a("button", "gw-rig-node"),
+        // At Murk's, a part with something on his shelf: its chip says what and how many.
+        sale = host.sale?.(nd) || null;
       (b.type = "button"),
         (b.dataset.part = nd.part),
         (b.dataset.key = nd.key ?? ""),
         b.setAttribute("aria-haspopup", "dialog"),
         b.setAttribute(
           "aria-label",
-          [`${nd.head}: ${nd.name}`, nd.mark ? n()?.TEXT_LOOP?.rig?.marks?.[nd.mark] : null]
+          [`${nd.head}: ${nd.name}`, nd.mark ? n()?.TEXT_LOOP?.rig?.marks?.[nd.mark] : null, sale?.text]
             .filter(Boolean)
             .join(". "),
         ),
         (b.style.top = `${((ys[k] / h) * 100).toFixed(2)}%`);
       nd.mark && (b.classList.add(`gw-rig-${nd.mark}ed`), (b.dataset.mark = nd.mark));
-      let kind = a("span", "gw-rig-kind"),
+      // A part with goods has a chip in place of its kind: what is for sale for it and how many.
+      let kind = a("span", sale ? "gw-rig-sale" : "gw-rig-kind"),
         name = a("span", "gw-rig-name");
-      (kind.textContent = nd.head), (name.textContent = nd.name), b.appendChild(kind), b.appendChild(name);
+      (kind.textContent = sale ? sale.text : nd.head),
+        (name.textContent = nd.name),
+        b.appendChild(kind),
+        b.appendChild(name);
+      sale && (b.classList.add("gw-rig-forsale"), (b.dataset.sale = String(sale.n)));
       b.addEventListener("click", (ev) => {
         ev.stopPropagation(), l("ui_click", { volume: 0.42, pitch: 0.7 }), rigTrayOpen(nd.part, host);
       });
@@ -167403,6 +167525,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     if (!st) return;
     host.snap();
     let was = st.tray || null;
+    part && host.opened?.();
     (st.said = null),
       (st.tray = part || null),
       host.rerender(part ? { into: part } : was ? { outOf: was } : {});
@@ -167447,6 +167570,37 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
   function rigPanel(spec = {}) {
     if (!t("state")) return null;
     let st = i0(spec.state) ? spec.state : {},
+      // Murk's Tackle tab marks its parts (spec.marks): whether a part's tray has ever been opened there, kept in the
+      // save for the player (not the lake), and the chip of what his shelf has for a part.
+      learned = () => !!e.meta?.()?.seenTips?.[RIG_TRAY_TIP],
+      learn = () => {
+        let meta = e.meta?.();
+        if (!meta || learned()) return;
+        (meta.seenTips = i0(meta.seenTips) ? meta.seenTips : {}), (meta.seenTips[RIG_TRAY_TIP] = !0);
+        Promise.resolve().then(() => {
+          try {
+            s.game?.save?.();
+          } catch (err) {
+            o("rig.learn", err);
+          }
+        });
+      },
+      saleOf = (nd) => {
+        let count = Ed(nd.more).length;
+        if (!count) return null;
+        let w = rigWords().sale || {},
+          slots = new Set(Ed(nd.more).map((it) => (it.shelf?.slot === "lure" ? "lure" : "bait"))),
+          kind =
+            nd.part !== "bait" && nd.part !== "lure"
+              ? nd.part
+              : slots.size > 1
+                ? "both"
+                : slots.has("lure")
+                  ? "lure"
+                  : "bait",
+          what = Ed(w.what?.[kind])[count === 1 ? 0 : 1] || nd.head;
+        return { n: count, text: Ab(w.chip || "{what} · {n} for sale", { what, n: count }) };
+      },
       root = null,
       snapped = null,
       // What the next render restores: the tray's scroll, and the focus as it is now or as it was at the press.
@@ -167477,6 +167631,8 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         moreLines: spec.moreLines || null,
         yours: spec.yours || null,
         dear: spec.dear || null,
+        sale: spec.marks ? saleOf : null,
+        opened: spec.marks ? learn : null,
       },
       model = rigPicture(
         n(),
@@ -167489,16 +167645,41 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         },
         spec.shelf ? Ed(spec.shelf()) : shelfItems(),
       );
-    root = a("div", `gw-rig-host gw-rig-paper${model.busy ? " gw-ts-busy" : ""}`);
+    // At Murk's, the first time his Tackle tab is shown with nothing chosen, the first part with something he can
+    // be paid for now (else a part he has just shelved) is chosen, its tray open, so his goods show at once.
+    let arrived = !1;
+    if (spec.marks && !st.chosen) {
+      st.chosen = !0;
+      let clams = fh(t("state")?.clams, 0),
+        shelved = Ed(t("state")?.arrivals?.shelved),
+        pick = (ok) => model.nodes.find((nd) => Ed(nd.more).some(ok)) || null,
+        first =
+          pick((it) => it.price <= clams) ||
+          pick((it) => it.shelf?.slot === "part" && shelved.includes(it.shelf.partId));
+      !st.tray && first && ((st.tray = first.part), (arrived = !0));
+    }
+    root = a(
+      "div",
+      `gw-rig-host gw-rig-paper${model.busy ? " gw-ts-busy" : ""}${spec.marks && !learned() ? " gw-rig-learn" : ""}`,
+    );
     (root.dataset.loop = "rig-host"), (root.dataset.host = String(spec.id || ""));
-    let tabs = rigTabs(host);
-    tabs && root.appendChild(tabs), root.appendChild(rigCard(model, host));
     // The open tray covers the picture. The bait's tray is the lure's once a lure is on, and back.
     let bait = (p) => p === "bait" || p === "lure",
       open = st.tray
         ? model.nodes.find((nd) => nd.part === st.tray || (bait(st.tray) && bait(nd.part))) || null
         : null,
-      tray = open ? rigTray(model, open.part, model.words, st.said, host) : null;
+      tray = open ? rigTray(model, open.part, model.words, st.said, host) : null,
+      tabs = rigTabs(host);
+    tabs && root.appendChild(tabs);
+    // Until a part's tray has been opened at Murk's, a line over the picture says how to see his goods.
+    if (spec.marks && !tray && !learned()) {
+      let w = rigWords().sale || {},
+        p = a("p", "gw-rig-hint");
+      (p.dataset.loop = "rig-hint"),
+        (p.textContent = [w.hint, e.isTouch ? null : w.keys].filter(Boolean).join(" ")),
+        root.appendChild(p);
+    }
+    root.appendChild(rigCard(model, host));
     tray
       ? ((st.tray = open.part), root.appendChild(tray), root.classList.add("gw-rig-traying"))
       : (st.tray = null);
@@ -167511,11 +167692,18 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       if (!root.isConnected) return;
       let list = root.querySelector(".gw-rig-opts");
       list && keep && (list.scrollTop = fh(keep.trayTop, 0));
+      // At Murk's a tray that has just opened starts at his goods ("More at Murk's"), what is owned above it.
+      let goods = spec.marks && (keep?.into || arrived) ? tray?.querySelector(".gw-rig-more") : null;
+      goods &&
+        list &&
+        (list.scrollTop += goods.getBoundingClientRect().top - list.getBoundingClientRect().top - 2);
       let buttons = [...root.querySelectorAll("button")],
         target = keep?.focus ? buttons.find((b) => focusSig(b) === keep.focus) : null;
       keep?.into &&
         (target =
-          tray?.querySelector(".gw-rig-opt[aria-pressed=true]") || tray?.querySelector(".gw-rig-opt"));
+          (goods && tray?.querySelector("button.gw-rig-shop")) ||
+          tray?.querySelector(".gw-rig-opt[aria-pressed=true]") ||
+          tray?.querySelector(".gw-rig-opt"));
       keep?.outOf && (target = root.querySelector(`.gw-rig-node[data-part="${keep.outOf}"]`));
       keep?.hadFocus &&
         !target &&
@@ -167699,6 +167887,7 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     screenOpen: Z,
     pauseItem: Te,
     rigPanel,
+    rigKey,
     debug: () => ({
       shown: !u.hidden,
       busy: h.classList.contains("gw-busy"),
@@ -168222,12 +168411,30 @@ var Cb = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' widt
 .gw-mb-page--rig .gw-mb-body { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
 .gw-mb-page--rig .gw-mb-body::-webkit-scrollbar { display: none; }
 .gw-mb-page--rig .gw-rig-host { flex: none; padding-top: 6px; }
-/* a narrow page (the book on a phone): each part's label keeps to one line, so a two-word name does not run into the label below it */
+/* An open tray fills the page under the chapter's name and its list scrolls in itself, so wheel, touch and keys reach
+   its last option at any size. (It used to cover the picture's own box, taller than a short page: the list's end lay
+   below the page, out of reach of the list's own scrolling.) The picture, its tabs and its lines wait while it is open. */
+.gw-mb-page--rig .gw-rig-host.gw-rig-traying { flex: 1 1 auto; min-height: 0; padding-bottom: 0; }
+.gw-mb-page--rig .gw-rig-host.gw-rig-traying > :not(.gw-rig-tray) { display: none; }
+/* a narrow page (the book on a phone): each part's label keeps to one line, so a two-word name does not run into the label below it;
+   a chip may run a little wider than its name, over the water left of the rod (the name under it stays clear of the butt) */
 .gw-mb-page--rig .gw-rig-host { container-type: inline-size; }
 @container (max-width: 300px) {
   .gw-rig-node { width: auto; max-width: 52%; min-height: 40px; }
   .gw-rig-node .gw-rig-kind { font-size: 12px; }
   .gw-rig-node .gw-rig-name { font-size: 15px; white-space: nowrap; }
+  .gw-rig-node.gw-rig-forsale { max-width: 60%; }
+  .gw-rig-node .gw-rig-sale { margin-bottom: 1px; padding: 0 6px 1px; font-size: 13px; }
+  .gw-rig-hint { font-size: 15px; margin-bottom: 4px; }
+  /* its tray: the name on one line beside Back, and each option's drawing smaller, so an option fits the list whole */
+  .gw-rig-trayhead { gap: 6px; margin-bottom: 2px; }
+  .gw-rig-trayhead .gw-ts-title { min-width: 0; font-size: 15px; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .gw-rig-trayhead .gw-rig-back { flex: none; min-height: 44px; padding: 0 .5em; letter-spacing: .1em; }
+  .gw-rig-opt { grid-template-columns: 40px minmax(0, 1fr); column-gap: 8px; min-height: 48px; padding: 5px 4px 6px 6px; }
+  .gw-rig-opt .gw-ts-art { width: 40px; height: 30px; }
+  .gw-rig-opt .gw-rig-oname { font-size: 16px; }
+  .gw-rig-opt .gw-rig-line { font-size: 15px; line-height: 1.2; }
+  .gw-rig-sub { margin-top: 6px; }
 }
 .gw-mb-foot { display: flex; justify-content: center; align-items: center; min-height: 34px; padding: 0; flex: none; font: 500 16px/1 var(--f-body); color: var(--cat-ink-2); letter-spacing: .1em; }
 .gw-mb-foot::before, .gw-mb-foot::after { content: '\\2014'; margin: 0 8px; color: var(--cat-faint); }
@@ -168742,6 +168949,8 @@ function zV(e) {
     return e.rigPanel({
       id: "shop",
       state: rs,
+      // Each part he has something for is marked with a chip, and his goods show on arrival.
+      marks: !0,
       render: () => X.render(),
       shelf: raw,
       buy: (id) => {
@@ -169237,6 +169446,11 @@ function zV(e) {
     if (!_ || !f || f.entry !== _) return !1;
     let W = _.state,
       C = f.B;
+    // On the Tackle chapter's rig picture, up and down move between its parts, or the open tray's options.
+    let rigHost = ["ArrowUp", "ArrowDown", "KeyW", "KeyS"].includes(X)
+      ? _.el?.querySelector?.(".gw-mb-page--rig .gw-rig-host")
+      : null;
+    if (rigHost && typeof e.rigKey == "function") return e.rigKey(rigHost, X) === !0;
     if (X === "ArrowRight" || X === "PageDown") return Se(_, 1), !0;
     if (X === "ArrowLeft" || X === "PageUp") return Se(_, -1), !0;
     if (X === "Home") return be(_, 0), !0;
@@ -171914,6 +172128,7 @@ function WV(e) {
       openOdds: () => e.screens?.openTackle?.({ titleChild: !0 }),
       // The Tackle chapter is the rig picture (the tackle screen's, pV.rigPanel), when there is one.
       rigPanel: typeof L?.rigPanel == "function" ? (spec) => L.rigPanel(spec) : null,
+      rigKey: typeof L?.rigKey == "function" ? (el, code) => L.rigKey(el, code) : null,
     }),
     x = e.layers.hud,
     M = n("div", "gw-hold");

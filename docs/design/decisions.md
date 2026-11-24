@@ -187,6 +187,14 @@ Eight questions were put as yes or no; the designer said yes to all ("Sounds goo
   Mother's Cup, and shore beds of spore reeds, moss tussocks and small mushrooms on medium and best. Mossmere's code
   paths are unchanged. On low, draw calls are the same and triangles rise by about 0.2%.
 
+## Murk's Tackle tab made plain, 24 November 2026
+
+The designer asked for two fixes after playing Mossmere: it must be plain that a part of the rig is pressed to see what Murk sells for it, and the bait and lure tray must scroll to its last item. Both lakes share the screen.
+
+- **A part with goods carries a chip** in place of its kind, naming what Murk sells for it and how many: "Rod · 1 for sale", "Lures · 4 for sale". A part with nothing on his shelf keeps its kind and still opens its tray. Until a part's tray has been opened at Murk's once (kept in the save for the player, not the lake), the chips glow softly and a line shows over the picture: "Press a part of your rig to see what Murk sells for it.", followed by "Pick one with the arrow keys or the left stick." where keys or a controller are in use. Up and down (W and S) now move between the parts, and a tray's options, in his book.
+- **His goods show on arrival.** The first time the Tackle tab shows in a visit with nothing chosen, the first part with something the purse can pay for (else a part he has just shelved) has its tray open. A tray opened there starts at "More at Murk's", with what is owned above it.
+- **Every tray reaches its end.** The tray covered the picture's own box, which is taller than the page at every size measured, so the end of its list lay below the page where the list's own scrolling could not bring it (on a phone the wheel moved the page and not the list). The open tray now fills the page under the chapter's name, and its list is the one thing that scrolls. While part of a list is hidden its edge fades and a small arrow shows below it, on every tray. On a narrow page the tray's name keeps to one line and each option's drawing is smaller, so the longest option fits whole.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.

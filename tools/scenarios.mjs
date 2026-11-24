@@ -8975,6 +8975,199 @@ const SCENARIOS = [
   },
 
   {
+    name: "Murk's Tackle tab: each part with goods carries a chip with their count, the line over the picture shows until a tray is opened once and stays gone after a reload, and at 844 x 390 the last item of the bait and lure trays scrolls into view by wheel and keys and is bought",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session) {
+      // A phone held sideways.
+      await session.page.setViewportSize({ width: 844, height: 390 });
+      await session.toHome();
+      const HOST = RIG_HOST.shop;
+      const shownNow = () =>
+        session.eval((sel) => {
+          const host = document.querySelector(sel);
+          if (!host) return null;
+          return {
+            chips: [...host.querySelectorAll(".gw-rig-node")].map(
+              (b) =>
+                `${b.dataset.part}:${b.dataset.sale ?? "-"}:${b.querySelector(".gw-rig-sale")?.textContent ?? ""}`,
+            ),
+            hint: host.querySelector(".gw-rig-hint")?.textContent ?? null,
+            glow: host.classList.contains("gw-rig-learn"),
+            tray: host.querySelector(".gw-rig-tray")?.dataset.part ?? null,
+            seen: window.__gw.state.meta.seenTips?.rig_tray === true,
+          };
+        }, HOST);
+      // What his Tackle tab sells for each part: rod, reel and line steps, and lures for the bait.
+      const forSale = await session.eval(() => {
+        const n = {};
+        for (const c of window.__gw.progression.loop.shelf().tabs.find((t) => t.id === "tackle").items)
+          if (c.bought !== true && c.sealed !== true && c.price != null) {
+            const part = c.slot === "lure" ? "bait" : c.slot;
+            n[part] = (n[part] || 0) + 1;
+          }
+        return n;
+      });
+      const what = {
+        rod: ["Rod", "Rods"],
+        reel: ["Reel", "Reels"],
+        line: ["Line", "Lines"],
+        bait: ["Lure", "Lures"],
+      };
+      // The chips expected, the bait's part named `last` ("lure" once a lure is on).
+      const want = (counts, last = "bait") =>
+        ["rod", "reel", "line", "bait"].map((p) =>
+          counts[p]
+            ? `${p === "bait" ? last : p}:${counts[p]}:${what[p][counts[p] === 1 ? 0 : 1]} · ${counts[p]} for sale`
+            : `${p === "bait" ? last : p}:-:`,
+        );
+      const HINT =
+        "Press a part of your rig to see what Murk sells for it. Pick one with the arrow keys or the left stick.";
+      // Nothing is affordable yet (137 clams), so no tray opens by itself: the picture, its chips and the line.
+      await openRigHost(session, "shop");
+      const first = await shownNow();
+      check(
+        sameJson(first?.chips, want(forSale)) &&
+          first.hint === HINT &&
+          first.glow &&
+          !first.tray &&
+          !first.seen,
+        `on first open: ${JSON.stringify(first)}; the shelf sells ${JSON.stringify(forSale)}`,
+      );
+      // A tray opened by the player: the line and the glow go, and stay gone after Back.
+      await rigHostTray(session, "shop", "bait");
+      await rigHostBack(session, "shop");
+      await session.pause(700);
+      const after = await shownNow();
+      check(
+        after && after.hint === null && !after.glow && after.seen && sameJson(after.chips, first.chips),
+        `after a tray was opened: ${JSON.stringify(after)}`,
+      );
+      await backToJetty(session);
+      // Saved and loaded again: still gone. Clams for everything, so the first part he can be paid for (the rod)
+      // opens by itself.
+      await reloadToHome(session);
+      await session.closeGuides(4000);
+      await session.eval(() => window.__gw.debug.loop.giveClams(5000));
+      await openRigHost(session, "shop");
+      const reloaded = await shownNow();
+      check(
+        reloaded && reloaded.hint === null && !reloaded.glow && reloaded.seen && reloaded.tray === "rod",
+        `after a reload, with clams: ${JSON.stringify(reloaded)}`,
+      );
+      await rigHostBack(session, "shop");
+      await session.pause(700);
+      // The tray's list, its last option and what the page shows of it.
+      const lastShown = () =>
+        session.eval((sel) => {
+          const host = document.querySelector(sel),
+            tray = host?.querySelector(".gw-rig-tray"),
+            list = tray?.querySelector(".gw-rig-opts"),
+            opts = [...(list?.querySelectorAll(".gw-rig-opt") || [])],
+            last = opts[opts.length - 1];
+          if (!last) return null;
+          const lr = last.getBoundingClientRect(),
+            vr = list.getBoundingClientRect(),
+            pr = host.closest(".gw-mb-page").getBoundingClientRect(),
+            x = lr.left + lr.width / 2,
+            y = lr.top + Math.min(lr.height / 2, 20);
+          return {
+            part: tray.dataset.part,
+            id: last.dataset.buy ?? null,
+            price: Number((last.querySelector(".gw-rig-price")?.textContent || "").replace(/\D/g, "")),
+            more: tray.dataset.more ?? "",
+            inView: lr.top >= Math.max(vr.top, pr.top) - 1 && lr.bottom <= Math.min(vr.bottom, pr.bottom) + 1,
+            hit: document.elementFromPoint(x, y)?.closest(".gw-rig-opt") === last,
+            x,
+            y,
+            list: { top: Math.round(list.scrollTop), height: list.scrollHeight, shown: list.clientHeight },
+          };
+        }, HOST);
+      const lures = () => session.eval(() => [...window.__gw.progression.loop.state().lures]);
+      const clams = () => session.eval(() => window.__gw.progression.loop.state().clams);
+      // The bait's tray (Spore Cake on): the wheel over its list brings the last lure into view, pressed there.
+      await rigHostTray(session, "shop", "bait");
+      const before = await lastShown();
+      check(
+        before && before.id?.startsWith("lure:") && !before.inView && /below/.test(before.more),
+        `the bait's tray before scrolling: ${JSON.stringify(before)}`,
+      );
+      const box = await session.eval(
+        (sel) => document.querySelector(`${sel} .gw-rig-opts`).getBoundingClientRect().toJSON(),
+        HOST,
+      );
+      await session.page.mouse.move(box.x + box.width / 2, box.y + Math.min(60, box.height / 2));
+      for (let i = 0; i < 16; i++) {
+        await session.page.mouse.wheel(0, 240);
+        await session.pause(150);
+      }
+      await session.pause(800);
+      const wheeled = await lastShown();
+      check(
+        wheeled?.inView && wheeled.hit && !/below/.test(wheeled.more),
+        `the bait's tray after the wheel: ${JSON.stringify(wheeled)}`,
+      );
+      const had = await clams();
+      await session.page.mouse.click(wheeled.x, wheeled.y);
+      await session.pause(1200);
+      const bought1 = { lures: await lures(), clams: await clams() };
+      const lure1 = wheeled.id.slice(5);
+      check(
+        bought1.lures.includes(lure1) && bought1.clams === had - wheeled.price,
+        `after pressing ${wheeled.id} (${wheeled.price}): ${JSON.stringify(bought1)} (had ${had})`,
+      );
+      // The lure bought, fitted from the same tray: the part is now the Lure, and its tray is the same list.
+      await session.eval(
+        ([sel, id]) => document.querySelector(`${sel} .gw-rig-tray .gw-rig-opt[data-key="${id}"]`)?.click(),
+        [HOST, lure1],
+      );
+      await session.pause(1000);
+      const fitted = await session.eval(() => window.__gw.progression.loop.state().fitted.lure);
+      check(fitted === lure1, `the lure fitted from the tray: ${fitted}`);
+      // The Lure's tray by keys: down to its last option, which comes into view, and Enter buys it.
+      await rigHostTray(session, "shop", "lure");
+      await session.eval((sel) => document.querySelector(`${sel} .gw-rig-tray .gw-rig-back`)?.focus(), HOST);
+      let keyed = null;
+      for (let i = 0; i < 30; i++) {
+        await session.page.keyboard.press("ArrowDown");
+        await session.pause(120);
+        keyed = await session.eval((sel) => {
+          const opts = [...document.querySelectorAll(`${sel} .gw-rig-tray button.gw-rig-opt`)];
+          return { at: opts.indexOf(document.activeElement), of: opts.length };
+        }, HOST);
+        if (keyed.at === keyed.of - 1) break;
+      }
+      await session.pause(800);
+      const keyLast = await lastShown();
+      check(
+        keyed?.at === keyed.of - 1 &&
+          keyLast?.part === "lure" &&
+          keyLast.id?.startsWith("lure:") &&
+          keyLast.inView,
+        `the Lure's tray by keys: ${JSON.stringify({ keyed, keyLast })}`,
+      );
+      const had2 = await clams();
+      await session.page.keyboard.press("Enter");
+      await session.pause(1200);
+      const bought2 = { lures: await lures(), clams: await clams() };
+      check(
+        bought2.lures.includes(keyLast.id.slice(5)) && bought2.clams === had2 - keyLast.price,
+        `after Enter on ${keyLast.id} (${keyLast.price}): ${JSON.stringify(bought2)} (had ${had2})`,
+      );
+      // Escape closes the tray; the Lure's chip counts the two fewer.
+      await session.page.keyboard.press("Escape");
+      await session.pause(900);
+      const left = await shownNow();
+      check(
+        left && !left.tray && sameJson(left.chips, want({ ...forSale, bait: forSale.bait - 2 }, "lure")),
+        `after the two lures were bought: ${JSON.stringify(left)}`,
+      );
+      return `chips ${first.chips.join(", ")}; ${lure1} bought by wheel and press, ${keyLast.id.slice(5)} by keys and Enter; then ${left.chips[3]}`;
+    },
+  },
+
+  {
     name: "camera after reeling: once a landed fish's card closes, the camera pulls back once to the resting distance and is still three seconds later",
     fixture: "mid-mossmere",
     debug: true,
