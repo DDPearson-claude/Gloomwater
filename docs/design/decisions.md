@@ -161,6 +161,7 @@ The designer's rulings for the second lake, given as yes or no.
 - **Yes: the fish grow from 14 kinds to about 24,** starting with the three Sporewood fish that were left out.
 - **The legend is the Meadowback Pacu.** "The Drifting Grove" goes. By ruling 4 she is a real kind of fish plus a descriptor: a pacu, the fish of River Monsters' "The Mutilator", which cracks nuts and seeds with teeth like a person's. That is the seed-pod clue in the line-up and the reason she crushes ordinary hooks. Around the lake she is called "the wandering island", as the Bellhead Catfish is "the thief".
 - Ruling 5 holds here too: about 1 cast in 3 once every condition is right. Today she takes every cast.
+- **Sporewood's plain faults, fixed before its design work.** The Odds page lists only the places of the lake the player is in. The first-play card about worms and the spoon shows only on the first lake. Five Journal hints now match how the fish really bite (the Sleepspore Jelly, the Nightbloom Carp on Sporewood's page, the Mildew Angler and the Harpstring Eel), the Velvet Ray and the Capshell Crayfish have hints at last, and no hint says "Gloomtide". The Sheet's Rivals page is left out away from Mossmere, where it was untrue. At home with no screen open, Escape, P (a controller's B or Start) or a tap on the water brings the barge's menu back; closing every screen at once had left no way back. The Glowcap Bulb fits and fishes as it should, and the locked places' mist is there.
 
 ## Still open
 

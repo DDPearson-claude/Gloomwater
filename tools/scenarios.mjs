@@ -320,6 +320,48 @@ const clickAll = (session, selector, index) =>
   );
 const countOf = (session, selector) => session.eval((sel) => document.querySelectorAll(sel).length, selector);
 
+// At home: the chart closed with Escape leaves the barge's menu; and with every screen closed (as a sail or tow
+// closes them), Escape, the pause key (a controller's B and Start) and a tap on the water each bring it back.
+// Then the chart's Sail still sets out. Returns what was tried.
+async function homeMenuComesBack(session, water) {
+  const jettyUp = () => session.eval(() => !!document.querySelector('.gw-modal.gw-in[data-modal="jetty"]'));
+  const tried = [];
+  for (let n = 0; n < 3; n++) {
+    await session.eval(() => document.querySelector('[data-modal="jetty"] [data-tile="chart"]')?.click());
+    await session.waitFor(
+      "the chart",
+      10_000,
+      () => !!document.querySelector('.gw-modal.gw-in[data-modal="chart"]'),
+    );
+    await session.pause(n * 400);
+    await session.page.keyboard.press("Escape");
+    await session.pause(900);
+    check(await jettyUp(), `no barge's menu after Escape on the chart (try ${n + 1})`);
+  }
+  tried.push("chart and Escape x3");
+  const view = session.page.viewportSize();
+  for (const [name, act] of [
+    ["Escape", () => session.page.keyboard.press("Escape")],
+    ["P", () => session.page.keyboard.press("KeyP")],
+    ["a tap", () => session.page.mouse.click(view.width / 2, view.height / 2)],
+  ]) {
+    await session.eval(() => window.__gw.ui.closeAll());
+    await session.pause(900);
+    check(!(await jettyUp()), "the barge's menu is still up after every screen was closed");
+    await act();
+    await session.waitFor(
+      `the barge's menu after ${name}`,
+      5_000,
+      () => !!document.querySelector('.gw-modal.gw-in[data-modal="jetty"]'),
+    );
+    tried.push(name);
+  }
+  await session.sail({ water, timeoutMs: 200_000 });
+  const zone = await session.eval(() => window.__gw.state.run?.zone ?? null);
+  check(zone === water, `the trip after the menu came back is on ${zone}`);
+  return tried.join(", ");
+}
+
 // Closes screens (Escape) until the barge at home is in front again, with Murk, Chart and Journal.
 async function backToJetty(session) {
   for (let i = 0; i < 8; i++) {
@@ -6616,6 +6658,154 @@ const SCENARIOS = [
         `Sporewood's bait tray: ${JSON.stringify(bait)}`,
       );
       return `${r.limit.text}`;
+    },
+  },
+
+  {
+    name: "sheet in Sporewood: the Odds page lists only Sporewood's places, never Mossmere's (the maps of both lakes are in one list)",
+    fixture: "sporewood-crossed",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      const r = await session.eval(() => {
+        const g = window.__gw,
+          loop = g.progression.loop;
+        return {
+          owned: loop.state().maps.places,
+          choices: loop.sheet({}).picks.choices.map((c) => c.id),
+        };
+      });
+      check(r.owned.includes("lily_maze"), `the fixture owns no Mossmere map: ${JSON.stringify(r)}`);
+      check(
+        sameJson(r.choices, [null, "lullaby", "gill_harp"]),
+        `the Odds page's places in Sporewood: ${JSON.stringify(r.choices)}`,
+      );
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "sheet" }));
+      await session.waitFor("the Sheet", 10_000, () => !!document.querySelector(".gw-kit-row"));
+      await session.eval(() => document.querySelector('[data-sheet-page="odds"]')?.click());
+      await session.pause(800);
+      const odds = await visibleText(session, ".gw-kit-page");
+      check(
+        odds.includes("The Lullaby") && !/Lily Maze|Under the Span|Buoy Lights|Bell Pool/.test(odds),
+        `the Odds page on screen: ${odds.slice(0, 400)}`,
+      );
+      return r.choices.map((id) => id ?? "open water").join(", ");
+    },
+  },
+  {
+    name: "sheet in Sporewood: no Rivals page, as Old Rivals come only from Mossmere's water; the Journal's hints for Sporewood's fish say where, when and on what they bite",
+    fixture: "sporewood-crossed",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "sheet" }));
+      await session.waitFor("the Sheet", 10_000, () => !!document.querySelector(".gw-kit-row"));
+      const tabs = await session.eval(() =>
+        [...document.querySelectorAll("[data-sheet-page]")].map((b) => b.dataset.sheetPage),
+      );
+      check(sameJson(tabs, ["buffs", "tackle", "raft", "home", "odds"]), `the Sheet's tabs: ${tabs}`);
+      // innerText leaves out the pages that are not shown.
+      const page = await session.eval(() => document.querySelector(".gw-kit-page")?.innerText ?? "");
+      check(!/Old Rivals|big ones that get away/.test(page), `a Rivals page shows: ${page.slice(0, 300)}`);
+      await backToJetty(session);
+      // The hints of fish not yet caught (the measured bites are in the Sporewood audit's table).
+      const WANT = {
+        sleepspore_jelly: "It bites only in the Lullaby, by day and at dusk, and only on Amber Larvae.",
+        nightbloom_carp: "It bites only at night, and only in the Veilwater.",
+        mildew_angler:
+          "It bites only at night, and Amber Larvae suits it best. It feeds most in the Lullaby, the Gill Harp and the Mother's Cup.",
+        velvet_ray: "It bites at any hour and feeds most in the Lullaby. The Root Jig suits it best.",
+        capshell_crayfish:
+          "It bites at any hour, all over the pools. Spore Cake, Amber Larvae and the Root Jig all suit it.",
+        harpstring_eel: "It never leaves the gill-strings, so it bites only at the Gill Harp.",
+      };
+      for (const [id, want] of Object.entries(WANT)) {
+        await session.eval((id) => window.__gw.ui.openJournal({ zone: "sporewood", sel: id }), id);
+        await session.waitFor(`${id}'s page`, 10_000, () => !!document.querySelector(".gw-jr-where"));
+        const where = await visibleText(session, ".gw-jr-where");
+        check(where === want, `${id}: the Journal says "${where}", expected "${want}"`);
+        await backToJetty(session);
+      }
+      // Nightbloom Carp keeps its Mossmere line, where it is a guest on the lily pads at night.
+      const mossmere = await session.eval(() => window.__gw.data.SPECIES_BY_ID.nightbloom_carp.hint);
+      check(
+        mossmere === "It bites only at night, and it likes the lily pads best.",
+        `the carp's own hint: ${mossmere}`,
+      );
+      const gloom = await session.eval(() =>
+        window.__gw.data.SPECIES.filter((sp) => /Gloomtide/.test(sp.hint || "")).map((sp) => sp.id),
+      );
+      check(gloom.length === 0, `hints that still say Gloomtide: ${gloom}`);
+      return `tabs ${tabs.join(", ")}; ${Object.keys(WANT).length} hints`;
+    },
+  },
+  {
+    name: "guide in Sporewood: the first-play card about worms and the spoon does not come up after a cast and a catch there, on a save whose guide is not finished",
+    fixture: "sporewood-crossed",
+    debug: true,
+    // Every other card of the opening guide seen, so only the tackle card could come up.
+    editSave(save) {
+      Object.assign(save.meta.guide.seen, { bite: true, fight: true, card: true, away: true });
+      save.meta.guide.on = true;
+      delete save.meta.guide.seen.tackle;
+    },
+    async run(session) {
+      await session.toHome();
+      await session.sail({ water: "sporewood", timeoutMs: 200_000 });
+      await session.eval(() => {
+        const g = window.__gw;
+        window.__guidesSeen = [];
+        setInterval(() => {
+          for (const el of document.querySelectorAll('.gw-modal[data-modal="guide"] .gw-guide'))
+            window.__guidesSeen.includes(el.className) || window.__guidesSeen.push(el.className);
+        }, 200);
+        const p = g.player.position,
+          yaw = g.render.getYaw();
+        g.debug.castAt(p.x - Math.sin(yaw) * 9, p.z - Math.cos(yaw) * 9, 0.6);
+      });
+      await session.waitFor("the float out", 15_000, () => window.__gw.fishing.state === "waiting");
+      await session.eval(() => window.__gw.fishing.reelInQuiet?.());
+      await session.catchFish("netcloud_fry");
+      await session.pause(6000);
+      const r = await session.eval(() => ({
+        seen: window.__guidesSeen,
+        tackle: window.__gw.state.meta.guide?.seen?.tackle ?? null,
+        on: window.__gw.state.meta.guide?.on,
+        fish: window.__gw.fishing.state,
+        tin: !!document.querySelector("[data-loop=tin]"),
+      }));
+      check(r.on === true && r.tin, `the guide is off or there is no tin: ${JSON.stringify(r)}`);
+      check(
+        !r.seen.some((c) => c.includes("gw-guide--tackle")) && r.tackle !== true,
+        `the tackle card came up in Sporewood: ${JSON.stringify(r)}`,
+      );
+      return `cards seen: ${r.seen.join(", ") || "none"}`;
+    },
+  },
+
+  {
+    name: "home in Sporewood: the barge's menu always comes back, after Escape on the chart and with every screen closed (Escape, P or a tap), and Sail still sets out",
+    fixture: "sporewood-crossed",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      return homeMenuComesBack(session, "sporewood");
+    },
+  },
+  {
+    name: "home in Mossmere: the barge's menu always comes back, after Escape on the chart and with every screen closed (Escape, P or a tap), and Sail still sets out; the Sheet keeps its Rivals page",
+    fixture: "mid-mossmere",
+    debug: true,
+    async run(session) {
+      await session.toHome();
+      await session.eval(() => window.__gw.ui.openJournal({ tab: "sheet" }));
+      await session.waitFor("the Sheet", 10_000, () => !!document.querySelector(".gw-kit-row"));
+      const tabs = await session.eval(() =>
+        [...document.querySelectorAll("[data-sheet-page]")].map((b) => b.dataset.sheetPage),
+      );
+      check(tabs.includes("rivals"), `Mossmere's Sheet has no Rivals page: ${tabs}`);
+      await backToJetty(session);
+      return homeMenuComesBack(session, "mossmere");
     },
   },
 

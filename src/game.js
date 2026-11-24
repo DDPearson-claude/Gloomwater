@@ -34450,7 +34450,7 @@ var Ms = [
         eyes: "glow",
         scale: 1.1,
       },
-      hint: "Its lure lights only in the Gloomtide, out where the water is deep.",
+      hint: "It bites only at night, and Amber Larvae suits it best. It feeds most in the Lullaby, the Gill Harp and the Mother's Cup.",
       lore: "Its lure is one soft mushroom, lit like a window left on for someone who isn't coming.",
     },
     {
@@ -34478,7 +34478,7 @@ var Ms = [
         eyes: "blind",
         scale: 0.75,
       },
-      hint: "Drifts only in the calm, towards a gentle glow like Lumen Moss.",
+      hint: "It bites only in the Lullaby, by day and at dusk, and only on Amber Larvae.",
       lore: "It drifts through other creatures' dreams to rest. Most never notice. Some wake up kinder.",
     },
     {
@@ -39944,7 +39944,7 @@ var IS = {
         eyes: "glow",
         scale: 1.1,
       },
-      hint: "It only leaves the gill-strings while the Gill Harp sings.",
+      hint: "It never leaves the gill-strings, so it bites only at the Gill Harp.",
       lore: "It lives between the gill-strings and comes out only when the chord is right. It has perfect pitch and no patience.",
     },
     {
@@ -41739,6 +41739,7 @@ var Nf = [
       prefers: "mist",
       phase: 1,
       src: "v1",
+      hint: "It bites at any hour, all over the pools. Spore Cake, Amber Larvae and the Root Jig all suit it.",
     }),
     mi("velvet_ray", {
       size: Ga(67, 0.14, "ray"),
@@ -41748,6 +41749,7 @@ var Nf = [
       src: "v1",
       style: "runner",
       spots: { mothers_cup: 2, gill_harp: 2 },
+      hint: "It bites at any hour and feeds most in the Lullaby. The Root Jig suits it best.",
     }),
     mi("threadling_eel", {
       size: Ga(86, 0.13, "swampeel"),
@@ -41799,7 +41801,9 @@ var Nf = [
         reference: !0,
         spots: { veilwater: 2 },
       },
-      { hint: "Its lure lights only at night, out where the water is deep." },
+      {
+        hint: "It bites only at night, and Amber Larvae suits it best. It feeds most in the Lullaby, the Gill Harp and the Mother's Cup.",
+      },
     ),
     mi("sleepspore_jelly", {
       size: Ga(33, 0.09, "jelly"),
@@ -48152,6 +48156,10 @@ Ca.log = Object.assign(Ca.log || {}, {
     },
     takes: "It takes only {bait}.",
     midnight: "She feeds just after the old bell strikes midnight, in deep water.",
+  },
+  // A guest's hint on its home lake's Journal page, where it does not feed as it does as a guest.
+  hints: {
+    sporewood: { nightbloom_carp: "It bites only at night, and only in the Veilwater." },
   },
 });
 wo.start = { lures: ["bent_spoon"], bait: { mireworm: 10 }, fit: "mireworm" };
@@ -108738,7 +108746,11 @@ function hF(
   for (let re of t8) (h[re] = ju(t, c, re)), (E[re] = h[re]);
   (Object.keys(O.hold).length || !A) && (E.hold = { ...S });
   let P = new Set(qi(c.lifted)),
-    B = qi(c.maps?.places).filter((re) => P.has(re) && jg(t, re)),
+    // Only the places of the lake the player is in: the maps of every lake are kept in one list.
+    sheetLake = (f && n.zone) || d,
+    B = qi(c.maps?.places).filter(
+      (re) => P.has(re) && jg(t, re) && (t?.LOOP?.places?.[re]?.water ?? sheetLake) === sheetLake,
+    ),
     j = s && !s.place && typeof s.area == "string" && hg.includes(s.area) ? s.area : null,
     z = [
       { id: null, kind: "open" },
@@ -116465,7 +116477,7 @@ function Kle(e) {
     if (ce.hint) return ce.hint;
     let me = [];
     ce.time === "gloom"
-      ? me.push("Rises only in the Gloomtide")
+      ? me.push("Rises only at night")
       : ce.time === "calm" && me.push("Rises only in the calm");
     let [ft = 0, Qt = 1] = ce.depth || [];
     return (
@@ -174721,7 +174733,13 @@ function VV(e) {
       }
     const rivals = _("rivals", "Old Rivals");
     let readRivals = false;
-    const pages = { buffs: lt, tackle: Te, raft: ee, home: pe, odds: Ze, rivals };
+    // Old Rivals come only from Mossmere's water (loseOldRival), so another lake has no Rivals page.
+    const sheetRun = t.state?.run,
+      sheetLake =
+        (sheetRun?.outing === "trip" && sheetRun.zone) || t.state?.meta?.loop?.barge?.water || "mossmere";
+    const pages = { buffs: lt, tackle: Te, raft: ee, home: pe, odds: Ze };
+    if (sheetLake === "mossmere") pages.rivals = rivals;
+    else rivals.hidden = true;
     const labels = {
       buffs: "Overview",
       tackle: "Tackle",
@@ -175392,14 +175410,16 @@ function YV(e) {
     K.bait && words.takes && lines.push(words.takes.replace("{bait}", e.baitData(K.bait)?.name || K.bait));
     return lines.filter(Boolean).join(" ");
   }
-  function rt(K, we = !1) {
-    if (K.hint && !we) return K.hint;
+  // A fish's hint, or the line built from its hours. `lake` is the Journal tab it is shown on: a fish that is a
+  // guest in another lake keeps a hint for each lake (TEXT_LOOP.log.hints).
+  function rt(K, we = !1, lake = null) {
+    if (K.hint && !we) return (lake && d().TEXT_LOOP?.log?.hints?.[lake]?.[K.id]) || K.hint;
     if (B() && typeof d().loopHours == "function") return journalBitesLine(K);
     let te = [];
     K.id === MIDNIGHT.legend
       ? te.push("feeds just after the old bell strikes midnight")
       : K.time === "gloom"
-        ? te.push("rises only in the Gloomtide")
+        ? te.push("rises only at night")
         : K.time === "calm"
           ? te.push("feeds while the water is calm")
           : te.push("bites at any hour");
@@ -177514,12 +177534,12 @@ function YV(e) {
         Mt.insertAdjacentHTML(
           "beforeend",
           `<h3>Undiscovered</h3><div class="gw-kicker gw-glimpse-k">Glimpsed</div>
-          <p class="gw-lore">${o(ut)}</p>${qe && st.has(K.id) ? "" : `<p class="gw-jr-where">${m("quill")}${o(rt(K))}</p>`}`,
+          <p class="gw-lore">${o(ut)}</p>${qe && st.has(K.id) ? "" : `<p class="gw-jr-where">${m("quill")}${o(rt(K, !1, we?.zone))}</p>`}`,
         );
       } else
         Mt.insertAdjacentHTML(
           "beforeend",
-          `<h3 class="gw-dim">Unnamed</h3><p class="gw-lore">${o(zt.journalUnknown || "")}</p>${qe && st.has(K.id) ? "" : `<p class="gw-jr-where">${m("quill")}${o(rt(K))}</p>`}`,
+          `<h3 class="gw-dim">Unnamed</h3><p class="gw-lore">${o(zt.journalUnknown || "")}</p>${qe && st.has(K.id) ? "" : `<p class="gw-jr-where">${m("quill")}${o(rt(K, !1, we?.zone))}</p>`}`,
         );
       if (!on) return Mt;
       let U = pe(K, we.hl);
@@ -180217,7 +180237,8 @@ function KV(e, t = {}) {
     case "card":
       return t.trip === !0 && t.top === "catch" && !t.measuring;
     case "tackle":
-      return Sw(t) && t.fish === "idle" && _c(t.casts) >= 1 && t.tin === !0 && t.kit === !0;
+      // It names the first lake's worms and spoon, so it shows only there (newWater is set on any later lake).
+      return Sw(t) && t.fish === "idle" && _c(t.casts) >= 1 && t.tin === !0 && t.kit === !0 && !t.newWater;
     case "home":
       return Sw(t) && t.fish === "idle" && t.holdFull === !0;
     case "murk":
@@ -182641,6 +182662,13 @@ function Npe(e) {
       Pn.onResize?.(Wt, rn);
   }
   addEventListener("resize", Ut), addEventListener("orientationchange", () => setTimeout(Ut, 120));
+  // At home with every screen closed (the barge's menu included), nothing else leads back to the chart. Escape,
+  // the pause key (a controller's B and Start) and a tap on the water bring the barge's menu back.
+  function homeMenuBack() {
+    if (e.flow !== "home" || ne() || typeof et?.openJetty != "function") return !1;
+    if (e.cinematic || e.game?.towing?.() || e.player?.glideState) return !1;
+    return et.openJetty(), !0;
+  }
   function on(U) {
     let ue = ne();
     if (ue) {
@@ -182659,6 +182687,7 @@ function Npe(e) {
             U === "KeyJ" ||
             U === "KeyB";
     }
+    if ((U === "Escape" || U === "KeyP") && homeMenuBack()) return !0;
     if (e.flow === "playing" && !e.paused) {
       if (r() && et?.handleKey?.(U) === !0) return !0;
       if (U === "KeyC") return gn("KeyC") || kn.openCreel(), !0;
@@ -182777,6 +182806,7 @@ function Npe(e) {
     isShopOpen: () => he("shop"),
     isCatchOpen: () => he("catch"),
     handleKey: on,
+    homeMenuBack: () => homeMenuBack(),
     showTitle: () => kn.showTitle(),
     showDeath: (U) => kn.showDeath(U),
     showVictory: (U) => kn.showVictory(U),
@@ -183856,6 +183886,11 @@ var IC = -91,
     : null;
 E4 && ($t.debug.pad = E4.debug);
 vp.addEventListener("pointerdown", (e) => {
+  // A tap on the water at home with every screen closed brings the barge's menu back (ui.homeMenuBack).
+  if (e.isPrimary && $t.flow === "home" && ci(() => $t.ui.homeMenuBack?.(), !1) === !0) {
+    e.preventDefault();
+    return;
+  }
   if ((z4(), e.isPrimary)) {
     for (let t of Bb) t !== e.pointerId && Bb.delete(t);
     kr !== null && kr !== e.pointerId && C4(), (af = null);
