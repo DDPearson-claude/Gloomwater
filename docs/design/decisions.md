@@ -128,11 +128,25 @@ The designer asked for Mossmere's environment graphics to be made as good as the
 - **Every screen looked at, at two sizes.** Each Mossmere screen was pictured at 1280 x 720 (a handheld) and 844 x 390 (a phone held sideways) and its layout faults fixed, with no word, rule or number changed. Fixed: the leaving card's lines scroll above its two buttons on a phone; a tab row wider than its panel starts at its first tab and brings the chosen tab into view; the rig picture's labels keep to one line in a narrow page; the Journal's notepad scrolls in its own column, so the line-up stays above Close; the measuring card fits her name and both lines on a short screen; on a handheld every Journal tab fits its row, and both rows of the Giants page fit with their names. Left as they are: on a phone, Murk's Tackle tab and the Sheet's Tackle page show only a strip of the rig picture at a time and must be scrolled (a new page split would be needed); the hold counter and the bait icon on the water are smaller than a comfortable press on a phone.
 - **The finished look costs no speed.** The build before the reeds, props, light, rods and raft work and the build after it were measured side by side on the same machine. Low setting: 709 and 536 ms a frame before, 588 and 580 after, with slightly fewer triangles. Middle setting: 1,862 and 1,748 before, 1,984 and 1,817 after, a difference of about a twentieth, which is within what this machine's measuring wanders by. (The machine has no graphics card, so only the comparison means anything, not the times.) How it feels on the handheld is still for the designer to say.
 
+## The designer's rulings of 24 November 2026, evening
+
+Ten questions were put as yes or no after Mossmere's final checks.
+
+- **No: Murk does not count down to the Waxed Silk.** He says nothing at the tally about how many clams it still needs, and gives no earning tip.
+- **No: no practice orders without the Order Board.** They stay as built: a practice order needs the board.
+- **Yes: the tale is spoken under Murk's name.** Every line of it is in his speech box.
+- **Yes: at the ending tally, Murk's line comes first.** "You landed the thief. Sit down, I'll count it twice." is heard before Hob's Lamp is given.
+- **No: earnings are not raised.** The Waxed Silk stays at 600 and the saving stretch stays as long as it is.
+- **No: the Journal does not record escaped fish.** Anything that promised otherwise is corrected instead.
+- **Yes: she fights harder each time she is hooked again after a landing,** and the Odds page shows what the game will use.
+- **Yes: the reeds keep their pale sage colour.**
+- **Yes: early evening stays amber-gold near the raft.**
+- **Yes: the handheld is the target size.** On a phone held sideways the rig picture stays a strip that is scrolled.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.
 - The designer's approval of the Mossbell Isle rock artwork.
-- **What the game says while the player saves for the Waxed Silk**, and **practice orders for a player with no Order Board**. Both are with the designer (see the play-through below).
 - A play-through by people, told nothing about the case, has not been done yet.
 
 ## Timed play-through by script, 22 November 2026
