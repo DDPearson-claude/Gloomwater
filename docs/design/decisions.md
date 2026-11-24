@@ -6,7 +6,7 @@ The designer has the final say on every gameplay decision. This file is the reco
 
 1. **One monster per lake.** Each lake has one target monster. The player investigates the lake, works out where it lives, when it feeds and what bait and rig it needs, and tries different areas and rigs. Catching it is hard and needs several things right at once. Landing it is what opens the next lake. The lake has plenty of other fish as well. The inspiration is River Monsters: one headline fish per episode.
 2. **A fun, casual auto fisher.** Fights play out on their own. No dexterity tests and no simulation busywork.
-3. **Mossmere first.** It should feel finished before work moves to any other lake. Sporewood stays as it is for now.
+3. **Mossmere first.** It should feel finished before work moves to any other lake. On 24 November 2026 the designer moved work on to Sporewood (see "Sporewood: the direction" below).
 4. **Fish names follow real life.** A real kind of fish plus a descriptor (Reedjaw Pike, Mossback Perch). Mossmere's legend, formerly The Belled Matriarch, is the **Bellhead Catfish**, a wels. Her model and authored fight are kept.
 5. **About 1 in 3 per cast** that the monster takes once every condition is right.
 6. **Deep gear customisation**, made light enough to stay fun. The designer's tackle database (rod action, reel type, line material, leader, hook style, rig depth, bait or lure, chum, landing gear) is the source of ideas.
@@ -142,6 +142,18 @@ Ten questions were put as yes or no after Mossmere's final checks.
 - **Yes: the reeds keep their pale sage colour.**
 - **Yes: early evening stays amber-gold near the raft.**
 - **Yes: the handheld is the target size.** On a phone held sideways the rig picture stays a strip that is scrolled.
+
+## Sporewood: the direction, 24 November 2026
+
+The designer's rulings for the second lake, given as yes or no.
+
+- **The same loop, about as much content as Mossmere, its own story and its own fish.** Sporewood today is thin beside Mossmere: 14 kinds of fish against about 24, four places against five, no hunt, no character but Murk, about 30 lines of story, the older look, and prices that would take well over 100 evenings.
+- **Yes: the story is "The island that wanders".** The lake's legend is a huge fish with a garden growing on her back. Burr, the last seed-keeper, planted her best seeds on a mossy islet; by morning the islet had gone, and it has been seen since, never in the same place twice. The hunt asks the same three questions as Mossmere's. Where she is: follow the spore drift at dusk to where she feeds. Which fish she is not: a line-up crossed off by which fish could crack the Mother Cap's hard seed pods. What gear holds her: lessons from lost fights; she crushes ordinary hooks. The ending: she is landed, one seed is taken from her back as the keepsake, and she is let go.
+- **Yes: reading the spore drift is Sporewood's own skill.** The player casts up-current and lets the float ride the ribbon of spores.
+- **Yes: Burr the seed-keeper is the lake's new character,** as Hob is Mossmere's.
+- **Yes: the fish grow from 14 kinds to about 24,** starting with the three Sporewood fish that were left out.
+- **The legend is renamed in the manner of River Monsters.** "The Drifting Grove" goes. By ruling 4 she is a real kind of fish plus a descriptor; the name is with the designer.
+- Ruling 5 holds here too: about 1 cast in 3 once every condition is right. Today she takes every cast.
 
 ## Still open
 
