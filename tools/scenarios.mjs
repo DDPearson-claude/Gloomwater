@@ -5332,10 +5332,10 @@ const SCENARIOS = [
             },
           });
         const l = loop();
-        d.findHerWater(l, null, { x: -4, z: -14 });
+        d.findHerWater(l, null, { x: -4, z: -14, water: "mossmere" });
         const shelvedFirst = loop();
         shelvedFirst.arrivals.shelved.push("turnback_hook");
-        d.findHerWater(shelvedFirst, null, { x: -4, z: -14 });
+        d.findHerWater(shelvedFirst, null, { x: -4, z: -14, water: "mossmere" });
         return {
           beat: l.arrivals.beats.turnback_hook,
           byTheft: l.hunt.mossmere.hookByTheft,
@@ -5554,7 +5554,7 @@ const SCENARIOS = [
           rec = (over) => ({ ...JSON.parse(JSON.stringify(base)), ...over }),
           tally = (r, evening) => {
             const loop = { hunt: { mossmere: r }, evenings: evening };
-            const beat = g.mossmereTallyBeat(loop, { zone: "mossmere", evening }, undefined, { journal: {} });
+            const beat = g.huntTallyBeat(loop, { zone: "mossmere", evening }, undefined, { journal: {} });
             return beat ? Object.keys(beat).join("+") + (beat.murk ? ":" + beat.murk : "") : "none";
           },
           early = rec({ taleAt: 0, sketches: { ...base.sketches, map: 2 } }),
@@ -5565,7 +5565,7 @@ const SCENARIOS = [
           again: tally(early, 4),
           passTally: tally(passed, 6),
           afterPass: tally(passed, 7),
-          sporewood: g.mossmereTallyBeat(
+          sporewood: g.huntTallyBeat(
             { hunt: { mossmere: rec({}) } },
             { zone: "sporewood", evening: 5 },
             undefined,
@@ -5686,7 +5686,8 @@ const SCENARIOS = [
             }
             return Object.fromEntries(Object.entries(n).map(([k, v]) => [k, v / N]));
           },
-          roll = (id, area, phase) => share(() => g.catchMarkRoll(id, area, phase, rng));
+          roll = (id, area, phase) =>
+            share(() => g.catchMarkRoll(id, area, phase, rng, g.LOOP.hunts.mossmere.marks));
         const loop = window.__gw.progression.loop.state(),
           noMap = { hunt: { mossmere: { ...loop.hunt.mossmere, sketches: { map: 0 } } } },
           run = (t, over = {}) => ({
@@ -5762,7 +5763,7 @@ const SCENARIOS = [
       await session.sail(SLOW_SAIL);
       await listenForToasts(session);
       // About one Kissmark in four carries the ring: make this one carry it.
-      await session.eval(() => (window.__gw.data.LOOP.hunt.marks.ring.oftenChance = 1));
+      await session.eval(() => (window.__gw.data.LOOP.hunts.mossmere.marks.ring.oftenChance = 1));
       const kiss = await catchAndReadCard(session, "kissmark_trout");
       check(
         kiss.line === RING_LINE && /gw-cc-mark--ring/.test(kiss.ink || ""),
@@ -6125,7 +6126,7 @@ const SCENARIOS = [
           relics: [...s.relics],
           lakes: [...s.maps.lakes],
           open: loop.isOpen("sporewood"),
-          beat: g.data.mossmereTallyBeat(JSON.parse(JSON.stringify(s)), { zone: "mossmere", evening }),
+          beat: g.data.huntTallyBeat(JSON.parse(JSON.stringify(s)), { zone: "mossmere", evening }),
           next: loop.notepad()?.next ?? null,
         };
       });
@@ -8055,7 +8056,7 @@ const SCENARIOS = [
               n: 1,
               have: 0,
               part,
-              rig: { ...D.LOOP.orders.practice.parts[part].rig },
+              rig: { ...D.LOOP.orders.practice.mossmere.parts[part].rig },
             }),
             orders = table.map(order),
             others = [

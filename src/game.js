@@ -30557,7 +30557,7 @@ Ic(vg, {
   catchMarkRoll: () => catchMarkRoll,
   catchMarkFor: () => catchMarkFor,
   noteHuntCatch: () => noteHuntCatch,
-  mossmereTallyBeat: () => mossmereTallyBeat,
+  huntTallyBeat: () => huntTallyBeat,
   // Hob's Lamp's bite rule (B5), for the scenario tests.
   lampBiteMult: () => lampBiteMult,
   lampOf: () => lampOf,
@@ -32689,30 +32689,38 @@ function Rl(e, { lure: t = null, bait: n = null, water: o = null } = {}) {
 var D5 = (e) => e !== 0;
 // Whether a species id is a lake's legend (Ms is the live species table).
 var isLegendSpecies = (id) => Sr(Ms).some((sp) => sp?.id === id && sp.rarity === "legendary");
-// Hob's Lamp (mossmere-hunt-2.md B5): `lamp` is null without it, or { met(id) } saying which kinds have been
-// caught. With it, a kind never caught bites wo.relics.hobs_lamp.stat.unmetBite times as often; never a legend.
+// A relic that makes new kinds bite (one whose wo.relics entry has stat.unmetBite: Hob's Lamp, mossmere-hunt-2.md
+// B5): `lamp` is null without one, or { met(id), unmetBite } saying which kinds have been caught. With it, a kind
+// never caught bites unmetBite times as often; never a legend.
 function lampBiteMult(species, lamp) {
   if (!lamp || !species?.id || species.rarity === "legendary" || isLegendSpecies(species.id)) return 1;
-  return lamp.met?.(species.id) ? 1 : ka(wo.relics?.hobs_lamp?.stat?.unmetBite, 1);
+  return lamp.met?.(species.id) ? 1 : ka(lamp.unmetBite, 1);
 }
-// The lamp for bite rolls from a save's meta: null unless Hob's Lamp is the save's, else which kinds are met.
+// The lamp for bite rolls from a save's meta: null unless such a relic is the save's, else which kinds are met.
 function lampOf(meta) {
-  return Sr(meta?.loop?.relics).includes("hobs_lamp")
-    ? { met: (id) => Number(meta?.journal?.[id]?.caught) > 0 }
+  let relic = Sr(meta?.loop?.relics).find((id) => ka(wo.relics?.[id]?.stat?.unmetBite, 0) > 0);
+  return relic
+    ? {
+        met: (id) => Number(meta?.journal?.[id]?.caught) > 0,
+        unmetBite: ka(wo.relics[relic].stat.unmetBite, 1),
+      }
     : null;
 }
 // The local kind (wo.localKinds) that takes some of `baseId`'s bites at `at`, or null. `at`: { water (null is the
 // home lake, as in Ih()), place (the place the pool fishes), castPlace, area (open water only), light (a phase or a
-// light), x, z (the float) }. Never in her water: her place, or within her theft reach of her centre.
+// light), x, z (the float) }. Never in her water (the water's hunt's find): her place, or within her theft reach
+// of her centre.
 function localKindAt(baseId, at) {
+  let water = at?.water ?? "mossmere",
+    her = huntOf(water)?.find;
   if (
-    at?.place === HER_WATER.place ||
-    at?.castPlace === HER_WATER.place ||
-    Math.hypot(ka(at?.x, NaN) - HER_WATER.x, ka(at?.z, NaN) - HER_WATER.z) <= HER_WATER.theft
+    her &&
+    (at?.place === her.place ||
+      at?.castPlace === her.place ||
+      Math.hypot(ka(at?.x, NaN) - her.x, ka(at?.z, NaN) - her.z) <= her.theft)
   )
     return null;
-  let water = at?.water ?? "mossmere",
-    light = id(at?.light);
+  let light = id(at?.light);
   for (let [kindId, kind] of Object.entries(wo.localKinds?.kinds || {}))
     if (
       kind.of === baseId &&
@@ -47386,18 +47394,6 @@ var pP = {
   },
   Ca = {
     holdFull: "Hold's full.",
-    // Mossmere's midnight bell and the thief's feeding time (mossmere-hunt-2.md, B6).
-    midnight: {
-      strikes: "Far off, the old bell on the toll-tower strikes midnight.",
-      missing: "This is when things go missing.",
-      still: "The water goes still again.",
-      birds: "The birds by the Gatehouse scatter across the water.",
-      // After the bird at midnight (the once-only cutscene on the first night after her water is found).
-      birdTaken: "A bird went under, and it didn't come back up. This is when it feeds.",
-      // The Odds sheet's line under her row, once she is landed.
-      odds: "The {name} bites only in the few minutes after the old bell strikes midnight.",
-      holdFull: "Your hold is full. You can still fish and let them go. The old bell strikes midnight soon.",
-    },
     home: "Home",
     keep: "Keep",
     letGo: "Let go",
@@ -47549,9 +47545,10 @@ wo.live = {
 // Mossmere's local kinds (mossmere-review-addendum.md section 6): four fish, each living in one home and in all else
 // its base fish (`of`) in new colours. In its home (a `place`, or an open-water `area`; at the `light` only, when
 // set), when the base fish would be the one that bites, the local kind bites instead `share` of the time (half
-// again as often with Hob's Lamp while it has never been caught). Never in her water (HER_WATER). They stay off the
-// lake's list, the catch seal and the Order Board, carry no bite marks, and show in the Journal in a "Local kinds"
-// strip under their base fish once it is caught. `length`: the local kind's typical length against its base fish's.
+// again as often with Hob's Lamp while it has never been caught). Never in her water (the hunt's find). They stay
+// off the lake's list, the catch seal and the Order Board, carry no bite marks, and show in the Journal in a
+// "Local kinds" strip under their base fish once it is caught. `length`: the local kind's typical length against
+// its base fish's.
 wo.localKinds = {
   share: 0.25,
   kinds: {
@@ -47611,20 +47608,22 @@ wo.orders = {
   cls: "prize",
   heavyZ: 0.35,
   // Practice orders (mossmere-review-addendum.md section 3): one ordinary fish, taken on one part, at the usual
-  // double pay. Mossmere only, one on the board at a time. When a slot refills, a part owned since the last tally
-  // (loop.practice.ready) may post its order: `first` of the time while its order has never been filled, `after`
-  // once it has (loop.practice.filled). Each part's `rig` is what the catch must have been taken on (the catch
-  // record's castRig), and `fish` the kinds it may name, each only while the board's own list has it.
+  // double pay, one on the board at a time, by lake: a lake with no entry posts none (Sporewood). When a slot
+  // refills, a part owned since the last tally (loop.practice.ready) may post its order: `first` of the time while
+  // its order has never been filled, `after` once it has (loop.practice.filled). A lake's entry supplies first,
+  // after, max and parts: for each part, its `rig`, what the catch must have been taken on (the catch record's
+  // castRig), and `fish`, the kinds it may name, each only while the board's own list has it.
   practice: {
-    first: 0.5,
-    after: 1 / 6,
-    max: 1,
-    water: "mossmere",
-    parts: {
-      minnow_tin: { rig: { bait: "live_minnow" }, fish: ["mossback_perch", "milkeye_perch"] },
-      sounding_lead: { rig: { depth: "bottom" }, fish: ["rustfin_sucker", "bridgechain_sturgeon"] },
-      turnback_hook: { rig: { hook: "turnback_hook" }, fish: ["weeping_carp"] },
-      chafe_gut: { rig: { leader: "chafe_gut" }, fish: ["overbold_bass"] },
+    mossmere: {
+      first: 0.5,
+      after: 1 / 6,
+      max: 1,
+      parts: {
+        minnow_tin: { rig: { bait: "live_minnow" }, fish: ["mossback_perch", "milkeye_perch"] },
+        sounding_lead: { rig: { depth: "bottom" }, fish: ["rustfin_sucker", "bridgechain_sturgeon"] },
+        turnback_hook: { rig: { hook: "turnback_hook" }, fish: ["weeping_carp"] },
+        chafe_gut: { rig: { leader: "chafe_gut" }, fish: ["overbold_bass"] },
+      },
     },
   },
 };
@@ -47716,24 +47715,28 @@ wo.rigBiteFloor = 0.35;
 //     (Ca.arrivals.lines.hookHunt); and the theft, which is to call noteArrivalBeat(loop, "turnback_hook") too.
 //   pike_wire: the first Reedjaw Pike landed or lost. Pike Wire alone.
 //   leaders: Hob's map drawn (sketches.map, which carries his worn line end). Chafe Gut never comes sooner.
+// By lake: a lake with no entry gets no arrivals. Its entry supplies `order` and, for each arrival, its `parts`
+// and its beats (`runs`, `fish`, `quiet`); the hunt's own beats for them are its `beats` (wo.hunts).
 wo.arrivals = {
-  order: ["turnback_hook", "pike_wire", "leaders"],
-  turnback_hook: {
-    parts: ["turnback_hook"],
-    runs: [
-      "weeping_carp",
-      "nightbloom_carp",
-      "candlefin_koi",
-      "overbold_bass",
-      "reedjaw_pike",
-      "thousandcast_pike",
-      "kissmark_trout",
-      "bridgechain_sturgeon",
-    ],
-    quiet: !0,
+  mossmere: {
+    order: ["turnback_hook", "pike_wire", "leaders"],
+    turnback_hook: {
+      parts: ["turnback_hook"],
+      runs: [
+        "weeping_carp",
+        "nightbloom_carp",
+        "candlefin_koi",
+        "overbold_bass",
+        "reedjaw_pike",
+        "thousandcast_pike",
+        "kissmark_trout",
+        "bridgechain_sturgeon",
+      ],
+      quiet: !0,
+    },
+    pike_wire: { parts: ["pike_wire"], fish: ["reedjaw_pike"] },
+    leaders: { parts: ["pike_wire", "chafe_gut"] },
   },
-  pike_wire: { parts: ["pike_wire"], fish: ["reedjaw_pike"] },
-  leaders: { parts: ["pike_wire", "chafe_gut"] },
 };
 Ca.depth = {
   head: "Depth",
@@ -47932,213 +47935,344 @@ Object.assign(Ca.shelf, {
   pike_wire: "Sharp teeth cannot cut through wire.",
   chafe_gut: "Thick gut won't wear through on rough lips.",
 });
-// The first part of the hunt (mossmere-hunt-2.md sections 1, 2 and 5, B6): the tale at a Mossmere tally from
-// evening 2, the fisherman's notepad, and Hob on Mossbell Isle with his map (sketch 1). Distances are metres
-// from the middle of Mossbell Isle. Sketches 2 to 5 come in later steps, so their places stay blank.
-wo.hunt = { taleEvening: 2, lampEvening: 2, hobReach: 12, hobLeave: 16 };
-// The line-up (sketch 3, section 3): the five big fish Murk names, in the order they are drawn.
-wo.hunt.lineup = ["reedjaw_pike", "milkeye_perch", "kissmark_trout", "weeping_carp", "bridgechain_sturgeon"];
-// The bite marks a landed fish can carry (B3 "Marks" and "Ring mark"), once Hob's map is drawn. cuts and holes:
-// on the listed fish caught in the listed areas (and lights), at `chance`. ring: on every fish in `always`, and on
-// `nearChance` of the fish landed with the float within `near` metres of her centre in her time. `leftBy`: the
-// fish whose catch matches a mark (the ring has none: nothing you can catch leaves it).
-wo.hunt.marks = {
-  order: ["cuts", "holes", "ring"],
-  cuts: {
-    fish: ["dusk_minnow", "mossback_perch", "likely_chub", "lampsipper"],
-    areas: ["reeds", "pads"],
-    chance: 1 / 8,
+// ---- The monster hunts, one per lake (docs/design/hunt-per-lake.md) ---------------------------------------------
+// A lake's hunt rules, by the water's id (its words are in Ca.hunts). A lake with no entry has no hunt (Sporewood,
+// for now), and every hunt check there says no. A new lake's entry supplies legend, hidden, taleEvening,
+// character, part, time, find, scene, rig, lineup, marks, beats, pad, bounty, relic and opens: what each is, one
+// line a field, is in that doc, and Mossmere's entry says it again for its own values (mossmere-hunt-2.md,
+// mossmere-hunt.md, mossmere-notepad.md).
+wo.hunts = {
+  mossmere: {
+    legend: "belled_matriarch",
+    hidden: !0,
+    // The tale at a Mossmere tally from evening 2 (sections 1 and 2).
+    taleEvening: 2,
+    // Hob on Mossbell Isle with his map (sketch 1), from evening 2. Distances are metres from the isle's middle.
+    character: { island: "Mossbell Isle", lampEvening: 2, reach: 12, leave: 16 },
+    // Hob's part: the water between the Gatehouse and the Sisters, about an eighth of the lake. The whole 8 m
+    // circle of her water lies inside it with 2 m to spare, well south of its middle, so the patch never points at
+    // the spot.
+    part: [-5, -22, 27.5, 16.5, 41, 14, 0.06],
+    // The midnight bell and the thief's feeding time (section 1 and B2). From evening 2, midnight strikes `at`
+    // seconds into the night phase's own clock: twelve strokes of the dusk bell, rung lower, with the toll-tower's
+    // top window flaring on each. Her time runs `herTime` seconds from the first stroke, and the legend takes only
+    // inside it. Her tries a night (H5): casts in her found water, in her time, on a rig that could bring her. At
+    // the first stroke the water birds roosting by the Gatehouse (the third lampbill flock) scatter.
+    time: {
+      fromEvening: 2,
+      at: 60,
+      strokes: 12,
+      strokeGap: 2.2,
+      herTime: 180,
+      tries: 3,
+      sound: "midnight_toll",
+      pitch: 0.7,
+      volume: 0.75,
+      late: 1.5,
+      flare: "flareTollTower",
+      roostFlock: 2,
+      roostNear: 30,
+    },
+    // Her water (section 4 and B3): her hole is centred at (x, z). Nothing marks it until it is found. Once Hob's
+    // map is drawn, in her time, boils rise over it and the first ordinary fish hooked close by is taken, which
+    // finds it. The nudge night's boils come twice as often, seen from further off; a boil closer than boilClose
+    // is "right beside you"; an older save's marker cork floats at corkOffset (it found the spot by its chart).
+    find: {
+      place: "bell_pool",
+      x: -4,
+      z: -14,
+      theft: 8,
+      boilSpread: 6,
+      boilEvery: [20, 30],
+      boilSeen: 25,
+      nudgedEvery: [10, 15],
+      nudgedSeen: 40,
+      boilClose: 5,
+      corkOffset: [2.2, 2.6],
+    },
+    // The bird at midnight (section 1 and B2; decisions.md "The midnight cutscene"), in seconds from its start: it
+    // may start `after` the first stroke; the boil's back rises under the bird at boilAt, and the bird is pulled
+    // under from takeAt over `under`; the camera holds on her water until `release`, then eases back over `back`;
+    // the bird sits `offset` metres from her centre on the raft's side, framed by `frame`; boilSize is the boil
+    // sign's size (metres of fish it is painted for: only a size, never a shape or colour).
+    scene: {
+      kind: "bird",
+      after: 1.5,
+      length: 5,
+      boilAt: 1.9,
+      takeAt: 2.4,
+      under: 0.35,
+      release: 4.4,
+      back: 0.6,
+      offset: 3,
+      frame: { r: 1.5, dist: 7.5, elev: 16 },
+      boilSize: 2.2,
+    },
+    // The parts that hold her (section 2, B3; mossmere-hunt.md A2): the hook breaks free early in the fight, the
+    // leader about halfway, the line at the end. Her first take waits until the Turnback Hook and Chafe Gut are
+    // both on Murk's shelf or owned (mossmere-review-addendum.md, "Her gate").
+    rig: {
+      order: ["hook", "leader", "line"],
+      right: { hook: "turnback_hook", leader: "chafe_gut" },
+      at: { hook: 0.15, leader: 0.5 },
+      cause: { hook: "spat", leader: "thrown", line: "snapped" },
+      takeNeeds: ["turnback_hook", "chafe_gut"],
+      wire: "pike_wire",
+    },
+    // The line-up (sketch 3, section 3): the five big fish Murk names, in the order they are drawn.
+    lineup: ["reedjaw_pike", "milkeye_perch", "kissmark_trout", "weeping_carp", "bridgechain_sturgeon"],
+    // The bite marks a landed fish can carry (B3 "Marks" and "Ring mark"), once Hob's map is drawn. cuts and holes:
+    // on the listed fish caught in the listed areas (and lights), at `chance`. ring: on `oftenChance` of the fish
+    // in `often`, and on `nearChance` of the fish landed with the float within `near` metres of her centre in her
+    // time. `leftBy`: the fish whose catch matches a mark (the ring has none: nothing you can catch leaves it).
+    marks: {
+      order: ["cuts", "holes", "ring"],
+      cuts: {
+        fish: ["dusk_minnow", "mossback_perch", "likely_chub", "lampsipper"],
+        areas: ["reeds", "pads"],
+        chance: 1 / 8,
+      },
+      holes: {
+        fish: ["dusk_minnow", "mossback_perch", "rustfin_sucker"],
+        areas: ["dropoff", "deep"],
+        phases: ["dusk", "gloomtide"],
+        chance: 1 / 8,
+      },
+      ring: { often: ["kissmark_trout"], oftenChance: 1 / 4, near: 16, nearChance: 0.5 },
+      leftBy: { cuts: "reedjaw_pike", holes: "milkeye_perch" },
+    },
+    // Hob's map carries his worn line end (the leaders' beat); the theft and the first ring of scrapes are beats
+    // for the Turnback Hook.
+    beats: { map: "leaders", theft: "turnback_hook", ring: "turnback_hook" },
+    // The notepad (mossmere-notepad.md): Mossmere's drawings, and its five sketches on three pages.
+    pad: {
+      art: "mossmere",
+      places: [
+        { key: "map", n: 1, page: "where" },
+        { key: "taken", n: 2, page: "where" },
+        { key: "lineup", n: 3, page: "suspects" },
+        { key: "swirl", n: 4, page: "gear" },
+        { key: "back", n: 5, page: "gear" },
+      ],
+      // Sketch 4 for an older save that had landed her before the notepad: as the default rig would have drawn
+      // it, worms under the float.
+      oldSwirl: { kind: "left", bait: "mireworm" },
+    },
+    // The bounty Murk pays at the tally of the evening she is landed, once (decisions.md "Her reward"), and Hob's
+    // Lamp, given there. Her landing opens Sporewood (mossmere-hunt.md H7 and A7).
+    bounty: 900,
+    relic: "hobs_lamp",
+    opens: "sporewood",
   },
-  holes: {
-    fish: ["dusk_minnow", "mossback_perch", "rustfin_sucker"],
-    areas: ["dropoff", "deep"],
-    phases: ["dusk", "gloomtide"],
-    chance: 1 / 8,
-  },
-  ring: { often: ["kissmark_trout"], oftenChance: 1 / 4, near: 16, nearChance: 0.5 },
-  leftBy: { cuts: "reedjaw_pike", holes: "milkeye_perch" },
 };
-Ca.hunt = {
-  tale: "Things go missing on Mossmere at night. Birds go, and floats, and once a whole rod. People say the gloom takes them.",
-  murk: {
-    tale: "It's always just after the old bell strikes midnight. Hob on Mossbell Isle says it's a fish. Go and ask him.",
-    findHob: "Hob's lamp is lit on Mossbell Isle. Sail close and say hello.",
-    mapPassed: "Hob always said it was between the Gatehouse and the Sisters. I've drawn it for you.",
-    // Nudges while her water is not found (section 4): not yet in Hob's part at midnight, after one evening
-    // and after two; in it at midnight but no find, after one evening. Then his word once it is found.
-    midnight: "Be out in Hob's part when the old bell strikes midnight.",
-    sail: "Sail out there before dark, and wait for the bell.",
-    boils: "Watch for boils after the bell, and fish right under them.",
-    found: "Right off your line? I've marked the spot on your chart.",
-    // Stuck on sketch 4 (section 4): after one evening with her water found, and again after two.
-    spot: "Fish the marked spot after the bell, and watch your rig.",
-    // At the first tally after Hob's map is drawn, with sketch 3 (section 3).
-    lineup: "I can think of five fish here big enough to pull a rod in. Catch them and see.",
-  },
-  drawn: "You draw it in your notepad.",
-  // The bite marks (section 3 and B6), each on the catch card under the fish picture. The ring's line ends as
-  // the review addendum changed it ("a soft, rough mouth"). `leaves`: the line on the card of the fish that
-  // leaves a mark, the Reedjaw Pike's (the cuts) and the Milkeye Perch's (the holes).
-  marks: {
-    ring: "This fish has a wide ring of fine scrapes, and no tooth holes. Something big had it in a soft, rough mouth.",
-    cuts: "This fish has two rows of small cuts. Something with sharp teeth had a go at it.",
-    holes: "This fish has two deep holes, a thumb apart. Something with long fangs had a go at it.",
-    leaves: {
-      cuts: "Look at its teeth. They leave two rows of small cuts.",
-      holes: "Look at its two long fangs. They leave two deep holes.",
-    },
-  },
-  // Her water (section 4 and B6): the boils in her time, the theft that finds it, and what marks it after.
-  water: {
-    boil: "Something big boils up on the water, {where}.",
-    where: { ahead: "ahead of you", behind: "behind you", left: "to your left", right: "to your right" },
-    boilClose: "Something huge boils up, right beside you.",
-    takenFloat:
-      "Taken! Something grabs your fish and pulls it under, float and all. Your line comes back empty.",
-    takenLead: "Taken! Something grabs your fish and pulls it under. Your line comes back empty.",
-    spareFloat: "You tie on a spare float.",
-    cork: "You drop a marker cork on the spot.",
-    bell: "An old harbour bell stands over the spot, cracked and silent.",
-  },
-  hob: {
-    tag: "Hob",
-    // His first talk, four boxes. The last two go with his map, so a player Murk gave the map to hears two.
-    first: [
-      "Evening! I'm Hob. I've fished off this rock for forty years.",
-      "I hooked something huge once, out in my old boat. It broke my line. I can't think now what it was.",
-      "It was out this way, I'm nearly sure. Here, I'll draw it for you.",
-      "My line came back like this, worn rough, not cut. You keep it.",
-    ],
-    // One a night after that, in order. His other lines wait for what they speak of: sketches 2, 4 and 5.
-    nights: {
-      rod: "Another night it took my whole rod. It pulled it right over the side.",
-      bell: "Both times it was just after the old bell struck midnight. I'm sure of that much.",
-      // Only once sketch 2 is drawn.
-      taken: "Right off your line? Then that's it. That's what had me.",
-      // Only once sketch 4 is drawn.
-      swirl: "Big, wasn't it? I felt it go under my boat once.",
-      // Only once your worn end is drawn in sketch 5 (a loss to the leader).
-      worn: "Worn rough, like mine? Then it's the same one, all right.",
-    },
-    greeting: "Any luck out there? Stay warm.",
-    next: "Next",
-    ok: "Got it",
-  },
-  pad: {
-    tab: "Notepad",
-    intro:
-      "This is your notepad. Each time you find a clue, you draw it here. Look at the pictures to work out what you're hunting, and where.",
-    pages: { where: "Where", suspects: "Suspects", gear: "Gear" },
-    titles: {
-      map: "Hob's map",
-      taken: "Taken at midnight",
-      lineup: "The line-up",
-      swirl: "The swirl",
-      back: "What came back",
-    },
-    blank: "Not found yet",
-    nextHead: "What to try next",
-    next: {
-      hob: "Hob's lamp is lit on Mossbell Isle. Sail close to talk to him.",
-      midnight: "Be in Hob's part when the old bell strikes midnight.",
-      boils: "After the bell, watch Hob's part for boils, and fish where they rise.",
+// A lake's hunt words (Ca.hunts), by the same id: the tale, Murk's and the character's lines, the notepad, her water,
+// her refusals, the ending, the time clue's lines (time) and the seal on the chart her landing opens (seal).
+Ca.hunts = {
+  mossmere: {
+    tale: "Things go missing on Mossmere at night. Birds go, and floats, and once a whole rod. People say the gloom takes them.",
+    murk: {
+      tale: "It's always just after the old bell strikes midnight. Hob on Mossbell Isle says it's a fish. Go and ask him.",
+      findHob: "Hob's lamp is lit on Mossbell Isle. Sail close and say hello.",
+      mapPassed: "Hob always said it was between the Gatehouse and the Sisters. I've drawn it for you.",
+      // Nudges while her water is not found (section 4): not yet in Hob's part at midnight, after one evening
+      // and after two; in it at midnight but no find, after one evening. Then his word once it is found.
+      midnight: "Be out in Hob's part when the old bell strikes midnight.",
+      sail: "Sail out there before dark, and wait for the bell.",
+      boils: "Watch for boils after the bell, and fish right under them.",
+      found: "Right off your line? I've marked the spot on your chart.",
+      // Stuck on sketch 4 (section 4): after one evening with her water found, and again after two.
       spot: "Fish the marked spot after the bell, and watch your rig.",
-      // After sketch 4; after a loss to a part, while a part that held her is not yet yours; then once it is.
-      swirl: "Look again at the swirl in your notepad.",
-      sells: "Your notepad shows what broke. Murk sells what holds.",
-      fix: "Fix what broke, then fish the marked spot after the bell.",
+      // At the first tally after Hob's map is drawn, with sketch 3 (section 3).
+      lineup: "I can think of five fish here big enough to pull a rod in. Catch them and see.",
     },
-    map: "Hob lost it somewhere in this shaded part, between the Gatehouse and the Sisters.",
-    end: "This is Hob's old line end. It is worn rough, not cut.",
-    taken: "Something took a fish off the line, right here. It happened just after the bell struck midnight.",
-    // Sketch 2's words for an older save that bought the Bell Pool's chart before the hunt (B4).
-    takenSelf: "You found this spot yourself.",
-    labels: { gatehouse: "Gatehouse", sisters: "Sisters", isle: "Mossbell Isle", home: "home" },
-    art: {
-      map: "A pencil map of Mossmere with a shaded part between the Gatehouse and the Sisters",
-      end: "An old line end taped to the page, its end worn rough",
+    drawn: "You draw it in your notepad.",
+    // The bite marks (section 3 and B6), each on the catch card under the fish picture. The ring's line ends as
+    // the review addendum changed it ("a soft, rough mouth"). `leaves`: the line on the card of the fish that
+    // leaves a mark, the Reedjaw Pike's (the cuts) and the Milkeye Perch's (the holes).
+    marks: {
+      ring: "This fish has a wide ring of fine scrapes, and no tooth holes. Something big had it in a soft, rough mouth.",
+      cuts: "This fish has two rows of small cuts. Something with sharp teeth had a go at it.",
+      holes: "This fish has two deep holes, a thumb apart. Something with long fangs had a go at it.",
+      leaves: {
+        cuts: "Look at its teeth. They leave two rows of small cuts.",
+        holes: "Look at its two long fangs. They leave two deep holes.",
+      },
+    },
+    // Her water (section 4 and B6): the boils in her time, the theft that finds it, and what marks it after.
+    water: {
+      boil: "Something big boils up on the water, {where}.",
+      where: { ahead: "ahead of you", behind: "behind you", left: "to your left", right: "to your right" },
+      boilClose: "Something huge boils up, right beside you.",
+      takenFloat:
+        "Taken! Something grabs your fish and pulls it under, float and all. Your line comes back empty.",
+      takenLead: "Taken! Something grabs your fish and pulls it under. Your line comes back empty.",
+      spareFloat: "You tie on a spare float.",
+      cork: "You drop a marker cork on the spot.",
+      bell: "An old harbour bell stands over the spot, cracked and silent.",
+    },
+    hob: {
+      tag: "Hob",
+      // His first talk, four boxes. The last two go with his map, so a player Murk gave the map to hears two.
+      first: [
+        "Evening! I'm Hob. I've fished off this rock for forty years.",
+        "I hooked something huge once, out in my old boat. It broke my line. I can't think now what it was.",
+        "It was out this way, I'm nearly sure. Here, I'll draw it for you.",
+        "My line came back like this, worn rough, not cut. You keep it.",
+      ],
+      // One a night after that, in order. His other lines wait for what they speak of: sketches 2, 4 and 5.
+      nights: {
+        rod: "Another night it took my whole rod. It pulled it right over the side.",
+        bell: "Both times it was just after the old bell struck midnight. I'm sure of that much.",
+        // Only once sketch 2 is drawn.
+        taken: "Right off your line? Then that's it. That's what had me.",
+        // Only once sketch 4 is drawn.
+        swirl: "Big, wasn't it? I felt it go under my boat once.",
+        // Only once your worn end is drawn in sketch 5 (a loss to the leader).
+        worn: "Worn rough, like mine? Then it's the same one, all right.",
+      },
+      greeting: "Any luck out there? Stay warm.",
+      next: "Next",
+      ok: "Got it",
+    },
+    pad: {
+      tab: "Notepad",
+      intro:
+        "This is your notepad. Each time you find a clue, you draw it here. Look at the pictures to work out what you're hunting, and where.",
+      pages: { where: "Where", suspects: "Suspects", gear: "Gear" },
+      titles: {
+        map: "Hob's map",
+        taken: "Taken at midnight",
+        lineup: "The line-up",
+        swirl: "The swirl",
+        back: "What came back",
+      },
+      blank: "Not found yet",
+      nextHead: "What to try next",
+      next: {
+        hob: "Hob's lamp is lit on Mossbell Isle. Sail close to talk to him.",
+        midnight: "Be in Hob's part when the old bell strikes midnight.",
+        boils: "After the bell, watch Hob's part for boils, and fish where they rise.",
+        spot: "Fish the marked spot after the bell, and watch your rig.",
+        // After sketch 4; after a loss to a part, while a part that held her is not yet yours; then once it is.
+        swirl: "Look again at the swirl in your notepad.",
+        sells: "Your notepad shows what broke. Murk sells what holds.",
+        fix: "Fix what broke, then fish the marked spot after the bell.",
+      },
+      map: "Hob lost it somewhere in this shaded part, between the Gatehouse and the Sisters.",
+      end: "This is Hob's old line end. It is worn rough, not cut.",
       taken:
-        "A pencil close-up of Hob's shaded part, with an X where the float went under and the toll-tower far off",
-      swirl:
-        "A slice through the water: your rig, a dark swirl under it, and an arrow down to a small fish on the bottom",
-      hook: "A bare hook",
-      leader: "Two line ends side by side, yours and Hob's, worn the same way",
-      line: "A rod tip with the line snapped just below it",
-      held: "Your hook, your leader and your line drawn whole, beside Hob's old line end",
-    },
-    // Sketch 4, The swirl (section 2): its words for the rig she refused. "left": a bait she won't take, on the
-    // float or the lead ({bait} is "the worms" for worms); "float": a live fish under the float; "lure"; "bunch":
-    // the Worm Bunch on the lead.
-    swirl: {
-      left: "It left {bait}. It wants something alive, down on the bottom.",
-      float: "It took the live fish, but let go when the float pulled. It feeds down on the bottom.",
-      lure: "It turned away from the lure. It wants something real, down on the bottom.",
-      bunch: "It mouthed the Worm Bunch and let it go. It wants something alive.",
-    },
-    // Sketch 5, What came back: one sentence for each part that broke, or the page drawn whole ("What held").
-    back: {
-      hook: "The hook pulled out of a soft mouth and came back bare.",
-      leader: "The end came back worn rough, just like Hob's.",
-      line: "The line snapped by the rod, so it is too heavy for this line.",
-      held: "Your hook, your leader and your line all held.",
-      mine: "mine",
-      hobs: "Hob's",
-    },
-    heldTitle: "What held",
-    // Sketch 3, the line-up (section 3): its head line, each fish's name and the words written when it is
-    // crossed out, the empty frame's line before and after all five are crossed out, and the marks strip, whose
-    // line for a mark changes once the fish that leaves it is caught ("match").
-    lineup: {
-      head: "These five fish are big enough to pull a rod in.",
-      frame: "It isn't any of these, so far.",
-      none: "It's none of them. Nobody here has ever caught it.",
-      fish: {
-        reedjaw_pike: {
-          name: "Reedjaw Pike",
-          why: "Its teeth cut a line clean. Hob's line was worn, not cut.",
-        },
-        milkeye_perch: {
-          name: "Milkeye Perch",
-          why: "Its two fangs leave two holes. The thief leaves a ring.",
-        },
-        kissmark_trout: {
-          name: "Kissmark Trout",
-          why: "It has the ring of scrapes on it. Something had it, and let go.",
-          // A trout crossed out without the ring on it.
-          whyPlain: "It is big, but its mouth could not take a bird.",
-        },
-        weeping_carp: {
-          name: "Weeping Carp",
-          why: "It has soft lips and no teeth. It eats worms and weed, not birds.",
-        },
-        bridgechain_sturgeon: {
-          name: "Bridgechain Sturgeon",
-          why: "It is long, but its mouth is a small tube for snails.",
-        },
-      },
-      marks: {
-        cuts: {
-          open: "Something leaves two rows of small cuts.",
-          match: "A pike's teeth leave two rows of small cuts.",
-        },
-        holes: { open: "Something leaves two deep holes.", match: "A Milkeye's fangs leave two deep holes." },
-        ring: { open: "Something else leaves a wide ring of fine scrapes." },
-      },
-      labels: { cut: "cut", hobs: "Hob's", thumb: "a thumb" },
+        "Something took a fish off the line, right here. It happened just after the bell struck midnight.",
+      // Sketch 2's words for an older save that bought the Bell Pool's chart before the hunt (B4).
+      takenSelf: "You found this spot yourself.",
+      labels: { gatehouse: "Gatehouse", sisters: "Sisters", isle: "Mossbell Isle", home: "home" },
       art: {
-        frame: "An empty frame with a question mark",
-        out: "crossed out",
-        cuts: "A small fish with two rows of small cuts",
-        holes: "A small fish with two deep holes",
-        ring: "A small fish with a wide ring of fine scrapes",
+        map: "A pencil map of Mossmere with a shaded part between the Gatehouse and the Sisters",
+        end: "An old line end taped to the page, its end worn rough",
+        taken:
+          "A pencil close-up of Hob's shaded part, with an X where the float went under and the toll-tower far off",
+        swirl:
+          "A slice through the water: your rig, a dark swirl under it, and an arrow down to a small fish on the bottom",
+        hook: "A bare hook",
+        leader: "Two line ends side by side, yours and Hob's, worn the same way",
+        line: "A rod tip with the line snapped just below it",
+        held: "Your hook, your leader and your line drawn whole, beside Hob's old line end",
       },
+      // Sketch 4, The swirl (section 2): its words for the rig she refused. "left": a bait she won't take, on the
+      // float or the lead ({bait} is "the worms" for worms); "float": a live fish under the float; "lure"; "bunch":
+      // the Worm Bunch on the lead.
+      swirl: {
+        left: "It left {bait}. It wants something alive, down on the bottom.",
+        float: "It took the live fish, but let go when the float pulled. It feeds down on the bottom.",
+        lure: "It turned away from the lure. It wants something real, down on the bottom.",
+        bunch: "It mouthed the Worm Bunch and let it go. It wants something alive.",
+      },
+      // Sketch 5, What came back: one sentence for each part that broke, or the page drawn whole ("What held").
+      back: {
+        hook: "The hook pulled out of a soft mouth and came back bare.",
+        leader: "The end came back worn rough, just like Hob's.",
+        line: "The line snapped by the rod, so it is too heavy for this line.",
+        held: "Your hook, your leader and your line all held.",
+        mine: "mine",
+        hobs: "Hob's",
+      },
+      heldTitle: "What held",
+      // Sketch 3, the line-up (section 3): its head line, each fish's name and the words written when it is
+      // crossed out, the empty frame's line before and after all five are crossed out, and the marks strip, whose
+      // line for a mark changes once the fish that leaves it is caught ("match").
+      lineup: {
+        head: "These five fish are big enough to pull a rod in.",
+        frame: "It isn't any of these, so far.",
+        none: "It's none of them. Nobody here has ever caught it.",
+        fish: {
+          reedjaw_pike: {
+            name: "Reedjaw Pike",
+            why: "Its teeth cut a line clean. Hob's line was worn, not cut.",
+          },
+          milkeye_perch: {
+            name: "Milkeye Perch",
+            why: "Its two fangs leave two holes. The thief leaves a ring.",
+          },
+          kissmark_trout: {
+            name: "Kissmark Trout",
+            why: "It has the ring of scrapes on it. Something had it, and let go.",
+            // A trout crossed out without the ring on it.
+            whyPlain: "It is big, but its mouth could not take a bird.",
+          },
+          weeping_carp: {
+            name: "Weeping Carp",
+            why: "It has soft lips and no teeth. It eats worms and weed, not birds.",
+          },
+          bridgechain_sturgeon: {
+            name: "Bridgechain Sturgeon",
+            why: "It is long, but its mouth is a small tube for snails.",
+          },
+        },
+        marks: {
+          cuts: {
+            open: "Something leaves two rows of small cuts.",
+            match: "A pike's teeth leave two rows of small cuts.",
+          },
+          holes: {
+            open: "Something leaves two deep holes.",
+            match: "A Milkeye's fangs leave two deep holes.",
+          },
+          ring: { open: "Something else leaves a wide ring of fine scrapes." },
+        },
+        labels: { cut: "cut", hobs: "Hob's", thumb: "a thumb" },
+        art: {
+          frame: "An empty frame with a question mark",
+          out: "crossed out",
+          cuts: "A small fish with two rows of small cuts",
+          holes: "A small fish with two deep holes",
+          ring: "A small fish with a wide ring of fine scrapes",
+        },
+      },
+      close: "Got it",
+      // The lake's name at the head of each page.
+      lake: "Mossmere",
     },
-    close: "Got it",
+    // The midnight bell and the thief's feeding time (B6). bites: her line in the Journal; feeds: the same in the
+    // Journal's older hint words.
+    time: {
+      strikes: "Far off, the old bell on the toll-tower strikes midnight.",
+      missing: "This is when things go missing.",
+      still: "The water goes still again.",
+      birds: "The birds by the Gatehouse scatter across the water.",
+      // After the bird at midnight (the once-only cutscene on the first night after her water is found).
+      birdTaken: "A bird went under, and it didn't come back up. This is when it feeds.",
+      // The Odds sheet's line under her row, once she is landed.
+      odds: "The {name} bites only in the few minutes after the old bell strikes midnight.",
+      holdFull: "Your hold is full. You can still fish and let them go. The old bell strikes midnight soon.",
+      bites: "She feeds just after the old bell strikes midnight, in deep water.",
+      feeds: "feeds just after the old bell strikes midnight",
+    },
+    // What she is called on the seal of the chart her landing opens, until she is first landed (section 3).
+    seal: "Land the thief of the mere.",
   },
 };
 // Her refusals in her water (mossmere-hunt-2.md B6): a swirl under the rig and one of these lines, once a night
 // for each part. {bait} names the bait (the worm words for worms), {them} what it is left as.
-Ca.hunt.refusal = {
+Ca.hunts.mossmere.refusal = {
   lure: "Something huge swirls behind the lure, and sinks back down.",
   floatLive: "Something huge takes the minnow, feels the float pull, and lets go.",
   float: "Something huge rises under the float, looks at {bait}, and sinks back down.",
@@ -48158,7 +48292,7 @@ Ca.hunt.refusal = {
 // The end of the hunt (mossmere-hunt-2.md sections 1, 5 and 6, B6; decisions.md "Her reward"): she is measured
 // and let go, Murk pays the bounty and hands over Hob's Lamp at that evening's tally, and the next cast in her
 // water brings up Hob's old rod, which goes back to him on Mossbell Isle.
-Ca.hunt.ending = {
+Ca.hunts.mossmere.ending = {
   // The measuring card, in place of the catch card: who she is, then the bell grown into her head.
   measured: [
     "So that's the thief. She's a great wels catfish, the biggest fish in Mossmere.",
@@ -48182,24 +48316,24 @@ Ca.hunt.ending = {
   ],
 };
 // Hob after the landing: his line about her bell (once), and his last line when you bring his rod back.
-Ca.hunt.hob.after = {
+Ca.hunts.mossmere.hob.after = {
   landed: "A bell, on its head? Well, now. I had a bell like that once.",
   rod: "My rod! And she's got my old bell. Well, she can keep it.",
 };
 // The notepad once she is landed: its last line, the foot while you carry Hob's rod, the empty frame of the
 // line-up and the ring's line in its marks strip.
-Ca.hunt.pad.solved = "You solved it. It was never the gloom. It was her.";
-Ca.hunt.pad.next.rod = "Take it to Hob on Mossbell Isle.";
-Ca.hunt.pad.lineup.landed = "It was her all along.";
-Ca.hunt.pad.lineup.marks.ring.landed = "She leaves the wide ring of scrapes.";
-// The bounty Murk pays at the tally of the evening she is landed, once (decisions.md "Her reward").
-wo.hunt.bounty = 900;
+Ca.hunts.mossmere.pad.solved = "You solved it. It was never the gloom. It was her.";
+Ca.hunts.mossmere.pad.next.rod = "Take it to Hob on Mossbell Isle.";
+Ca.hunts.mossmere.pad.lineup.landed = "It was her all along.";
+Ca.hunts.mossmere.pad.lineup.marks.ring.landed = "She leaves the wide ring of scrapes.";
 // The unique items a lake's monster gives, kept in the save's `relics` list and carried to every lake (B5). Hob's
 // Lamp: a kind of fish never caught bites `unmetBite` times as often, in all three bite paths, never a legend.
 wo.relics = { hobs_lamp: { stat: { unmetBite: 1.5 }, mount: "raft_bow" } };
 // The lake whose monster's landing opens a water, instead of its gear and catch seals (mossmere-hunt.md H7 and
-// A7): the chart comes with the landing, so it is not for sale before it.
-wo.access.monster = { sporewood: { legend: "belled_matriarch", from: "mossmere" } };
+// A7): the chart comes with the landing, so it is not for sale before it. Made from each hunt's `opens`.
+wo.access.monster = {};
+for (let [from, hunt] of Object.entries(wo.hunts))
+  hunt.opens && (wo.access.monster[hunt.opens] = { legend: hunt.legend, from });
 // The Worm Bunch's two lines on the tackle screen, as the Live Minnow has (mossmere-gear.md, "Worm Bunch").
 Ca.bunch = {
   good: "Good for: carp, suckers, crayfish and sturgeon.",
@@ -48253,7 +48387,6 @@ Ca.log = Object.assign(Ca.log || {}, {
       any: "It feeds at any depth.",
     },
     takes: "It takes only {bait}.",
-    midnight: "She feeds just after the old bell strikes midnight, in deep water.",
   },
   // A guest's hint on its home lake's Journal page, where it does not feed as it does as a guest.
   hints: {
@@ -48301,38 +48434,37 @@ Ca.legendAway = {
     },
   },
 };
-// What Mossmere's monster is called until she is first landed (mossmere-hunt-2.md, section 3).
-Ca.thief = { seal: "Land the thief of the mere." };
-// Mossmere's monster is "the thief" until the player first lands her: until then nothing may show or say
-// what she is (her name, kind, picture or model). A save that sold her has landed her.
+// A hunt's legend marked hidden (Mossmere's monster, "the thief") stays hidden until the player first lands her:
+// until then nothing may show or say what she is (her name, kind, picture or model). A save that sold her has
+// landed her.
 function thiefHidden(meta, speciesId) {
   return (
-    speciesId === "belled_matriarch" &&
+    huntOf(huntWaterOf(speciesId))?.hidden === !0 &&
     !(Number(meta?.journal?.[speciesId]?.caught) > 0) &&
     !(Number(meta?.loop?.legends?.[speciesId]) > 0)
   );
 }
-// Whether a lake's legend has been landed, from the loop's save: a sale counts (older saves), and so does the
-// Mossmere hunt's own landing, since she is let go and never sold (mossmere-hunt-2.md section 3).
+// Whether a lake's legend has been landed, from the loop's save: a sale counts (older saves), and so does her
+// hunt's own landing, since she is let go and never sold (mossmere-hunt-2.md section 3).
 function legendLanded(loop, speciesId) {
   return (
-    Number(loop?.legends?.[speciesId]) > 0 ||
-    (speciesId === "belled_matriarch" && Number(loop?.hunt?.mossmere?.landed) > 0)
+    Number(loop?.legends?.[speciesId]) > 0 || Number(huntRecordOf(loop, huntWaterOf(speciesId))?.landed) > 0
   );
 }
 // How many landings make a legend's fight harder (LEGEND growthPerLanding, up to growthCap). The fight, the
-// Journal's odds and the Odds page all read this one count. Only Mossmere's thief grows (the designer's ruling
-// of 24 November 2026): her hunt record counts her landings, so the hunt itself is fought at 0, and each landing
-// makes the next fight one step harder. Every other legend stays at 0.
+// Journal's odds and the Odds page all read this one count. Only a hunt's legend grows (Mossmere's thief, the
+// designer's ruling of 24 November 2026): her hunt record counts her landings, so the hunt itself is fought at 0,
+// and each landing makes the next fight one step harder. Every other legend stays at 0.
 function legendGrowthLandings(meta, speciesId) {
-  if (speciesId !== MIDNIGHT.legend) return 0;
-  return ha(huntRecordOf(meta?.loop)?.landings);
+  let water = huntWaterOf(speciesId);
+  if (!water) return 0;
+  return ha(huntRecordOf(meta?.loop, water)?.landings);
 }
 // An older save, written before her landings were counted: the count is her landings so far, taken from the
 // Journal's catches of her (each landing is one), and at least 1 once the hunt is landed.
-function carryHerLandings(loop, meta) {
-  let record = huntRecordOf(loop),
-    id = MIDNIGHT.legend;
+function carryHerLandings(loop, meta, water) {
+  let record = huntRecordOf(loop, water),
+    id = huntOf(water)?.legend;
   if (!record) return;
   let soFar = Math.max(ha(meta?.journal?.[id]?.caught), ha(loop?.legends?.[id]), record.landed > 0 ? 1 : 0);
   record.landings = Math.max(ha(record.landings), soFar);
@@ -51749,8 +51881,8 @@ function nI(e) {
   }
   // sailRefused: a short word for the check that refused the last sail call (homeState), or null.
   let v = { glide: null, sailing: !1, lift: null, sailRefused: null, failTrip: !1 },
-    // The bird at midnight on Mossmere: played, skipped and put away here beside the place lifts.
-    birdScene = birdSceneDirector(t, { report: o }),
+    // The hunt's cutscene (Mossmere's bird at midnight): played, skipped and put away here beside the place lifts.
+    birdScene = huntSceneDirector(t, { report: o }),
     b = { thin: $l(m.lift?.thin, 3), title: $l(m.lift?.title, 1.2), back: $l(m.lift?.back, 0.6) },
     L =
       typeof e.reduced == "function"
@@ -74732,7 +74864,7 @@ function $ae(e) {
       return;
     }
     // The dark tone over her hole shows only once her water is found.
-    g.uWcRim.value = huntWaterFound(e.state?.meta?.loop) ? 1 : 0;
+    g.uWcRim.value = huntWaterFound(e.state?.meta?.loop, ue()) ? 1 : 0;
     let Kt = null;
     try {
       Kt = e.survival && !e.survival.isStub ? (e.survival.getPhaseInfo?.()?.phase ?? null) : null;
@@ -83838,10 +83970,11 @@ uniform float uK; uniform vec3 uGlowCol; varying float vGlowW;`,
       harbour.frame.visible = harbour.clapper.visible = !!(bank.lifted || bank.lift);
       if (harbour.cork) {
         let loop = e.state?.meta?.loop,
-          show = harbour.frame.visible && huntWaterFound(loop);
+          water = huntWaterOfPlace(bank.id),
+          show = harbour.frame.visible && huntWaterFound(loop, water);
         harbour.cork.group.visible = show;
         if (show) {
-          let at = herWaterCorkAt(loop),
+          let at = herWaterCorkAt(loop, water),
             surface = e.water?.getHeight?.(at.x, at.z);
           harbour.cork.update(
             Math.min(0.1, Math.max(0, ht)),
@@ -101914,7 +102047,8 @@ function GA(e, t = ["mossmere"]) {
     o = n.home && typeof n.home == "object" ? n.home : {},
     a = Array.isArray(n.barge?.towed) ? n.barge.towed : [],
     s = n.legends && typeof n.legends == "object" ? n.legends : {},
-    r = { mossmere: "belled_matriarch" },
+    // Each lake's stone is gilt once its hunt's legend is landed (wo.hunts).
+    r = Object.fromEntries(huntWaters().map((water) => [water, huntOf(water).legend])),
     l = [];
   for (let d = 0; d < 4; d++) {
     let f = t[d];
@@ -107509,8 +107643,8 @@ function ule(e, t) {
 // A practice order for this refill, or null for an ordinary one (wo.orders.practice). Draws on `rng` only when
 // some part may post one, so a board with no such part refills exactly as it always has.
 function practiceOrderFor(e, loop, { rng, list, taken, water }) {
-  let rule = e?.LOOP?.orders?.practice;
-  if (!or(rule) || !or(rule.parts) || water !== rule.water || !(Os(loop?.home?.orders) > 0)) return null;
+  let rule = typeof water == "string" ? e?.LOOP?.orders?.practice?.[water] : null;
+  if (!or(rule) || !or(rule.parts) || !(Os(loop?.home?.orders) > 0)) return null;
   if (Ts(loop.orders).filter((o) => or(o) && o.kind === "rig").length >= Os(rule.max, 1)) return null;
   let listed = new Set([...list.common, ...list.uncommon, ...list.rare].map((p) => p.id)),
     owned = Ts(loop.parts),
@@ -108368,37 +108502,40 @@ var Mle = (e, t) => ({
     let a = e?.catchParts?.(t, n, o, { strike: "struck" });
     return a ? a.p : null;
   };
-// Mossmere's midnight bell and the thief's feeding time (mossmere-hunt-2.md, section 1 and B2). From evening 2,
-// midnight strikes `at` seconds into the night phase's own clock: twelve strokes of the dusk bell, rung
-// lower, with the toll-tower's top window flaring on each. Her time runs `herTime` seconds from the first
-// stroke, and the legend takes only inside it. The evening's flags live on the run (run.midnight).
-const MIDNIGHT = Object.freeze({
-  water: "mossmere",
-  legend: "belled_matriarch",
-  fromEvening: 2,
-  at: 60,
-  strokes: 12,
-  strokeGap: 2.2,
-  herTime: 180,
-  // Her tries a night (H5): casts in her found water, in her time, on a rig that could bring her.
-  tries: 3,
-  pitch: 0.7,
-  volume: 0.75,
-  // A stroke more than this late (a save loaded past it) is skipped silently rather than rung late.
-  late: 1.5,
-  // At the first stroke the water birds roosting by the Gatehouse (the third lampbill flock) scatter, when
-  // the raft is within this many metres of their roost.
-  roostFlock: 2,
-  roostNear: 30,
-});
-// True on a trip on Mossmere from evening 2: the evenings the bell strikes.
-function midnightEvening(run) {
-  return (
-    !!run &&
-    run.outing === "trip" &&
-    run.zone === MIDNIGHT.water &&
-    Math.trunc(Number(run.evening) || 0) >= MIDNIGHT.fromEvening
-  );
+// ---- The hunts' lookups (wo.hunts and Ca.hunts, by the water's id) -----------------------------------------------
+// A lake's hunt rules, or null for a lake with no hunt. Plain checks, so it works before the shared helpers exist.
+function huntOf(water) {
+  let hunt = typeof water == "string" && wo.hunts ? wo.hunts[water] : null;
+  return hunt && typeof hunt == "object" && !Array.isArray(hunt) ? hunt : null;
+}
+// A lake's hunt words, or none.
+function huntWords(water) {
+  let words = huntOf(water) && Ca.hunts ? Ca.hunts[water] : null;
+  return words && typeof words == "object" && !Array.isArray(words) ? words : {};
+}
+// The lakes with a hunt, in the table's order.
+function huntWaters() {
+  return Object.keys(wo.hunts || {}).filter((water) => huntOf(water));
+}
+// The lake whose hunt is for this legend, whose hunt finds her in this place, or whose ending gives this relic; or
+// null.
+function huntWaterOf(speciesId) {
+  return (speciesId && huntWaters().find((water) => huntOf(water).legend === speciesId)) || null;
+}
+function huntWaterOfPlace(placeId) {
+  return (placeId && huntWaters().find((water) => huntOf(water).find?.place === placeId)) || null;
+}
+function huntWaterOfRelic(relicId) {
+  return (relicId && huntWaters().find((water) => huntOf(water).relic === relicId)) || null;
+}
+// ---- Her time (the time clue: Mossmere's midnight bell; mossmere-hunt-2.md, section 1 and B2) -------------------
+// The time clue strikes `time.at` seconds into the night phase's own clock, and her time runs `time.herTime`
+// seconds from its first stroke: the legend takes only inside it. The evening's flags live on the run
+// (run.midnight). Returns the hunt of the run's water on a trip from the evening its time clue first comes (the
+// evenings Mossmere's bell strikes), or null.
+function huntEvening(run) {
+  let hunt = run && run.outing === "trip" ? huntOf(run.zone) : null;
+  return hunt && Math.trunc(Number(run.evening) || 0) >= hunt.time.fromEvening ? hunt : null;
 }
 function midnightFlags(run) {
   let m = run.midnight;
@@ -108413,132 +108550,131 @@ function midnightFlags(run) {
 function nightClock(run) {
   return run?.phase === "gloomtide" ? Math.max(0, Number(run.phaseTime) || 0) : null;
 }
-// Her time: from the first stroke of midnight for herTime seconds, closed early for the night once she has
+// Her time: from the first stroke of the time clue for herTime seconds, closed early for the night once she has
 // been hooked or her tries are used up. Outside it she never takes.
 function herTimeOpen(run) {
-  if (!midnightEvening(run) || run.midnight?.hooked === !0) return !1;
-  if ((Number(run.midnight?.tries) || 0) >= MIDNIGHT.tries) return !1;
+  let hunt = huntEvening(run);
+  if (!hunt || run.midnight?.hooked === !0) return !1;
+  let time = hunt.time;
+  if ((Number(run.midnight?.tries) || 0) >= time.tries) return !1;
   let t = nightClock(run);
-  return t != null && t >= MIDNIGHT.at && t <= MIDNIGHT.at + MIDNIGHT.herTime;
+  return t != null && t >= time.at && t <= time.at + time.herTime;
 }
 function noteHerHookup(run) {
-  midnightEvening(run) && (midnightFlags(run).hooked = !0);
+  huntEvening(run) && (midnightFlags(run).hooked = !0);
 }
-// Called every frame from the phase clock with the run. Rings the strokes, flares the tower, scatters the
-// Gatehouse birds when the raft is near, and shows the midnight, birds, still-water and full-hold lines once
-// an evening each.
-function updateMidnightBell(game, run) {
-  if (!midnightEvening(run)) return;
-  let m = midnightFlags(run),
+// Called every frame from the phase clock with the run. Rings the strokes (Mossmere's bell), lights the world's
+// flare (the toll-tower), scatters the roosting birds when the raft is near, and shows the time clue's, birds,
+// still-water and full-hold lines once an evening each.
+function updateHuntTime(game, run) {
+  let hunt = huntEvening(run);
+  if (!hunt) return;
+  let time = hunt.time,
+    m = midnightFlags(run),
     say = (text) => text && game.bus?.emit?.("toast", { text, kind: "lore" }),
-    words = Ca.midnight,
+    words = huntWords(run.zone).time || {},
     t = nightClock(run);
-  if (!m.holdFullSaid && (t == null || t < MIDNIGHT.at)) {
+  if (!m.holdFullSaid && (t == null || t < time.at)) {
     let full = !1;
     try {
       full = game.progression?.loop?.holdFull?.() === !0;
     } catch {}
     full && ((m.holdFullSaid = !0), say(words.holdFull));
   }
-  if (t == null || t < MIDNIGHT.at) return;
-  let ringing = m.struck < MIDNIGHT.strokes;
-  for (; m.struck < MIDNIGHT.strokes; ) {
-    let due = MIDNIGHT.at + m.struck * MIDNIGHT.strokeGap;
+  if (t == null || t < time.at) return;
+  let ringing = m.struck < time.strokes;
+  for (; m.struck < time.strokes; ) {
+    let due = time.at + m.struck * time.strokeGap;
     if (t < due) break;
-    let onTime = t - due <= MIDNIGHT.late;
+    let onTime = t - due <= time.late;
     if (onTime) {
       try {
-        game.audio?.play?.("midnight_toll", { volume: MIDNIGHT.volume, pitch: MIDNIGHT.pitch });
+        game.audio?.play?.(time.sound, { volume: time.volume, pitch: time.pitch });
       } catch {}
       if (m.struck === 0 && !m.said) {
         m.said = !0;
         say(words.strikes);
-        bellPoolFoundFor(game) || say(words.missing);
+        huntWaterLifted(game, hunt) || say(words.missing);
         let scattered = 0;
         try {
-          scattered = game.waterBirds?.scatterRoost?.(MIDNIGHT.roostFlock, MIDNIGHT.roostNear) || 0;
+          scattered = game.waterBirds?.scatterRoost?.(time.roostFlock, time.roostNear) || 0;
         } catch {}
         scattered > 0 && !m.birdsSaid && ((m.birdsSaid = !0), say(words.birds));
-        markHerTimeStart(game, m);
+        markHerTimeStart(game, m, run);
       }
     }
     m.struck++;
   }
-  // The window flares at each stroke and dies away over about a second.
-  if (ringing || t < MIDNIGHT.at + MIDNIGHT.strokes * MIDNIGHT.strokeGap + 2) {
-    let sinceStroke = t - (MIDNIGHT.at + Math.max(0, m.struck - 1) * MIDNIGHT.strokeGap),
+  // The flare lights at each stroke and dies away over about a second.
+  if (ringing || t < time.at + time.strokes * time.strokeGap + 2) {
+    let sinceStroke = t - (time.at + Math.max(0, m.struck - 1) * time.strokeGap),
       flare = m.struck > 0 && sinceStroke >= 0 ? Math.exp(-sinceStroke / 0.45) : 0;
     try {
-      game.world?.flareTollTower?.(flare);
+      game.world?.[time.flare]?.(flare);
     } catch {}
   }
   // The still-water line ends her time; once she is landed it is not said (the bell and the birds go on).
-  if (!m.stillSaid && t > MIDNIGHT.at + MIDNIGHT.herTime) {
+  if (!m.stillSaid && t > time.at + time.herTime) {
     m.stillSaid = !0;
-    huntLanded(game.state?.meta?.loop) || say(words.still);
+    huntLanded(game.state?.meta?.loop, run.zone) || say(words.still);
   }
 }
-// Her water counts as found once the Bell Pool is owned and its mist lifted: the same test the cast makes.
-function bellPoolFoundFor(game) {
+// Her water counts as found once her place is owned and its mist lifted: the same test the cast makes.
+function huntWaterLifted(game, hunt) {
   try {
     let loop = game.progression?.loop,
       state = loop?.state?.(),
       owned = Array.isArray(state?.maps?.places) ? state.maps.places : [],
-      lifted = loop?.lifted?.() ?? state?.lifted;
-    return owned.includes("bell_pool") && Array.isArray(lifted) && lifted.includes("bell_pool");
+      lifted = loop?.lifted?.() ?? state?.lifted,
+      place = hunt?.find?.place;
+    return !!place && owned.includes(place) && Array.isArray(lifted) && lifted.includes(place);
   } catch {
     return !1;
   }
 }
 // ---- Her water (mossmere-hunt-2.md section 4 and B3) ----------------------------------------------------------
-// Her hole is centred at (x, z). Nothing marks it until it is found. Once Hob's map is drawn, in her time, boils
-// rise over it and the first ordinary fish hooked close by is taken, which finds it. Distances are metres.
-const HER_WATER = Object.freeze({
-  place: "bell_pool",
-  x: -4,
-  z: -14,
-  theft: 8,
-  boilSpread: 6,
-  boilEvery: [20, 30],
-  boilSeen: 25,
-  // The second evening of the "Finding the spot" nudge: boils twice as often, seen from further off.
-  nudgedEvery: [10, 15],
-  nudgedSeen: 40,
-  // A boil closer than this to the raft is "right beside you".
-  boilClose: 5,
-  // Where an older save's marker cork floats (it found the spot by its chart, with no theft): off the frame.
-  corkOffset: [2.2, 2.6],
-});
-function huntRecordOf(loop) {
-  let record = loop?.hunt?.mossmere;
+// Her hole is centred at the hunt's find (x, z). Nothing marks it until it is found. Once the character's map is
+// drawn, in her time, boils rise over it and the first ordinary fish hooked close by is taken, which finds it.
+// Distances are metres.
+// One lake's hunt record in the save (loop.hunt[water]), or null for a lake with no hunt.
+function huntRecordOf(loop, water) {
+  let record = huntOf(water) ? loop?.hunt?.[water] : null;
   return record && typeof record == "object" && !Array.isArray(record) ? record : null;
 }
-// Found by the theft, or by owning the Bell Pool (an older save that bought its chart, B4).
-function huntWaterFound(loop) {
+// Found by the theft, or by owning her place (an older save that bought its chart, B4).
+function huntWaterFound(loop, water) {
+  let hunt = huntOf(water);
   return (
-    huntRecordOf(loop)?.found === !0 ||
-    (Array.isArray(loop?.maps?.places) && loop.maps.places.includes(HER_WATER.place))
+    !!hunt &&
+    (huntRecordOf(loop, water)?.found === !0 ||
+      (Array.isArray(loop?.maps?.places) && loop.maps.places.includes(hunt.find.place)))
   );
 }
-// A place nothing may mark yet: an unmarked place (her water) on the loop's lake while it is not found.
+// A place nothing may mark yet: an unmarked place (her water) while its hunt has not found it.
 function placeUnmarked(game, placeId) {
   return (
     game?.data?.LOOP_ENABLED === !0 &&
     game.data.LOOP?.places?.[placeId]?.unmarked === !0 &&
-    !huntWaterFound(game.state?.meta?.loop)
+    !huntWaterFound(game.state?.meta?.loop, huntWaterOfPlace(placeId))
   );
 }
-// Where the marker cork floats once her water is found: where the float went under, or beside the frame.
-function herWaterCorkAt(loop) {
-  let at = huntRecordOf(loop)?.foundAt;
+// Where the marker cork floats once her water is found: where the float went under, or beside the frame (an
+// older save that found the spot by its chart, with no theft: the hunt's corkOffset from her centre).
+function herWaterCorkAt(loop, water) {
+  let at = huntRecordOf(loop, water)?.foundAt,
+    find = huntOf(water)?.find;
   return at && (at.x || at.z)
     ? { x: at.x, z: at.z }
-    : { x: HER_WATER.x + HER_WATER.corkOffset[0], z: HER_WATER.z + HER_WATER.corkOffset[1] };
+    : find
+      ? { x: find.x + find.corkOffset[0], z: find.z + find.corkOffset[1] }
+      : null;
 }
-// Hob's part of the lake (the shaded patch on his map, in lake units).
-function inHobsPart(x, z) {
-  let pts = PAD_HOB_PART,
-    inside = !1;
+// The character's part of the lake (the shaded patch on his map, in lake units: the hunt's `part`), made once.
+const huntPartPts = new WeakMap();
+function inHuntPart(hunt, x, z) {
+  let pts = huntPartPts.get(hunt);
+  pts || huntPartPts.set(hunt, (pts = Array.isArray(hunt?.part) ? padBlobPts(...hunt.part) : []));
+  let inside = !1;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
     let [xi, zi] = pts[i],
       [xj, zj] = pts[j];
@@ -108571,13 +108707,16 @@ function bearingWord(game, raft, x, z) {
         ? "right"
         : "left";
 }
-// Called every frame from the phase clock with the run, after the midnight bell. In her time, once Hob's map
-// is drawn: notes being in Hob's part (for the nudges), and raises a boil over her water every 20 to 30 s,
-// with a word when the raft is near enough to see it.
+// Called every frame from the phase clock with the run, after the time clue. In her time, once the character's
+// map is drawn: notes being in his part (for the nudges), and raises a boil over her water every boilEvery
+// seconds (20 to 30 s on Mossmere), with a word when the raft is near enough to see it.
 function updateHerWater(game, run) {
   if (!herTimeOpen(run)) return;
-  let loop = game.state?.meta?.loop,
-    record = huntRecordOf(loop);
+  let water = run.zone,
+    hunt = huntOf(water),
+    find = hunt.find,
+    loop = game.state?.meta?.loop,
+    record = huntRecordOf(loop, water);
   // No boils once she is landed: her time is over (section 3, "After the landing").
   if (!record || !(record.sketches?.map > 0) || record.landed > 0) return;
   let m = midnightFlags(run),
@@ -108585,61 +108724,67 @@ function updateHerWater(game, run) {
     pos = game.player?.position,
     raft = pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) ? pos : null,
     evening = Math.max(1, Math.trunc(Number(run.evening) || 0));
-  raft && !record.partAt && inHobsPart(raft.x, raft.z) && (record.partAt = evening);
-  let nudged = !huntWaterFound(loop) && herBoilsNudged(record, run),
-    [lo, hi] = nudged ? HER_WATER.nudgedEvery : HER_WATER.boilEvery,
+  raft && !record.partAt && inHuntPart(hunt, raft.x, raft.z) && (record.partAt = evening);
+  let nudged = !huntWaterFound(loop, water) && herBoilsNudged(record, run),
+    [lo, hi] = nudged ? find.nudgedEvery : find.boilEvery,
     gap = () => lo + Math.random() * (hi - lo);
   if (!(Number(m.boilAt) > 0)) m.boilAt = t + gap();
   if (t < m.boilAt) return;
   m.boilAt = t + gap();
   let a = Math.random() * Math.PI * 2,
-    r = HER_WATER.boilSpread * Math.sqrt(Math.random()),
-    x = HER_WATER.x + Math.cos(a) * r,
-    z = HER_WATER.z + Math.sin(a) * r;
+    r = find.boilSpread * Math.sqrt(Math.random()),
+    x = find.x + Math.cos(a) * r,
+    z = find.z + Math.sin(a) * r;
   try {
     game.water?.addRipple?.(x, z, 1.2);
     game.water?.addRipple?.(x + 0.6, z - 0.3, 1.2);
     game.water?.addRipple?.(x - 0.4, z + 0.5, 1.2);
     game.water?.splash?.(x, z, { size: 1.1, count: 18 });
   } catch {}
-  let words = Ca.hunt.water,
+  let words = huntWords(water).water || {},
     dist = raft ? Math.hypot(x - raft.x, z - raft.z) : 1 / 0,
     word = null;
-  if (dist <= (nudged ? HER_WATER.nudgedSeen : HER_WATER.boilSeen))
-    word = dist < HER_WATER.boilClose ? "close" : bearingWord(game, raft, x, z);
+  if (dist <= (nudged ? find.nudgedSeen : find.boilSeen))
+    word = dist < find.boilClose ? "close" : bearingWord(game, raft, x, z);
   m.boils = (m.boils | 0) + 1;
   m.lastBoil = { x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, t, word };
   word &&
     game.bus?.emit?.("toast", {
-      text: word === "close" ? words.boilClose : words.boil.replace("{where}", words.where[word]),
+      text:
+        word === "close" ? words.boilClose : String(words.boil || "").replace("{where}", words.where?.[word]),
       kind: "lore",
     });
   game.bus?.emit?.("hunt:boil", { ...m.lastBoil });
 }
-// The theft (B3): in her time, once Hob's map is drawn and while her water is not found, once a night, a fish
-// hooked within `theft` metres of her centre is taken. The caller checks that it is an ordinary fish on bait.
+// The theft (B3): in her time, once the character's map is drawn and while her water is not found, once a night,
+// a fish hooked within `theft` metres of her centre is taken. The caller checks that it is an ordinary fish on
+// bait.
 function thiefTakes(game, run, x, z) {
   if (!herTimeOpen(run) || !Number.isFinite(x) || !Number.isFinite(z)) return !1;
-  let loop = game.state?.meta?.loop,
-    record = huntRecordOf(loop);
+  let water = run.zone,
+    find = huntOf(water).find,
+    loop = game.state?.meta?.loop,
+    record = huntRecordOf(loop, water);
   return (
     !!record &&
     record.sketches?.map > 0 &&
-    !huntWaterFound(loop) &&
+    !huntWaterFound(loop, water) &&
     midnightFlags(run).thiefTook !== !0 &&
-    Math.hypot(x - HER_WATER.x, z - HER_WATER.z) <= HER_WATER.theft
+    Math.hypot(x - find.x, z - find.z) <= find.theft
   );
 }
-// The theft found her water: sketch 2 is drawn and the Bell Pool becomes the player's, as owning its chart
-// made it (maps.places, places.revealed), so it lifts and is fished as a found place. Returns true the once.
-function findHerWater(loop, run, { x = NaN, z = NaN, onLead = !1 } = {}) {
-  let record = huntRecordOf(loop);
+// The theft found her water (in `water`, the run's): sketch 2 is drawn and her place becomes the player's, as
+// owning its chart made it (maps.places, places.revealed), so it lifts and is fished as a found place. Returns true
+// the once.
+function findHerWater(loop, run, { x = NaN, z = NaN, onLead = !1, water = run?.zone ?? null } = {}) {
+  let hunt = huntOf(water),
+    record = huntRecordOf(loop, water);
   if (!record || record.found === !0) return !1;
   let evening = Math.max(
     1,
     Math.trunc(Number(run?.evening) || 0) || Math.trunc(Number(loop.evenings) || 0) + 1,
   );
-  run && midnightEvening(run) && (midnightFlags(run).thiefTook = !0);
+  run && huntEvening(run) && (midnightFlags(run).thiefTook = !0);
   (record.found = !0),
     (record.foundEvening = evening),
     (record.foundBy = "theft"),
@@ -108651,18 +108796,22 @@ function findHerWater(loop, run, { x = NaN, z = NaN, onLead = !1 } = {}) {
   (loop.places && typeof loop.places == "object" && !Array.isArray(loop.places)) ||
     (loop.places = { revealed: [] });
   Array.isArray(loop.places.revealed) || (loop.places.revealed = []);
-  loop.places.revealed.includes(HER_WATER.place) || loop.places.revealed.push(HER_WATER.place);
-  h7(loop, HER_WATER.place);
-  // The theft is also the Turnback Hook's beat (wo.arrivals), with Murk's own line for it at the tally.
-  herPartOffered(loop, "turnback_hook") ||
-    (noteArrivalBeat(loop, "turnback_hook") && (record.hookByTheft = !0));
+  loop.places.revealed.includes(hunt.find.place) || loop.places.revealed.push(hunt.find.place);
+  h7(loop, hunt.find.place);
+  // The theft is also a tackle arrival's beat (the hunt's beats.theft, wo.arrivals: Mossmere's Turnback Hook),
+  // with Murk's own line for it at the tally.
+  let beat = hunt.beats?.theft;
+  beat &&
+    !Sr(wo.arrivals?.[water]?.[beat]?.parts).every((id) => herPartOffered(loop, id)) &&
+    noteArrivalBeat(loop, beat) &&
+    (record.hookByTheft = !0);
   return !0;
 }
-// An older save that owns the Bell Pool counts as found (B4): sketches 1 and 2 are drawn (to draw in when the
+// An older save that owns her place counts as found (B4): sketches 1 and 2 are drawn (to draw in when the
 // notepad next opens), sketch 2 with the words "You found this spot yourself."
-function foundByChart(loop) {
-  let record = huntRecordOf(loop);
-  if (!record || record.found === !0 || !loop.maps?.places?.includes?.(HER_WATER.place)) return !1;
+function foundByChart(loop, water) {
+  let record = huntRecordOf(loop, water);
+  if (!record || record.found === !0 || !loop.maps?.places?.includes?.(huntOf(water).find.place)) return !1;
   let evening = Math.max(1, Math.trunc(Number(loop.evenings) || 0));
   (record.found = !0), (record.foundEvening = evening), (record.foundBy = "chart"), (record.murkFound = !0);
   record.sketches.map || drawHuntSketch(record, "map", evening);
@@ -108670,47 +108819,44 @@ function foundByChart(loop) {
   return !0;
 }
 // ---- Her tries, refusals and losses (mossmere-hunt-2.md section 2 and B3, mossmere-hunt.md A2) ---------------
-// The parts that hold her, in fight order: the hook breaks free early in the fight, the leader about halfway, the
-// line at the end. `at` is the share of the planned fight at which she gets away, `cause` how the loss looks.
-const HER_RIG = Object.freeze({
-  order: ["hook", "leader", "line"],
-  right: { hook: "turnback_hook", leader: "chafe_gut" },
-  at: { hook: 0.15, leader: 0.5 },
-  cause: { hook: "spat", leader: "thrown", line: "snapped" },
-  // Her first take waits until both are on Murk's shelf or owned (mossmere-review-addendum.md, "Her gate").
-  takeNeeds: ["turnback_hook", "chafe_gut"],
-});
+// The parts that hold her (the hunt's rig), in fight order: on Mossmere the hook breaks free early in the fight,
+// the leader about halfway, the line at the end. `at` is the share of the planned fight at which she gets away,
+// `cause` how the loss looks.
 // Whether a rig part is on Murk's shelf or owned (the arrivals record).
 function herPartOffered(loop, id) {
   return Sr(loop?.parts).includes(id) || Sr(loop?.arrivals?.shelved).includes(id);
 }
-// Whether her first take may come: the Turnback Hook and Chafe Gut both shelved or owned.
-function herTakeAllowed(loop) {
-  return HER_RIG.takeNeeds.every((id) => herPartOffered(loop, id));
+// Whether her first take may come: the parts it waits for (rig.takeNeeds: Mossmere's Turnback Hook and Chafe Gut)
+// all shelved or owned.
+function herTakeAllowed(loop, water) {
+  return Sr(huntOf(water)?.rig?.takeNeeds).every((id) => herPartOffered(loop, id));
 }
-// Whether a part that broke her free is matched by one the player owns: the Turnback Hook, Chafe Gut, or a line
-// strong enough to land her (Waxed Silk or better, on Murk's line shelf in the barge's water).
-function herPartOwned(data, loop, part) {
-  if (HER_RIG.right[part]) return Sr(loop?.parts).includes(HER_RIG.right[part]);
+// Whether a part that broke her free is matched by one the player owns: the right hook or leader (rig.right), or a
+// line strong enough to land her (Mossmere's Waxed Silk or better, on Murk's line shelf in the barge's water).
+function herPartOwned(data, loop, part, water) {
+  let hunt = huntOf(water);
+  if (!hunt) return !1;
+  if (hunt.rig.right[part]) return Sr(loop?.parts).includes(hunt.rig.right[part]);
   if (part !== "line") return !1;
   let lines = jr(data, al(data, loop), "line"),
-    need = ka(Wi.legend.minLineHold?.[MIDNIGHT.legend], 5);
+    need = ka(Wi.legend.minLineHold?.[hunt.legend], 5);
   return lines.some((line, tier) => tier <= ha(loop?.tackle?.line) && ka(line?.hold, 0) >= need);
 }
 // A part that broke her free once ("hook", "leader", "line"): taught for good, drawn into sketch 5 in fight
 // order. A loss on a fully right rig ("fight") draws sketch 5 whole, as "What held", if it is still blank. No
-// part is drawn twice.
-function noteHerLoss(record, reason, evening) {
+// part is drawn twice. `hunt` gives the parts' fight order.
+function noteHerLoss(record, reason, evening, hunt) {
   if (!Ln(record)) return;
   // Once she is landed the notepad is finished: a part that breaks is not drawn into it.
   if (record.landed > 0) return;
-  if (HER_RIG.order.includes(reason)) {
-    Ln(record.lessons) || (record.lessons = { hook: !1, leader: !1, line: !1 });
+  let order = Sr(hunt?.rig?.order);
+  if (order.includes(reason)) {
+    Ln(record.lessons) || (record.lessons = Object.fromEntries(order.map((part) => [part, !1])));
     (record.lessons[reason] = !0), reason === "line" && (record.lineLesson = !0);
     Array.isArray(record.back) || (record.back = []);
     if (record.back.includes(reason)) return;
     record.back.push(reason);
-    record.back.sort((a, b) => HER_RIG.order.indexOf(a) - HER_RIG.order.indexOf(b));
+    record.back.sort((a, b) => order.indexOf(a) - order.indexOf(b));
     drawHuntSketch(record, "back", evening);
   } else reason === "fight" && !record.sketches.back && drawHuntSketch(record, "back", evening);
 }
@@ -108752,18 +108898,20 @@ function markRigPiece(loop, kind, part, piece) {
     : m.tick.includes(id) || m.notch.includes(id) || m.notch.push(id);
 }
 // Her loss to a part ("hook", "leader", "line") notches it and ticks the parts that held before it; a loss with
-// everything held ("fight") ticks all three.
-function markHerLoss(loop, reason) {
-  let at = HER_RIG.order.indexOf(reason);
+// everything held ("fight") ticks all three. `hunt` gives the parts' fight order.
+function markHerLoss(loop, reason, hunt) {
+  let order = Sr(hunt?.rig?.order),
+    at = order.indexOf(reason);
   if (at < 0 && reason !== "fight") return;
-  for (let [k, part] of HER_RIG.order.entries())
+  for (let [k, part] of order.entries())
     (at < 0 || k < at) && markRigPiece(loop, "tick", part, rigPieceNow(loop, part));
   at >= 0 && markRigPiece(loop, "notch", reason, rigPieceNow(loop, reason));
 }
 // ---- The end of the hunt (mossmere-hunt-2.md sections 1, 5 and 6, B4 to B6) ----------------------------------
-// Whether she has been landed in this save's hunt (an older save that sold her counts once it is loaded).
-function huntLanded(loop) {
-  return ha(huntRecordOf(loop)?.landed) > 0;
+// Whether she has been landed in this save's hunt of `water` (an older save that sold her counts once it is
+// loaded).
+function huntLanded(loop, water) {
+  return ha(huntRecordOf(loop, water)?.landed) > 0;
 }
 function relicHeld(loop, id) {
   return Sr(loop?.relics).includes(id);
@@ -108789,41 +108937,49 @@ function layMonsterChart(loop, legendId) {
         loop.maps.places.push(id);
   }
 }
-// She is landed (on a Mossmere trip): sketch 5 is drawn whole if it is still blank ("What held"); the first time,
-// the hunt notes the evening and the water her landing opens has its chart laid down. The bounty and Hob's Lamp
-// wait for the tally. Returns whether this was the first landing.
-function markHerLanded(loop, evening) {
-  let record = huntRecordOf(loop);
+// She is landed (on a trip in `water`, her hunt's lake): sketch 5 is drawn whole if it is still blank ("What
+// held"); the first time, the hunt notes the evening and the water her landing opens has its chart laid down. The
+// bounty and the relic wait for the tally. Returns whether this was the first landing.
+function markHerLanded(loop, water, evening) {
+  let hunt = huntOf(water),
+    record = huntRecordOf(loop, water);
   if (!record) return !1;
   noteHerLanded(record, evening);
   record.landings = ha(record.landings) + 1;
   // Landed: every part she pulled against held, and nothing on the rig failed.
-  markHerLoss(loop, "fight");
+  markHerLoss(loop, "fight", hunt);
   Ln(loop.rigMarks) && (loop.rigMarks.notch = []);
   if (record.landed > 0) return !1;
   (record.landed = Math.max(1, ha(evening))), (record.landedBy = "catch");
-  layMonsterChart(loop, MIDNIGHT.legend);
+  layMonsterChart(loop, hunt.legend);
   return !0;
 }
-// At the first tally after she is landed, once: the bounty paid into the clams and Hob's Lamp given. Murk's old
-// line for a legend sold is marked said, since his landing line is told here. Returns { bounty } or null.
-function herEndingAtTally(loop, rule = wo.hunt) {
-  let record = huntRecordOf(loop);
-  if (!record || !(record.landed > 0) || record.bountyPaid === !0) return null;
-  let bounty = Math.max(0, ha(rule?.bounty));
-  record.bountyPaid = !0;
-  loop.clams = oa(loop.clams) + bounty;
-  grantRelic(loop, "hobs_lamp");
-  Ln(loop.said) || (loop.said = {});
-  loop.said.legendFirst = !0;
-  return { bounty };
+// At the first tally after a hunt's legend is landed, once: its bounty paid into the clams and its relic (Hob's
+// Lamp) given. Murk's old line for a legend sold is marked said, since his landing line is told here. Returns
+// { bounty, relic, legend, water } or null.
+function herEndingAtTally(loop) {
+  for (let water of huntWaters()) {
+    let hunt = huntOf(water),
+      record = huntRecordOf(loop, water);
+    if (!record || !(record.landed > 0) || record.bountyPaid === !0) continue;
+    let bounty = Math.max(0, ha(hunt.bounty));
+    record.bountyPaid = !0;
+    loop.clams = oa(loop.clams) + bounty;
+    hunt.relic && grantRelic(loop, hunt.relic);
+    Ln(loop.said) || (loop.said = {});
+    loop.said.legendFirst = !0;
+    return { bounty, relic: hunt.relic || null, legend: hunt.legend, water };
+  }
+  return null;
 }
 // An older save that had already sold or landed her (B4) loads with the hunt over: every sketch drawn, the hunt
-// marked landed, Hob's Lamp on the raft and the chart of the water she opens laid down if it is missing. Nothing
-// is left to come: no tale, line-up, nudge, cutscene or bounty (she was sold, or landed before there was one).
-function settleOldLanding(loop, meta) {
-  let record = huntRecordOf(loop),
-    id = MIDNIGHT.legend;
+// marked landed, its relic (Hob's Lamp) on the raft and the chart of the water she opens laid down if it is
+// missing. Nothing is left to come: no tale, line-up, nudge, cutscene or bounty (she was sold, or landed before
+// there was one).
+function settleOldLanding(loop, meta, water) {
+  let hunt = huntOf(water),
+    record = huntRecordOf(loop, water),
+    id = hunt?.legend;
   if (!record || record.landed > 0) return !1;
   if (!(Number(meta?.journal?.[id]?.caught) > 0) && !(Number(loop.legends?.[id]) > 0)) return !1;
   let evening = Math.max(1, ha(loop.evenings));
@@ -108834,32 +108990,35 @@ function settleOldLanding(loop, meta) {
     (record.found = !0), (record.foundEvening = evening), (record.foundBy = "save");
     Ln(loop.places) || (loop.places = { revealed: [] });
     Array.isArray(loop.places.revealed) || (loop.places.revealed = []);
-    loop.places.revealed.includes(HER_WATER.place) || loop.places.revealed.push(HER_WATER.place);
-    h7(loop, HER_WATER.place);
+    loop.places.revealed.includes(hunt.find.place) || loop.places.revealed.push(hunt.find.place);
+    h7(loop, hunt.find.place);
   }
-  // Sketch 4 as the default rig would have drawn it: worms under the float.
-  record.swirlKind || ((record.swirlKind = "left"), (record.swirlRig = { bait: "mireworm", lead: !1 }));
+  // Sketch 4 as the default rig would have drawn it (pad.oldSwirl: on Mossmere, worms under the float).
+  let swirl = hunt.pad?.oldSwirl || {};
+  record.swirlKind ||
+    ((record.swirlKind = swirl.kind || "left"), (record.swirlRig = { bait: swirl.bait || "", lead: !1 }));
   (record.murkNudged = !0), (record.murkFound = !0), (record.birdCutsceneSeen = !0);
   (record.padUnseen = []), (record.padDue = !1);
   (record.landed = evening), (record.landedBy = "save"), (record.bountyPaid = !0);
-  grantRelic(loop, "hobs_lamp");
+  hunt.relic && grantRelic(loop, hunt.relic);
   layMonsterChart(loop, id);
   return !0;
 }
-// Hob's rod comes up on the first cast in her water after she is landed (section 5), once.
-function herRodDue(loop) {
-  let record = huntRecordOf(loop);
+// The character's rod (Hob's) comes up on the first cast in her water after she is landed (section 5), once.
+function herRodDue(loop, water) {
+  let record = huntRecordOf(loop, water);
   return !!record && record.landed > 0 && !(record.rodFound > 0);
 }
 // An older save's line lesson (set before the notepad) carries over: taught, and drawn into sketch 5.
-function carryHerLineLesson(loop) {
-  let record = huntRecordOf(loop);
+function carryHerLineLesson(loop, water) {
+  let record = huntRecordOf(loop, water);
   if (!record || record.lineLesson !== !0 || record.lessons.line) return;
-  noteHerLoss(record, "line", Math.max(1, Math.trunc(Number(loop.evenings) || 0)));
+  noteHerLoss(record, "line", Math.max(1, Math.trunc(Number(loop.evenings) || 0)), huntOf(water));
 }
-// The words that name a bait in her refusal lines: the worms, the minnow, or "the" and its name.
-function herBaitWords(baitId) {
-  let words = Ca.hunt.refusal.baits[baitId],
+// The words that name a bait in her refusal lines (the hunt's refusal.baits: the worms, the minnow), or "the" and
+// its name.
+function herBaitWords(baitId, water) {
+  let words = huntWords(water).refusal?.baits?.[baitId],
     name = Ca.gearItems[baitId] || "bait";
   return words || { the: `the ${name}`, your: `your ${name}`, them: "it" };
 }
@@ -108868,58 +109027,67 @@ function herBaitWords(baitId) {
 // camera goes to her water, a grown water bird sits on it, a boil rises under it and it is gone. It shows a dark
 // shape on the water and a swirl, never her model. The evening's clock stops while it plays (ctx.cinematic), it
 // waits for a moment with nothing on the line and nothing open, and one press skips it. On every later night a
-// splash and a ripple at her spot mark the start of her time instead. Times are seconds from its start.
-const BIRD_SCENE = Object.freeze({
-  // It may start this long after the first stroke, so the bell and its line come first.
-  after: 1.5,
-  length: 5,
-  // The boil's dark back rises under the bird, then the bird is pulled under over `under` seconds.
-  boilAt: 1.9,
-  takeAt: 2.4,
-  under: 0.35,
-  // The camera holds on her water until `release`, then eases back over `back`.
-  release: 4.4,
-  back: 0.6,
-  // The bird sits this far from her centre on the raft's side, so the harbour frame stands behind it.
-  offset: 3,
-  // How the camera frames it: close, low, from the raft's side.
-  frame: { r: 1.5, dist: 7.5, elev: 16 },
-  // The boil sign's size (metres of fish it is painted for: only a size, never a shape or colour).
-  boilSize: 2.2,
-});
+// splash and a ripple at her spot mark the start of her time instead. Its timings and framing are the hunt's
+// `scene` (wo.hunts: kind "bird"); times are seconds from its start.
 // Whether the thief has ever been landed (an older save that sold her): the cutscene's line calls her "it".
-function thiefLanded(game) {
-  return Number(game?.state?.meta?.journal?.[MIDNIGHT.legend]?.caught) > 0;
+function thiefLanded(game, hunt) {
+  return Number(game?.state?.meta?.journal?.[hunt?.legend]?.caught) > 0;
 }
-// True while the bird at midnight is waiting to play tonight: in her time, after the first stroke, on a night
-// after the one her water was found, not yet seen, and never for a save that has not found her water.
-function birdSceneDue(game, run) {
+// True while the hunt's cutscene (Mossmere's bird at midnight) is waiting to play tonight: in her time, after the
+// first stroke, on a night after the one her water was found, not yet seen, and never for a save that has not
+// found her water.
+function huntSceneDue(game, run) {
   if (!herTimeOpen(run)) return !1;
-  let t = nightClock(run),
-    record = huntRecordOf(game?.state?.meta?.loop);
+  let hunt = huntOf(run.zone),
+    t = nightClock(run),
+    record = huntRecordOf(game?.state?.meta?.loop, run.zone);
   return (
     !!record &&
-    t >= MIDNIGHT.at + BIRD_SCENE.after &&
+    !!hunt.scene &&
+    t >= hunt.time.at + hunt.scene.after &&
     record.found === !0 &&
     record.birdCutsceneSeen !== !0 &&
     Math.trunc(Number(run.evening) || 0) > Math.trunc(Number(record.foundEvening) || 0) &&
-    !thiefLanded(game)
+    !thiefLanded(game, hunt)
   );
 }
-// At the first stroke, on the nights after the bird at midnight was seen: a splash and a ripple at her centre.
-function markHerTimeStart(game, m) {
-  let record = huntRecordOf(game.state?.meta?.loop);
+// At the first stroke, on the nights after the cutscene was seen: a splash and a ripple at her centre.
+function markHerTimeStart(game, m, run) {
+  let water = run?.zone,
+    find = huntOf(water)?.find,
+    record = huntRecordOf(game.state?.meta?.loop, water);
   if (!record || record.found !== !0 || record.birdCutsceneSeen !== !0 || m.herMarked || record.landed > 0)
     return;
   m.herMarked = !0;
   try {
-    game.water?.splash?.(HER_WATER.x, HER_WATER.z, { size: 1.3, count: 22 });
-    game.water?.addRipple?.(HER_WATER.x, HER_WATER.z, 1.4);
-    game.water?.addRipple?.(HER_WATER.x + 0.5, HER_WATER.z - 0.4, 1.2, 0.35);
+    game.water?.splash?.(find.x, find.z, { size: 1.3, count: 22 });
+    game.water?.addRipple?.(find.x, find.z, 1.4);
+    game.water?.addRipple?.(find.x + 0.5, find.z - 0.4, 1.2, 0.35);
   } catch {}
-  game.bus?.emit?.("hunt:herTimeMark", { x: HER_WATER.x, z: HER_WATER.z });
+  game.bus?.emit?.("hunt:herTimeMark", { x: find.x, z: find.z });
 }
-// Plays the bird at midnight. The flow module owns one, updates it every frame, and skips it on a press.
+// The directors a hunt's scene.kind names. A new lake's own cutscene adds its director here.
+const HUNT_SCENES = { bird: birdSceneDirector };
+// Plays the cutscene of the run's water's hunt, by its scene.kind: one director for each kind, made when first
+// needed. The flow module owns one, updates it every frame, and skips it on a press.
+function huntSceneDirector(game, opts = {}) {
+  let made = {},
+    current = null;
+  const of = (kind) =>
+    made[kind] || (HUNT_SCENES[kind] ? (made[kind] = HUNT_SCENES[kind](game, opts)) : null);
+  return {
+    begin() {
+      let kind = huntOf(game.state?.run?.zone)?.scene?.kind,
+        director = kind ? of(kind) : null;
+      return director ? (director.begin() ? ((current = director), !0) : !1) : !1;
+    },
+    update: (dt) => current?.update(dt),
+    skip: () => current?.skip() ?? !1,
+    stop: () => current?.stop(),
+    state: () => current?.state() ?? null,
+  };
+}
+// Plays the bird at midnight (scene kind "bird"): its rules are the hunt's scene, her centre its find.
 function birdSceneDirector(game, { report = () => {} } = {}) {
   let scene = null;
   const safe = (what, fn) => {
@@ -108937,16 +109105,19 @@ function birdSceneDirector(game, { report = () => {} } = {}) {
           z: scene.z,
           yaw: scene.yaw,
           under,
-          flock: MIDNIGHT.roostFlock,
+          flock: scene.flock,
         }),
       );
   function begin() {
     let run = game.state?.run,
-      record = huntRecordOf(game.state?.meta?.loop);
-    if (scene || game.flow !== "playing" || game.cinematic === !0 || !birdSceneDue(game, run)) return !1;
-    let raft = game.player?.position,
-      dx = Number.isFinite(raft?.x) ? raft.x - HER_WATER.x : 0,
-      dz = Number.isFinite(raft?.z) ? raft.z - HER_WATER.z : 1,
+      record = huntRecordOf(game.state?.meta?.loop, run?.zone);
+    if (scene || game.flow !== "playing" || game.cinematic === !0 || !huntSceneDue(game, run)) return !1;
+    let hunt = huntOf(run.zone),
+      rule = hunt.scene,
+      find = hunt.find,
+      raft = game.player?.position,
+      dx = Number.isFinite(raft?.x) ? raft.x - find.x : 0,
+      dz = Number.isFinite(raft?.z) ? raft.z - find.z : 1,
       len = Math.hypot(dx, dz) || 1;
     (dx /= len), (dz /= len);
     // Seen from the moment it starts, so it never plays again, even if it is skipped or cut short.
@@ -108954,18 +109125,21 @@ function birdSceneDirector(game, { report = () => {} } = {}) {
     safe("save", () => game.game?.save?.());
     scene = {
       t: 0,
-      x: HER_WATER.x + dx * BIRD_SCENE.offset,
-      z: HER_WATER.z + dz * BIRD_SCENE.offset,
+      x: find.x + dx * rule.offset,
+      z: find.z + dz * rule.offset,
       // Side-on to the camera, which looks from the raft's side.
       yaw: Math.atan2(dx, dz) + Math.PI / 2,
       boiled: !1,
       taken: !1,
+      rule,
+      flock: hunt.time.roostFlock,
+      words: huntWords(run.zone).time || {},
     };
     game.cinematic = !0;
     safe("frame", () =>
       game.render?.frameLandmark?.(
-        { x: scene.x, y: 0, z: scene.z, ...BIRD_SCENE.frame },
-        { dur: BIRD_SCENE.release, back: BIRD_SCENE.back },
+        { x: scene.x, y: 0, z: scene.z, ...rule.frame },
+        { dur: rule.release, back: rule.back },
       ),
     );
     stage(0);
@@ -108977,13 +109151,13 @@ function birdSceneDirector(game, { report = () => {} } = {}) {
     if (game.flow !== "playing" || !game.state?.run) return void stop();
     if (game.paused || !(dt > 0)) return;
     scene.t += Math.min(dt, 0.25);
-    let { x, z } = scene;
-    if (!scene.boiled && scene.t >= BIRD_SCENE.boilAt) {
+    let { x, z, rule } = scene;
+    if (!scene.boiled && scene.t >= rule.boilAt) {
       scene.boiled = !0;
       // The water's boil sign: a dark back turning under the surface and the swirl it leaves.
-      safe("boil", () => game.water?.addRipple?.(x, z, 1, { kind: "boil", size: BIRD_SCENE.boilSize }));
+      safe("boil", () => game.water?.addRipple?.(x, z, 1, { kind: "boil", size: rule.boilSize }));
     }
-    if (!scene.taken && scene.t >= BIRD_SCENE.takeAt) {
+    if (!scene.taken && scene.t >= rule.takeAt) {
       scene.taken = !0;
       safe("take", () => {
         game.water?.splash?.(x, z, { size: 1.2, count: 24 });
@@ -108993,26 +109167,28 @@ function birdSceneDirector(game, { report = () => {} } = {}) {
       });
       emit("hunt:birdScene", { phase: "take", x, z });
     }
-    stage(Math.max(0, Math.min(1, (scene.t - BIRD_SCENE.takeAt) / BIRD_SCENE.under)));
-    scene.t >= BIRD_SCENE.length && finish(!1);
+    stage(Math.max(0, Math.min(1, (scene.t - rule.takeAt) / rule.under)));
+    scene.t >= rule.length && finish(!1);
   }
   // Ends it (played out or skipped): the bird stays under for the rest of the trip, the clock runs again and the
   // line shows.
   function finish(skipped) {
     if (!scene) return !1;
+    let { rule, words } = scene;
     scene = null;
-    skipped && safe("frame", () => game.render?.frameLandmark?.(null, { back: BIRD_SCENE.back }));
+    skipped && safe("frame", () => game.render?.frameLandmark?.(null, { back: rule.back }));
     safe("bird", () => game.waterBirds?.stageBird?.(null, { gone: !0 }));
     game.cinematic = !1;
-    emit("toast", { text: Ca.midnight.birdTaken, kind: "lore" });
+    emit("toast", { text: words.birdTaken, kind: "lore" });
     emit("hunt:birdScene", { phase: "end", skipped });
     return !0;
   }
   // Leaving the water mid-scene: everything is put back, with no line.
   function stop() {
     if (!scene) return;
+    let { rule } = scene;
     scene = null;
-    safe("frame", () => game.render?.frameLandmark?.(null, { back: BIRD_SCENE.back }));
+    safe("frame", () => game.render?.frameLandmark?.(null, { back: rule.back }));
     safe("bird", () => game.waterBirds?.stageBird?.(null, { gone: !0 }));
     game.cinematic = !1;
   }
@@ -109551,13 +109727,9 @@ function hF(
       !!_t &&
       (() => {
         let re = W3(t, _t);
-        // Mossmere's legend bites only in her time after the midnight bell, so the sheet lists her by night.
+        // A hunt's legend (Mossmere's) bites only in her time after the time clue, so the sheet lists her by night.
         return (
-          _t === MIDNIGHT.legend && d === MIDNIGHT.water
-            ? ["night"]
-            : typeof t?.loopHours == "function"
-              ? t.loopHours(re)
-              : QA
+          _t === huntOf(d)?.legend ? ["night"] : typeof t?.loopHours == "function" ? t.loopHours(re) : QA
         ).includes(Se);
       })(),
     // Her chance per cast on this rig, by the same rule as the bite check (legendBaitChance).
@@ -109891,7 +110063,7 @@ function hF(
         legend: legendShare === 1 ? _t : null,
         depth: sheetDepth,
         // Her row is shown (she is landed): the sheet also says that she bites only after the midnight bell.
-        herTime: d === MIDNIGHT.water && qt.some((row) => row.id === MIDNIGHT.legend),
+        herTime: !!huntOf(d) && qt.some((row) => row.id === huntOf(d).legend),
       },
       fresh: lt,
     }
@@ -110086,7 +110258,8 @@ function yF(e) {
     gearWater: il(e),
     fit: { rod: null, line: null, reel: null },
     eveningsAt: { [il(e)]: 0 },
-    hunt: { mossmere: freshHuntRecord() },
+    // Each lake's monster hunt (wo.hunts), by lake.
+    hunt: Object.fromEntries(huntWaters().map((water) => [water, freshHuntRecord(water)])),
     // The unique items lake monsters gave (wo.relics), by id. They belong to the save, not a lake, so a tow
     // never touches them.
     relics: [],
@@ -110225,23 +110398,24 @@ function normaliseLakeKit(kit, D, water) {
   kit.fitted = fitted;
   kit.rigs[kit.activeRig] = { ...fitted };
 }
-// One lake's monster hunt in the save. Only the part built so far: lineLesson is set by the first loss to a
-// line too weak for her.
-function freshHuntRecord() {
+// One lake's monster hunt in the save (`water`'s, from its wo.hunts entry): lineLesson is set by the first loss to
+// a line too weak for her.
+function freshHuntRecord(water) {
+  let hunt = huntOf(water);
   return {
     lineLesson: false,
     // Her losses (section 2, B4): the parts she has taught (each broke her free once), the parts that came back
     // broken in fight order (sketch 5), whether the theft brought the Turnback Hook, and what sketch 4 drew:
     // swirlKind "left", "float", "lure" or "bunch", and the rig (its bait and whether it was on the lead).
-    lessons: { hook: false, leader: false, line: false },
+    lessons: Object.fromEntries(Sr(hunt?.rig?.order).map((part) => [part, false])),
     back: [],
     hookByTheft: false,
     swirlKind: "",
     swirlRig: { bait: "", lead: false },
     // The tale (mossmere-hunt-2.md section 1): the evening it was told at the tally, 0 until then.
     taleAt: 0,
-    // The notepad's five sketches: the evening each was drawn, 0 while its place is blank.
-    sketches: { map: 0, taken: 0, lineup: 0, swirl: 0, back: 0 },
+    // The notepad's sketches (pad.places: Mossmere's five): the evening each was drawn, 0 while its place is blank.
+    sketches: Object.fromEntries(Sr(hunt?.pad?.places).map((place) => [place.key, 0])),
     // Who drew Hob's map: "hob", or "murk" when he passed it on after two evenings without meeting Hob.
     mapBy: "",
     // Sketches not yet drawn in front of the player, and whether the notepad opens by itself when next at home
@@ -110321,7 +110495,8 @@ const CATCH_MARKS = ["cuts", "holes", "ring"];
 // the listed fish caught in reeds or pads, and the holes on the listed fish caught on a drop-off or in deep
 // water at dusk or night, each at its chance. `phase` is the run's ("calm", "dusk", "gloomtide"). Returns
 // "ring", "cuts", "holes" or null; `rng` gives a number from 0 to 1.
-function catchMarkRoll(speciesId, area, phase, rng = Math.random, rule = wo.hunt.marks) {
+function catchMarkRoll(speciesId, area, phase, rng = Math.random, rule = null) {
+  if (!rule) return null;
   if (Sr(rule.ring.often).includes(speciesId)) return rng() < rule.ring.oftenChance ? "ring" : null;
   let { cuts, holes } = rule;
   if (Sr(cuts.fish).includes(speciesId) && Sr(cuts.areas).includes(area))
@@ -110334,59 +110509,63 @@ function catchMarkRoll(speciesId, area, phase, rng = Math.random, rule = wo.hunt
     return rng() < holes.chance ? "holes" : null;
   return null;
 }
-// The mark on an ordinary fish just landed on a Mossmere trip (B3), or null. There are none before Hob's map is
-// drawn (her signs wait for it, and before it there is no page to draw them on). In her time, with the float
-// within `near` metres of her centre, a fish carries the ring at `nearChance`; otherwise the table decides.
+// The mark on an ordinary fish just landed on a trip in a lake with a hunt (B3; the hunt's marks), or null. There
+// are none before the character's map is drawn (her signs wait for it, and before it there is no page to draw
+// them on). In her time, with the float within `near` metres of her centre, a fish carries the ring at
+// `nearChance`; otherwise the table decides.
 function catchMarkFor(
   loop,
   run,
   { speciesId = null, area = null, phase = null, x = NaN, z = NaN, legendary = !1 } = {},
   rng = Math.random,
-  rule = wo.hunt.marks,
+  rule = huntOf(run?.zone)?.marks,
 ) {
   // The local kinds never carry a mark (wo.localKinds).
   if (
     legendary ||
     !speciesId ||
     wo.localKinds?.kinds?.[speciesId] ||
-    run?.zone !== "mossmere" ||
-    !(huntRecordOf(loop)?.sketches?.map > 0)
+    !rule ||
+    !(huntRecordOf(loop, run?.zone)?.sketches?.map > 0)
   )
     return null;
+  let find = huntOf(run.zone).find;
   if (
     herTimeOpen(run) &&
-    !huntLanded(loop) &&
+    !huntLanded(loop, run.zone) &&
     Number.isFinite(x) &&
     Number.isFinite(z) &&
-    Math.hypot(x - HER_WATER.x, z - HER_WATER.z) <= rule.ring.near &&
+    Math.hypot(x - find.x, z - find.z) <= rule.ring.near &&
     rng() < rule.ring.nearChance
   )
     return "ring";
   return catchMarkRoll(speciesId, area, phase, rng, rule);
 }
 // A mark seen for the first time: its evening in `marks`, and (`unseen`) it draws into the strip when the
-// notepad next opens. The first ring of scrapes is also a beat for the Turnback Hook (wo.arrivals), in a water
-// with hooks while the hook is not on the shelf yet. Returns whether it was new.
+// notepad next opens. A mark the hunt's beats name (Mossmere's first ring of scrapes) is also a tackle arrival's
+// beat (wo.arrivals: the Turnback Hook), in a water with hooks while its parts are not on the shelf yet. Returns
+// whether it was new.
 function noteMarkSeen(loop, record, mark, evening, water, { unseen = !0 } = {}) {
   if (!CATCH_MARKS.includes(mark) || ha(record.marks[mark]) > 0) return !1;
   record.marks[mark] = Math.max(1, ha(evening));
   unseen && !record.padUnseen.includes(`mark:${mark}`) && record.padUnseen.push(`mark:${mark}`);
-  mark === "ring" &&
-    typeof water == "string" &&
+  let beat = mark === "ring" ? huntOf(water)?.beats?.ring : null;
+  beat &&
     bs[water]?.hookSet &&
-    !wo.arrivals.turnback_hook.parts.every((id) => Sr(loop?.arrivals?.shelved).includes(id)) &&
-    noteArrivalBeat(loop, "turnback_hook");
+    !Sr(wo.arrivals?.[water]?.[beat]?.parts).every((id) => Sr(loop?.arrivals?.shelved).includes(id)) &&
+    noteArrivalBeat(loop, beat);
   return !0;
 }
 // Crosses a line-up fish out, once: its evening in `crossed`, drawn in when the notepad next opens (`unseen`).
 // A Kissmark Trout landed with the ring of scrapes on it (`ring`) is crossed out for that; one without it, or one
 // only known from the Journal, is crossed out for its small mouth.
 function crossLineupFish(loop, record, speciesId, evening, water, { unseen = !0, ring = !1 } = {}) {
-  if (!Sr(wo.hunt.lineup).includes(speciesId) || ha(record.crossed[speciesId]) > 0) return !1;
+  let hunt = huntOf(water);
+  if (!hunt || !Sr(hunt.lineup).includes(speciesId) || ha(record.crossed[speciesId]) > 0) return !1;
   record.crossed[speciesId] = Math.max(1, ha(evening));
   unseen && !record.padUnseen.includes(`cross:${speciesId}`) && record.padUnseen.push(`cross:${speciesId}`);
   ring &&
-    Sr(wo.hunt.marks.ring.often).includes(speciesId) &&
+    Sr(hunt.marks?.ring?.often).includes(speciesId) &&
     (Array.isArray(record.ringed) || (record.ringed = []),
     record.ringed.includes(speciesId) || record.ringed.push(speciesId));
   return !0;
@@ -110394,15 +110573,15 @@ function crossLineupFish(loop, record, speciesId, evening, water, { unseen = !0,
 // Sketch 3 drawn at a tally: the five fish, with those already caught (journal) crossed out as part of it.
 function drawLineup(loop, record, evening, journal, water) {
   drawHuntSketch(record, "lineup", evening);
-  for (let id of Sr(wo.hunt.lineup))
+  for (let id of Sr(huntOf(water)?.lineup))
     Number(journal?.[id]?.caught) > 0 && crossLineupFish(loop, record, id, evening, water, { unseen: !1 });
 }
-// A fish landed on a Mossmere trip, once Hob's map is drawn: a mark on it never seen before goes into the strip,
-// and, once the line-up is drawn, a line-up fish not crossed out yet is crossed out. Returns what was new
-// ({ mark, crossed }) or null.
+// A fish landed on a trip in a lake with a hunt, once the character's map is drawn: a mark on it never seen
+// before goes into the strip, and, once the line-up is drawn, a line-up fish not crossed out yet is crossed out.
+// Returns what was new ({ mark, crossed }) or null.
 function noteHuntCatch(loop, trip, speciesId, fish = null) {
-  let record = huntRecordOf(loop);
-  if (trip?.zone !== "mossmere" || !record || !(record.sketches?.map > 0) || !speciesId) return null;
+  let record = huntRecordOf(loop, trip?.zone);
+  if (!record || !(record.sketches?.map > 0) || !speciesId) return null;
   let evening = ha(trip.evening) || ha(loop.evenings) + 1,
     seen = {};
   noteMarkSeen(loop, record, fish?.mark, evening, trip.zone) && (seen.mark = fish.mark);
@@ -110411,17 +110590,18 @@ function noteHuntCatch(loop, trip, speciesId, fish = null) {
     ((seen.crossed = speciesId), (seen.ringed = Sr(record.ringed).includes(speciesId)));
   return seen.mark || seen.crossed ? seen : null;
 }
-// The hunt's moment at a Mossmere tally (mossmere-hunt-2.md sections 1, 2 and 4): the tale at the tally of
-// evening 2, or at an older save's next tally; then, while Hob's map is missing, Murk's word after one evening
+// The hunt's moment at a tally in a lake with a hunt (`rule`, the trip's lake's; mossmere-hunt-2.md sections 1, 2
+// and 4): the tale at the tally of its taleEvening (Mossmere's evening 2), or at an older save's next tally; then,
+// while the character's map is missing, Murk's word after one evening
 // and the map passed on after two. Returns what the tally shows ({ tale, murk }) or null. The notepad is marked
 // to open by itself after this tally when the tale is told or a sketch waits to be seen. `quiet` (a tally with
 // Murk's gift): nothing is told this time, so the tale and the nudges come one tally later. At the first tally
 // after Hob's map is drawn (not the tally that passes it on, nor the tally of the tale itself, which a map drawn
 // before the tale would share), Murk also names the line-up and sketch 3 is drawn, with the fish already in the
 // Journal (`journal`) crossed out ({ lineup: true }).
-function mossmereTallyBeat(loop, trip, rule = wo.hunt, { quiet = !1, journal = null } = {}) {
-  let record = loop?.hunt?.mossmere;
-  if (trip?.zone !== "mossmere" || !Ln(record)) return null;
+function huntTallyBeat(loop, trip, rule = huntOf(trip?.zone), { quiet = !1, journal = null } = {}) {
+  let record = huntRecordOf(loop, trip?.zone);
+  if (!rule || !Ln(record)) return null;
   // Once she is landed the hunt tells nothing more here (its end is told at the tally: herEndingAtTally), but a
   // sketch drawn at the landing ("What held") still opens the notepad once.
   if (record.landed > 0) return record.padUnseen.length && (record.padDue = !0), null;
@@ -110508,19 +110688,26 @@ function noteArrivalBeat(loop, key) {
 // fish that grabs and runs lost after it ran before the hook was set (struck, or a hard take, which is struck).
 // Only in a water with hooks and leaders, and only while the part is not on the shelf yet.
 function noteFishArrivalBeats(loop, water, speciesId, { lost = !1, grade = null } = {}) {
-  let rule = wo.arrivals,
-    shelved = (key) => rule[key].parts.every((id) => Sr(loop?.arrivals?.shelved).includes(id));
-  if (typeof water != "string" || !bs[water]?.hookSet || !speciesId) return;
-  Sr(rule.pike_wire.fish).includes(speciesId) && !shelved("pike_wire") && noteArrivalBeat(loop, "pike_wire");
+  let rule = typeof water == "string" ? wo.arrivals?.[water] : null,
+    shelved = (key) => Sr(rule[key]?.parts).every((id) => Sr(loop?.arrivals?.shelved).includes(id));
+  if (typeof water != "string" || !bs[water]?.hookSet || !speciesId || !rule) return;
+  Sr(rule.pike_wire?.fish).includes(speciesId) && !shelved("pike_wire") && noteArrivalBeat(loop, "pike_wire");
   lost &&
     grade === "struck" &&
-    Sr(rule.turnback_hook.runs).includes(speciesId) &&
+    Sr(rule.turnback_hook?.runs).includes(speciesId) &&
     !shelved("turnback_hook") &&
     noteArrivalBeat(loop, "turnback_hook");
 }
+// Every lake's practice-order parts in one table (wo.orders.practice is by lake): what a tally notes.
+function practicePartsAll(practice = wo.orders?.practice) {
+  let parts = {};
+  for (let lake of Object.values(Ln(practice) ? practice : {}))
+    Ln(lake?.parts) && Object.assign(parts, lake.parts);
+  return parts;
+}
 // At the start of a tally (wo.orders.practice): each practice order the catch fills marks its part as filled,
 // and the parts owned now become the ones that may post a practice order until the next tally.
-function notePracticeTally(loop, fills, rule = wo.orders?.practice) {
+function notePracticeTally(loop, fills, rule = { parts: practicePartsAll() }) {
   if (!Ln(loop) || !Ln(rule?.parts)) return;
   Ln(loop.practice) || (loop.practice = { filled: [], ready: [] });
   let record = loop.practice,
@@ -110541,11 +110728,20 @@ function notePracticeTally(loop, fills, rule = wo.orders?.practice) {
 // gift from Murk: { gift, giftSay } with gift "turnback_hook", "pike_wire" or "leaders", or null. Puts the parts on
 // the shelf. Hob's map drawn before this tally is the leaders' beat; a map Murk passes on at this tally counts from
 // the next. With nothing due, a tally after the tin's brings the Turnback Hook anyway (a quiet tally).
-function rigArrivalAtTally(loop, water, rule = wo.arrivals) {
+function rigArrivalAtTally(loop, water, rule = typeof water == "string" ? wo.arrivals?.[water] : null) {
   let arrivals = loop?.arrivals;
-  if (!Ln(arrivals) || !Array.isArray(arrivals.shelved) || typeof water != "string" || !bs[water]?.hookSet)
+  if (
+    !Ln(arrivals) ||
+    !Array.isArray(arrivals.shelved) ||
+    typeof water != "string" ||
+    !bs[water]?.hookSet ||
+    !Ln(rule)
+  )
     return null;
-  loop.hunt?.mossmere?.sketches?.map > 0 && noteArrivalBeat(loop, "leaders");
+  // The character's map drawn before this tally is the beat the hunt's beats.map names (Mossmere: the leaders).
+  let hunt = huntOf(water),
+    record = huntRecordOf(loop, water);
+  record?.sketches?.map > 0 && hunt.beats?.map && noteArrivalBeat(loop, hunt.beats.map);
   let waiting = (key) =>
       Sr(rule[key]?.parts).filter((id) => !arrivals.shelved.includes(id) && !Sr(loop.parts).includes(id)),
     order = Sr(rule.order),
@@ -110566,7 +110762,7 @@ function rigArrivalAtTally(loop, water, rule = wo.arrivals) {
   // Brought by the theft that found her water, or after the ring of scrapes has been seen: Murk's hunt line.
   gift === "turnback_hook" &&
     giftSay === "beat" &&
-    (loop.hunt?.mossmere?.hookByTheft === !0 || ha(loop.hunt?.mossmere?.marks?.ring) > 0) &&
+    (record?.hookByTheft === !0 || ha(record?.marks?.ring) > 0) &&
     (giftSay = "hunt");
   return { gift, giftSay };
 }
@@ -110751,20 +110947,17 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
   for (let key of ["filled", "ready"])
     c.practice[key] = Array.isArray(c.practice[key])
       ? c.practice[key].filter(
-          (id, n, all) =>
-            typeof id == "string" && Ln(wo.orders?.practice?.parts?.[id]) && all.indexOf(id) === n,
+          (id, n, all) => typeof id == "string" && Ln(practicePartsAll()[id]) && all.indexOf(id) === n,
         )
       : [];
   for (let [lake, record] of Object.entries(o.hunt)) {
     let saved = Ln(c.hunt[lake]) ? c.hunt[lake] : (c.hunt[lake] = record);
     normaliseHuntRecord(saved, record);
   }
-  foundByChart(c);
-  carryHerLineLesson(c);
+  for (let water of huntWaters()) foundByChart(c, water), carryHerLineLesson(c, water);
   // Relics: known ids only, each once.
   c.relics = c.relics.filter((g, p, w) => Ln(wo.relics?.[g]) && w.indexOf(g) === p);
-  settleOldLanding(c, e, t);
-  carryHerLandings(c, e);
+  for (let water of huntWaters()) settleOldLanding(c, e, water), carryHerLandings(c, e, water);
   for (let [g, p] of Object.entries(c.eveningsAt)) c.eveningsAt[g] = Math.max(0, ha(p));
   for (let [g, p] of Object.entries(t?.LOOP?.lostTackle || {}))
     p?.slot === "lure" && Zl(c, g) && !c.lures.includes(g) && c.lures.push(g);
@@ -111118,7 +111311,7 @@ function sw(e, t, n = "sporewood") {
       monster: {
         held: legendLanded(o, monster.legend),
         legend: monster.legend,
-        label: t?.TEXT_LOOP?.thief?.seal || "",
+        label: t?.TEXT_LOOP?.hunts?.[monster.from]?.seal || "",
       },
     };
   return {
@@ -111575,8 +111768,8 @@ function CF(e) {
   function j(ze) {
     let H = a();
     if ((p(), !r(H) || !Ln(ze))) return { ok: !1, msg: "", gained: { clams: 0 } };
-    // Mossmere's thief is measured and let go, never kept or sold (mossmere-hunt-2.md section 1).
-    if (ze.speciesId === MIDNIGHT.legend) return { ok: !1, msg: "", gained: { clams: 0 } };
+    // A hunt's legend (Mossmere's thief) is measured and let go, never kept or sold (mossmere-hunt-2.md section 1).
+    if (huntWaterOf(ze.speciesId)) return { ok: !1, msg: "", gained: { clams: 0 } };
     if ((H.creel || []).some((K) => K?.uid === ze.uid)) return { ok: !0, msg: "", gained: { clams: M(ze) } };
     if (B())
       return (
@@ -111919,13 +112112,13 @@ function CF(e) {
     // Practice orders: note the ones this tally fills, and which parts may post one from now on (the parts owned
     // as the tally begins, so a part Murk gives below waits for the next tally).
     notePracticeTally(H, je);
-    // The tally after she is landed: Murk pays the bounty (a row of its own, after the fish) and hands over Hob's
-    // Lamp. The lamp is that tally's one new thing, so any gift of tackle waits for the next one.
+    // The tally after she is landed: Murk pays the bounty (a row of its own, after the fish) and hands over the
+    // hunt's relic (Hob's Lamp). It is that tally's one new thing, so any gift of tackle waits for the next one.
     let ending = herEndingAtTally(H);
     ending &&
       (K.push({
         uid: null,
-        speciesId: MIDNIGHT.legend,
+        speciesId: ending.legend,
         sizeClass: null,
         length: 0,
         weight: 0,
@@ -111976,8 +112169,8 @@ function CF(e) {
     }
     // Murk's gift goes in the kit and changes no rig: the three rigs are the player's own to build (decisions.md).
     // The tale and Murk's word about Hob are story, not new tackle, so they may share a tally with his gift.
-    let huntBeat = mossmereTallyBeat(H, ze, f().hunt, { quiet: !1, journal: o()?.journal });
-    ending && ((gift = "hobs_lamp"), (giftSay = "lamp"), (huntBeat = { ...(huntBeat || {}), landed: !0 }));
+    let huntBeat = huntTallyBeat(H, ze, huntOf(ze.zone), { quiet: !1, journal: o()?.journal });
+    ending && ((gift = ending.relic), (giftSay = "lamp"), (huntBeat = { ...(huntBeat || {}), landed: !0 }));
     if (
       (typeof H.fitted?.bait == "string" &&
         !(ha(H.bait?.[ze.zone]?.[H.fitted.bait]) > 0) &&
@@ -112382,22 +112575,24 @@ function CF(e) {
       { ok: !0, changed: !0, reeled: K, depth: ze }
     );
   }
-  // The hunt (mossmere-hunt-2.md): Hob is on his rock on Mossmere trips from evening 2, and talks when you pass.
+  // The hunt (mossmere-hunt-2.md): its character (Hob, on Mossmere) is on his rock on trips in a lake with a hunt
+  // from his lamp's evening (character.lampEvening: evening 2), and talks when you pass.
   function hobHere() {
-    let ze = a();
-    return r(ze) && ze.zone === "mossmere" && ha(ze.evening) >= ha(f().hunt?.lampEvening, 2);
+    let ze = a(),
+      hunt = r(ze) ? huntOf(ze.zone) : null;
+    return !!hunt && ha(ze.evening) >= ha(hunt.character?.lampEvening, 2);
   }
-  // His lamp burns at his side while he is there, until it is yours (Hob's Lamp, given when she is landed): then
-  // it hangs on your raft instead.
+  // His lamp burns at his side while he is there, until it is yours (the hunt's relic, Hob's Lamp, given when she
+  // is landed): then it hangs on your raft instead.
   function hobLampLit() {
-    return hobHere() && !relicHeld(p(), "hobs_lamp");
+    return hobHere() && !relicHeld(p(), huntOf(a()?.zone)?.relic);
   }
-  // Hob's rod comes up in her water after she is landed (section 5): noted once, with its two lines on the water.
+  // His rod comes up in her water after she is landed (section 5): noted once, with its two lines on the water.
   function noteRodFound() {
     let ze = a(),
       H = p();
-    if (!r(ze) || ze.zone !== MIDNIGHT.water || !herRodDue(H)) return !1;
-    let record = huntRecordOf(H);
+    if (!r(ze) || !huntOf(ze.zone) || !herRodDue(H, ze.zone)) return !1;
+    let record = huntRecordOf(H, ze.zone);
     return (
       (record.rodFound = Math.max(1, ha(ze.evening))), c(), d("hunt:rod", { evening: record.rodFound }), !0
     );
@@ -112408,7 +112603,9 @@ function CF(e) {
   // he has nothing more to say tonight.
   function hobTalk() {
     let ze = a(),
-      record = p()?.hunt?.mossmere;
+      water = ze?.zone,
+      hunt = huntOf(water),
+      record = huntRecordOf(p(), water);
     if (!Ln(record) || !hobHere()) return null;
     let evening = ha(ze.evening),
       talk = null;
@@ -112435,8 +112632,8 @@ function CF(e) {
           ? (talk = { first: 2, drew: null })
           : (drawHuntSketch(record, "map", evening),
             (record.mapBy = "hob"),
-            // His map carries his worn line end: the beat that brings the leaders to Murk's shelf.
-            noteArrivalBeat(p(), "leaders"),
+            // His map carries his worn line end: the beat that brings the leaders to Murk's shelf (beats.map).
+            hunt.beats?.map && noteArrivalBeat(p(), hunt.beats.map),
             (talk = { first: 4, drew: "map" }));
     else if (record.hobNight !== evening) {
       record.hobNight = evening;
@@ -112448,7 +112645,7 @@ function CF(e) {
           swirl: () => record.sketches.swirl > 0,
           worn: () => record.back.includes("leader"),
         },
-        line = Object.keys(n().TEXT_LOOP?.hunt?.hob?.nights || {}).find(
+        line = Object.keys(n().TEXT_LOOP?.hunts?.[water]?.hob?.nights || {}).find(
           (k) => !record.hobLines.includes(k) && (!waits[k] || waits[k]()),
         );
       line
@@ -112457,11 +112654,25 @@ function CF(e) {
     } else record.hobGreeted !== evening && ((record.hobGreeted = evening), (talk = { greeting: !0 }));
     return talk && (c(), d("hunt:hob", { ...talk })), talk;
   }
-  // The notepad as the Journal and its own page show it, or null before it exists (before the tale and any sketch).
-  function notepad() {
-    let record = p()?.hunt?.mossmere;
+  // Which lake's notepad the Journal shows: the lake of the trip (or of the barge, at home) once its notepad has
+  // begun, else the first lake whose notepad has; null before any has.
+  function padWater() {
+    let loop = p(),
+      run = a(),
+      here = r(run) ? run.zone : loop?.barge?.water,
+      begun = (water) => {
+        let record = huntRecordOf(loop, water);
+        return !!record && (record.taleAt > 0 || Object.values(record.sketches || {}).some((v) => v > 0));
+      };
+    return begun(here) ? here : huntWaters().find(begun) || null;
+  }
+  // The notepad of a lake's hunt as the Journal and its own page show it, or null before it exists (before the
+  // tale and any sketch).
+  function notepad(water = padWater()) {
+    let record = huntRecordOf(p(), water);
     if (!Ln(record) || !(record.taleAt > 0 || Object.values(record.sketches).some((v) => v > 0))) return null;
     return {
+      water,
       sketches: { ...record.sketches },
       mapBy: record.mapBy,
       unseen: record.padUnseen.slice(),
@@ -112477,9 +112688,9 @@ function CF(e) {
           ? record.rodFound > 0 && !(record.rodReturned > 0)
             ? "rod"
             : "solved"
-          : huntWaterFound(p())
+          : huntWaterFound(p(), water)
             ? record.back.length
-              ? record.back.every((part) => herPartOwned(n(), p(), part))
+              ? record.back.every((part) => herPartOwned(n(), p(), part, water))
                 ? "fix"
                 : "sells"
               : record.sketches.swirl
@@ -112492,20 +112703,20 @@ function CF(e) {
               : "hob",
       foundBy: record.foundBy,
       // Sketch 2's X: where the float went under (the centre of her hole for a save that bought the chart).
-      foundAt: record.foundBy === "theft" ? herWaterCorkAt(p()) : null,
+      foundAt: record.foundBy === "theft" ? herWaterCorkAt(p(), water) : null,
       // Sketch 4's rig and words, and sketch 5's broken parts in fight order (none: "What held").
       swirlKind: record.swirlKind,
       swirlRig: { ...record.swirlRig },
       back: record.back.slice(),
       // Sketch 3: the line-up fish crossed out and the bite marks seen (ids only).
-      crossed: Sr(f().hunt?.lineup).filter((id) => ha(record.crossed?.[id]) > 0),
+      crossed: Sr(huntOf(water)?.lineup).filter((id) => ha(record.crossed?.[id]) > 0),
       ringed: Sr(record.ringed).filter((id) => typeof id == "string"),
       marks: CATCH_MARKS.filter((k) => ha(record.marks?.[k]) > 0),
     };
   }
   // The notepad opened by itself and was closed: what it drew in has been seen.
-  function notepadShown() {
-    let record = p()?.hunt?.mossmere;
+  function notepadShown(water = padWater()) {
+    let record = huntRecordOf(p(), water);
     Ln(record) && ((record.padDue = !1), (record.padUnseen = []), (record.padIntro = !0), c());
   }
   // Whether the Sounding Lead fishes right now: on a trip, in the trip's water with the run's lure; at home, in
@@ -112593,8 +112804,9 @@ function CF(e) {
     for (let slot of RIG_FIELDS) was[slot] !== H.fitted[slot] && d("loop:fit", { slot, id: H.fitted[slot] });
     return d("loop:rig", { rig: want }), { ok: !0, changed: !0, reeled, rig: want };
   }
-  // A fish landed on a trip: the first Reedjaw Pike is the beat that brings Pike Wire (wo.arrivals). On Mossmere,
-  // the line-up crosses it out and a new bite mark on it goes into the strip (noteHuntCatch), with their lines.
+  // A fish landed on a trip: the first Reedjaw Pike is the beat that brings Pike Wire (wo.arrivals). In a lake with
+  // a hunt, the line-up crosses it out and a new bite mark on it goes into the strip (noteHuntCatch), with their
+  // lines.
   function noteLanded(speciesId, fish = null) {
     let ze = a(),
       H = p();
@@ -112602,9 +112814,9 @@ function CF(e) {
     noteFishArrivalBeats(H, ze.zone, speciesId);
     // The thief landed: sketch 5 is drawn whole if it is still blank ("What held"), and the first time the hunt
     // is over (markHerLanded): the bounty and Hob's Lamp wait for the tally.
-    speciesId === MIDNIGHT.legend &&
-      ze.zone === MIDNIGHT.water &&
-      markHerLanded(H, Math.max(1, ha(ze.evening))) &&
+    !!speciesId &&
+      huntOf(ze.zone)?.legend === speciesId &&
+      markHerLanded(H, ze.zone, Math.max(1, ha(ze.evening))) &&
       d("hunt:landed", { evening: ha(ze.evening) });
     let noted = noteHuntCatch(H, ze, speciesId, fish);
     noted && (c(), d("hunt:noted", { ...noted }));
@@ -114547,20 +114759,21 @@ function FF(e) {
     let k = Se(!0);
     return (k[ge] = Math.min(be(), (k[ge] | 0) + 1)), k[ge];
   }
-  // A legend's escape: a lost fight wounds her; a loss to a wrong part (a line too weak for her, and for Mossmere's
-  // thief a wrong hook or leader) adds no wound and records the lesson in the lake's hunt record, where the thief's
-  // loss is also drawn into sketch 5.
+  // A legend's escape: a lost fight wounds her; a loss to a wrong part (a line too weak for her, and for a hunt's
+  // legend a wrong part of its rig: Mossmere's hook or leader) adds no wound and records the lesson in the lake's
+  // hunt record, where her loss is also drawn into sketch 5.
   function noteLegendEscape(loss, speciesId) {
     const reason = loss.legendLossReason,
-      hunt = u()?.hunt?.[loss.zone];
+      hunt = u()?.hunt?.[loss.zone],
+      rules = huntOf(loss.zone);
     if (hunt && typeof hunt == "object" && !e.isReplay()) {
       reason === "line" && (hunt.lineLesson = true);
-      speciesId === MIDNIGHT.legend &&
-        loss.zone === MIDNIGHT.water &&
-        (noteHerLoss(hunt, reason, Math.max(1, Math.trunc(Number(a()?.evening) || 0))),
-        hunt.landed > 0 || markHerLoss(u(), reason));
+      !!rules &&
+        rules.legend === speciesId &&
+        (noteHerLoss(hunt, reason, Math.max(1, Math.trunc(Number(a()?.evening) || 0)), rules),
+        hunt.landed > 0 || markHerLoss(u(), reason, rules));
     }
-    return HER_RIG.order.includes(reason) ? 0 : ne(speciesId);
+    return reason === "line" || Sr(rules?.rig?.order).includes(reason) ? 0 : ne(speciesId);
   }
   function he(ge) {
     if (!l() || e.isReplay()) return;
@@ -116815,7 +117028,7 @@ function Kle(e) {
             ft.label ||
             (ft.type === "legendary"
               ? thiefHidden(n(), ft.id)
-                ? t().TEXT_LOOP?.thief?.seal || "Land the thief of the mere."
+                ? t().TEXT_LOOP?.hunts?.[huntWaterOf(ft.id)]?.seal || "Land the thief of the mere."
                 : `Land ${m(ft.id)?.name || ft.id}`
               : String(ft.type)),
           done: We(ft, ce),
@@ -119587,7 +119800,7 @@ function rce(e) {
       un = Ze(et.phase, et.day, et);
     }
     try {
-      updateMidnightBell(e, et);
+      updateHuntTime(e, et);
       updateHerWater(e, et);
     } catch (midnightError) {
       console.warn("[midnight]", midnightError);
@@ -135098,8 +135311,10 @@ function Y0e(e) {
       run?.evening <= 1 ||
       // Old Rivals never visit her water at night (mossmere-hunt.md A2, "Old Rivals guard").
       (j() === "gloomtide" &&
-        ((cast.place?.id || null) === HER_WATER.place ||
-          Math.hypot(c.bob.x - HER_WATER.x, c.bob.z - HER_WATER.z) <= HER_WATER.theft)) ||
+        !!huntOf(Yt()) &&
+        ((cast.place?.id || null) === huntOf(Yt()).find.place ||
+          Math.hypot(c.bob.x - huntOf(Yt()).find.x, c.bob.z - huntOf(Yt()).find.z) <=
+            huntOf(Yt()).find.theft)) ||
       e.state?.meta?.loop?.tutorial?.done === false ||
       i.forceSpecies ||
       i.forceFind ||
@@ -135394,15 +135609,15 @@ function Y0e(e) {
         (i.floatT = 0.5);
     }
     prepareRivalVisit();
-    // Hob's rod (mossmere-hunt-2.md section 5): the first cast in her water after she is landed snags it, a
-    // moment after it lands; the line then comes back in with the rod, and no fish bites on that cast.
+    // The character's rod (Hob's; mossmere-hunt-2.md section 5): the first cast in her water after she is landed
+    // snags it, a moment after it lands; the line then comes back in with the rod, and no fish bites on that cast.
     i.rodDue = null;
     xe() &&
       !i.tutorial &&
-      h()?.zone === MIDNIGHT.water &&
-      i.cast?.place?.id === HER_WATER.place &&
+      !!huntOf(h()?.zone) &&
+      i.cast?.place?.id === huntOf(h()?.zone).find.place &&
       !i.cast.mist &&
-      p(() => herRodDue(e.state?.meta?.loop)) === !0 &&
+      p(() => herRodDue(e.state?.meta?.loop, h()?.zone)) === !0 &&
       (i.rodDue = { at: i.clock + 0.9 });
     {
       let herAnswer = null;
@@ -135684,17 +135899,18 @@ function Y0e(e) {
     return (
       !!bn &&
       !!At &&
-      // Mossmere's legend takes only in her time after the midnight bell; every other legend keeps its hours.
-      (xe() && bn.species?.id === MIDNIGHT.legend && h()?.zone === MIDNIGHT.water
+      // A hunt's legend (Mossmere's) takes only in her time after the time clue; every other legend keeps its hours.
+      (xe() && !!bn.species?.id && bn.species.id === huntOf(h()?.zone)?.legend
         ? herTimeOpen(h())
         : C(bn.species, Dt)) &&
       i.clock >= i.legendDimUntil &&
       (xe() ? $(bn) : Math.hypot(c.bob.x - bn.x, c.bob.z - bn.z) <= bn.r)
     );
   }
-  // Mossmere's thief answers a cast herself (answerHerCast); every other legend rolls in zt().
+  // A hunt's legend (Mossmere's thief) answers a cast herself in her hunt's lake (answerHerCast); every other
+  // legend rolls in zt().
   function herRuleFor(bn) {
-    return xe() && bn?.species?.id === MIDNIGHT.legend && h()?.zone === MIDNIGHT.water;
+    return xe() && !!bn?.species?.id && bn.species.id === huntOf(h()?.zone)?.legend;
   }
   // Her answer to the cast just released (mossmere-hunt.md A2 steps 4 to 7, mossmere-hunt-2.md section 2). Only in
   // her found water, in her time. A cast on a rig that could bring her (the lead, no lure, a bait she grades above
@@ -135706,9 +135922,11 @@ function Y0e(e) {
     i.herTake = !1;
     let bn = We(),
       run = h(),
+      water = run?.zone,
+      rig = huntOf(water)?.rig,
       loop = e.state?.meta?.loop,
-      record = huntRecordOf(loop);
-    if (!herRuleFor(bn) || !record || i.tutorial || i.find || !huntWaterFound(loop)) return null;
+      record = huntRecordOf(loop, water);
+    if (!herRuleFor(bn) || !record || i.tutorial || i.find || !huntWaterFound(loop, water)) return null;
     // (No 20 s rebite wait for her: one hook-up a night closes her time; mossmere-hunt.md A2, "Rebite".)
     if (!herTimeOpen(run) || !$(bn)) return null;
     let bait = i.castBait || null,
@@ -135724,16 +135942,16 @@ function Y0e(e) {
               ?.landingBlockedBy === "line",
         ) === !0,
       wrongNow = {
-        hook: (i.castHook ?? null) !== HER_RIG.right.hook,
-        leader: leader !== HER_RIG.right.leader,
+        hook: (i.castHook ?? null) !== rig.right.hook,
+        leader: leader !== rig.right.leader,
         line: lineWeak,
       },
-      taught = HER_RIG.order.find((part) => record.lessons?.[part] === !0 && wrongNow[part]) || null,
-      gateOpen = herTakeAllowed(loop),
+      taught = rig.order.find((part) => record.lessons?.[part] === !0 && wrongNow[part]) || null,
+      gateOpen = herTakeAllowed(loop, water),
       // Once she is landed her tries no longer count and she refuses without a swirl or a word: the hunt is
       // over. She can still take again on the right rig in the same three minutes, as before the landing.
       landed = record.landed > 0,
-      tried = !landed && !lure && onLead && grade > 0 && leader !== "pike_wire" && !taught && gateOpen,
+      tried = !landed && !lure && onLead && grade > 0 && leader !== rig.wire && !taught && gateOpen,
       m = midnightFlags(run);
     tried && (m.tries = (m.tries | 0) + 1);
     let u = lt(),
@@ -135747,7 +135965,7 @@ function Y0e(e) {
           ? "bait"
           : !(u < legendCastChance(bn, bait, onLead))
             ? "bunch"
-            : leader === "pike_wire"
+            : leader === rig.wire
               ? "wire"
               : taught
                 ? "lesson"
@@ -135756,8 +135974,8 @@ function Y0e(e) {
                   : "gate";
     if (!part) return (i.herTake = !0), { ...answer, take: !0 };
     if (landed) return answer;
-    let words = t().TEXT_LOOP?.hunt?.refusal || {},
-      named = herBaitWords(bait),
+    let words = t().TEXT_LOOP?.hunts?.[water]?.refusal || {},
+      named = herBaitWords(bait, water),
       fill = (line) =>
         String(line || "")
           .replace("{bait}", named.the)
@@ -135791,7 +136009,7 @@ function Y0e(e) {
   // drawn with its own line. Returns the line shown, or null.
   function showHerRefusal(answer) {
     let run = h(),
-      record = huntRecordOf(e.state?.meta?.loop);
+      record = huntRecordOf(e.state?.meta?.loop, run?.zone);
     if (!answer?.part || answer.part === "gate" || !record || !run) return null;
     // The part she refused gets the red notch on the rig picture.
     let loop = e.state?.meta?.loop,
@@ -135800,7 +136018,7 @@ function Y0e(e) {
         depth: ["depth", "cork_float"],
         bait: ["bait", answer.bait],
         bunch: ["bait", answer.bait],
-        wire: ["leader", "pike_wire"],
+        wire: ["leader", huntOf(run.zone).rig.wire],
         lesson: [answer.taught, rigPieceNow(loop, answer.taught)],
       }[answer.part];
     refused && markRigPiece(loop, "notch", refused[0], refused[1]);
@@ -135814,7 +136032,7 @@ function Y0e(e) {
       (record.swirlKind = answer.swirl),
         (record.swirlRig = { bait: answer.bait || "", lead: !!answer.lead }),
         drawHuntSketch(record, "swirl", evening),
-        (said = t().TEXT_LOOP?.hunt?.refusal?.drawn || null);
+        (said = t().TEXT_LOOP?.hunts?.[run.zone]?.refusal?.drawn || null);
     else if (!m.refusalSaid[answer.key] || everyTime) (m.refusalSaid[answer.key] = !0), (said = answer.text);
     let dx = c.bob.x - c.raft.x,
       dz = c.bob.z - c.raft.z,
@@ -136700,9 +136918,9 @@ function Y0e(e) {
       vn = xe(),
       qn = !1;
     // One hook-up a night: her time closes for the evening once she is on the line.
-    vn && At && Q.id === MIDNIGHT.legend && noteHerHookup(h());
+    vn && At && Q.id === huntOf(h()?.zone)?.legend && noteHerHookup(h());
     // She took this cast herself (answerHerCast, then the bite): its depth and bait are proven right on the picture.
-    if (vn && At && Q.id === MIDNIGHT.legend && i.legendCast === !0) {
+    if (vn && At && huntWaterOf(Q.id) && i.legendCast === !0) {
       let loop = e.state?.meta?.loop;
       markRigPiece(loop, "tick", "depth", i.castLead ? "sounding_lead" : "cork_float");
       markRigPiece(loop, "tick", "bait", i.castBait || null);
@@ -136760,15 +136978,17 @@ function Y0e(e) {
         y(Oi);
       }
     i.legendLineLoss && (i.p = 0);
-    // Mossmere's thief on the hook (mossmere-gear-deeper.md B5): the rig is checked in fight order and she breaks
-    // free at the first wrong part, whatever the roll: a hook that is not the Turnback, a leader that is not Chafe
-    // Gut, then a line too weak for her (the check above). herWounds: her wounds as she was hooked.
+    // A hunt's legend on the hook in its lake (Mossmere's thief; mossmere-gear-deeper.md B5): the rig is checked in
+    // fight order and she breaks free at the first wrong part, whatever the roll: a hook that is not the right one
+    // (the Turnback), a leader that is not (Chafe Gut), then a line too weak for her (the check above).
+    // herWounds: her wounds as she was hooked.
     i.herLossPart = null;
-    if (At && vn && !i.find && Q.id === MIDNIGHT.legend && Yt() === MIDNIGHT.water) {
+    let herRig = huntOf(Yt())?.rig;
+    if (At && vn && !i.find && Q.id === huntOf(Yt())?.legend) {
       i.herLossPart =
-        (i.castHook ?? null) !== HER_RIG.right.hook
+        (i.castHook ?? null) !== herRig.right.hook
           ? "hook"
-          : (i.castLeader ?? null) !== HER_RIG.right.leader
+          : (i.castLeader ?? null) !== herRig.right.leader
             ? "leader"
             : i.legendLineLoss
               ? "line"
@@ -136787,7 +137007,7 @@ function Y0e(e) {
       !i.rivalFight &&
       !i.tutorial &&
       !i.castVisualLure &&
-      Yt() === MIDNIGHT.water &&
+      !!huntOf(Yt()) &&
       p(() => thiefTakes(e, h(), c.bob.x, c.bob.z)) === !0 &&
       ((i.thiefAt = { x: c.bob.x, z: c.bob.z, onLead: !!i.castLead }), (i.p = 0));
     let _o = zB(lt);
@@ -136815,7 +137035,7 @@ function Y0e(e) {
         Aa = i.thiefAt
           ? "thief"
           : i.herLossPart
-            ? HER_RIG.cause[i.herLossPart]
+            ? herRig.cause[i.herLossPart]
             : i.overCap && !i.find
               ? i.overCap.by === "line"
                 ? "snapped"
@@ -136833,13 +137053,13 @@ function Y0e(e) {
         cause: Aa || i.forceCause || null,
         A: Ke,
       })),
-        // She breaks free on the hook early in the fight and on the leader about halfway (HER_RIG.at).
+        // She breaks free on the hook early in the fight and on the leader about halfway (rig.at).
         i.herLossPart &&
-          HER_RIG.at[i.herLossPart] != null &&
+          herRig.at[i.herLossPart] != null &&
           (i.loss = {
             ...i.loss,
-            at: wi(Ii.dur * HER_RIG.at[i.herLossPart]),
-            frac: HER_RIG.at[i.herLossPart],
+            at: wi(Ii.dur * herRig.at[i.herLossPart]),
+            frac: herRig.at[i.herLossPart],
           }),
         (i.plan = L8(Ii, i.loss));
     } else i.plan = Ii;
@@ -137420,7 +137640,7 @@ function Y0e(e) {
     const legendLossReason = i.herLossPart || (i.legendLineLoss ? "line" : "fight"),
       words = t().TEXT_LOOP?.legendAway?.[species.id],
       template =
-        (species.id === MIDNIGHT.legend && huntLanded(e.state?.meta?.loop)
+        (huntWaterOf(species.id) && huntLanded(e.state?.meta?.loop, huntWaterOf(species.id))
           ? words?.after?.[legendLossReason]
           : null) || words?.[legendLossReason],
       rules = t().CATCH_V3?.legend || {},
@@ -137430,7 +137650,7 @@ function Y0e(e) {
     // so (mossmere-review-addendum.md section 4).
     legendLossText &&
       legendLossReason === "fight" &&
-      species.id === MIDNIGHT.legend &&
+      !!huntWaterOf(species.id) &&
       words.weaker &&
       (i.herWounds | 0) < woundCap &&
       (legendLossText += ` ${words.weaker}`);
@@ -139581,9 +139801,9 @@ function Y0e(e) {
     let Ke = h(),
       At = !!Pe.baitId && Bt(Ke?.bait?.[Pe.baitId], 0) > 0,
       Dt = i.clock < i.legendDimUntil,
-      // The pool's glimmer follows her time after the midnight bell, as her bite does.
+      // The pool's glimmer follows her time after the time clue, as her bite does.
       herHours =
-        xe() && Pe.species?.id === MIDNIGHT.legend && Ke?.zone === MIDNIGHT.water
+        xe() && !!Pe.species?.id && Pe.species.id === huntOf(Ke?.zone)?.legend
           ? herTimeOpen(Ke)
           : C(Pe.species, j()),
       tn = At && herHours && !Dt;
@@ -142239,7 +142459,11 @@ function Y0e(e) {
           // the water: the try counted, a refusal shown at once (its swirl, its line or sketch 4). `u` fixes her roll
           // (0 to 1) for this cast. Returns the answer with the line shown (said), tonight's tries and whether her
           // time is still open.
-          fishHerCast: ({ place: Q = "bell_pool", bait: Pe = null, u: U = null } = {}) => {
+          fishHerCast: ({
+            place: Q = huntOf(h()?.zone)?.find?.place ?? null,
+            bait: Pe = null,
+            u: U = null,
+          } = {}) => {
             if (!xe()) return null;
             let keep = {
               cast: i.cast,
@@ -162726,12 +162950,13 @@ function catchCardMark(art, fish, game, text) {
     line = mark ? words[mark] : null;
   if (!line) {
     let meta = game?.state?.meta,
-      leftBy = wo.hunt.marks.leftBy,
+      water = game?.state?.run?.zone,
+      hunt = huntOf(water),
+      leftBy = hunt?.marks?.leftBy || {},
       leaves = Object.keys(leftBy).find((k) => leftBy[k] === fish.speciesId);
     leaves &&
-      game?.state?.run?.zone === "mossmere" &&
-      huntRecordOf(meta?.loop)?.sketches?.map > 0 &&
-      thiefHidden(meta, "belled_matriarch") &&
+      huntRecordOf(meta?.loop, water)?.sketches?.map > 0 &&
+      thiefHidden(meta, hunt.legend) &&
       (line = words.leaves?.[leaves]);
   }
   if (!line) return;
@@ -169749,7 +169974,8 @@ function Bhe(e, { D: t = null, pace: n = {} } = {}) {
         weight: "",
       });
     // The bounty's row: her name, and the word "Bounty" where a fish's weight would be. Gold, as a giant's is.
-    m.bounty === !0 && Object.assign(u, { bounty: !0, weight: tf(t).hunt?.ending?.bounty || "" });
+    m.bounty === !0 &&
+      Object.assign(u, { bounty: !0, weight: tf(t).hunts?.[huntWaterOf(m.speciesId)]?.ending?.bounty || "" });
   });
   let d = c.reduce((u, h) => u + h.clams, 0),
     f = c.length ? i + o.total - 0.3 : o.start;
@@ -169905,7 +170131,7 @@ function Uhe(e, t, n, { tutorial: o = !1 } = {}) {
         giantLanded: b,
         marked: p && !L ? Yo(Number(a.giants?.[p]?.marked), 0) > 0 : !1,
         // Murk's pencilled ring round her water once it is found (mossmere-hunt-2.md section 4).
-        ringed: d === HER_WATER.place && u && huntWaterFound(a),
+        ringed: huntWaterOfPlace(d) !== null && u && huntWaterFound(a, huntWaterOfPlace(d)),
         wounds: w && !L ? Math.max(0, Math.min(c, Math.floor(Yo(Number(e?.legendWounds?.[w]), 0)))) : 0,
       };
     });
@@ -170700,7 +170926,7 @@ const PAD_ISLES = {
   // Hob's part: the water between the Gatehouse and the Sisters, about an eighth of the lake. The whole 8 m
   // circle of the thief's water lies inside it with 2 m to spare, well south of its middle, so the patch never
   // points at the spot.
-  PAD_HOB_PART = padBlobPts(-5, -22, 27.5, 16.5, 41, 14, 0.06);
+  PAD_HOB_PART = padBlobPts(...wo.hunts.mossmere.part);
 // Sketch 1: Hob's map, and under it his old line end taped to the page.
 function padHobMap(labels) {
   return [
@@ -171084,7 +171310,7 @@ function padGearPanels(key, text, at, view = {}) {
       }),
       words = (text.swirl?.[kind] || text.swirl?.left || "").replace(
         "{bait}",
-        herBaitWords(rig.bait || "mireworm").the,
+        herBaitWords(rig.bait || huntOf(view.water)?.pad?.oldSwirl?.bait || "", view.water).the,
       );
     return `<div class="gw-pad-pnl"><div class="gw-pad-box">${sk.html}</div>${cap(words, at == null ? null : sk.end)}</div>`;
   }
@@ -171422,7 +171648,8 @@ function padLineupPanel(text, view, at = null, fresh = []) {
     },
     html = cap("gw-pad-lu-head", lu.head || "", t);
   t != null && (t += 0.6);
-  for (let id of Sr(wo.hunt.lineup)) {
+  let hunt = huntOf(view.water);
+  for (let id of Sr(hunt?.lineup)) {
     let art = PAD_LU.art[id],
       words = lu.fish?.[id] || {},
       out = crossed.includes(id),
@@ -171463,7 +171690,7 @@ function padLineupPanel(text, view, at = null, fresh = []) {
     html += `<figure class="gw-pad-lu-row${out ? " gw-out" : ""}" data-fish="${id}"><span class="gw-pad-lu-nm">${padEsc(words.name || "")}</span><div class="gw-pad-lu-box">${fish.html}${mark}</div>${why}</figure>`;
   }
   // The empty frame: its line changes once all five are crossed out.
-  let all = Sr(wo.hunt.lineup).every((id) => crossed.includes(id)),
+  let all = Sr(hunt?.lineup).every((id) => crossed.includes(id)),
     frameWhen = t,
     frame = sketch(
       "lu-q",
@@ -171493,7 +171720,7 @@ function padLineupPanel(text, view, at = null, fresh = []) {
   let strip = "";
   for (let k of CATCH_MARKS) {
     if (!marks.includes(k)) continue;
-    let by = wo.hunt.marks.leftBy?.[k],
+    let by = hunt?.marks?.leftBy?.[k],
       matched = !!by && crossed.includes(by),
       // The ring has no fish that matches it until she is landed: then it is hers.
       words =
@@ -171512,24 +171739,20 @@ function padLineupPanel(text, view, at = null, fresh = []) {
   strip && (html += `<div class="gw-pad-marks">${strip}</div>`);
   return `<div class="gw-pad-pnl gw-pad-lu">${html}</div>`;
 }
-// The five places: their pages, and how a drawn one is made.
-const PAD_PLACES = [
-  { key: "map", n: 1, page: "where" },
-  { key: "taken", n: 2, page: "where" },
-  { key: "lineup", n: 3, page: "suspects" },
-  { key: "swirl", n: 4, page: "gear" },
-  { key: "back", n: 5, page: "gear" },
-];
-// The page a sketch is on; a line-up crossing or a bite mark ("cross:..." or "mark:...") is on the line-up's.
-const padPageOf = (key) =>
-  /^(cross|mark):/.test(key) ? "suspects" : PAD_PLACES.find((p) => p.key === key)?.page || "where";
+// The page a sketch is on, of a hunt's notepad places (pad.places); a line-up crossing or a bite mark
+// ("cross:..." or "mark:...") is on the line-up's. Anything else is on the first page.
+const padPageOf = (key, places = []) =>
+  (/^(cross|mark):/.test(key) ? places.find((p) => p.key === "lineup") : places.find((p) => p.key === key))
+    ?.page ||
+  places[0]?.page ||
+  "where";
 // A drawn sketch's panels. `at` draws it all in from that time; `fresh` lists the parts of the line-up that draw
 // in now on a page already drawn.
 function padPanels(key, text, at, view = {}, fresh = []) {
   if (key === "lineup") return padLineupPanel(text, view, at, fresh);
   if (key === "swirl" || key === "back") return padGearPanels(key, text, at, view);
   if (key === "taken") {
-    let spot = view.foundAt || { x: -4, z: -14 },
+    let spot = view.foundAt || huntOf(view.water)?.find || { x: 0, z: 0 },
       sk = padSketchSvg("s2-0", [-37, -52, 68, 49], padTakenAtMidnight(text.labels || {}, spot.x, spot.z), {
         sw: 0.3,
         amp: 0.2,
@@ -171562,6 +171785,8 @@ function padPanels(key, text, at, view = {}, fresh = []) {
     `<div class="gw-pad-pnl gw-pad-end"><div class="gw-pad-box">${end.html}</div>${cap(text.end, at == null ? null : end.end)}</div>`
   );
 }
+// Each notepad's drawings, by the hunt's pad.art: (key, text, at, view, fresh) gives a drawn sketch's panels.
+const PAD_ART = { mossmere: padPanels };
 function padCoils(n = 12) {
   let s = `<svg viewBox="0 0 ${n * 30} 30" preserveAspectRatio="none" aria-hidden="true">`;
   for (let i = 0; i < n; i++) {
@@ -171572,36 +171797,41 @@ function padCoils(n = 12) {
   return s + "</svg>";
 }
 // The notepad as an element: one page at a time with paper tabs under it, and the What to try next line at
-// the foot. `view` is the loop's notepad(); `animate` lists the sketches that draw in now.
-function notepadElement(h, text, view, { page = "where", animate = [], intro = !1, close = null } = {}) {
+// the foot. `view` is the loop's notepad() of a lake (view.water), whose hunt gives the places, pages and drawings;
+// `animate` lists the sketches that draw in now.
+function notepadElement(h, text, view, { page = null, animate = [], intro = !1, close = null } = {}) {
   let el = h("div", "gw-pad"),
+    pad = huntOf(view.water)?.pad || {},
+    places = Sr(pad.places),
+    order = [...new Set(places.map((place) => place.page))],
+    draw = PAD_ART[pad.art] || (() => null),
     titles = text.titles || {},
     pages = text.pages || {},
     fig = (place) => {
       let drawn = view.sketches?.[place.key] > 0,
         panels = drawn
-          ? padPanels(place.key, text, animate.includes(place.key) ? 0.6 : null, view, animate)
+          ? draw(place.key, text, animate.includes(place.key) ? 0.6 : null, view, animate)
           : null;
       // Sketch 5 drawn with nothing broken is titled "What held".
       let title = place.key === "back" && drawn && !view.back?.length ? text.heldTitle : titles[place.key];
       return `<figure class="gw-pad-fig${panels ? "" : " gw-pad-blank"}" data-sketch="${place.key}"${panels ? ' data-drawn="1"' : ""}><div class="gw-pad-fig-h"><span class="n">${place.n}</span>${padEsc(title || "")}</div><div class="gw-pad-panels">${panels || `<p class="gw-pad-none">${padEsc(text.blank || "")}</p>`}</div></figure>`;
     };
+  page = page || order[0] || "where";
   el.dataset.loop = "notepad";
   el.innerHTML =
     `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><filter id="gw-pad-pencil" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="4" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.2 1.75" result="g"/><feComposite in="SourceGraphic" in2="g" operator="in"/></filter></defs></svg>` +
     (intro ? `<p class="gw-pad-intro">${padEsc(text.intro || "")}</p>` : "") +
     `<div class="gw-pad-sheet${animate.length ? " gw-pad-anim" : ""}"><div class="gw-pad-coils">${padCoils()}</div>` +
-    ["where", "suspects", "gear"]
+    order
       .map(
         (p) =>
-          `<section class="gw-pad-page${p === page ? " gw-on" : ""}" data-page="${p}"><div class="gw-pad-head"><h2>${padEsc(pages[p] || p)}</h2><small>Mossmere</small></div>${PAD_PLACES.filter(
-            (x) => x.page === p,
-          )
+          `<section class="gw-pad-page${p === page ? " gw-on" : ""}" data-page="${p}"><div class="gw-pad-head"><h2>${padEsc(pages[p] || p)}</h2><small>${padEsc(text.lake || "")}</small></div>${places
+            .filter((x) => x.page === p)
             .map(fig)
             .join("")}</section>`,
       )
       .join("") +
-    `</div><nav class="gw-pad-tabs">${["where", "suspects", "gear"]
+    `</div><nav class="gw-pad-tabs">${order
       .map(
         (p) =>
           `<button type="button" class="gw-pad-tab${p === page ? " gw-on" : ""}" data-page="${p}">${padEsc(pages[p] || p)}</button>`,
@@ -171643,9 +171873,11 @@ function tallyHuntBlock(h, text, beat, now) {
     el
   );
 }
-// Hob's Lamp on the tally, in the same plain line style as the tackle Murk hands over: a pole lamp, lit.
+// A relic on the tally (RELIC_ART, by relic id), in the same plain line style as the tackle Murk hands over. Hob's
+// Lamp: a pole lamp, lit.
 const HOBS_LAMP_ART =
   '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 8V20" stroke-width="2.4"/><path d="M88 30L100 20L112 30Z" stroke-width="3.2"/><path d="M90 30H110V62H90Z" stroke-width="3.6"/><path d="M100 38C95 44 95 50 100 54C105 50 105 44 100 38Z" stroke-width="2.4"/><path d="M86 62H114" stroke-width="3.6"/><path d="M100 62V132" stroke-width="4"/><path d="M84 132H116" stroke-width="3.2"/><path d="M70 44C66 40 66 34 70 30M130 44C134 40 134 34 130 30" stroke-width="1.6" stroke-opacity=".5"/><path d="M60 140H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>';
+const RELIC_ART = { hobs_lamp: HOBS_LAMP_ART };
 const NOTEPAD_CSS = `
 .gw-m-notepad .gw-modal-body { max-width: none; width: 100%; }
 .gw-pad-wrap { box-sizing: border-box; width: 100%; max-height: 100dvh; overflow-y: auto; padding: 18px 16px calc(16px + var(--sab, 0px)); display: flex; justify-content: center; }
@@ -171796,12 +172028,15 @@ function openSpeechBox(K, { id, kind, tag, icon, pages, next, ok, escape = "end"
   K.sfx?.("ui_open", { volume: 0.4 });
   return !0;
 }
-// The hunt on screen: Hob's talk when the raft comes near his lit lamp, the line when a sketch is drawn, and the
-// notepad opening by itself at home after a tally that has something new for it.
+// The hunt on screen, in the lake of the trip: its character's talk (Hob's) when the raft comes near his lit lamp,
+// the line when a sketch is drawn, and the notepad opening by itself at home after a tally that has something new
+// for it.
 function huntView(K) {
   let { ctx: t } = K,
     D = () => (typeof K.D == "function" ? K.D() : t.data) || {},
-    text = () => D().TEXT_LOOP?.hunt || {},
+    // A lake's hunt words (TEXT_LOOP.hunts), and the trip's lake.
+    text = (water) => D().TEXT_LOOP?.hunts?.[water] || {},
+    here = () => t.state?.run?.zone ?? null,
     report = (what, err) => {
       try {
         K.report?.(`hunt.${what}`, err);
@@ -171817,9 +172052,9 @@ function huntView(K) {
       }
     },
     // armed: the raft has been away from Hob since he last spoke; padWait: time at home with nothing open.
-    // liftDue: her water was found and its lift waits for a free moment; corkDue: its last two lines wait for
-    // the lift's end.
-    state = { armed: !0, padWait: 0, talks: 0, liftDue: !1, corkDue: !1 },
+    // liftDue: her water was found and its lift waits for a free moment (liftPlace: her place); corkDue: its last
+    // two lines wait for the lift's end.
+    state = { armed: !0, padWait: 0, talks: 0, liftDue: !1, corkDue: !1, liftPlace: null },
     say = (words) => {
       try {
         words && t.bus?.emit?.("toast", { text: words, kind: "lore" });
@@ -171832,25 +172067,26 @@ function huntView(K) {
   // cork and the silent bell when the lift ends.
   try {
     t.bus?.on?.("hunt:found", (found = {}) => {
-      let words = text().water || {};
+      let words = text(here()).water || {};
       say(found.onLead ? words.takenLead : words.takenFloat);
       found.onLead || say(words.spareFloat);
-      say(text().drawn);
-      (state.liftDue = !0), (state.corkDue = !0);
+      say(text(here()).drawn);
+      (state.liftDue = !0), (state.corkDue = !0), (state.liftPlace = huntOf(here())?.find?.place ?? null);
     });
     // A line-up fish crossed out (its reason) or a bite mark seen for the first time, drawn into sketch 3.
     t.bus?.on?.("hunt:noted", (noted = {}) => {
-      let words = noted.crossed ? text().pad?.lineup?.fish?.[noted.crossed] : null;
+      let words = noted.crossed ? text(here()).pad?.lineup?.fish?.[noted.crossed] : null;
       words && say(noted.ringed ? words.why : (words.whyPlain ?? words.why));
-      say(text().drawn);
+      say(text(here()).drawn);
     });
-    // Hob's rod brought up from her hole after the landing: what it is, and where it goes.
+    // The character's rod (Hob's) brought up from her hole after the landing: what it is, and where it goes.
     t.bus?.on?.("hunt:rod", () => {
-      for (let line of text().ending?.rod || []) say(line);
+      for (let line of text(here()).ending?.rod || []) say(line);
     });
     t.bus?.on?.("place:lift", (lift = {}) => {
-      if (lift.placeId !== HER_WATER.place || lift.phase !== "end" || !state.corkDue) return;
-      let words = text().water || {};
+      let water = huntWaterOfPlace(lift.placeId);
+      if (!water || lift.phase !== "end" || !state.corkDue) return;
+      let words = text(water).water || {};
       (state.corkDue = !1), say(words.cork), say(words.bell);
     });
   } catch (err) {
@@ -171860,17 +172096,19 @@ function huntView(K) {
     let style = document.createElement("style");
     (style.id = "gw-notepad-css"), (style.textContent = NOTEPAD_CSS), document.head.appendChild(style);
   }
-  let isle = () => {
-      let zone = D().ZONE_BY_ID?.mossmere || (D().ZONES || []).find((z) => z?.id === "mossmere");
-      return (zone?.arena?.islands || []).find((i) => i?.name === "Mossbell Isle") || null;
+  // The character's island in a lake's arena (character.island: Mossbell Isle), or null.
+  let isle = (water) => {
+      let name = huntOf(water)?.character?.island,
+        zone = D().ZONE_BY_ID?.[water] || (D().ZONES || []).find((z) => z?.id === water);
+      return (name && (zone?.arena?.islands || []).find((i) => i?.name === name)) || null;
     },
     // Hob waits until nothing is on screen and the line is in, so he never cuts into a bite or a card.
     free = () => {
       let f = t.fishing;
       return !K.top?.() && !t.paused && !t.cinematic && (!f || f.isStub || f.state === "idle");
     };
-  function openHob(talk) {
-    let hob = text().hob || {},
+  function openHob(talk, water) {
+    let hob = text(water).hob || {},
       boxes = talk.first
         ? (hob.first || []).slice(0, talk.first)
         : talk.after
@@ -171891,7 +172129,7 @@ function huntView(K) {
       ok: hob.ok,
       onDone: () =>
         talk.drew &&
-        K.toast?.(text().drawn || "", "lore", {
+        K.toast?.(text(water).drawn || "", "lore", {
           icon: "quill",
           cls: "gw-toast--loop gw-toast--drawn",
           dur: 4600,
@@ -171904,14 +172142,15 @@ function huntView(K) {
   }
   function openPad(view) {
     if (K.has?.("notepad")) return !1;
-    let page = view.unseen.length ? padPageOf(view.unseen[0]) : "where";
+    let places = Sr(huntOf(view.water)?.pad?.places),
+      page = view.unseen.length ? padPageOf(view.unseen[0], places) : places[0]?.page || "where";
     return (
       K.openModal(
         "notepad",
         (M, A) => {
           let wrap = K.h("div", "gw-pad-wrap gw-scroll");
           wrap.appendChild(
-            notepadElement(K.h, text().pad || {}, view, {
+            notepadElement(K.h, text(view.water).pad || {}, view, {
               page,
               animate: view.unseen,
               intro: view.intro,
@@ -171934,42 +172173,39 @@ function huntView(K) {
   function update(dt) {
     let run = t.state?.run,
       pos = t.player?.position,
-      spot = isle();
-    if (
-      t.flow === "playing" &&
-      run?.outing === "trip" &&
-      run.zone === "mossmere" &&
-      spot &&
-      Number.isFinite(pos?.x)
-    ) {
-      let rule = D().LOOP?.hunt || {},
+      hunt = huntOf(run?.zone),
+      spot = hunt ? isle(run.zone) : null;
+    if (t.flow === "playing" && run?.outing === "trip" && spot && Number.isFinite(pos?.x)) {
+      let rule = hunt.character || {},
         dist = Math.hypot(pos.x - spot.x, pos.z - spot.z),
         talk = null;
-      dist > (rule.hobLeave ?? 16)
+      dist > (rule.leave ?? 16)
         ? (state.armed = !0)
         : state.armed &&
-          dist <= (rule.hobReach ?? 12) &&
+          dist <= (rule.reach ?? 12) &&
           free() &&
           call("hobHere") === !0 &&
-          ((state.armed = !1), (talk = call("hobTalk")), talk && openHob(talk));
+          ((state.armed = !1), (talk = call("hobTalk")), talk && openHob(talk, run.zone));
     } else t.flow !== "playing" && (state.armed = !0);
     // Her water's lift, when nothing holds the screen. Off the water it waits for the next trip's own lifts.
     if (state.liftDue)
       if (t.flow !== "playing") state.liftDue = !1;
       else if (free() && !t.game?.lifting?.()) {
         state.liftDue = !1;
-        let lifted = call("lifted");
-        Array.isArray(lifted) && lifted.includes(HER_WATER.place)
+        let lifted = call("lifted"),
+          place = state.liftPlace;
+        Array.isArray(lifted) && lifted.includes(place)
           ? (state.corkDue = !1)
-          : t.game?.beginLifts?.([HER_WATER.place]);
+          : t.game?.beginLifts?.([place]);
       }
-    // The bird at midnight, once it is due tonight: at a moment with nothing on the line, no card and no lift.
+    // The hunt's cutscene (the bird at midnight), once it is due tonight: at a moment with nothing on the line, no
+    // card and no lift.
     t.flow === "playing" &&
       free() &&
       !t.game?.lifting?.() &&
       !t.game?.birdScene?.() &&
       t.ui?.isCatchOpen?.() !== !0 &&
-      birdSceneDue(t, t.state?.run) &&
+      huntSceneDue(t, t.state?.run) &&
       t.game?.beginBirdScene?.();
     // At home after a tally, once the jetty is up and nothing else is: the notepad opens by itself.
     if (t.flow === "home" && K.top?.()?.id === "jetty" && !K.has?.("tally")) {
@@ -171987,7 +172223,7 @@ function huntView(K) {
       let view = call("notepad");
       if (!view) return;
       let wrap = K.h("div", "gw-journal-pad");
-      wrap.appendChild(notepadElement(K.h, text().pad || {}, view, {})), content.appendChild(wrap);
+      wrap.appendChild(notepadElement(K.h, text(view.water).pad || {}, view, {})), content.appendChild(wrap);
     },
     openPad: () => {
       let view = call("notepad");
@@ -172737,35 +172973,39 @@ function WV(e) {
         : gift === "turnback_hook" && qt.tally?.giftSay === "hunt"
           ? "hookHunt"
           : gift,
-      endingText = f().hunt?.ending || {},
-      giftShown =
-        gift === "hobs_lamp"
-          ? // Hob's Lamp, at the tally after she is landed: Murk's line, then what it does.
-            { name: endingText.lamp?.name, line: endingText.murk?.lamp, fit: endingText.lamp?.line }
-          : gift === "minnow_tin"
-            ? {
-                name: liveText.tin,
-                line: liveText.gift?.[qt.tally?.giftSay] || liveText.gift?.plain,
-                fit: "",
-              }
-            : arrivalText.lines?.[arrivalKey]
-              ? { name: arrivalText.names?.[arrivalKey], line: arrivalText.lines[arrivalKey], fit: "" }
-              : {
-                  name: giftText.names?.[gift],
-                  line: giftText.gift,
-                  // It says where to fit it. (An older save's last tally may name the rig its gift went on.)
-                  fit: qt.tally?.giftRig
-                    ? Ab(f().rig?.saved?.onRig || "", { n: qt.tally.giftRig })
-                    : giftText.fit,
-                };
+      // A hunt's relic (Hob's Lamp) at the tally after she is landed, in that hunt's words.
+      relicWater = huntWaterOfRelic(gift),
+      endingText = f().hunts?.[relicWater]?.ending || {},
+      giftShown = relicWater
+        ? // Hob's Lamp, at the tally after she is landed: Murk's line, then what it does.
+          { name: endingText.lamp?.name, line: endingText.murk?.lamp, fit: endingText.lamp?.line }
+        : gift === "minnow_tin"
+          ? {
+              name: liveText.tin,
+              line: liveText.gift?.[qt.tally?.giftSay] || liveText.gift?.plain,
+              fit: "",
+            }
+          : arrivalText.lines?.[arrivalKey]
+            ? { name: arrivalText.names?.[arrivalKey], line: arrivalText.lines[arrivalKey], fit: "" }
+            : {
+                name: giftText.names?.[gift],
+                line: giftText.gift,
+                // It says where to fit it. (An older save's last tally may name the rig its gift went on.)
+                fit: qt.tally?.giftRig
+                  ? Ab(f().rig?.saved?.onRig || "", { n: qt.tally.giftRig })
+                  : giftText.fit,
+              };
     // The hunt's moment at this tally (the tale, or Murk's word about Hob), shown like the gift. At the tally
     // after she is landed his line about her comes first, before Hob's Lamp; at any other it follows the gift.
+    // Its words are its lake's hunt's (the relic's hunt at the landing's tally).
     let huntBeat = qt.tally?.hunt,
-      huntEl = huntBeat ? tallyHuntBlock(n, f().hunt || {}, huntBeat, Le.empty) : null;
+      huntEl = huntBeat
+        ? tallyHuntBlock(n, f().hunts?.[relicWater || qt.tally?.zone] || {}, huntBeat, Le.empty)
+        : null;
     huntBeat?.landed && Tt.querySelector(".gw-tally")?.appendChild(huntEl);
     if (gift && giftShown.line) {
       let g = n("div", `gw-tally-gift${Le.empty ? " gw-in" : ""}`),
-        art = gift === "hobs_lamp" ? HOBS_LAMP_ART : dV[gutOnly ? "chafe_gut" : gift] || "";
+        art = RELIC_ART[gift] ?? (dV[gutOnly ? "chafe_gut" : gift] || "");
       g.innerHTML = `<span class="gw-tally-gift-art" aria-hidden="true">${art}</span><b class="gw-tally-gift-name"></b><p class="gw-murk-line gw-in"></p>${giftShown.fit ? '<p class="gw-tally-gift-fit"></p>' : ""}`;
       (g.querySelector(".gw-tally-gift-name").textContent = giftShown.name || ""),
         (g.querySelector(".gw-murk-line").textContent = giftShown.line),
@@ -174239,7 +174479,7 @@ function GV(e, t, { names: n = {}, phone: o = !1 } = {}) {
       strike: t?.AUTOFISH?.text?.log?.strike || "",
       // The Sounding Lead's numbers, shown on this page only (elsewhere: "more often", "less often").
       depth: be.depth === "lead" ? a.depth?.odds || "" : "",
-      herTime: be.herTime ? s0(Ca.midnight.odds, { name: l(MIDNIGHT.legend) }) : "",
+      herTime: be.herTime ? s0(huntWords(r.water).time?.odds, { name: l(huntOf(r.water)?.legend) }) : "",
     };
   return {
     head: b,
@@ -176087,7 +176327,8 @@ function YV(e) {
   // feeds (the lake's depth table) and the one bait it takes, if it takes only one.
   function journalBitesLine(K) {
     let words = d().TEXT_LOOP?.log?.bites || {};
-    if (K.id === MIDNIGHT.legend) return words.midnight || "";
+    // A hunt's legend: the hunt's own line about her time (time.bites).
+    if (huntWaterOf(K.id)) return d().TEXT_LOOP?.hunts?.[huntWaterOf(K.id)]?.time?.bites || "";
     let hours = i(d().loopHours(K)),
       named = hours.map((h) => words.hours?.[h] || h),
       joined =
@@ -176117,8 +176358,8 @@ function YV(e) {
     if (K.hint && !we) return (lake && d().TEXT_LOOP?.log?.hints?.[lake]?.[K.id]) || K.hint;
     if (B() && typeof d().loopHours == "function") return journalBitesLine(K);
     let te = [];
-    K.id === MIDNIGHT.legend
-      ? te.push("feeds just after the old bell strikes midnight")
+    huntWaterOf(K.id)
+      ? te.push(d().TEXT_LOOP?.hunts?.[huntWaterOf(K.id)]?.time?.feeds || "")
       : K.time === "gloom"
         ? te.push("rises only at night")
         : K.time === "calm"
@@ -176972,8 +177213,9 @@ function YV(e) {
         let Mt = u(),
           zt = st.state,
           Ut = te.rarity === "legendary",
-          // The thief landed on a trip: the measuring card, in place of the catch card.
-          herCard = qe && te.id === MIDNIGHT.legend,
+          // A hunt's legend landed on a trip (the thief): the measuring card, in place of the catch card.
+          herWords = d().TEXT_LOOP?.hunts?.[huntWaterOf(te.id)],
+          herCard = qe && !!huntWaterOf(te.id),
           on = dt(we),
           ae = Math.round(f("creelSize")),
           Ue = i(Mt?.creel).includes(we),
@@ -177131,7 +177373,7 @@ function YV(e) {
           let box = n("div", "gw-cc-measured-words");
           // On a phone the card's parts are ordered one column: the lines come after her length and weight.
           box.style.order = "9";
-          for (let line of i(d().TEXT_LOOP?.hunt?.ending?.measured)) {
+          for (let line of i(herWords?.ending?.measured)) {
             let para = n("p", "gw-cc-lore");
             (para.textContent = line), box.appendChild(para);
           }
@@ -177149,7 +177391,7 @@ function YV(e) {
           e.report("fishart", Qt);
         }
         no.appendChild(pi),
-          qe && catchCardMark(no, we, t, d().TEXT_LOOP?.hunt),
+          qe && catchCardMark(no, we, t, d().TEXT_LOOP?.hunts?.[u()?.zone]),
           fpe(fn, Jt),
           fn.querySelector("[data-room]")?.addEventListener("click", () => {
             (zt.room = !zt.room), p("ui_click"), st.render();
@@ -177237,7 +177479,7 @@ function YV(e) {
         }
         if (herCard) {
           // One button: let her go, with the release line. She is never put in the hold.
-          let release = d().TEXT_LOOP?.hunt?.ending?.release || "";
+          let release = herWords?.ending?.release || "";
           nn.classList.add("gw-catch-actions--loop"),
             nn.appendChild(
               b(o(d().TEXT_LOOP?.letGo || "Let go"), {
@@ -178713,9 +178955,10 @@ function YV(e) {
         let bt = m4(ue(vt), d());
         return { id: vt, label: se(vt).replace(/^The /, ""), badge: bt ? bt.head.count : "" };
       });
-    // The notepad, once the tale is told or a sketch is drawn (mossmere-hunt-2.md section 2).
-    c(() => t.progression?.loop?.notepad?.(), null) &&
-      Oe.push({ id: "notepad", label: d().TEXT_LOOP?.hunt?.pad?.tab || "Notepad" });
+    // The notepad, once the tale is told or a sketch is drawn (mossmere-hunt-2.md section 2): its lake's words.
+    let padView = c(() => t.progression?.loop?.notepad?.(), null);
+    padView &&
+      Oe.push({ id: "notepad", label: d().TEXT_LOOP?.hunts?.[padView.water]?.pad?.tab || "Notepad" });
     Oe.push({ id: "prints", label: qe.tabs?.prints || "Prints" }),
       Oe.push({ id: "giants", label: "", icon: "star" });
     let ut = z();
