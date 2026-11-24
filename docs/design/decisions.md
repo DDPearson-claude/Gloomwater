@@ -163,6 +163,19 @@ The designer's rulings for the second lake, given as yes or no.
 - Ruling 5 holds here too: about 1 cast in 3 once every condition is right. Today she takes every cast.
 - **Sporewood's plain faults, fixed before its design work.** The Odds page lists only the places of the lake the player is in. The first-play card about worms and the spoon shows only on the first lake. Five Journal hints now match how the fish really bite (the Sleepspore Jelly, the Nightbloom Carp on Sporewood's page, the Mildew Angler and the Harpstring Eel), the Velvet Ray and the Capshell Crayfish have hints at last, and no hint says "Gloomtide". The Sheet's Rivals page is left out away from Mossmere, where it was untrue. At home with no screen open, Escape, P (a controller's B or Start) or a tap on the water brings the barge's menu back; closing every screen at once had left no way back. The Glowcap Bulb fits and fishes as it should, and the locked places' mist is there.
 
+## Sporewood: the hunt, 24 November 2026
+
+Eight questions were put as yes or no; the designer said yes to all ("Sounds good"). The full plan is in `sporewood-plan.md`.
+
+- **Her time is the seedfall.** Each dusk the Mother Cap sighs and drops its seed pods, as Mossmere has its midnight bell.
+- **She has no fixed home.** Each evening the spore drift carries the pods to a different eddy, and the player reads the drift to find her.
+- **Burr lives at a new hidden place, the Drowned Greenhouse,** which makes five places, as Mossmere has.
+- **The suspects are other crushers:** the Festival Puffer (a beak), the Velvet Ray (plates) and a new piranha (razor teeth). The clue is cracked pods with marks like a person's teeth.
+- **Her rig:** seeds gathered at the seedfall, a float that rides the drift, a strong hook (she crushes ordinary ones) and a brass leader.
+- **Seven more fish after the three:** four local kinds, a Silver Dollar that comes with the seedfall, the piranha at the Greenhouse, and one other visitor.
+- **The first rod, line and reel steps cost 350 on the shelf, not 600.** Sporewood earns about 178 clams an evening on its starter kit (Mossmere 47), so a first step takes about two evenings, as in Mossmere. Everything else keeps its price.
+- **Sporewood gets Mossmere's look pass:** light by the hour, the water, its own plants.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.

@@ -49072,13 +49072,15 @@ wo.legendBait.sporewood = { id: "glowcap_bulb", price: 250 };
       raft: wo.raft,
     },
     sporewood: {
+      // The first step of each costs 350 on the shelf (cost factor 2): Sporewood earns about 178 clams an evening on
+      // its starter kit, so a first step takes about two evenings, as Mossmere's does (decisions.md, Sporewood).
       rod: [
         t("rod"),
-        { id: "stalkwood", hold: 3, cast: 2, hookWindow: 1.04, price: 300 },
+        { id: "stalkwood", hold: 3, cast: 2, hookWindow: 1.04, price: 175 },
         { id: "amberheart", hold: 6, cast: 4, hookWindow: 1.08, price: 1400 },
       ],
-      line: [t("line"), { id: "rootthread", hold: 3, price: 300 }, { id: "mothsilk", hold: 7, price: 1400 }],
-      reel: [t("reel"), { id: "capwheel", hold: 3, price: 300 }, { id: "burlwheel", hold: 6, price: 1400 }],
+      line: [t("line"), { id: "rootthread", hold: 3, price: 175 }, { id: "mothsilk", hold: 7, price: 1400 }],
+      reel: [t("reel"), { id: "capwheel", hold: 3, price: 175 }, { id: "burlwheel", hold: 6, price: 1400 }],
       hold: {
         ladder: [
           { slots: 4, price: 300, id: "bark_creel", name: "Bark Creel" },
