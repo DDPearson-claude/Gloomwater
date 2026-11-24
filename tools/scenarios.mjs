@@ -6740,6 +6740,142 @@ const SCENARIOS = [
     },
   },
   {
+    name: "Sporewood's list of 12: the Sporebelly Puffer, Plumgill Perch and Hushcap Koi each bite in a niche of their own by the game's own roll, are landed there, show on the lake's page and in its count, and their hints are true",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session) {
+      // Each one's niche: its hour, its place and its bait or lure, and an hour when it never bites.
+      const THREE = {
+        sporebelly_puffer: {
+          name: "Sporebelly Puffer",
+          light: "calm",
+          off: "gloomtide",
+          place: "lullaby",
+          rig: { lure: "seedpod_twirl" },
+          hint: "It bites only by day and at dusk, and feeds most in the Lullaby. The Seedpod Twirl suits it best.",
+          line: "It bites only by day and at dusk. It feeds at any depth.",
+        },
+        plumgill_perch: {
+          name: "Plumgill Perch",
+          light: "dusk",
+          off: "calm",
+          place: "gill_harp",
+          rig: { lure: "spore_moth" },
+          hint: "It bites only at dusk and at night, and feeds most at the Gill Harp. The Spore Moth suits it best.",
+          line: "It bites only at dusk and at night. It feeds at any depth.",
+        },
+        hushcap_koi: {
+          name: "Hushcap Koi",
+          light: "gloomtide",
+          off: "calm",
+          place: "veilwater",
+          rig: { lure: null, bait: "spore_cake" },
+          hint: "It bites only at night, and feeds most in the Veilwater. Spore Cake suits it best.",
+          line: "It bites only at night. It feeds at any depth.",
+        },
+      };
+      await session.toHome();
+      const before = await session.eval(() => window.__gw.progression.loop.listCount("sporewood"));
+      check(before.need === 12 && before.have === 2, `Sporewood's list before: ${JSON.stringify(before)}`);
+      // Not yet caught, each one's Journal page shows its hint.
+      for (const [id, f] of Object.entries(THREE)) {
+        await session.eval((id) => window.__gw.ui.openJournal({ zone: "sporewood", sel: id }), id);
+        await session.waitFor(`${id}'s page`, 10_000, () => !!document.querySelector(".gw-jr-where"));
+        const where = await visibleText(session, ".gw-jr-where");
+        check(where === f.hint, `${id}: the Journal says "${where}", expected "${f.hint}"`);
+        await backToJetty(session);
+      }
+      await session.sail();
+      await session.eval(() => {
+        const g = window.__gw,
+          loop = g.progression.loop;
+        g.debug.loop.giveClams(5000);
+        for (const item of ["place:veilwater", "lure:spore_moth"]) loop.buy(item);
+        loop.markLifted("veilwater");
+      });
+      const seen = [];
+      for (const [id, f] of Object.entries(THREE)) {
+        // The game's own odds for this rig: at its place in its hour, in open water then, and at its place in
+        // an hour it never bites. Then the game's own roll, cast after cast at its place, until it bites.
+        const r = await session.eval(
+          ([id, f]) => {
+            const d = window.__gw.debug,
+              loop = window.__gw.progression.loop;
+            loop.changeHook(f.rig);
+            const share = (light, place) => {
+              d.setPhase(light);
+              const roll = d.fishPoolRoll(1, { place, bait: f.rig.bait ?? null });
+              return {
+                place: roll.place,
+                p: roll.shares?.[id] ?? 0,
+                top: Math.max(...Object.values(roll.shares)),
+              };
+            };
+            const out = {
+              home: share(f.light, f.place),
+              open: share(f.light, null),
+              off: share(f.off, f.place),
+            };
+            d.setPhase(f.light);
+            d.fishSeed(7);
+            for (out.casts = 1; out.casts <= 400; out.casts++) {
+              const roll = d.fishPoolRoll(1, { place: f.place, bait: f.rig.bait ?? null });
+              if (roll.counts[id]) break;
+            }
+            return out;
+          },
+          [id, f],
+        );
+        check(r.home.place === f.place, `${id}: rolled at ${r.home.place}, not ${f.place}`);
+        check(
+          r.home.p >= 0.15 && r.home.p >= 2 * r.open.p,
+          `${id}: share ${r.home.p} at ${f.place}, ${r.open.p} in open water`,
+        );
+        check(r.off.p === 0, `${id} bites at ${f.place} in the wrong hour: ${r.off.p}`);
+        check(r.casts <= 400, `${id} never bit in 400 casts at ${f.place}`);
+        await session.catchFish(id);
+        seen.push(
+          `${id} ${(100 * r.home.p).toFixed(0)}% at ${f.place} (open ${(100 * r.open.p).toFixed(0)}%), cast ${r.casts}`,
+        );
+      }
+      // The lake's page: the three by name, the count of 12, and each one's line now that it is caught.
+      const after = await session.eval(() => window.__gw.progression.loop.listCount("sporewood"));
+      check(after.need === 12 && after.have === 5, `Sporewood's list after: ${JSON.stringify(after)}`);
+      await session.eval(() => window.__gw.ui.openJournal({ zone: "sporewood" }));
+      await session.waitFor("the Journal", 10_000, () => !!document.querySelector(".gw-m-catalogue .gw-tab"));
+      const tabs = await visibleText(session, ".gw-m-catalogue .gw-tab");
+      check(/Sporewood[^|]*5\/12/.test(tabs), `the Journal's tabs: ${tabs}`);
+      // The lake's page: its head counts the list, and each fish on the list carries a notch.
+      await session.waitFor(
+        "the lake's page",
+        15_000,
+        () => !!document.querySelector(".gw-cat-list .gw-cat-card"),
+      );
+      const page = await session.eval(() => ({
+        count: document.querySelector(".gw-cat-head .gw-cat-count")?.textContent ?? "",
+        listed: [...document.querySelectorAll(".gw-cat-list .gw-cat-card")]
+          .filter((card) => card.querySelector(".gw-jr-notch"))
+          .map((card) => card.querySelector(".gw-cat-name > span")?.textContent ?? ""),
+      }));
+      check(
+        page.listed.length === 12 && /5\D+12/.test(page.count),
+        `the lake's page: ${JSON.stringify(page)}`,
+      );
+      for (const f of Object.values(THREE))
+        check(page.listed.includes(f.name), `${f.name} is not on the lake's list: ${page.listed}`);
+      await session.eval(() => window.__gw.ui.closeAll());
+      for (const [id, f] of Object.entries(THREE)) {
+        await session.eval((id) => window.__gw.ui.openJournal({ zone: "sporewood", sel: id }), id);
+        await session.waitFor(`${id}'s page`, 10_000, () => !!document.querySelector(".gw-jr-where"));
+        const where = await visibleText(session, ".gw-jr-where");
+        check(where === f.line, `${id} caught: the Journal says "${where}", expected "${f.line}"`);
+        await session.eval(() => window.__gw.ui.closeAll());
+      }
+      return `${seen.join("; ")}; list ${after.have}/${after.need}`;
+    },
+  },
+  {
     name: "guide in Sporewood: the first-play card about worms and the spoon does not come up after a cast and a catch there, on a save whose guide is not finished",
     fixture: "sporewood-crossed",
     debug: true,

@@ -175,6 +175,11 @@ Eight questions were put as yes or no; the designer said yes to all ("Sounds goo
 - **Seven more fish after the three:** four local kinds, a Silver Dollar that comes with the seedfall, the piranha at the Greenhouse, and one other visitor.
 - **The first rod, line and reel steps cost 350 on the shelf, not 600.** Sporewood earns about 178 clams an evening on its starter kit (Mossmere 47), so a first step takes about two evenings, as in Mossmere. Everything else keeps its price.
 - **Sporewood gets Mossmere's look pass:** light by the hour, the water, its own plants.
+- **The three left-out fish are back, so the lake's list has 12, as Mossmere's.** Each has a niche of its own, measured
+  by the game's own roll: the Sporebelly Puffer (common, by day and at dusk, the Lullaby, best on the Seedpod Twirl), the
+  Plumgill Perch (common, at dusk and at night, the Gill Harp, best on the Spore Moth) and the Hushcap Koi (rare, at
+  night, the Veilwater, best on Spore Cake). The Puffer is always drawn blown up into its ball. Murk's "list complete"
+  line is now heard once on each lake.
 
 ## Still open
 

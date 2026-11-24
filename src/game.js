@@ -31234,6 +31234,64 @@ var O5 = {
       water: ["Sporewood Pools"],
       favours: "Bottom: Spore Cake under a float, Root Jig, Spore-Lamp Fly.",
     },
+    // The three left out of the first Sporewood list, brought back by the designer's ruling of 24 November 2026.
+    // Their lore and hint live on their records (Nf), as the Velvet Ray's do; these lines say the same.
+    {
+      id: "sporebelly_puffer",
+      name: "Sporebelly Puffer",
+      journal:
+        "A small puffer with a pale, spotted belly and a beak for cracking snails. Scared, it gulps water and swells into a ball.",
+      haunt:
+        "It bites only by day and at dusk, and feeds most in the Lullaby. The Seedpod Twirl suits it best.",
+      play: "Sulker. It swells up and hangs on the line like a ball.",
+      sizeModel: { L50: 25, sigma: 0.1 },
+      hours: "day, dusk",
+      place: "open",
+      placeName: null,
+      giant: !1,
+      rarity: "common",
+      family: "bottom",
+      bodyPlan: "puffer",
+      water: ["Sporewood Pools"],
+      favours: "The Seedpod Twirl suits it best.",
+    },
+    {
+      id: "plumgill_perch",
+      name: "Plumgill Perch",
+      journal:
+        "A striped perch with a spiny back fin. Its gills are the colour of a bruise healing, and have been for a very long time.",
+      haunt:
+        "It bites only at dusk and at night, and feeds most at the Gill Harp. The Spore Moth suits it best.",
+      play: "Darter. Short, quick dashes and a shake of the head.",
+      sizeModel: { L50: 30, sigma: 0.12 },
+      hours: "dusk, night",
+      place: "open",
+      placeName: null,
+      giant: !1,
+      rarity: "common",
+      family: "insect",
+      bodyPlan: "perch",
+      water: ["Sporewood Pools"],
+      favours: "The Spore Moth suits it best.",
+    },
+    {
+      id: "hushcap_koi",
+      name: "Hushcap Koi",
+      journal:
+        "A pale koi with a dark patch on its head, like a cap pulled low. It feeds after dark, when the water is still.",
+      haunt: "It bites only at night, and feeds most in the Veilwater. Spore Cake suits it best.",
+      play: "Runner. Long, slow runs out into the dark, then it comes in.",
+      sizeModel: { L50: 50, sigma: 0.13 },
+      hours: "night",
+      place: "open",
+      placeName: null,
+      giant: !1,
+      rarity: "rare",
+      family: "bottom",
+      bodyPlan: "koi",
+      water: ["Sporewood Pools"],
+      favours: "Spore Cake suits it best.",
+    },
   ],
 };
 var mr = (e) => !!e && typeof e == "object" && !Array.isArray(e),
@@ -32042,6 +32100,9 @@ var Ph = [
     lostsea_mackerel: [0.2, 0.2, 0.2, 0.4, 1.5, 2.5, 2.2, 1.6, 1, 0.8],
     downcast_catfish: [0.3, 0.3, 0.3, 0.8, 2.2, 0.6, 1.2, 3, 0.6, 1],
     mildew_angler: [0.6, 0.8, 1.2, 2.5, 1.2, 0.2, 0.4, 1.2, 0.4, 0.6],
+    sporebelly_puffer: [1.8, 1.4, 2.4, 1.2, 0.4, 0.8, 0.5, 0.2, 1, 0.8],
+    plumgill_perch: [0.8, 1.8, 1.2, 2.4, 1.6, 0.6, 0.6, 0.5, 1, 1.4],
+    hushcap_koi: [1.4, 1, 2.6, 0.4, 0.4, 0.4, 0.6, 0.4, 0.6, 0.9],
   },
   YQ = {
     netcloud_fry: [1, 2, 1, 0, 3, 0, 0, 0, 1],
@@ -32053,6 +32114,9 @@ var Ph = [
     lostsea_mackerel: [0, 0, 0, 2, 1, 3, 0, 2, 0],
     downcast_catfish: [0, 3, 1, 1, 0, 0, 2, 2, 0],
     mildew_angler: [0, 1, 3, 2, 0, 1, 0, 0, 0],
+    sporebelly_puffer: [0, 1, 0, 1, 0, 0, 1, 0, 3],
+    plumgill_perch: [0, 0, 0, 1, 3, 0, 0, 0, 0],
+    hushcap_koi: [0, 3, 1, 0, 1, 0, 0, 0, 0],
     sleepspore_jelly: [0, 0, 3, 0, 0, 0, 0, 0, 0],
     nightbloom_carp: [0, 2, 3, 0, 0, 0, 1, 2, 0],
     harpstring_eel: [0, 0, 0, 0, 0, 2, 1, 3, 0],
@@ -32290,6 +32354,7 @@ bs.sporewood.factors = {
     netcloud_fry: 0.9598,
     threadling_eel: 1.2127,
     velvet_ray: 0.6616,
+    sporebelly_puffer: 0.5,
   },
   dusk: {
     capshell_crayfish: 1.4943,
@@ -32300,6 +32365,8 @@ bs.sporewood.factors = {
     netcloud_fry: 0.9598,
     threadling_eel: 1.2127,
     velvet_ray: 0.6616,
+    sporebelly_puffer: 0.5,
+    plumgill_perch: 0.5,
   },
   night: {
     capshell_crayfish: 1.5114,
@@ -32308,6 +32375,8 @@ bs.sporewood.factors = {
     netcloud_fry: 0.9514,
     threadling_eel: 1.208,
     velvet_ray: 0.6397,
+    plumgill_perch: 0.5,
+    hushcap_koi: 0.6,
   },
 };
 {
@@ -34299,22 +34368,24 @@ var Ms = [
       value: 13,
       food: 22,
       oil: 26,
-      time: "any",
+      time: "calm",
       depth: [0, 0.6],
       bait: null,
-      behavior: "thrasher",
-      difficulty: Ta(2, "thrasher"),
+      behavior: "sulker",
+      difficulty: Ta(2, "sulker"),
+      // The Journal's and the catch card's drawing, in the coat of its portrait (merePortraits).
       model: {
         shape: "puffer",
-        body: 8015726,
-        belly: 15780312,
-        fin: 15243866,
-        glow: 16752580,
+        body: 8026703,
+        belly: 15721924,
+        fin: 11970675,
+        glow: null,
         pattern: "spots",
         eyes: "normal",
         scale: 0.7,
       },
-      lore: "Frightened, it swells and sighs out spores. In the quiet, the whole pool smells of lullabies.",
+      hint: "It bites only by day and at dusk, and feeds most in the Lullaby. The Seedpod Twirl suits it best.",
+      lore: "A small puffer with a pale, spotted belly and a beak for cracking snails. Scared, it gulps water and swells into a ball.",
     },
     {
       id: "plumgill_perch",
@@ -34326,22 +34397,23 @@ var Ms = [
       value: 14,
       food: 26,
       oil: 24,
-      time: "any",
+      time: "dusk",
       depth: [0.15, 1],
       bait: null,
-      behavior: "steady",
-      difficulty: Ta(2, "steady"),
+      behavior: "darter",
+      difficulty: Ta(2, "darter"),
       model: {
         shape: "perch",
-        body: 5913950,
-        belly: 14862296,
-        fin: 13073056,
+        body: 6778943,
+        belly: 15129789,
+        fin: 9063004,
         glow: null,
         pattern: "stripes",
         eyes: "normal",
         scale: 0.85,
       },
-      lore: "Its gills are the colour of a bruise healing. It has been healing for a very long time.",
+      hint: "It bites only at dusk and at night, and feeds most at the Gill Harp. The Spore Moth suits it best.",
+      lore: "A striped perch with a spiny back fin. Its gills are the colour of a bruise healing, and have been for a very long time.",
     },
     {
       id: "capshell_crayfish",
@@ -39953,29 +40025,27 @@ var IS = {
       zone: "sporewood",
       rarity: "rare",
       tier: 3,
-      place: "veilwater",
-      cond: "deed",
       weight: [1, 4],
       value: 78,
       food: 26,
       oil: 46,
-      time: "calm",
+      time: "gloom",
       depth: [0.6, 1],
       bait: null,
-      behavior: "darter",
-      difficulty: Ta(3, "darter"),
+      behavior: "runner",
+      difficulty: Ta(3, "runner"),
       model: {
         shape: "koi",
-        body: 2825008,
-        belly: 15324912,
-        fin: 16757866,
-        glow: 16765578,
-        pattern: "spots",
-        eyes: "glow",
+        body: 14209472,
+        belly: 16249571,
+        fin: 12827820,
+        glow: null,
+        pattern: "scales",
+        eyes: "normal",
         scale: 1.05,
       },
-      hint: "In the Veilwater, once its veil has burned away.",
-      lore: "It glows only in the dark the pool keeps. Burn the veil and the dark comes up to look at you.",
+      hint: "It bites only at night, and feeds most in the Veilwater. Spore Cake suits it best.",
+      lore: "A pale koi with a dark patch on its head, like a cap pulled low. It feeds after dark, when the water is still.",
     },
     {
       id: "the_unreflected",
@@ -41724,14 +41794,16 @@ var Nf = [
       prefers: "drip",
       phase: 1,
       src: "v1",
-      spots: { puffball_vent: 3 },
+      spots: { lullaby: 2 },
     }),
+    // Sporewood's commons run 7 to 24 cm, so the perch is a 30 cm fish, not the old walk-world's 40.
     mi("plumgill_perch", {
-      size: Ga(40, 0.13, "perch"),
+      size: Ga(30, 0.12, "perch"),
       family: "predator",
       prefers: "hush",
       phase: 1,
       src: "v1",
+      spots: { gill_harp: 2 },
     }),
     mi("capshell_crayfish", {
       size: Ga(24, 0.1, "crayfish"),
@@ -41820,7 +41892,14 @@ var Nf = [
       phase: 3,
       src: "walk",
     }),
-    mi("hushcap_koi", { size: Ga(50, 0.13, "koi"), family: "glow", prefers: "hush", phase: 3, src: "walk" }),
+    mi("hushcap_koi", {
+      size: Ga(50, 0.13, "koi"),
+      family: "bottom",
+      prefers: "hush",
+      phase: 1,
+      src: "walk",
+      spots: { veilwater: 5 },
+    }),
     {
       id: "the_remembered_sun",
       name: "The Remembered Sun",
@@ -48923,7 +49002,7 @@ Object.assign(wo.places, {
     lake: !0,
     card: "sleepspore_jelly",
     own: ["sleepspore_jelly"],
-    draws: { velvet_ray: 3 },
+    draws: { velvet_ray: 3, sporebelly_puffer: 2 },
     out: [
       [36.59, 32.5],
       [42.4, 30.8],
@@ -48943,7 +49022,7 @@ Object.assign(wo.places, {
     lake: !0,
     card: "harpstring_eel",
     giant: "harpstring_eel",
-    draws: { cindertail_catfish: 2 },
+    draws: { cindertail_catfish: 2, plumgill_perch: 2 },
     out: [
       [36.59, 32.5],
       [42.4, 30.8],
@@ -48959,6 +49038,7 @@ Object.assign(wo.places, {
     price: 1200,
     card: "festival_puffer",
     giant: "festival_puffer",
+    draws: { hushcap_koi: 5 },
     out: [
       [36.59, 32.5],
       [42.4, 30.8],
@@ -49041,16 +49121,21 @@ wo.species.sporewood = [
   "netcloud_fry",
   "falsesmile_barb",
   "capshell_crayfish",
+  "sporebelly_puffer",
+  "plumgill_perch",
   "threadling_eel",
   "cindertail_catfish",
   "velvet_ray",
   "lostsea_mackerel",
   "downcast_catfish",
   "mildew_angler",
+  "hushcap_koi",
 ];
 wo.kept.push("capshell_crayfish", "mildew_angler", "sleepspore_jelly");
 wo.keptAs = { sleepspore_jelly: { place: "lullaby", bait: "amber_larvae" } };
-wo.leftOut = { sporewood: ["sporebelly_puffer", "plumgill_perch", "hushcap_koi"] };
+// Records kept in the data but dropped from a lake's play. The Sporebelly Puffer, Plumgill Perch and Hushcap Koi
+// were here until they joined Sporewood's list.
+wo.leftOut = { sporewood: [] };
 wo.legendBait.sporewood = { id: "glowcap_bulb", price: 250 };
 {
   let e = (n, o) => ({
@@ -50041,13 +50126,40 @@ registerLakeFight(
   1.35,
 );
 registerLakeFight("gutter_crayfish capshell_crayfish", "kick", 0.82, 0.76, -1.5, 0, 0.32, 1.65);
-registerLakeFight("mossback_perch milkeye_perch falsesmile_barb", "dart", 0.95, 0.92, -0.5, 0.04, 0.78, 1.15);
+registerLakeFight(
+  "mossback_perch milkeye_perch falsesmile_barb plumgill_perch",
+  "dart",
+  0.95,
+  0.92,
+  -0.5,
+  0.04,
+  0.78,
+  1.15,
+);
 registerLakeFight("likely_chub", "rush", 1, 1.05, 0.5, 0.02, 1.1, 1);
-registerLakeFight("rustfin_sucker mildew_angler festival_puffer", "hold", 1.02, 1.04, 0, 0, 0.48, 0.62);
+registerLakeFight(
+  "rustfin_sucker mildew_angler festival_puffer sporebelly_puffer",
+  "hold",
+  1.02,
+  1.04,
+  0,
+  0,
+  0.48,
+  0.62,
+);
 registerLakeFight("kissmark_trout rosefleck_trout", "runner", 1.13, 1.15, 1.5, 0.48, 1.36, 1.25);
 registerLakeFight("overbold_bass", "rush", 1.1, 1.15, 1, 0.38, 1.22, 1.14);
 registerLakeFight("reedjaw_pike thousandcast_pike", "rush", 1.12, 1.28, 2, 0.08, 1.5, 1.06);
-registerLakeFight("weeping_carp candlefin_koi nightbloom_carp", "longRun", 1.2, 1.16, 1.5, 0.02, 1.16, 0.7);
+registerLakeFight(
+  "weeping_carp candlefin_koi nightbloom_carp hushcap_koi",
+  "longRun",
+  1.2,
+  1.16,
+  1.5,
+  0.02,
+  1.16,
+  0.7,
+);
 registerLakeFight("bridgechain_sturgeon", "longRun", 1.24, 1.24, 2, 0.3, 1.3, 0.65);
 registerLakeFight(
   "gloam_eel hullkiss_lamprey threadling_eel harpstring_eel",
@@ -89372,6 +89484,43 @@ Object.assign(merePortraits, {
     mark: "meadow",
     speed: 2.45,
   },
+  // Drawn as it is seen, on the line: puffed up into its ball ("ball" form), dark-spotted above, pale below,
+  // with spore freckles and short spines on the belly and a beak at the front ("sporebelly").
+  sporebelly_puffer: {
+    form: "ball",
+    w: 0.35,
+    h: 0.34,
+    coat: ["5f6140", "9d9661", "efe5c4", "7d7350", "d6c08a", "35311f"],
+    dorsal: [-0.17, 0.075, 0.07],
+    tail: [0.085, 0.012],
+    eye: 0.034,
+    mark: "sporebelly",
+    speed: 4.4,
+  },
+  // A perch with six dark bars, plum fins and a plum gill cover ("plumgill").
+  plumgill_perch: {
+    form: "perch",
+    w: 0.098,
+    h: 0.138,
+    coat: ["3b4630", "8f9058", "e6dcbd", "7c4452", "c08680", "2a2a20"],
+    dorsal: [0.18, 0.35, 0.112],
+    tail: [0.13, 0.06],
+    eye: 0.03,
+    mark: "plumgill",
+    speed: 5.4,
+  },
+  // A pale koi with a charcoal cap pulled low over its head and a few faint grey clouds ("hushcap").
+  hushcap_koi: {
+    form: "koi",
+    w: 0.1,
+    h: 0.13,
+    coat: ["d8d1c0", "ece5d2", "f7f2e3", "c3bcac", "f3ede0", "222127"],
+    dorsal: [0.09, 0.32, 0.085],
+    tail: [0.175, -0.02],
+    eye: 0.022,
+    mark: "hushcap",
+    speed: 3.4,
+  },
 });
 // Mossmere's local kinds (wo.localKinds): each its base fish's shape in a coat of its own. "blotch" is a row of
 // dark blotches along the side, "stripe" a bright stripe along it, "mirror" bare skin with a few big pale scales
@@ -89525,6 +89674,8 @@ function buildMerePortrait(id) {
     coal: [0.19, 0.3, 0.55, 0.82, 0.97, 1, 0.94, 0.8, 0.62, 0.36, 0.05],
     silt: [0.16, 0.32, 0.58, 0.86, 1, 0.99, 0.96, 0.88, 0.66, 0.37, 0.05],
     puff: [0.15, 0.33, 0.76, 0.96, 1, 0.99, 0.91, 0.77, 0.57, 0.31, 0.08],
+    // A puffer blown up round: a sphere from the tail's wrist to the beak.
+    ball: [0.12, 0.22, 0.7, 0.96, 1, 0.94, 0.85, 0.69, 0.5, 0.26, 0.06],
     anglerfish: [0.17, 0.28, 0.54, 0.82, 0.99, 1, 0.97, 0.91, 0.74, 0.41, 0.06],
     sliver: [0.13, 0.27, 0.54, 0.85, 1, 0.97, 0.83, 0.67, 0.48, 0.22, 0.025],
     surface: [0.17, 0.25, 0.52, 0.8, 0.99, 1, 0.9, 0.72, 0.46, 0.25, 0.035],
@@ -89731,6 +89882,25 @@ function buildMerePortrait(id) {
       c = mix(c, color("8f87a0"), 0.5 * s ** 3 * mask);
     }
     if (mark === "chain") c = mix(c, ink, 0.26 * (0.5 + 0.5 * cos(70 * z)) ** 3 * mask);
+    if (mark === "plumgill") {
+      // Six dark bars down the flank, fading out above the belly, as on a real perch.
+      const bar = (0.5 + 0.5 * cos(tau * (z * 11.5 + 0.4 * wav * 11.5 + 0.12 * k + 0.3))) ** 3;
+      c = mix(
+        c,
+        ink,
+        0.82 * bar * smooth(-0.62, -0.02, k) * smooth(-0.3, -0.24, z) * (1 - smooth(0.2, 0.26, z)),
+      );
+    }
+    if (mark === "hushcap") {
+      // A charcoal cap over the crown of the head, pulled low to the eye.
+      const brim = 0.4 - 0.5 * (z - 0.3);
+      const nape = 0.25 - 0.04 * k;
+      c = mix(
+        c,
+        ink,
+        0.97 * smooth(nape, nape + 0.02, z) * (1 - smooth(0.46, 0.475, z)) * smooth(brim, brim + 0.035, k),
+      );
+    }
     if (mark === "bell")
       c = mix(
         c,
@@ -89746,7 +89916,7 @@ function buildMerePortrait(id) {
       );
     // Small overlapping scale edges disappear into the smooth skin of the face.
     const scaled =
-      !["netglass", "cinder", "silt", "festival", "lanterncap", "mirror"].includes(mark) &&
+      !["netglass", "cinder", "silt", "festival", "lanterncap", "mirror", "sporebelly"].includes(mark) &&
       !serpent &&
       form !== "shovel" &&
       mark !== "bloom";
@@ -90434,6 +90604,51 @@ function buildMerePortrait(id) {
           limb(detail, [p, q], 0.0037, 0.0002, side, cream, 3, 4);
         }
     }
+    if (mark === "sporebelly") {
+      // Round dark spots over the back and upper flank (the eye left clear), pale spore freckles on the belly,
+      // and short spines standing out from the belly, as on a puffed-up puffer.
+      for (let row = 0; row < 5; row++)
+        for (let j = 0; j < 8; j++) {
+          const z = -0.21 + 0.082 * j + 0.041 * (row % 2) + 0.018 * (rnd() - 0.5),
+            k = -0.04 + 0.19 * row + 0.05 * (rnd() - 0.5),
+            r = 0.009 + 0.006 * rnd();
+          if (z > 0.45 || (abs(z - 0.374) < 0.06 && abs(k - 0.34) < 0.26)) continue;
+          flankPatch(z, k, s, r, r / cross(z).h, mix(ink, back, 0.25 * rnd()), "oval", mix(ink, side, 0.45));
+        }
+      for (let i = 0; i < 34; i++) {
+        const z = -0.16 + 0.5 * rnd(),
+          k = -0.92 + 0.6 * rnd(),
+          r = 0.004 + 0.004 * rnd();
+        flankPatch(z, k, s, r, r / cross(z).h, mix(brass, cream, 0.35 + 0.45 * rnd()));
+      }
+      for (let i = 0; i < 4; i++)
+        for (let j = 0; j < 6; j++) {
+          const k = -0.86 + 0.15 * i,
+            z = -0.13 + 0.085 * j + 0.04 * (i % 2),
+            p = flank(z, k, s),
+            q = p.clone().add(vec(s * 0.016 * sqrt(1 - k * k), 0.016 * k, -0.006));
+          limb(detail, [p, q], 0.0042, 0.0003, side, cream, 3, 4);
+        }
+    }
+    if (mark === "plumgill")
+      flankPatch(0.312, -0.08, s, 0.028, 0.46, color("6b3a50"), "oval", mix(side, color("6b3a50"), 0.55));
+    if (mark === "hushcap") {
+      const base = flank(0.45, -0.56, s);
+      limb(
+        detail,
+        [
+          base,
+          base.clone().add(vec(s * 0.016, -0.036, -0.014)),
+          base.clone().add(vec(s * 0.04, -0.045, -0.034)),
+          base.clone().add(vec(s * 0.044, -0.05, -0.08)),
+        ],
+        0.005,
+        0.0008,
+        mix(side, ink, 0.25),
+        edge,
+        16,
+      );
+    }
     if (mark === "lanterncap") {
       // Short, inward-slanting ivory teeth follow a dark jaw pocket.
       for (let j = 0; j < 7; j++) {
@@ -90533,6 +90748,12 @@ function buildMerePortrait(id) {
         },
         4,
       );
+    if (mark === "sporebelly") {
+      // The beak: two pale plates, top and bottom, at the front of the ball.
+      const f = cross(0.486);
+      for (const dir of [-1, 1])
+        detail.oval(vec(0, f.y + dir * 0.012, 0.488), 0.022, 0.01, 0.017, mix(cream, brass, 0.3));
+    }
     if (mark === "festival") {
       for (let s of [-1, 1])
         for (let j = 0; j < 2; j++) {
@@ -111639,7 +111860,9 @@ function CF(e) {
         ? Ee.at?.[je[1]]?.[je[2]]
         : ze === "firstChart"
           ? (Ee.firstChartBy?.[y()] ?? Ee.firstChart)
-          : Ee[ze];
+          : /^listComplete:[a-z_]+$/.test(ze)
+            ? Ee.listComplete
+            : Ee[ze];
     return typeof K != "string" || !K ? null : ((H.said[ze] = !0), i(), K);
   }
   function rt(ze) {
@@ -169418,7 +169641,10 @@ function Xhe({
 } = {}) {
   let i = Oa(t) ? t : {};
   if ((s === !0 || ri(e).some((u) => u.find === "veil_notebook")) && !i.brook) return "brook";
-  if (n && !i.listComplete) return "listComplete";
+  // Each lake's list has its own "list complete" line. Mossmere's keeps the old key, so a save that heard it
+  // there is unchanged, and Murk still says it when another lake's list is done.
+  let listKey = typeof r == "string" && r && r !== "mossmere" ? `listComplete:${r}` : "listComplete";
+  if (n && !i[listKey]) return listKey;
   let c = (u) =>
     typeof r == "string" && Oa(l) && typeof l[u] == "string" && l[u] && !i[`at:${r}:${u}`]
       ? `at:${r}:${u}`
@@ -171650,7 +171876,8 @@ function WV(e) {
       (Ne.pressed = !1),
       Ne.press)
     ) {
-      let Ht = i("listCount", "mossmere");
+      // The count under the seal is for the lake the barge is in.
+      let Ht = i("listCount", u()?.zone || i("barge")?.water || "mossmere");
       Ne.count = Ht ? `${Math.floor(Yo(Number(Ht.have), 0))}/${Math.floor(Yo(Number(Ht.need), 0))}` : null;
     }
     if (e.has("jetty")) {
@@ -172308,7 +172535,7 @@ function WV(e) {
     return {
       line: De || null,
       id: De ? re : null,
-      press: De && re === "listComplete" ? "catch" : null,
+      press: De && /^listComplete(:|$)/.test(re) ? "catch" : null,
       count: Le ? `${Math.floor(Yo(Number(Le.have), 0))}/${Math.floor(Yo(Number(Le.need), 0))}` : null,
     };
   }
