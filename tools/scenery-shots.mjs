@@ -1,11 +1,16 @@
 #!/usr/bin/env node
-// Renders a fixed set of named Mossmere views to PNG files, the same way every time, so "before" and "after"
-// pictures of the lake's scenery can be laid side by side. It changes nothing in the game.
+// Renders a fixed set of named views of a lake (Mossmere, or Sporewood Pools with --lake sporewood) to PNG files, the
+// same way every time, so "before" and "after" pictures of the lake's scenery can be laid side by side. It changes
+// nothing in the game.
 //
 // Usage: node tools/scenery-shots.mjs --out <dir> [--only name,name] [--quality high|low] [--size 1280x720]
-//          [--rod <rod id>] [--raft top|none|keel:N|lantern:N|oars:N[+...][,...]]
-//        node tools/scenery-shots.mjs --speed
+//          [--rod <rod id>] [--raft top|none|keel:N|lantern:N|oars:N[+...][,...]] [--lake mossmere|sporewood]
+//        node tools/scenery-shots.mjs --speed [--lake mossmere|sporewood]
 //        either may add --page <path/to/built.html> to use another build than the repo's own
+//
+// --lake sporewood: Sporewood Pools' own views (SPOREWOOD_VIEWS) from tools/fixtures/sporewood-crossed.json, a save
+// with the barge at Sporewood, the Lullaby and the Gill Harp free and the Veilwater and the Mother's Cup still locked
+// under their mist. --rod is for Mossmere's rods only.
 //
 // --rod: the "found" save owns and fits that Mossmere rod (willow_switch, ashwood_rod, whalebone_rod, or the found
 // lamp_pole), and each picture's name gains "-<rod id>". --raft top: the save has every raft part at its top level
@@ -16,7 +21,8 @@
 //
 // Default: the game's best quality setting ("high") at 1280x720, device scale 1.
 // --speed: at 480x270 on low quality (or --quality), prints the average time of 60 frames at the set-out spot and in the
-// Lily Maze (wall-clock time between animation frames; builders use it to check the low setting is no slower).
+// Lily Maze (with --lake sporewood: in the Lullaby) (wall-clock time between animation frames; builders use it to check
+// the low setting is no slower).
 //
 // How each view is made the same every time:
 // - The page's clock is replaced before the game loads: every animation frame moves the game on by a fixed step,
@@ -52,6 +58,7 @@ const QUALITY = option("--quality", "high");
 const PAGE = option("--page", undefined);
 const ROD = option("--rod", null);
 const RAFT = option("--raft", null);
+const LAKE = option("--lake", "mossmere");
 const MOSSMERE_RODS = ["willow_switch", "ashwood_rod", "whalebone_rod"];
 const RAFTS = RAFT ? RAFT.split(",").map((r) => r.trim()) : [null];
 const RAFT_OK = /^(top|none|(oars|keel|lantern):\d(\+(oars|keel|lantern):\d)*)$/;
@@ -81,6 +88,10 @@ if (
   console.error(
     `--rod must be one of ${MOSSMERE_RODS.join(", ")}, lamp_pole; --raft must be top, none or part:level[+part:level]`,
   );
+  process.exit(2);
+}
+if (!["mossmere", "sporewood"].includes(LAKE) || (LAKE === "sporewood" && ROD)) {
+  console.error("--lake must be mossmere or sporewood; --rod is for Mossmere only");
   process.exit(2);
 }
 if (!["high", "medium", "low"].includes(QUALITY) || !(SHOT_W > 0 && SHOT_H > 0)) {
@@ -122,9 +133,19 @@ const PLACES = {
   nwShore: { at: { x: -27, z: 38 }, look: { x: -34, z: 45 } },
 };
 
+// Sporewood Pools' places: each raft spot faces the place across open water (the Veilwater from outside its curtain of
+// moss, the Mother's Cup from the neck's side of the East Pool), close enough that the fishing camera frames it.
+const SPOREWOOD_PLACES = {
+  lullaby: { at: { x: -50, z: -24.5 }, look: { x: -52.5, z: -37 } }, // the sleeping cove's lily rafts, from the north
+  harp: { at: { x: -9, z: 6.5 }, look: { x: 2, z: 6.5 } }, // the raft under the Gill Harp's west strings, facing the neck
+  veil: { at: { x: -66, z: 29.5 }, look: { x: -84, z: 36.5 } }, // the moss curtain over the Veilwater's mouth
+  cup: { at: { x: 35, z: 11 }, look: { x: 48, z: 6 } }, // the Mother's Cup under the Mother Cap
+  open: { at: { x: 30, z: -6 }, look: { x: 44, z: -14 } }, // the open East Pool
+};
+
 // The views, in the order they are taken. `session` names the save they need; `at` a place above or "setout" (the
 // spot the set-out sail ends at); `hour` a key of HOURS; `act` an extra step before the scene settles.
-const VIEWS = [
+const MOSSMERE_VIEWS = [
   ...["day", "dusk", "night"].map((hour) => ({ name: `dock-${hour}`, session: "found", at: "dock", hour })),
   ...["day", "dusk", "night"].map((hour) => ({
     name: `lily-maze-${hour}`,
@@ -173,6 +194,27 @@ const VIEWS = [
   { name: "dock-posts-dusk", session: "found", at: "dock", dock: 1, hour: "dusk", dockCam: true },
   { name: "mist-lifting-dusk", session: "locked", at: "mistview", hour: "dusk", act: "liftMist" },
 ];
+
+// Sporewood's views (--lake sporewood), all from the one save: the arrival as the set-out sail leaves the raft, each
+// free place at dusk from the raft, the two locked places under their mist, the open water by the hour, the raft with the
+// line out.
+const SPOREWOOD_VIEWS = [
+  { name: "arrival-setout", session: "crossed", at: "setout", hour: "setout" },
+  { name: "lullaby-dusk", session: "crossed", at: "lullaby", hour: "dusk" },
+  { name: "gill-harp-dusk", session: "crossed", at: "harp", hour: "dusk" },
+  // the two locked places through their own landmark camera (the one the mist lift uses), so the picture faces the place
+  { name: "veilwater-locked-dusk", session: "crossed", at: "veil", hour: "dusk", frame: "veilwater" },
+  { name: "mothers-cup-locked-dusk", session: "crossed", at: "cup", hour: "dusk", frame: "mothers_cup" },
+  ...["day", "dusk", "night"].map((hour) => ({
+    name: `open-water-${hour}`,
+    session: "crossed",
+    at: "open",
+    hour,
+  })),
+  { name: "raft-line-out-dusk", session: "crossed", at: "setout", hour: "dusk", act: "cast" },
+];
+const VIEWS = LAKE === "sporewood" ? SPOREWOOD_VIEWS : MOSSMERE_VIEWS;
+const PLACES_HERE = LAKE === "sporewood" ? SPOREWOOD_PLACES : PLACES;
 
 // ---- the page's fixed clock and seeded random, installed before the game's own scripts run -------------------
 
@@ -275,6 +317,16 @@ function lockedSave(quality) {
   return JSON.stringify(save);
 }
 
+// Sporewood as the save left it (the barge there); --raft sets its raft parts as for Mossmere.
+function crossedSave(quality) {
+  const save = readSave("sporewood-crossed");
+  save.meta.settings.quality = quality;
+  if (RAFTS[0]) save.meta.loop.raft = raftLevels(RAFTS[0]);
+  return JSON.stringify(save);
+}
+
+const SAVES = { found: foundSave, locked: lockedSave, crossed: crossedSave };
+
 // ---- steps on the page ---------------------------------------------------------------------------------------------
 
 const t0 = Date.now();
@@ -349,7 +401,8 @@ async function stage(s, view, setout) {
       };
       place = { x: dock.x * 0.7, z: dock.z * 0.7, yaw: facing({ x: dock.x * 0.7, z: dock.z * 0.7 }, dock) };
     }
-  } else place = { ...PLACES[view.at].at, yaw: facing(PLACES[view.at].at, PLACES[view.at].look) };
+  } else
+    place = { ...PLACES_HERE[view.at].at, yaw: facing(PLACES_HERE[view.at].at, PLACES_HERE[view.at].look) };
   await s.eval(
     ([hour, place]) => {
       const g = window.__gw;
@@ -450,14 +503,11 @@ async function shots() {
   const browser = await launchBrowser();
   const failed = [];
   try {
-    for (const kind of ["found", "locked"]) {
+    for (const kind of Object.keys(SAVES)) {
       const mine = views.filter((v) => v.session === kind);
       if (!mine.length) continue;
       say(`session ${kind}: ${mine.length} views`);
-      const { s, setout } = await openSession(
-        browser,
-        kind === "found" ? foundSave(QUALITY) : lockedSave(QUALITY),
-      );
+      const { s, setout } = await openSession(browser, SAVES[kind](QUALITY));
       say(`  set-out spot ${setout.x.toFixed(1)}, ${setout.z.toFixed(1)}`);
       for (const view of mine)
         for (const [i, setting] of RAFTS.entries()) {
@@ -466,7 +516,7 @@ async function shots() {
             // The first setting is the save's and the view is staged for it; the others are put in the game's
             // state, which the raft reads, with the view left as it is (staging again would move the camera).
             if (i === 0) await stage(s, view, setout);
-            else if (kind === "found")
+            else if (kind !== "locked")
               await s.eval((levels) => {
                 window.__gw.state.meta.loop.raft = levels;
               }, raftLevels(setting));
@@ -499,7 +549,7 @@ async function speed() {
     const q = args.includes("--quality") ? QUALITY : "low";
     // The scenery is built for the quality the save names when the lake loads (low or not, and medium or high for
     // some pieces), so the save carries the measured quality: a change of setting alone does not rebuild it.
-    const { s, setout } = await openSession(browser, foundSave(q));
+    const { s, setout } = await openSession(browser, LAKE === "sporewood" ? crossedSave(q) : foundSave(q));
     await setQuality(s, q);
     const measure = () =>
       s.eval(
@@ -519,7 +569,9 @@ async function speed() {
     const out = {};
     for (const [name, view] of [
       ["set-out spot", { at: "setout", hour: "dusk" }],
-      ["Lily Maze", { at: "lily", hour: "dusk" }],
+      LAKE === "sporewood"
+        ? ["the Lullaby", { at: "lullaby", hour: "dusk" }]
+        : ["Lily Maze", { at: "lily", hour: "dusk" }],
     ]) {
       await stage(s, view, setout);
       await frames(s, 20);

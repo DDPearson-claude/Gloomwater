@@ -49611,7 +49611,9 @@ var PP = Object.freeze({
     albedo: 1.25,
     gain: Object.freeze([0.98, 1.1, 0.92]),
     floor: 0.17,
-    night: Object.freeze({ floor: 0.3, trans: 1.23 }),
+    // (the look pass: the night's flat floor light was lifted to 0.3, which kept the banks as bright by night as by day; it is
+    // lower, so the night is dark and the glowing caps, spores and the lantern carry it)
+    night: Object.freeze({ floor: 0.15, trans: 1.15 }),
     flora: Object.freeze({
       moss: 420,
       ferns: 150,
@@ -49626,10 +49628,25 @@ var PP = Object.freeze({
       fireflies: 120,
     }),
     tiers: Object.freeze({ high: 1, medium: 0.7, low: 0.4 }),
-    haze: Object.freeze({ tint: 14998214, top: 1.2, amt: 0.42, from: 0.25 }),
-    mist: Object.freeze({ lit: 15130572, litN: 9083048, shade: 10132638, shadeN: 2767434, low: 0.7 }),
+    // (the look pass: the evening haze and the locked places' mist in the lake's own colours, a pale spore gold lit at dusk and a
+    // deep teal by night, where they were a cold grey)
+    haze: Object.freeze({ tint: 0xdccc94, top: 1.2, amt: 0.5, from: 0.25 }),
+    mist: Object.freeze({
+      lit: 0xe4d8a8,
+      litN: 0x76a6ae,
+      shade: 0x9a9476,
+      shadeN: 0x22424c,
+      low: 1,
+      lowLite: 0.7,
+    }),
     dapple: Object.freeze({ k: 0.42, scale: 0.075 }),
     weed: Object.freeze({ color: 4082236, k: 0.32 }),
+    // (the look pass) the Lullaby's lily rafts (raft centres within r of the cove's middle, pads within `spread` of a centre) and
+    // the number of shore beds of spore reeds, moss tussocks and small mushrooms (best setting; medium has 0.6 of them, low none)
+    lilyRafts: Object.freeze([
+      Object.freeze({ place: "lullaby", x: -51.5, z: -35, r: 5.6, rafts: 7, n: 54, spread: 1.9 }),
+    ]),
+    shoreBeds: 26,
     air: Object.freeze({
       palette: Object.freeze({
         fog: 2503743,
@@ -49663,63 +49680,88 @@ var PP = Object.freeze({
         cap: 7227940,
         capHi: 12883016,
       }),
+      // Sporewood's evening, hour by hour, after Mossmere's (mossHours): the same day / dusk / night blend, with the vault's extras
+      // (sun, zen, crack, shaft, warmAmt and their colours), so the hours read apart from the fishing camera. Day is soft green-gold
+      // light under the caps: an olive-gold air, a gold key, green fill, green-brown water. Dusk is warm amber, the key low (long
+      // shadows) and the caps beginning to glow. Night is deep blue-teal: a cool dim key, dark water, the caps, spores and the
+      // lantern carrying the scene.
       lights: Object.freeze({
         day: Object.freeze({
-          fog: 4084834,
-          horizon: 13945002,
-          key: 16049860,
-          keyI: 2.8,
-          amb: 5398638,
-          ambI: 0.95,
-          water: 1981e3,
-          deep: 529948,
-          tint: 5001298,
-          tintAmt: 0.12,
-          exposure: 1.18,
-          sat: 1,
-          stars: 0.03,
-          neb: 0.25,
-          glow: 0.7,
-          elev: 1,
-          leaf: 1.2,
+          fog: 0x4c5236,
+          horizon: 0xd8c47c,
+          key: 0xffe4a0,
+          keyI: 2.7,
+          amb: 0x5e6c4a,
+          ambI: 0.9,
+          water: 0x223424,
+          deep: 0x0a120e,
+          tint: 0x50582e,
+          tintAmt: 0.1,
+          exposure: 1.12,
+          sat: 1.06,
+          stars: 0.02,
+          neb: 0.2,
+          glow: 0.6,
+          elev: 0.7,
+          leaf: 1.35,
+          sun: 0.7,
+          sunCol: 0xe0c060,
+          zen: 0.22,
+          warmAmt: 0.08,
+          crack: 0.7,
+          crackCol: 0xf0e0a0,
+          shaft: 1.25,
+          fogK: 0.72,
         }),
         dusk: Object.freeze({
-          fog: 3028034,
-          horizon: 15769712,
-          key: 16758922,
-          keyI: 2.6,
-          amb: 3820114,
-          ambI: 0.7,
-          water: 1716802,
-          deep: 528410,
-          tint: 5914680,
-          tintAmt: 0.05,
+          fog: 0x48301e,
+          horizon: 0xd8925a,
+          key: 0xffac5c,
+          keyI: 2.5,
+          amb: 0x504052,
+          ambI: 0.58,
+          water: 0x1c2a28,
+          deep: 0x080c0e,
+          tint: 0x6a4428,
+          tintAmt: 0.12,
           exposure: 0.98,
-          sat: 1.1,
+          sat: 1.12,
           stars: 0.12,
           neb: 0.4,
-          glow: 1.15,
-          elev: 0.35,
+          glow: 1.3,
+          elev: 0.3,
           leaf: 1.5,
+          sun: 0.8,
+          sunCol: 0xf09048,
+          zen: 0.08,
+          warmAmt: 0.16,
+          crack: 0.8,
+          crackCol: 0xffbc78,
+          shaft: 1,
+          fogK: 0.9,
         }),
         night: Object.freeze({
-          fog: 796208,
-          horizon: 1455172,
-          key: 10794176,
-          keyI: 0.6,
-          amb: 1454138,
-          ambI: 0.36,
-          water: 663082,
-          deep: 133132,
-          tint: 1978424,
+          fog: 0x0a2230,
+          horizon: 0x123444,
+          key: 0x7cb0c8,
+          keyI: 0.65,
+          amb: 0x163646,
+          ambI: 0.4,
+          water: 0x0c2230,
+          deep: 0x03090e,
+          tint: 0x0e3040,
           tintAmt: 0.3,
-          exposure: 0.8,
-          sat: 0.92,
-          stars: 0.65,
-          neb: 0.3,
-          glow: 1.8,
+          exposure: 0.84,
+          sat: 0.94,
+          stars: 0.6,
+          neb: 0.35,
+          glow: 2,
           elev: 1,
-          leaf: 0.85,
+          leaf: 0.8,
+          crack: 0.9,
+          crackCol: 0x8ed4dc,
+          shaft: 0.35,
+          fogK: 1.05,
         }),
       }),
     }),
@@ -71197,6 +71239,135 @@ function NO(
     }
     f.counts.fireflies = f.fireflies.length;
   }
+  // (Sporewood's look pass) the Lullaby's lily rafts: tight rafts of broad overlapping pads over the sleeping cove, a flower on
+  // most of them (every setting: the place is named for them). Their own seed, so the rest of the plan is as it was. They stand on
+  // their own place's water, which the plants above keep clear of, and leave a lane along the raft's glides in.
+  {
+    let x = Dr(((e.artSeed | 0) ^ 90731) >>> 0),
+      M = [];
+    for (let A of t.lilyRafts || []) {
+      let keep = { circles: w.circles.filter((P) => P.kind !== `place:${A.place}`), segs: w.segs },
+        y = (P, B) => T1(keep, P, B) >= 1.3,
+        S = [];
+      for (let P = 0; P < 200 && S.length < Il(A.rafts, 6); P++) {
+        let B = x() * Vs,
+          j = Math.sqrt(x()) * A.r,
+          z = A.x + Math.cos(B) * j * 1.15,
+          Z = A.z + Math.sin(B) * j * 0.85;
+        vi(d, z, Z) < 1.2 ||
+          !y(z, Z) ||
+          S.some((D) => Math.hypot(D.x - z, D.z - Z) < 2.6) ||
+          S.push({ x: z, z: Z });
+      }
+      let P = Math.round(Il(A.n, 40) * (n === "low" ? 0.6 : 1));
+      for (let B = 0, j = 0; B < P * 40 && j < P && S.length; B++) {
+        let z = S[B % S.length],
+          Z = x() * Vs,
+          D = Math.sqrt(x()) * Il(A.spread, 1.9),
+          be = z.x + Math.cos(Z) * D,
+          Se = z.z + Math.sin(Z) * D,
+          ye = x.range(0.5, 0.95);
+        vi(d, be, Se) < 0.6 ||
+          !y(be, Se) ||
+          M.some((se) => Math.hypot(se.x - be, se.z - Se) < (se.s + ye) * 0.6) ||
+          (M.push(
+            E({
+              k: "pad",
+              x: be,
+              y: 0.03 + 0.005 * (j % 4),
+              z: Se,
+              ry: x() * Vs,
+              s: ye,
+              sy: 1,
+              lean: 0,
+              la: 0,
+              v: x.range(-1, 1),
+            }),
+          ),
+          j++);
+      }
+      for (let B of S) {
+        let j = M.filter((z) => Math.hypot(z.x - B.x, z.z - B.z) < 1.4);
+        if (!j.length || x() < 0.25) continue;
+        let z = j[(x() * j.length) | 0];
+        f.flowers.push({ x: z.x, y: 0.06, z: z.z, s: x.range(1, 1.35), c: f.flowers.length % 2 });
+      }
+    }
+    (f.counts.flowers = f.flowers.length), (f.counts.lilyRafts = M.length);
+  }
+  // (Sporewood's look pass) shore beds of the lake's own plants, where Mossmere has its reed beds: a moss tussock or two at the
+  // waterline, low spore reeds in the shallows before them and a few small capped mushrooms on the bank behind. Medium and best
+  // settings only; their own seed.
+  if (n !== "low" && Il(t.shoreBeds) > 0) {
+    let x = Dr(((e.artSeed | 0) ^ 52817) >>> 0),
+      M = Math.round(Il(t.shoreBeds) * (n === "medium" ? 0.6 : 1)),
+      A = [],
+      S = (P, B, j) => jf(d, { x: P.x + P.tx * B, z: P.z + P.tz * B }, j);
+    for (let P = 0; P < M * 40 && A.length < M; P++) {
+      let B = jh(d, x, !0),
+        j = jf(d, B, 0);
+      if (
+        Lu(d, j.x, j.z).h > 2.2 ||
+        !v(j.x, j.z, 1.5) ||
+        !b(j.x, j.z, 1.5) ||
+        !y(j.x, j.z) ||
+        A.some((z) => Math.hypot(z.x - j.x, z.z - j.z) < 7)
+      )
+        continue;
+      let z = { x: j.x, z: j.z, tx: -j.nz, tz: j.nx };
+      A.push(z);
+      for (let Z = 0, D = 1 + (x() < 0.5 ? 1 : 0); Z < D; Z++) {
+        let be = S(z, x.range(-1.2, 1.2), x.range(0.1, 0.9));
+        be.s < 0.3 &&
+          E({
+            k: "cushion",
+            x: be.x,
+            y: qf(d, be.x, be.z) - 0.1,
+            z: be.z,
+            ry: x() * Vs,
+            s: x.range(0.55, 0.85),
+            sy: x.range(0.55, 0.8),
+            lean: 0,
+            la: 0,
+            v: x.range(-1, 1),
+          });
+      }
+      for (let Z = 0, D = 4 + ((x() * 4) | 0); Z < D; Z++) {
+        let be = S(z, x.range(-1.8, 1.8), -x.range(0.2, 1.4));
+        be.s < 0.15 ||
+          !y(be.x, be.z) ||
+          E({
+            k: "sedge",
+            x: be.x,
+            y: -0.08,
+            z: be.z,
+            ry: x() * Vs,
+            s: x.range(0.55, 0.85),
+            sy: x.range(0.45, 0.75),
+            lean: x.range(0, 0.15),
+            la: x() * Vs,
+            v: x.range(-1, 1),
+          });
+      }
+      for (let Z = 0, D = 2 + ((x() * 4) | 0), be = x.range(-1, 1); Z < D; Z++) {
+        let Se = S(z, be + x.range(-0.7, 0.7), x.range(0.35, 1.8));
+        Se.s < -0.2 &&
+          E({
+            k: "toadcap",
+            x: Se.x,
+            y: qf(d, Se.x, Se.z) - 0.03,
+            z: Se.z,
+            ry: x() * Vs,
+            s: x.range(0.7, 1.4),
+            sy: x.range(0.85, 1.2),
+            lean: x.range(0, 0.2),
+            la: x() * Vs,
+            v: x.range(-1, 1),
+          });
+      }
+    }
+    f.counts.shoreBeds = A.length;
+  }
   return f;
 }
 function Yf() {
@@ -71411,6 +71582,21 @@ function Pae(e, t) {
     return M;
   };
   (y.pad = L(!1)), (y.capleaf = L(!0));
+  // (Sporewood's look pass) a small capped mushroom for the shore beds: a pale stem, an amber-orange cap darker toward its rim and
+  // a pale gill ring under it (about 0.38 m tall at scale 1)
+  {
+    let x = Yf(),
+      M = t.bone || ko(Xo(14076590), n * 0.8),
+      A = new Xn(0.028, 0.045, 0.32, 5, 1, !0);
+    A.translate(0, 0.16, 0), Kk(x, A, (P, B) => [Jn(ko(M, 0.8), M, oc(B / 0.32)), 0, 0, 0]);
+    let S = new Xn(0.025, 0.16, 0.1, 7, 1, !1);
+    S.translate(0, 0.33, 0),
+      // (the cone's own vertices: 16 on its side, 15 on its top, then its underside, the gills)
+      Kk(x, S, (P, B, j, z) =>
+        z >= 31 ? [Jn(M, w, 0.25), 0, 0, 0] : [Jn(ko(p, 0.75), w, oc((B - 0.28) / 0.1)), 0, 0, 0],
+      ),
+      (y.toadcap = x);
+  }
   let E = (x) => {
     let M = Yf(),
       A = 6,
@@ -71635,6 +71821,7 @@ var LO = {
     fernUp: "lo",
     pad: "lo",
     capleaf: "lo",
+    toadcap: "lo",
     tfern: "hi",
     reed: "hi",
     sedge: "hi",
@@ -72806,8 +72993,15 @@ void main() {
   // (second pass) over the ledges and at a bank, rock or hull the water is clear over dim stone: darker, a little
   // green-brown, the stone's own mottle faint under it (it was a pale lifted margin that read as a lilac plastic sheet)
 #ifdef GW_LUSH
-  body *= mix(vec3(1.0), vec3(1.0, 1.2, 0.95), shallow * 0.7);
-  body = mix(body, uShallow * vec3(1.0, 1.25, 0.85) * 1.15, edgeW * edgeW * 0.4);
+  // (Sporewood's look pass, as Mossmere's second pass: the shallows and a bank's, root's or hull's edge are clear water over dim
+  // mossy stone, a little darker and green-brown with the bed's mottle under it; they were a pale green lifted margin)
+  body *= mix(vec3(1.0), vec3(0.98, 1.1, 0.9), shallow * 0.6);
+  vec3 stoneW = uShallow * vec3(0.9, 1.08, 0.7) * (0.5 + 0.55 * blot);
+#ifdef GW_RICH
+  stoneW *= 0.8 + 0.4 * wNoise(xz * 0.85 + 3.3);
+#endif
+  body = mix(body, stoneW, shallow * 0.35);
+  body = mix(body, stoneW * 0.72, edgeW * edgeW * 0.38);
 #else
   vec3 stoneW = uShallow * vec3(0.92, 1.04, 0.7) * (0.5 + 0.55 * blot);
 #ifdef GW_RICH
@@ -72849,6 +73043,14 @@ void main() {
     float rlC = dot(rcol, vec3(0.2126, 0.7152, 0.0722));
     float coolK = smoothstep(0.14, 0.55, rlC) * (1.0 - clamp((rcol.r - rcol.b) / max(rcol.r, 1e-3) * 1.4 - 0.2, 0.0, 1.0));
     rcol = mix(rcol, uSky * 1.4 + rcol * 0.25, coolK * 0.85);
+  }
+#else
+  // (Sporewood's look pass, the same) the long white streaks were the pale stems and lit cap edges mirrored: a pale mirrored
+  // light (cream, bone, grey: little more red than blue) takes the hour's air and is held down; the warm glows keep theirs
+  {
+    float rlC = dot(rcol, vec3(0.2126, 0.7152, 0.0722));
+    float coolK = smoothstep(0.12, 0.5, rlC) * (1.0 - clamp((rcol.r - rcol.b) / max(rcol.r, 1e-3) * 1.6 - 0.35, 0.0, 1.0));
+    rcol = mix(rcol, uSky * 1.3 + rcol * 0.22, coolK * 0.85);
   }
 #endif
   // (the loop: a pale lit face mirrored near the eye is held down, so it never lies on the water as a bright patch)
@@ -72949,7 +73151,15 @@ void main() {
     float att = (h * h) / (d2 + h * h);
     att *= sqrt(att);
     float cut = 1.0 - smoothstep(R * 0.2, R * 0.9, d);
+#if defined(GW_LUSH) && !defined(GW_LOW)
+    // (Sporewood's look pass; not on the lowest setting, whose water is as it was) a small warm pool under the light, not a wash: no even floor over its whole reach (under the low lens
+    // that reach is the whole foot of the frame), and the pool gathers within half of it. A glow high in a cap (the Mother Cap's,
+    // 18 m up, reaches 16 m) lays only a faint wide light: the pool's peak falls with the light's height, as light does, so the
+    // lantern at the raft (under 2 m up) keeps its pool and the caps no longer turn the whole lake amber
+    float pk = att * (1.0 - smoothstep(R * 0.08, R * 0.5, d)) / (1.0 + 0.06 * h * h);
+#else
     float pk = att * cut + cut * 0.035;
+#endif
     // no reach ring and no band: a light's pool fades smoothly out to where its reach ends (DESIGN \xA719.1). The old cel
     // banding (a 3-step toon on the pool) drew concentric rings round the raft's lights, which the landing's close-up and
     // the Wick's flare turned into a ring round the player (art rule: never a ring around the raft or the player)
@@ -75596,6 +75806,39 @@ function yie(e, t, n = 0.5, o = 1) {
   }
   return r;
 }
+// (Sporewood's look pass) the Gill Harp's strings hang low over the neck, so the raft there sees them: the cap's own strings (from
+// item `from` of the list) are let down to a graded line of tips 0.8 to 2.2 m above the water (as a harp's strings, shorter toward
+// the cap's rim), and a second set from their own seed fills the harp (8 on low, 18 elsewhere). Over the raft's way through the
+// neck (`onWay`) no tip comes lower than 1.8 m; near the raft the strings part round it, as all hanging strands do.
+function gwHarpStrings(list, from, cap, rng, low, onWay) {
+  let tipAt = (x, z) => {
+    let k = Math.min(1, Math.hypot(x - cap.x, z - cap.z) / Math.max(1, cap.r)),
+      tip = 0.8 + 1.4 * k * k + rng.range(-0.2, 0.25);
+    return onWay(x, z, 1.4) ? Math.max(1.8, tip) : Math.max(0.6, tip);
+  };
+  for (let i = from; i < list.length; i++) {
+    let it = list[i],
+      len = Math.max(it.sy * it.s, it.y - tipAt(it.x, it.z));
+    (it.s *= 0.45), (it.sy = len / it.s); // (finer: a long string as broad as the short one read as a pale plank)
+  }
+  for (let i = 0, n = low ? 8 : 18; i < n; i++) {
+    let a = rng() * Math.PI * 2,
+      r = cap.r * rng.range(0.25, 0.9),
+      x = cap.x + Math.cos(a) * r,
+      z = cap.z + Math.sin(a) * r,
+      y = cap.y - cap.ch * 0.06 * (r / cap.r) - 0.05,
+      s = rng.range(0.4, 0.6);
+    list.push({
+      k: rng() < 0.85 ? "gill" : "strand",
+      x,
+      y,
+      z,
+      ry: rng() * Math.PI * 2,
+      s,
+      sy: (y - tipAt(x, z)) / s,
+    });
+  }
+}
 function eN({
   ctx: e,
   L: t,
@@ -75867,7 +76110,9 @@ function eN({
         let Te = ie / 6;
         w.push({ x: X.x + (C - X.x) * Te, z: X.z + (W - X.z) * Te, r: 0.9 });
       }
+      let gwHarpFrom = m.length;
       D(le, d ? 12 : 24, { lenMin: 6, lenMax: 8.6, kindGill: 0.8, rMin: 0.2, rMax: 0.96, floor: 2.4 }),
+        gwHarpStrings(m, gwHarpFrom, le, Dr(((t.artSeed | 0) ^ (ne > 0 ? 7151 : 7152)) >>> 0), d, z),
         g.push({ x: X.x, z: X.z, r: 1.2 }),
         se.push({ x: le.x, y: le.y, z: le.z });
     }
@@ -77037,7 +77282,9 @@ function makeRockWick() {
 // on steep faces, and a dark wet band at the waterline with a fringe of green just above it. It only recolours vertices (the
 // shapes, the outlines and the toon shading are untouched), so it costs nothing per frame.
 const GW_MOSS = { deep: 0x34502a, lit: 0x66853a, dry: 0x8a9046, wet: 0x1c2a1e };
-function gwMossify(geo, amount = 1) {
+// Sporewood's moss on its stones and roots (its look pass): an olive, yellower green, as its own moss cushions
+const GW_SPORE_MOSS = { deep: 0x3a4628, lit: 0x6e7838, dry: 0x8e8646, wet: 0x1a2420 };
+function gwMossify(geo, amount = 1, tones = GW_MOSS) {
   const pos = geo?.attributes?.position,
     nor = geo?.attributes?.normal,
     col = geo?.attributes?.color;
@@ -77047,10 +77294,10 @@ function gwMossify(geo, amount = 1) {
   geo.computeBoundingBox();
   const y0 = geo.boundingBox.min.y,
     yh = Math.max(0.3, geo.boundingBox.max.y - y0);
-  const deep = Xo(GW_MOSS.deep),
-    lit = Xo(GW_MOSS.lit),
-    dry = Xo(GW_MOSS.dry),
-    wet = Xo(GW_MOSS.wet),
+  const deep = Xo(tones.deep),
+    lit = Xo(tones.lit),
+    dry = Xo(tones.dry),
+    wet = Xo(tones.wet),
     ss = (a, b, v) => {
       const t = Math.max(0, Math.min(1, (v - a) / (b - a)));
       return t * t * (3 - 2 * t);
@@ -80301,6 +80548,8 @@ $1`,
       return W(ke), Ws(ke, { cast: we }), E.add(ke), Qe.push(ke), ke;
     };
   if (l === "mossmere") for (let H of se.rock) gwMossify(H);
+  // (Sporewood's look pass: moss on its stones too, in its own greens)
+  else if (l === "sporewood" && c) for (let H of se.rock) gwMossify(H, 0.8, GW_SPORE_MOSS);
   Re(se.rock, Z, Se, "rocks"), Re(se.org, D, c ? null : ye, "organics");
   let ge = ne
     ? b(
@@ -82175,7 +82424,8 @@ function pN(
             shadeN: new Vt(r.shadeN ?? r.shade ?? r.lit),
           }
         : null,
-    P = S ? ac(r.low, 1) : 1,
+    // (a lake's mist may stand lower on the light settings: `lowLite`, Sporewood's look pass, so its lowest setting is as before)
+    P = S ? ac(h && r.lowLite != null ? r.lowLite : r.low, 1) : 1,
     B = P === 1 ? dN[h ? "low" : "high"] : dN[h ? "low" : "high"].map(([ht, Ht, qt]) => [ht * P, Ht, qt]),
     j = (() => {
       let ht = [],
@@ -84153,13 +84403,14 @@ function qie(e) {
   function Y(re) {
     let De = Pg(e.data, re?.id)?.air?.lights ?? ((re?.id ?? "mossmere") === "mossmere" ? mossHours : null);
     if (!De || !De.day || !De.dusk || !De.night) return null;
-    let We = { w: [1, 0, 0], own: De === mossHours };
+    // (own: the hours carry the vault's extras and drive it, as Mossmere's and Sporewood's do)
+    let We = { w: [1, 0, 0], own: De === mossHours || hourExtras.some((k) => Number.isFinite(De.day[k])) };
     for (let at of ["day", "dusk", "night"]) {
       let ct = De[at],
         Lt = {};
       for (let St of W) Lt[St] = new Vt(ct[St] ?? 0);
       for (let St of C) Lt[St] = Number.isFinite(ct[St]) ? ct[St] : 1;
-      // the extras only Mossmere's hours set (0 where a table leaves them out: that lake's sky is unchanged)
+      // the extras only Mossmere's and Sporewood's hours set (0 where a table leaves them out: that lake's sky is unchanged)
       for (let St of hourExtras) Lt[St] = Number.isFinite(ct[St]) ? ct[St] : 0;
       for (let St of hourExtraColors) Lt[St] = new Vt(ct[St] ?? 0);
       We[at] = Lt;
@@ -105195,12 +105446,18 @@ function qre(e) {
               alpha: 0.3,
               jitter: 0.04,
             })));
-      let ct = s.mat.uniforms;
+      let ct = s.mat.uniforms,
+        // (Sporewood's look pass: on its dark green water the lantern's light pool is a small warm pool round the raft, about half
+        // as wide and softer; at full width it laid one amber wash over the whole foot of the frame. How far the light counts in
+        // play is unchanged, and so is Mossmere's pool)
+        gwSmallPool = e.state?.run?.zone === "sporewood";
       (ct.uT.value = ve),
         (ct.uPulse.value = Math.sin(ve * 1.6) * 0.5 + 0.5 + (re - 1) * 2),
-        (ct.uK.value = De ? (0.5 + 0.5 * Ft) * (1 + b.boost * 1.4) : rc(ct.uK.value, 0, 6, Me)),
+        (ct.uK.value = De
+          ? (0.5 + 0.5 * Ft) * (1 + b.boost * 1.4) * (gwSmallPool ? 0.6 : 1)
+          : rc(ct.uK.value, 0, 6, Me)),
         (ct.uDanger.value = De ? Ct : 0);
-      let Lt = Math.max(0.5, b.radiusCur * (1 + b.boost * 0.08));
+      let Lt = Math.max(0.5, b.radiusCur * (1 + b.boost * 0.08)) * (gwSmallPool ? 0.5 : 1);
       (s.mesh.visible = ct.uK.value > 0.01),
         s.mesh.visible && s.layout(Qe, Re, Lt, be() ? Se : null, 0.07),
         b.brazierDelay > 0 &&

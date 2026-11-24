@@ -180,6 +180,12 @@ Eight questions were put as yes or no; the designer said yes to all ("Sounds goo
   Plumgill Perch (common, at dusk and at night, the Gill Harp, best on the Spore Moth) and the Hushcap Koi (rare, at
   night, the Veilwater, best on Spore Cake). The Puffer is always drawn blown up into its ball. Murk's "list complete"
   line is now heard once on each lake.
+- **Sporewood's look pass, as built.** Its own light by the hour (`PP.sporewood`): green-gold by day, amber at dusk with
+  the caps glowing, deep blue-teal at night. The brown wash over the water was the raft's lantern pool; in Sporewood it
+  is half as wide and softer (how far the light counts in play is unchanged). Full lily rafts at the Lullaby, gill-strings
+  hanging over the Gill Harp's neck (`gwHarpStrings`), moss on the stones in Sporewood's tones, a spore-gold mist at the
+  Mother's Cup, and shore beds of spore reeds, moss tussocks and small mushrooms on medium and best. Mossmere's code
+  paths are unchanged. On low, draw calls are the same and triangles rise by about 0.2%.
 
 ## Still open
 
