@@ -107,8 +107,11 @@ The designer asked for Mossmere's environment graphics to be made as good as the
 ## The lake's look as built, 24 November 2026
 
 - **Reed beds.** Reeds are now fans of broad flat leaves with a low tussock and a dark floating mat at each clump's foot; round stems stand only under the cattail heads. The middle and best settings also add a little green "light through the leaf" in the hour's light. Triangles are unchanged on the lowest setting (5,824 in the plants' mesh) and within half a percent on the middle one (about 116,000 for plants, organics and rocks together); the best setting fell from about 186,000 to about 127,000 in the plants' mesh. No new draw calls.
+
   - A choice of look, still the designer's to make: the beds read as a pale sage against the violet water at dusk, and lighter than a dark mass at night. They can be made greener or darker.
   - Not yet measured on a quiet machine: frame time on the lowest and middle settings before and after. The leaves are drawn on both faces, which costs something per pixel.
+
+- **The camera after reeling.** Measured before the fix: after every reel the camera eased out to 15.0 m from the raft, 4.2 m past its usual 10.8 m, and came back in a second move when the raft next moved. Now it makes one eased move of 1.1 to 1.3 seconds to the usual fishing distance (10.5 m) and holds still; when the raft paddles off it eases into the normal camera over 0.8 seconds. The four cases measured were an empty reel-in, a small fish, a big fish and a lost fish. A play test fails if the camera moves out and back, is still moving 3 seconds later, or settles more than 0.5 m from where it was before the cast.
 
 ## Still open
 

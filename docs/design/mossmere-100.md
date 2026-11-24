@@ -35,7 +35,7 @@ This is a proposal: add, strike or reword anything. Each item has a plain test f
 | ☐   | The mist over locked places belongs on the lake | You approve a clip of locked mist and of a mist lift                                                     |
 | ☐   | The Bell Pool bell is reworked                  | You approve the new bell, seen at the reveal and at night                                                |
 | ☐   | Arriving at Veilback Brook feels worth it       | You approve the arrival, with the restored arches kept                                                   |
-| ☐   | The camera after reeling                        | It pulls back once, smoothly, and settles at the usual fishing distance, with no bobbing                 |
+| ☑  | The camera after reeling                        | It pulls back once, smoothly, and settles at the usual fishing distance, with no bobbing                 |
 | ☐   | The unlock camera                               | You have finished the note "The camera angle when unlocking the …", and it is done as you described      |
 | ☐   | Upgrades are visible                            | Each rod upgrade changes the rod's look, and each raft upgrade visibly changes the raft                  |
 | ☐   | Fishing animation                               | You approve the cast, wait, strike and reel animation on the handheld                                    |

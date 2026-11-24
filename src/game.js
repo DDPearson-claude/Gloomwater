@@ -69352,7 +69352,16 @@ uniform float uBloomClamp;`,
   let H = { still: 0, w: 0 };
   function Ee($e) {
     if (castReturn.active) {
-      H.w = H.still = 0;
+      // After a reel the raft is at rest: the rig's resting pose (the usual fishing distance) is taken at
+      // once, so the return makes its one move straight to it.
+      const rests =
+        e.flow === "playing" &&
+        e.data?.LOOP_ENABLED === !0 &&
+        e.fishing?.view?.waterWhite === !0 &&
+        (N === "sail" || N === "night") &&
+        e.player?.gliding !== !0;
+      H.w = rests ? 1 : 0;
+      H.still = rests ? H1.after : 0;
       return;
     }
     let Fe = tl(e.player) ? e.player.velocity : null,
@@ -69829,22 +69838,40 @@ uniform float uBloomClamp;`,
       ),
       (Fe.fov = Fe.sf.x);
   } // Recover from the last rendered shot, including a catch card or a near-raft retrieve.
-  const castReturn = { armed: false, active: false, elapsed: 0, pos: new He(), look: new He(), fov: 45 };
+  // The return after a reel: one eased move (CAST_RETURN_S) from the last shot to the rig's resting pose, which
+  // is fixed when the move starts and kept relative to the raft's place on the water, not its bob. It is held
+  // still until the raft moves, then hands back to the live rig over CAST_RELEASE_S.
+  const CAST_RETURN_S = 1.15,
+    CAST_RELEASE_S = 0.8;
+  const castReturn = {
+    armed: false,
+    active: false,
+    elapsed: 0,
+    pos: new He(),
+    look: new He(),
+    fov: 45,
+    rest: null,
+    release: 0,
+    w: 0,
+  };
   function updateCastReturn(dt) {
     const state = Gt(),
       playing = e.flow === "playing" && e.data?.LOOP_ENABLED === true;
     const moving = Math.hypot(e.player?.velocity?.x || 0, e.player?.velocity?.z || 0) > 0.35;
     if (!playing || Ht || Le.on || On() || e.player?.gliding) {
       castReturn.active = castReturn.armed = false;
+      castReturn.release = 0;
       return;
     }
     if (["casting", "waiting", "bite", "reeling", "landing"].includes(state)) {
       castReturn.armed = true;
       castReturn.active = false;
+      castReturn.release = 0;
       return;
     }
     if (state === "charging") {
       castReturn.active = castReturn.armed = false;
+      castReturn.release = 0;
       return;
     }
     if (state !== "idle" && state !== "lost") return;
@@ -69852,6 +69879,8 @@ uniform float uBloomClamp;`,
       castReturn.armed = false;
       castReturn.active = true;
       castReturn.elapsed = 0;
+      castReturn.rest = null;
+      castReturn.release = 0;
       castReturn.pos.copy(u.position);
       castReturn.look.copy(Ae);
       castReturn.fov = u.fov;
@@ -69861,9 +69890,13 @@ uniform float uBloomClamp;`,
       H.w = H.still = 0;
     }
     if (castReturn.active) {
-      castReturn.elapsed = Math.min(1.15, castReturn.elapsed + dt);
-      if (moving && castReturn.elapsed >= 1.15) castReturn.active = false;
-    }
+      castReturn.elapsed = Math.min(CAST_RETURN_S, castReturn.elapsed + dt);
+      if (moving && castReturn.elapsed >= CAST_RETURN_S) {
+        castReturn.active = false;
+        castReturn.release = castReturn.rest ? 1 : 0;
+      }
+    } else if (castReturn.release > 0)
+      castReturn.release = Math.max(0, castReturn.release - dt / CAST_RELEASE_S);
   }
 
   function Ot($e) {
@@ -69967,22 +70000,43 @@ uniform float uBloomClamp;`,
     ft > 0 && St.pose && (Me.lerp(oe.fromArray(St.pose.pos), ft), Ae.lerp(oe.fromArray(St.pose.look), ft));
     let Qt = 0,
       dn = null;
-    if (castReturn.active && pt) {
-      // The hull still rides the swell. At rest the camera aims at the water datum.
-      const pitch = Dn(J.elev, 3, 85) * Uf,
-        yaw = ke(pt),
-        sx = Math.sin(yaw),
-        cz = Math.cos(yaw);
-      const distance = J.dist * Math.cos(pitch),
-        y = J.dist * Math.sin(pitch);
-      const phase = castReturn.elapsed / 1.15,
-        blend = phase * phase * (3 - 2 * phase);
-      Me.copy(castReturn.pos).lerp(
-        oe.set(pt.x + sx * distance, Math.max(1.2, y), pt.z + cz * distance),
-        blend,
-      );
-      Ae.copy(castReturn.look).lerp(oe.set(pt.x - sx * J.aim, J.aimY, pt.z - cz * J.aim), blend);
-      dn = ja(castReturn.fov, J.fov, blend);
+    castReturn.w = 0;
+    if ((castReturn.active || castReturn.release > 0) && pt) {
+      // The hull still rides the swell. At rest the camera aims at the water datum: the resting pose is the
+      // rig's target (no sway, no swell), fixed at the start of the move so nothing drifts after it.
+      if (!castReturn.rest) {
+        const pitch = Dn(J.elev, 3, 85) * Uf,
+          yaw = ke(pt),
+          sx = Math.sin(yaw),
+          cz = Math.cos(yaw),
+          distance = J.dist * Math.cos(pitch);
+        castReturn.rest = {
+          px: sx * distance,
+          py: Math.max(1.2, J.dist * Math.sin(pitch)),
+          pz: cz * distance,
+          lx: -sx * J.aim,
+          ly: J.aimY,
+          lz: -cz * J.aim,
+          fov: J.fov,
+        };
+      }
+      const rest = castReturn.rest;
+      if (castReturn.active) {
+        const phase = castReturn.elapsed / CAST_RETURN_S,
+          blend = phase * phase * (3 - 2 * phase);
+        Me.copy(castReturn.pos).lerp(oe.set(pt.x + rest.px, rest.py, pt.z + rest.pz), blend);
+        Ae.copy(castReturn.look).lerp(oe.set(pt.x + rest.lx, rest.ly, pt.z + rest.lz), blend);
+        dn = ja(castReturn.fov, rest.fov, blend);
+        castReturn.w = blend;
+      } else {
+        // The raft has moved off: ease from the held pose back into the live rig.
+        const k = castReturn.release,
+          w = k * k * (3 - 2 * k);
+        Me.lerp(oe.set(pt.x + rest.px, rest.py, pt.z + rest.pz), w);
+        Ae.lerp(oe.set(pt.x + rest.lx, rest.ly, pt.z + rest.lz), w);
+        dn = ja(pi, rest.fov, w);
+        castReturn.w = w;
+      }
     }
     Ht &&
       ((Qt = Dn(Number(Ht.w ?? 1), 0, 1)),
@@ -69992,13 +70046,7 @@ uniform float uBloomClamp;`,
       u.position.copy(Me),
       u.up.set(0, 1, 0),
       u.lookAt(Ae),
-      u.rotateZ(
-        Math.sin(rt * 0.29 + 0.7) *
-          0.004 *
-          (N === "title" ? 2 : 1) *
-          (1 - Qt) *
-          (castReturn.active ? 1 - Pa(0, 1.15, castReturn.elapsed) : 1),
-      ),
+      u.rotateZ(Math.sin(rt * 0.29 + 0.7) * 0.004 * (N === "title" ? 2 : 1) * (1 - Qt) * (1 - castReturn.w)),
       (ne.trauma = Math.max(0, ne.trauma - ne.traumaDecay * $e));
     let wn = _();
     if (ne.trauma > 0 && wn > 0) {
@@ -70021,7 +70069,7 @@ uniform float uBloomClamp;`,
         (Math.abs(ne.kickDue) < 0.001 || !(Ge.w > 0)) && (ne.kickDue = 0);
     }
     (ne.fovKick = $i(ne.fovKick, 0, 5, $e)), dn === null && ce > 0 && (dn = me);
-    let $n = Dn((dn ?? pi) + (castReturn.active ? 0 : ne.fovKick), 20, 95);
+    let $n = Dn((dn ?? pi) + (castReturn.active ? 0 : ne.fovKick * (1 - castReturn.w)), 20, 95);
     (Math.abs(u.fov - $n) > 0.001 || u.aspect !== b / L) &&
       ((u.fov = $n), (u.aspect = b / L), u.updateProjectionMatrix()),
       u.updateMatrixWorld(),

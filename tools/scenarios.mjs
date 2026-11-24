@@ -8357,6 +8357,106 @@ const SCENARIOS = [
       return want.join(", ");
     },
   },
+
+  {
+    name: "camera after reeling: once a landed fish's card closes, the camera pulls back once to the resting distance and is still three seconds later",
+    fixture: "mid-mossmere",
+    debug: true,
+    timeoutMs: 480_000,
+    async run(session) {
+      await session.sail();
+      // Every frame: the game's own time (the clamped step the camera gets), the camera and the raft.
+      await session.eval(() => {
+        const g = window.__gw,
+          r = g.render,
+          update = r.update.bind(r),
+          rec = (window.__camAfterReel = { t: 0, on: false, frames: [] });
+        r.update = (dt, ...rest) => {
+          const out = update(dt, ...rest);
+          rec.t += Math.min(Math.max(Number(dt) || 0, 0), 0.1);
+          if (rec.on) {
+            const p = r.camera.position,
+              raft = g.player.position,
+              e = r.camera.matrixWorld.elements;
+            rec.frames.push({
+              t: rec.t,
+              x: p.x,
+              y: p.y,
+              z: p.z,
+              look: [-e[8], -e[9], -e[10]],
+              dist: Math.hypot(p.x - raft.x, p.y - raft.y, p.z - raft.z),
+            });
+          }
+          return out;
+        };
+      });
+      const record = (on) =>
+        session.eval((v) => {
+          const rec = window.__camAfterReel;
+          v && (rec.frames = []);
+          rec.on = v;
+          return rec.t;
+        }, on);
+      const gameTime = () => session.eval(() => window.__camAfterReel.t);
+      const waitGame = async (secs) => {
+        const until = (await gameTime()) + secs;
+        for (const end = Date.now() + 240_000 * SLOW; Date.now() < end; await session.pause(400))
+          if ((await gameTime()) >= until) return;
+        throw new Error(`${secs}s of game time did not pass`);
+      };
+      // The camera at rest on the raft before the cast: the usual fishing distance.
+      await waitGame(3);
+      await record(true);
+      await waitGame(3);
+      const restFrames = await session.eval(() => window.__camAfterReel.frames.slice(-20));
+      const restDist = restFrames.reduce((s, f) => s + f.dist, 0) / restFrames.length;
+      await hookAndPlayOut(session, "dusk_minnow", "land", { z: -1 });
+      await session.pause(1500);
+      const closedAt = await record(true);
+      check(await session.clickButton(/^\d?Keep\b/), "no Keep on the catch card");
+      // A guide box that follows the card holds the screen, and the camera waits behind it: the three
+      // seconds count from when nothing holds the screen.
+      await session.pause(600);
+      await session.closeGuides(8000);
+      const freeAt = await gameTime();
+      await waitGame(3.6);
+      const frames = await session.eval(() => window.__camAfterReel.frames);
+      await record(false);
+      const after = frames.filter((f) => f.t >= closedAt);
+      check(after.length > 10, `only ${after.length} frames were drawn after the card closed`);
+      // One move away from the raft: the distance never comes back in by more than 2 cm from its furthest.
+      let far = after[0].dist,
+        back = 0;
+      for (const f of after) (far = Math.max(far, f.dist)), (back = Math.max(back, far - f.dist));
+      check(
+        back <= 0.02,
+        `the camera pulled out to ${far.toFixed(2)} m and came back in by ${back.toFixed(2)} m`,
+      );
+      // Still from three seconds on: no step, bob or turn of the view between frames.
+      const late = after.filter((f) => f.t - freeAt >= 3);
+      check(late.length >= 2, `only ${late.length} frames from three seconds after the card`);
+      let moved = 0,
+        turned = 0;
+      for (let i = 1; i < late.length; i++) {
+        const a = late[i - 1],
+          b = late[i];
+        moved = Math.max(moved, Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z));
+        turned = Math.max(turned, Math.hypot(...b.look.map((v, k) => v - a.look[k])));
+      }
+      check(
+        moved < 0.002 && turned < 0.0005,
+        `the camera still moves three seconds after the card: ${moved.toFixed(4)} m, view ${turned.toFixed(5)} a frame`,
+      );
+      // The usual distance: before the cast the live rig sways and rides the swell a few tenths of a metre
+      // about it; the return holds the pose without them.
+      const final = after.at(-1).dist;
+      check(
+        Math.abs(final - restDist) < 0.5,
+        `the camera settled at ${final.toFixed(2)} m from the raft, not its resting ${restDist.toFixed(2)} m`,
+      );
+      return `out from ${after[0].dist.toFixed(2)} m to ${final.toFixed(2)} m (resting ${restDist.toFixed(2)} m) in one move, still after 3 s`;
+    },
+  },
 ];
 
 // The local kinds, their base fish and homes, as in wo.localKinds.
