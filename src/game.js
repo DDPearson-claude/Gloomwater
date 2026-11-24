@@ -76897,6 +76897,7 @@ const GW_REED = {
   deadDark: 0x5e4f34,
   leaf: 0x4f7038, // broad leaves (arrowhead)
   leafHi: 0x6f8c48,
+  leafUp: 0x7f9448, // the broad blades' lit upper half: a warm sage that holds under the violet dusk
   duck: 0x6f8a36, // duckweed
   duckHi: 0x8c9f4c,
   flag: 0xcdb65a, // a yellow flag iris, muted
@@ -77012,6 +77013,9 @@ const gwReedRng = (x, z) =>
 // `look` (optional): `tone`, the clump's [mid, tip] colours (else the colour patch it stands in, gwReedTone), and
 // `fluff`, a random source for the seed heads that have burst into a pale tuft (else hashed from where it stands).
 // Neither draws on `rnd`, so a clump's shape is the same whatever its colours.
+// The body of a clump is broad flat leaves rising in fans from each foot (a thin round stem is a hairline on screen and
+// shows no colour); round stems stand only where a cattail head needs one. A tussock of short arched blades and a dark
+// floating mat of old leaves close the clump's foot, so its heart shows no bright water.
 function gwReedClump(out, rnd, x, z, n, h, spread = 0.6, look = null) {
   const tone = look?.tone || gwReedTone(x, z),
     fluffRnd = look?.fluff || gwReedRng(x + 3.1, z - 1.7),
@@ -77019,47 +77023,8 @@ function gwReedClump(out, rnd, x, z, n, h, spread = 0.6, look = null) {
     mid = tone[0],
     tip = tone[1],
     head = Xo(GW_REED.head),
-    lean0 = rnd() * Math.PI * 2;
-  const blade = (bx, bz, ht, r0, bend, flat, dir, colorAt) => {
-    const S = 4,
-      pos = [],
-      idx = [],
-      dx = Math.cos(dir),
-      dz = Math.sin(dir),
-      at = (t) => {
-        const off = bend * ht * t * t;
-        return [bx + dx * off, -0.12 + ht * t * (1 - 0.35 * bend * t * t), bz + dz * off];
-      };
-    for (let s = 0; s < S; s++) {
-      const t = s / S,
-        c = at(t),
-        r = r0 * (1 - 0.85 * t);
-      for (let k = 0; k < 3; k++) {
-        const a = dir + Math.PI / 2 + (k * Math.PI * 2) / 3,
-          ca = Math.cos(a) * r,
-          sa = Math.sin(a) * r;
-        // a blade is flattened across its lean; a stem is round
-        pos.push(c[0] + ca * dx * flat - sa * dz, c[1], c[2] + ca * dz * flat + sa * dx);
-      }
-    }
-    pos.push(...at(1));
-    for (let s = 0; s + 1 < S; s++)
-      for (let k = 0; k < 3; k++) {
-        const a = s * 3 + k,
-          b = s * 3 + ((k + 1) % 3);
-        idx.push(a, b, b + 3, a, b + 3, a + 3);
-      }
-    const top = S * 3;
-    for (let k = 0; k < 3; k++) idx.push((S - 1) * 3 + k, (S - 1) * 3 + ((k + 1) % 3), top);
-    const g = new lo();
-    g.setAttribute("position", new eo(pos, 3)), g.setIndex(idx), g.computeVertexNormals();
-    out.push(Gn(g, { colorFn: (px, py) => colorAt(Math.max(0, Math.min(1, (py + 0.12) / ht))) }));
-    return at;
-  };
-  const shade = (t, v) => {
-    const c = t < 0.55 ? Jn(foot, mid, t / 0.55) : Jn(mid, tip, Math.pow((t - 0.55) / 0.45, 1.4));
-    return ko(c, v);
-  };
+    lean0 = rnd() * Math.PI * 2,
+    sh = gwSheaf();
   for (let s = 0; s < n; s++) {
     const a = rnd() * Math.PI * 2,
       d = Math.sqrt(rnd()) * spread,
@@ -77069,9 +77034,23 @@ function gwReedClump(out, rnd, x, z, n, h, spread = 0.6, look = null) {
       bend = 0.06 + rnd() * rnd() * 0.3,
       dir = lean0 + (rnd() - 0.5) * 1.6,
       v = 0.8 + rnd() * 0.4;
-    const at = blade(bx, bz, ht, 0.045, bend, 1, dir, (t) => shade(t, v));
     if (rnd() < 0.38 && ht > h * 0.8) {
-      // a cattail seed head on the stem, below its tip
+      // a cattail: a thin round stem (three sides, one segment and a point) and its seed head below the tip
+      const dx = Math.cos(dir),
+        dz = Math.sin(dir),
+        at = (t) => {
+          const off = bend * 0.5 * ht * t * t;
+          return [bx + dx * off, -0.12 + ht * t * (1 - 0.18 * bend * t * t), bz + dz * off];
+        };
+      gwStrand(
+        out,
+        at,
+        (t) => 0.03 * (1 - 0.7 * t),
+        2,
+        (t) => gwLeafShade(foot, mid, tip, t, v),
+        1,
+        dir,
+      );
       const p0 = at(0.74),
         p1 = at(0.88),
         ax = new He(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]),
@@ -77080,7 +77059,7 @@ function gwReedClump(out, rnd, x, z, n, h, spread = 0.6, look = null) {
           new ea().setFromUnitVectors(new He(0, 1, 0), ax.clone().normalize()),
           new He(1, ax.length(), 1),
         );
-      out.push(Gn(new Xn(0.05, 0.045, 1, 5, 1), { matrix: m, color: ko(head, v) }));
+      out.push(Gn(new Xn(0.05, 0.045, 1, 5, 1, !0), { matrix: m, color: ko(head, v) }));
       // now and then the head has burst at its top into a pale tuft that catches the lantern
       if (fluffRnd() < 0.3) {
         const q = at(0.92);
@@ -77092,25 +77071,186 @@ function gwReedClump(out, rnd, x, z, n, h, spread = 0.6, look = null) {
         );
       }
     }
+    // a fan of broad strap leaves from this foot, leaning out round the clump's lean, some arching well over
+    // (two segments at most: the triangles go on more leaves, which the fishing camera sees, not on smoother curves)
+    for (let i = 0, nl = 3 + ((rnd() * 4) | 0); i < nl; i++) {
+      const lh = ht * (0.5 + rnd() * 0.55),
+        lv = v * (0.9 + rnd() * 0.2),
+        la = rnd() * ao,
+        ld = rnd() * 0.18;
+      gwBlade(
+        sh,
+        bx + Math.cos(la) * ld,
+        bz + Math.sin(la) * ld,
+        lh,
+        0.12 + rnd() * 0.06,
+        0.15 + rnd() * rnd() * 0.9,
+        dir + (rnd() - 0.5) * 2.6,
+        lh > 0.9 ? 2 : 1,
+        (t) => gwLeafShade(foot, mid, tip, t, lv),
+        (rnd() - 0.5) * 0.6,
+        (rnd() - 0.5) * 1.4,
+      );
+    }
   }
-  // shorter blades round the foot, some bent well over
-  const nb = 2 + ((rnd() * 3) | 0);
-  for (let s = 0; s < nb; s++) {
+  // the tussock at the waterline: short blades arching out all round the foot
+  // (low and wide, reaching out past the clump's stems so that neighbouring clumps meet)
+  for (let s = 0, nb = 7 + ((rnd() * 4) | 0); s < nb; s++) {
     const a = rnd() * Math.PI * 2,
-      d = Math.sqrt(rnd()) * spread * 0.9,
-      ht = h * (0.3 + rnd() * 0.35),
-      v = 0.75 + rnd() * 0.35;
-    blade(
+      d = Math.sqrt(rnd()) * spread,
+      v = 0.75 + rnd() * 0.3;
+    gwBlade(
+      sh,
+      x + Math.cos(a) * d,
+      z + Math.sin(a) * d,
+      h * (0.14 + rnd() * 0.16),
+      0.15 + rnd() * 0.06,
+      0.7 + rnd() * 0.5,
+      a + (rnd() - 0.5) * 0.8,
+      1,
+      (t) => gwLeafShade(foot, mid, tip, Math.min(1, t * 0.7 + 0.15), v),
+    );
+  }
+  gwSheafOut(out, sh);
+  // the floating mat of old leaves and duckweed round the foot: the bed's dark heart
+  gwFootMat(out, rnd, x, z, spread * 0.85 + 0.15, tone);
+}
+
+// ---- broad blades (every setting) ----------------------------------------------------------------------------------
+// A sheaf gathers a clump's flat blades into one piece for the merge (one geometry, not one for each blade).
+const gwSheaf = () => ({ pos: [], nor: [], col: [], idx: [] });
+function gwSheafOut(out, sh) {
+  if (!sh.idx.length) return;
+  const g = new lo(),
+    c = sh.col;
+  g.setAttribute("position", new eo(sh.pos, 3)),
+    g.setAttribute("normal", new eo(sh.nor, 3)),
+    g.setIndex(sh.idx);
+  out.push(Gn(g, { colorFn: (_x, _y, _z, _a, _b, _c, i) => c[i] }));
+}
+// A flat strap leaf from a foot at (x, z): `ht` tall, `w` wide, near even in width for its lower half and then tapering
+// to a point; it leans out along `dir` and arches over by `bend`, its broad side turned across the lean (by `turn` more,
+// twisting by `twist` up its length). `q` quads and a pointed tip: 2q + 1 triangles (q = 0, one long triangle). Its
+// normals lean well up to the sky (lit nearly as the lily pads are), and the reeds' material lights its back face as its front, so from either side it reads
+// as a lit leaf with its colour, never as a dark edge.
+function gwBlade(sh, x, z, ht, w, bend, dir, q, colorAt, turn = 0, twist = 0) {
+  const dx = Math.cos(dir),
+    dz = Math.sin(dir),
+    at = (t) => {
+      const off = bend * ht * t * t;
+      return [x + dx * off, -0.12 + ht * t * (1 - 0.35 * bend * t * t), z + dz * off];
+    },
+    b0 = sh.pos.length / 3,
+    rows = [];
+  for (let k = 0; k <= q; k++) {
+    const t = k / (q + 1),
+      c = at(t),
+      p = at(t + 0.02),
+      an = dir + Math.PI / 2 + turn + twist * t,
+      ax = Math.cos(an),
+      az = Math.sin(an),
+      hw = (w / 2) * Math.min(1, 1.7 * (1 - t));
+    // the face's normal: the tangent crossed with the across, turned to face up
+    const tx = p[0] - c[0],
+      ty = p[1] - c[1],
+      tz = p[2] - c[2];
+    let nx = ty * az,
+      ny = tz * ax - tx * az,
+      nz = -ty * ax;
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    rows.push([c, ax * hw, az * hw, nx / nl, ny / nl, nz / nl, colorAt(t)]);
+  }
+  // one side for the whole blade (by its top ring), so the winding agrees with the normals
+  const sg = rows[q][4] < 0 ? -1 : 1;
+  for (const [c, ox, oz, nx, ny, nz, col] of rows) {
+    let ux = nx * sg * 0.35,
+      uy = ny * sg * 0.35 + 0.95,
+      uz = nz * sg * 0.35;
+    const ul = Math.hypot(ux, uy, uz);
+    (ux /= ul), (uy /= ul), (uz /= ul);
+    sh.pos.push(c[0] + ox, c[1], c[2] + oz, c[0] - ox, c[1], c[2] - oz);
+    sh.nor.push(ux, uy, uz, ux, uy, uz);
+    sh.col.push(col, col);
+  }
+  const e = at(1),
+    ct = colorAt(1),
+    last = rows[q];
+  sh.pos.push(e[0], e[1], e[2]);
+  sh.nor.push(last[3] * sg * 0.3, last[4] * sg * 0.3 + 0.95, last[5] * sg * 0.3);
+  sh.col.push(ct);
+  const tri = (a, b, c) => (sg > 0 ? sh.idx.push(a, b, c) : sh.idx.push(a, c, b));
+  for (let k = 0; k < q; k++) {
+    const l0 = b0 + k * 2;
+    tri(l0, l0 + 1, l0 + 2), tri(l0 + 1, l0 + 3, l0 + 2);
+  }
+  tri(b0 + q * 2, b0 + q * 2 + 1, b0 + q * 2 + 2);
+}
+// A leaf's colour up its length: dark at the water, the clump's green lightened and warmed through its upper half (so a
+// bed reads olive and sage from the fishing camera, not black), and pale straw at the very tip.
+const gwLeafShade = (foot, mid, tip, t, v) => {
+  const up = Jn(ko(mid, 1.15), Xo(GW_REED.leafUp), 0.4);
+  return ko(
+    t < 0.18
+      ? Jn(foot, mid, t / 0.18)
+      : t < 0.78
+        ? Jn(mid, up, (t - 0.18) / 0.6)
+        : Jn(up, ko(tip, 1.05), Math.pow((t - 0.78) / 0.22, 1.3)),
+    v,
+  );
+};
+// The floating mat at a clump's foot: a ragged disc of old leaves and duckweed (7 triangles), dark olive at its heart.
+function gwFootMat(out, rnd, x, z, r, tone) {
+  const a0 = rnd() * ao,
+    pts = [[x, z]],
+    tris = [],
+    heart = Jn(Xo(GW_REED.deadDark), Xo(GW_REED.foot), 0.5),
+    edge = Jn(tone[0], Xo(GW_REED.duck), 0.4);
+  for (let j = 0; j < 7; j++) {
+    const a = a0 + (j / 7) * ao,
+      rr = r * (0.7 + rnd() * 0.45);
+    pts.push([x + Math.cos(a) * rr, z + Math.sin(a) * rr * 0.85]);
+    tris.push(0, j + 1, ((j + 1) % 7) + 1);
+  }
+  gwFlat(out, pts, tris, (k) => (k ? edge : heart), 0.012);
+}
+// Low's clump: a few broad blades and a tuft in place of its old plain cone stems, at the same count of triangles (four
+// for each stem the clump had): a bent two-part blade (3) and a short single-triangle blade (1) for each. Low's shader has
+// no light through the leaf, so its colours are baked lighter instead.
+function gwLowClump(out, rnd, x, z, n, h) {
+  const tone = gwReedTone(x, z),
+    foot = Xo(GW_REED.foot),
+    lean0 = rnd() * ao,
+    sh = gwSheaf();
+  for (let s = 0; s < n; s++) {
+    const a = rnd() * ao,
+      d = rnd() * 0.6,
+      ht = h * (0.6 + rnd() * 0.6),
+      v = 0.85 + rnd() * 0.3;
+    gwBlade(
+      sh,
       x + Math.cos(a) * d,
       z + Math.sin(a) * d,
       ht,
-      0.06,
-      0.35 + rnd() * 0.55,
-      0.35,
-      a + (rnd() - 0.5),
-      (t) => shade(Math.min(1, t * 0.8 + 0.1), v),
+      0.15 + rnd() * 0.06,
+      0.1 + rnd() * 0.5,
+      lean0 + (rnd() - 0.5) * 2.4,
+      1,
+      (t) => gwLeafShade(foot, tone[0], tone[1], t, v * 1.3),
+    );
+    const b = rnd() * ao;
+    gwBlade(
+      sh,
+      x + Math.cos(b) * d * 0.7,
+      z + Math.sin(b) * d * 0.7,
+      h * (0.25 + rnd() * 0.2),
+      0.15,
+      0.5 + rnd() * 0.4,
+      b,
+      0,
+      (t) => gwLeafShade(foot, tone[0], tone[1], t * 0.8 + 0.1, v * 1.15),
     );
   }
+  gwSheafOut(out, sh);
 }
 
 // ---- the reed beds (medium and high; low keeps its plain stems) -------------------------------------------------------
@@ -77209,33 +77349,30 @@ function gwLeaf(out, pts, tris, cols) {
 }
 const gwShade = (foot, mid, tip, t, v, knee = 0.5) =>
   ko(t < knee ? Jn(foot, mid, t / knee) : Jn(mid, tip, Math.pow((t - knee) / (1 - knee), 1.3)), v);
-// A sedge or rush tuft for the bed's front edge: many narrow blades fountaining from one foot, low and arching out.
+// A sedge or rush tuft for the bed's front edge: many narrow flat blades fountaining from one foot, low and arching out.
 function gwSedgeTuft(out, rnd, x, z, h, tone) {
   const n = 6 + ((rnd() * 5) | 0),
-    foot = Xo(GW_REED.foot);
+    foot = Xo(GW_REED.foot),
+    sh = gwSheaf();
   for (let i = 0; i < n; i++) {
     const dir = rnd() * ao,
       ht = h * (0.55 + rnd() * 0.55),
-      bend = 0.35 + rnd() * 0.6,
-      v = 0.8 + rnd() * 0.35,
-      dx = Math.cos(dir),
-      dz = Math.sin(dir),
-      bx = x + dx * 0.05,
-      bz = z + dz * 0.05;
-    gwStrand(
-      out,
-      (t) => [
-        bx + dx * bend * ht * t * t,
-        -0.1 + ht * t * (1 - 0.45 * bend * t * t),
-        bz + dz * bend * ht * t * t,
-      ],
-      (t) => 0.048 * (1 - 0.85 * t),
-      3,
-      (t) => gwShade(foot, tone[0], tone[1], t, v),
-      0.3,
+      v = 0.8 + rnd() * 0.35;
+    gwBlade(
+      sh,
+      x + Math.cos(dir) * 0.05,
+      z + Math.sin(dir) * 0.05,
+      ht,
+      0.06 + rnd() * 0.03,
+      0.35 + rnd() * 0.6,
       dir,
+      ht > 0.55 ? 2 : 1,
+      (t) => gwLeafShade(foot, tone[0], tone[1], t, v),
+      0,
+      (rnd() - 0.5) * 0.8,
     );
   }
+  gwSheafOut(out, sh);
 }
 // Bulrushes: tall, round, nearly straight dark stems with a little brown cluster of spikelets jutting out below the tip.
 function gwBulrush(out, rnd, x, z, n, h) {
@@ -77260,7 +77397,7 @@ function gwBulrush(out, rnd, x, z, n, h) {
       out,
       path,
       (t) => 0.03 * (1 - 0.75 * t),
-      4,
+      3,
       (t) => gwShade(foot, mid, tip, t, v, 0.6),
       1,
       dir,
@@ -77434,7 +77571,8 @@ function gwYellowFlag(out, rnd, x, z, h) {
     n = 4 + ((rnd() * 3) | 0),
     foot = Xo(GW_REED.foot),
     mid = Xo(GW_REED.leaf),
-    tip = Xo(GW_REED.leafHi);
+    tip = Xo(GW_REED.leafHi),
+    sk = gwSheaf();
   for (let i = 0; i < n; i++) {
     const dir = fan + Math.PI / 2 + (rnd() - 0.5) * 0.5,
       off = (i / (n - 1) - 0.5) * 0.9,
@@ -77442,21 +77580,21 @@ function gwYellowFlag(out, rnd, x, z, h) {
       dz = Math.sin(fan) * off,
       ht = h * (0.6 + rnd() * 0.4) * (1 - Math.abs(off) * 0.4),
       v = 0.85 + rnd() * 0.25;
-    // leaning out of the fan's plane only a little, so the blade's broad side stays in it
-    gwStrand(
-      out,
-      (t) => [
-        x + dx * ht * t * 0.5 + Math.cos(dir) * 0.04 * t,
-        -0.1 + ht * t,
-        z + dz * ht * t * 0.5 + Math.sin(dir) * 0.04 * t,
-      ],
-      (t) => 0.055 * (1 - 0.8 * t),
-      4,
-      (t) => gwShade(foot, mid, tip, t, v),
-      0.22,
-      dir,
+    // sword leaves: flat blades leaning out within the fan, their broad side in its plane
+    gwBlade(
+      sk,
+      x + dx * 0.05,
+      z + dz * 0.05,
+      ht,
+      0.07,
+      0.12 + Math.abs(off) * 0.3,
+      off < 0 ? fan + Math.PI : fan,
+      3,
+      (t) => gwLeafShade(foot, mid, tip, t, v),
+      Math.PI / 2 + (dir - fan - Math.PI / 2) * 0.3,
     );
   }
+  gwSheafOut(out, sk);
   const sh = h * (0.85 + rnd() * 0.2),
     p = [x, -0.1 + sh, z],
     yel = Xo(GW_REED.flag),
@@ -77772,7 +77910,7 @@ function gwReedBeds(parts, spots, A, avoid, rich, stoneColor) {
         open = pocket(s.x, s.z);
       // the heart: more tall stands round the clump, fewest at the open edge, none in a pocket of clear water
       if (!ar.minor && !open) {
-        const k = Math.round(Math.pow(1 - e, 1.2) * (rich ? 2.8 : 0.5) + rnd() * (rich ? 0.9 : 0.35));
+        const k = Math.round(Math.pow(1 - e, 1.2) * (rich ? 2.8 : 0.7) + rnd() * (rich ? 0.9 : 0.35));
         for (let i = 0; i < k; i++) {
           const [x, z] = near(s, 0.45, 1.25);
           if (!ok(x, z) || pocket(x, z)) continue;
@@ -78050,6 +78188,29 @@ uniform vec4 gwWaveA[4]; uniform vec2 gwWaveB[4]; uniform float gwWaveT;`
             `#include <begin_vertex>
 ${qe}`,
           );
+        // (the reeds' broad blades are flat and drawn from both sides: a back face keeps its normal's lean to the sky,
+        // so a blade is lit alike from either side)
+        je === "reeds" &&
+          (ke.fragmentShader = ke.fragmentShader.replace(
+            "#include <normal_fragment_begin>",
+            `#include <normal_fragment_begin>
+#ifdef DOUBLE_SIDED
+  if (!gl_FrontFacing) { vec3 gwUpV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz); normal -= 2.0 * dot(normal, gwUpV) * gwUpV; }
+#endif`,
+          ));
+        // (medium and high: light through the leaf: a share of the plant's own colour in the hour's key light, whichever
+        // way it faces (tinted to the leaf's green: lit straight, the warm key light turned the beds to pale straw), so an
+        // upright blade turned from the sky still reads olive and sage and not violet-black; strong
+        // in the early evening, less at dusk, little at night. Low bakes lighter colours instead.)
+        je === "reeds" &&
+          !g &&
+          (ke.fragmentShader = ke.fragmentShader.replace(
+            /(#include <opaque_fragment>)(?![\s\S]*#include <opaque_fragment>)/,
+            `#if NUM_DIR_LIGHTS > 0
+  outgoingLight += diffuseColor.rgb * directionalLights[0].color * vec3(0.17, 0.25, 0.13);
+#endif
+$1`,
+          ));
       };
       let te = K.customProgramCacheKey?.() || "gwInkToonFog";
       return (K.customProgramCacheKey = () => `${te}:wc:${je}${je === "reeds" && !g ? ":air" : ""}`), K;
@@ -79717,7 +79878,7 @@ ${qe}`,
     let H = jc(((t.artSeed | 0) ^ 388821) >>> 0),
       gwAvoid = Ag(t, e.data, o.id || "mossmere"),
       Ee = xk(t, H, { low: g, avoid: gwAvoid }),
-      // the best setting gets the full reed beds; medium keeps its clumps as they were (it is what most phones run)
+      // the best setting gets the richest reed beds; medium a thinner share of them, built of the same cheap broad blades
       gwRich =
         !g &&
         (() => {
@@ -79754,26 +79915,11 @@ ${qe}`,
               );
             }
         }
-        let te = H() * ao,
-          ke = H() * 0.6,
-          Ce = K.h * H.range(0.6, 1.2),
-          qe = new ii(0.045, Ce, 4, 1, !0);
-        (g ? se.fine : []).push(
-          Gn(qe, {
-            matrix: co(
-              K.x + Math.cos(te) * ke,
-              Ce / 2 - 0.12,
-              K.z + Math.sin(te) * ke,
-              H.range(-0.22, 0.22),
-              H() * ao,
-              H.range(-0.22, 0.22),
-            ),
-            color: Jn(i.organic, i.mossHi, H() * 0.45),
-          }),
-        );
+        // (low: broad blades and short tufts in place of its old plain cone stems, the same four triangles a stem)
+        g && we === 0 && gwLowClump(se.fine, H, K.x, K.z, K.n, K.h);
       }
     O.wcReeds = Ee.length;
-    if (gwRich && l === "mossmere") {
+    if (!g && l === "mossmere") {
       let st = gwReedBeds(se, Ee, t, gwAvoid, gwRich, le(0.6));
       (O.wcBedPlants = st.added), (O.wcBedFinds = st.finds);
     }
@@ -79849,17 +79995,22 @@ ${qe}`,
             detail: "wood",
             detailAmount: 0.7,
             grain: [0, 1, 0],
-            wet: 0.5,
+            // (wet only for a hand's height: a deeper wet band left the blades' lower half black)
+            wet: 0.25,
             gloss: 0.1,
             shine: 56,
             floor: 1,
+            // (the broad blades are flat: drawn from both sides)
+            side: Rs,
           },
           { fogScale: 0.9, fogMax: 1 },
           "reeds",
         ),
       )
     : D;
-  Re(se.fine, ge, null, "fine", !1), Re(se.glow, be, null, "glows");
+  // (the reeds take no cast shadow: a bed at a rock's shaded foot read as a black scatter, and thin blades gain nothing)
+  let gwFineMesh = Re(se.fine, ge, null, "fine", !1);
+  ne && gwFineMesh && (gwFineMesh.receiveShadow = !1), Re(se.glow, be, null, "glows");
   let k = b(
     el(
       {

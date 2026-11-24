@@ -104,6 +104,12 @@ The designer asked for Mossmere's environment graphics to be made as good as the
 - **The early evening is clearly lighter and warmer than night**, so the lake visibly darkens as the evening goes on. Approved. (The lake lies in a cavern: the warm light falls through the openings in the roof.)
 - The work is in three parts: light, sky, fog and tone; the water; and the shore, rocks, plants, props, the mist, the Bell Pool bell and Veilback Brook. Before-and-after pictures come from `tools/scenery-shots.mjs`. Each part goes to the designer as pictures to approve, as the "Look and feel" list in `mossmere-100.md` asks.
 
+## The lake's look as built, 24 November 2026
+
+- **Reed beds.** Reeds are now fans of broad flat leaves with a low tussock and a dark floating mat at each clump's foot; round stems stand only under the cattail heads. The middle and best settings also add a little green "light through the leaf" in the hour's light. Triangles are unchanged on the lowest setting (5,824 in the plants' mesh) and within half a percent on the middle one (about 116,000 for plants, organics and rocks together); the best setting fell from about 186,000 to about 127,000 in the plants' mesh. No new draw calls.
+  - A choice of look, still the designer's to make: the beds read as a pale sage against the violet water at dusk, and lighter than a dark mass at night. They can be made greener or darker.
+  - Not yet measured on a quiet machine: frame time on the lowest and middle settings before and after. The leaves are drawn on both faces, which costs something per pixel.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.
