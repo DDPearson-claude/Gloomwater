@@ -579,5 +579,9 @@ on from evening 17's save), with no game errors. It landed her on evening 20.
   landing about evening 18 or 19); and her landing chance on the right rig about 1 in 3 on the starter rod and reel
   (projected alone: about evening 20). With both, a keen player would land her about evening 16 or 17 on average.
   These are projections from the run's earnings and her measured chances, not runs.
+- **The designer's ruling on those two (25 November 2026):** the Mothsilk stays at 2,400; her landing chance goes to
+  about 1 in 3. Her fight value is 12 (was 28): on the Mothsilk with the starter rod and reel she is landed 0.31 of the
+  time on a struck hook and 0.37 on a clean one, 0.38 to 0.43 with the first rod and reel, and 0.43 to 0.46 with the
+  best, under her cap of 0.5. Projected from the run: a keen player lands her about evening 20.
 - **The full suite after the words pass:** every scenario in `tools/scenarios.mjs`, 174 of 174, with `--jobs 3` and
   `GW_SLOW=4`, in 7,393 s; the smoke test passes. The checklist's ticks in `sporewood-100.md` rest on these.

@@ -44492,7 +44492,9 @@ var pP = {
     },
     markedFish: 6,
     legend: {
-      fight: { belled_matriarch: 16, drifting_grove: 28, glass_sovereign: 40, lantern_swallower: 56 },
+      // The Meadowback Pacu (drifting_grove) at 12: on the Mothsilk with the starter rod and reel she is landed about 1
+      // time in 3 (0.31 struck, 0.37 clean), about 0.45 with the best; the designer's ruling of 25 November 2026.
+      fight: { belled_matriarch: 16, drifting_grove: 12, glass_sovereign: 40, lantern_swallower: 56 },
       fightRun: { belled_matriarch: 14, drifting_grove: 22, glass_sovereign: 30, lantern_swallower: 36 },
       style: {
         belled_matriarch: "steady",
