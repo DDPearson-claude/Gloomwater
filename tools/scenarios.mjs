@@ -2350,7 +2350,7 @@ const SW_BURR_FIRST = [
   "I've seen it since, here and there. Never in the same place twice.",
   "Here, a page of my almanac. It always turns up where the spores gather, at the seedfall.",
 ];
-const SW_NEXT_BURR = "Burr's lamp is lit at the old glasshouses after dusk. Sail close to talk to him.";
+const SW_NEXT_BURR = "Burr's lamp is lit at the old glasshouses from dusk. Sail close to talk to him.";
 // The door of the Drowned Greenhouse (Burr waits beside it), and a point in its aisle within his reach.
 const GH_DOOR = { x: 52, z: -31.3 };
 const NEAR_BURR = { x: 52, z: -25.5 };

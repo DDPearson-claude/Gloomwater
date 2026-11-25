@@ -490,3 +490,94 @@ stand in for a scene and the notepad's words for a drawing.
 - **No practice order was posted.** A practice order needs the Order Board, and nothing in the hunt points a new player to it.
 - **The opening went faster than designed.** The script knows where to go: Hob's map, the bell and the theft all came on evening 2. A person will be slower.
 - **Not checked by this run:** the bird scene's line after the find (the script skips scenes), and the real length of an evening (the test browser runs slow).
+
+## Sporewood's words pass, 25 November 2026
+
+Step 6 of the Sporewood plan: every Sporewood line a player can see, read against `voice.md`, against the rules as
+built and for spoilers (Murk's and Burr's lines, the notepad, the Journal and its hints, the catch cards, the Odds
+sheet, the finds, the field guide, the tally and the ending). The lines were read in the source and on the screens by
+a probe of the built page (each fish's Journal page before and after it is met, the Odds sheet, her page once landed);
+the six hints below were measured by the game's own roll and the hook table's grades. Nothing names her or her kind
+before its clue ("Sporewood hunt, she stays hidden" checks every screen). Thirteen changes:
+
+- Murk, where Burr is: "Burr's lamp is lit at the old glasshouses after dusk. Sail close and say hello." becomes
+  "... from dusk. ...", and the notepad's foot "... after dusk. Sail close to talk to him." the same: his lamp is lit,
+  and he talks, at dusk too.
+- Burr's greeting: "Evening. Mind the glass, it's sharp after dark." becomes "Evening. Mind the glass. It's sharp after
+  dark."
+- The line-up, the piranha's reason: "They slice a pod, they don't crack it." becomes "They slice a pod. They don't
+  crack it."
+- The Glowcap Bulb's line, which an older save still shows: "For the Mother's Cup. One try." becomes "An old glowing
+  bait. Nothing in the Pools takes it now." (since her hunt, nothing takes it).
+- Murk after the first loss in Sporewood: "Lost a big one? Rootthread holds them." becomes "Lost a big one? Stronger
+  gear holds them." He says it once, at any tally after a loss: the play-through heard it on evening 12, with the
+  Rootthread already on.
+- Six Journal hints were still the old roster's notes, with "Sign:" and no hour or bait. Each now says where, when and
+  on what:
+  - Netcloud Fry: "Surface shallows under the lily caps, in clouds. Sign: a shimmer of tiny rings." becomes "It bites
+    at any hour, all over the pools. The Spore Moth suits it best."
+  - Falsesmile Barb: "Under the caps where things fall in. Sign: a plop and a ring." becomes "It bites only by day and
+    at dusk, all over the pools. Spore Cake suits it best."
+  - Cindertail Catfish: "Deep channels and pool floors. Sign: a bubble trail, then nervous water." becomes "It bites at
+    any hour, all over the pools. Cut Strip and the Ember Minnow suit it best."
+  - Lostsea Mackerel: "Open mid water, always moving. Sign: a fast straight wake." becomes "It bites only by day and
+    at dusk, and feeds most in open water. The Ember Minnow suits it best."
+  - Downcast Catfish: "Deep open pools, mid water. Sign: a slow wide boil." becomes "It bites only by day and at dusk,
+    all over the pools. Spore Cake suits it best."
+  - Festival Puffer: "Night water: the Veilwater's still shallows. Sign: an amber globe glowing just under the
+    surface." becomes "It bites only at night, and only in the Veilwater. The Spore-Lamp Fly suits it best."
+- The Journal's landing odds named Sporewood's tackle by Mossmere's names: "Willow Switch · Waxed Silk · Wooden Winch"
+  for a player on the Mothsilk. In a lake with its own tackle each step now has that lake's name ("Willow Switch ·
+  Mothsilk · Wooden Winch"); Mossmere's are as before.
+- Read and kept: Burr's Seed says giant fish bite more often in every lake after this one, which the code does,
+  though no such lake exists yet (the next line says so); the Mother's Cup's map line, "The Mother breathes. Big
+  things breathe with her.", names the Cap, not her.
+
+## Sporewood's timed play-through by script, 25 November 2026
+
+Step 6 of the Sporewood plan. `tools/playthrough.mjs --lake sporewood` now plays a keen player, from
+`sporewood-crossed` made into a first arrival (no Sporewood evening played, 137 clams, the starter kit, Tallow's
+hold of 3 and 1). On a clock of the game's seconds (day 40 s, dusk 20 s, then night, home when the hold is full or at
+300 s, as the earnings study kept it) it fishes the best place and rig for the hour by value a cast (the game's own
+shares of the bites at Murk's price), with the game's own cast, bite, size, landing chance and fight, keeps every fish
+landed until the hold is full, and sells the hold at the tally. It buys Spore Cake for the next evening, the rig's
+parts as Murk shelves them, then saves for the Mothsilk. It follows the clues: Burr once the tale names him, the
+seedfall's pods, the drift's end and the moss rafts in her time, then her eddy. It never hands out clams or parts.
+20 of Sporewood's evenings were played (the first command stopped at its time limit during evening 18 and the run went
+on from evening 17's save), with no game errors. It landed her on evening 20.
+
+- **The beats, by Sporewood's evenings, against the plan.** The Drift Float 1 (planned 1); the Seed Pouch, the tale
+  and the notepad 2 (2); Burr's almanac 3 (3), the line-up 3, and the island rose 3 (planned 4 or 5: the script
+  follows the first moss raft in on its first night in her time); the Brass Trace shelved and bought 3; the crunch,
+  and the Burl Hook shelved and bought, 4; the snood shelved and the refusal 5 (5 or 6); the Rootthread bought 5; the
+  first hook-up 7, lost to the line, sketch 5 (losses 6 to 9); the first cracked pod 8; the Mothsilk bought 17; a
+  hook-up lost in the fight 19; landed 20, with the ending tally the same evening (planned 7 to 12 for a keen player;
+  Mossmere's keen player about 11 or 12). From evening 8 to 17 she only turned away ("It remembers the line").
+- **Earnings, the tally's sale each evening:** 36, 157, 98, 360, 106, 185, 191, 247, 76, 205, 689, 231, 239, 124, 225,
+  191, 132, 346, 111 and 181. The mean is 207 (median 191): 151 on the Twine (evenings 1 to 5) and 225 on the
+  Rootthread, which lands the bigger fish. Spore Cake cost 26 an evening. Clams at the tally of evenings 2, 5 and 10:
+  290, 394 and 788. The best place for the hour was the Lullaby on Spore Cake at every hour (by value a cast 23 to 27;
+  the Gill Harp 20 to 24, the Greenhouse 19 to 20 once found); on an evening of her time the hold of 4 was full at 235
+  to 300 s of the clock, after about 5 casts.
+- **Why the landing came after evening 16.**
+  - The Mothsilk. With the Burl Hook, the Brass Trace and the Rootthread bought by evening 5, the 2,400 took 12
+    evenings of saving (evenings 6 to 17, about 200 an evening after bait). The ruling priced it as the same saving-up
+    as Mossmere's Waxed Silk, 600 at the keen 80 an evening: 7.5 evenings. Measured, a keen player here earns about
+    2.6 times Mossmere's keen 80, not 4 times, so the same 7.5 evenings is about 1,500.
+  - Her landing chance. On the right rig with the Mothsilk it is 0.14 on the starter rod and reel (0.19 with the
+    Stalkwood, 0.16 with the Capwheel, 0.22 with both, 0.30 on the top rod and reel), measured with the game's own
+    fishChance; the plan's coin flip is only her cap. A hook-up comes on about 7 nights in 10 (three tries at 1 in 3),
+    and each fight lost on the right rig raises her chance a little (0.21 after one). So from the Mothsilk a keen
+    player needs about 4 hook-ups and 5 or 6 nights on average; the script's third night was lucky, and its
+    expected landing is about evening 22 or 23.
+  - Nothing stalled: every beat fired, and no beat waited on anything but clams.
+- **Only one of the three losses was met.** A keen player has the Burl Hook and the Brass Trace on before her first
+  take, so the crushed hook and the bitten knot never come; only the line is taught. A slower player meets more.
+- **Not checked by this run:** the art's scenes as a person sees them (the script skips them), a player who lets small
+  fish go to keep bigger ones, buys a creel or fills orders (each would earn more), and the real length of an evening.
+- **For the designer, yes or no:** the Mothsilk at 1,500, so a keen player buys it about evening 12 or 13 (projected:
+  landing about evening 18 or 19); and her landing chance on the right rig about 1 in 3 on the starter rod and reel
+  (projected alone: about evening 20). With both, a keen player would land her about evening 16 or 17 on average.
+  These are projections from the run's earnings and her measured chances, not runs.
+- **The full suite after the words pass:** every scenario in `tools/scenarios.mjs`, 174 of 174, with `--jobs 3` and
+  `GW_SLOW=4`, in 7,393 s; the smoke test passes. The checklist's ticks in `sporewood-100.md` rest on these.

@@ -31130,8 +31130,7 @@ var O5 = {
       id: "festival_puffer",
       name: "Festival Puffer",
       journal: "Puffed, it is the last paper lantern of a festival nobody finished.",
-      haunt:
-        "Night water: the Veilwater's still shallows. Sign: an amber globe glowing just under the surface.",
+      haunt: "It bites only at night, and only in the Veilwater. The Spore-Lamp Fly suits it best.",
       play: "Sulker. Swells and hangs like a bucket of water. Its beak cuts the line: snapped.",
       sizeModel: { L50: 45.5, sigma: 0.16 },
       hours: "night",
@@ -31183,7 +31182,7 @@ var O5 = {
       id: "netcloud_fry",
       name: "Netcloud Fry",
       journal: "Caught by the netful. Each one certain it is the exception.",
-      haunt: "Surface shallows under the lily caps, in clouds. Sign: a shimmer of tiny rings.",
+      haunt: "It bites at any hour, all over the pools. The Spore Moth suits it best.",
       play: "Darter. No fight to speak of. Up in two seconds.",
       sizeModel: { L50: 6.6, sigma: 0.1 },
       hours: "any",
@@ -31200,7 +31199,7 @@ var O5 = {
       id: "falsesmile_barb",
       name: "Falsesmile Barb",
       journal: "Looks just like a Smilejaw until it smiles.",
-      haunt: "Under the caps where things fall in. Sign: a plop and a ring.",
+      haunt: "It bites only by day and at dusk, all over the pools. Spore Cake suits it best.",
       play: "Darter. Flat-sided circles, light and quick.",
       sizeModel: { L50: 21.2, sigma: 0.1 },
       hours: "day, dusk",
@@ -31217,7 +31216,7 @@ var O5 = {
       id: "cindertail_catfish",
       name: "Cindertail Catfish",
       journal: "Its tail is the last coal of a fire it does not remember.",
-      haunt: "Deep channels and pool floors. Sign: a bubble trail, then nervous water.",
+      haunt: "It bites at any hour, all over the pools. Cut Strip and the Ember Minnow suit it best.",
       play: "Thrasher. Hard take, bullying short runs, head-shakes. Tests the line.",
       sizeModel: { L50: 57, sigma: 0.12 },
       hours: "any",
@@ -31234,7 +31233,8 @@ var O5 = {
       id: "lostsea_mackerel",
       name: "Lostsea Mackerel",
       journal: "A sea fish that swam upriver and never found the way back.",
-      haunt: "Open mid water, always moving. Sign: a fast straight wake.",
+      haunt:
+        "It bites only by day and at dusk, and feeds most in open water. The Ember Minnow suits it best.",
       play: "Runner. The fastest runs in the Pools, near the top. Tests the reel: spooled.",
       sizeModel: { L50: 77.5, sigma: 0.14 },
       hours: "day, dusk",
@@ -31251,7 +31251,7 @@ var O5 = {
       id: "downcast_catfish",
       name: "Downcast Catfish",
       journal: "Its eyes are set low. It has only ever looked where it will sink.",
-      haunt: "Deep open pools, mid water. Sign: a slow wide boil.",
+      haunt: "It bites only by day and at dusk, all over the pools. Spore Cake suits it best.",
       play: "Runner. One enormous steady run the length of the pool. No leaps. Tests the reel.",
       sizeModel: { L50: 77.5, sigma: 0.14 },
       hours: "day, dusk",
@@ -50084,7 +50084,7 @@ Object.assign(Ca.shelf, {
   ember_minnow: "Wobbles warm, for the hunters.",
   root_jig: "Hopped on the bottom, for rays.",
   sporelamp_fly: "For the Pools' giants.",
-  glowcap_bulb: "For the Mother's Cup. One try.",
+  glowcap_bulb: "An old glowing bait. Nothing in the Pools takes it now.",
 });
 Ca.shelfAt = {
   sporewood: {
@@ -50105,7 +50105,7 @@ Ca.murk.at = {
   sporewood: {
     map: "New water, new tackle. What you own here waits for you.",
     home: "Spore Cake on the hook. They like it sweet here.",
-    away: "Lost a big one? Rootthread holds them.",
+    away: "Lost a big one? Stronger gear holds them.",
   },
 };
 // Murk's speech box, the same box Hob talks in: his name on its tag, and the words of Hob's two buttons.
@@ -50825,7 +50825,7 @@ Object.assign(Ca.hunts.sporewood, {
   tale: "Burr kept the seeds of the old gardens. He planted his best on a mossy islet in the pools. By morning, the islet had gone.",
   murk: {
     tale: "It still turns up, never in the same place twice. They call it the wandering island. Burr lives at the old glasshouses. Go and ask him.",
-    findHob: "Burr's lamp is lit at the old glasshouses after dusk. Sail close and say hello.",
+    findHob: "Burr's lamp is lit at the old glasshouses from dusk. Sail close and say hello.",
     mapPassed: "Burr left this page of his almanac for you. It shows where the spores gather.",
     // Nudges while her water is not found: not near the evening's eddy in her time, after one evening and after
     // two; near it but no find, after one evening. Then his word once it is found.
@@ -50883,7 +50883,7 @@ Object.assign(Ca.hunts.sporewood, {
       // Only once a crushed hook is drawn in sketch 5.
       worn: "Crushed flat? I've seen pods cracked like that. Clean through.",
     },
-    greeting: "Evening. Mind the glass, it's sharp after dark.",
+    greeting: "Evening. Mind the glass. It's sharp after dark.",
     next: "Next",
     ok: "Got it",
     after: {
@@ -50905,7 +50905,7 @@ Object.assign(Ca.hunts.sporewood, {
     blank: "Not found yet",
     nextHead: "What to try next",
     next: {
-      hob: "Burr's lamp is lit at the old glasshouses after dusk. Sail close to talk to him.",
+      hob: "Burr's lamp is lit at the old glasshouses from dusk. Sail close to talk to him.",
       midnight: "Be where the spores gather when the Mother Cap sighs.",
       boils: "After the sigh, follow the drifting moss to where it gathers.",
       spot: "Fish where the drift ends after the sigh, and watch your rig.",
@@ -50970,7 +50970,7 @@ Object.assign(Ca.hunts.sporewood, {
         },
         razorpane_piranha: {
           name: "Razorpane Piranha",
-          why: "Its teeth are as sharp as glass. They slice a pod, they don't crack it.",
+          why: "Its teeth are as sharp as glass. They slice a pod. They don't crack it.",
         },
         cindertail_catfish: {
           name: "Cindertail Catfish",
@@ -183322,9 +183322,16 @@ function YV(e) {
     let ke = ["rod", "line", "reel"].every((st) => Number.isFinite(K[st]))
         ? K
         : c(() => d().upgradeTiers?.(we?.upgrades || {}), null) || {},
-      Ce = ["rod", "line", "reel"].map(
-        (st) => d().TACKLE?.[st]?.[Math.max(0, Math.min(4, Math.floor(l(ke[st]))))]?.name || "",
-      ),
+      // In a lake with its own tackle (Sporewood's), each step is named by that lake's piece, as its tackle screen
+      // names it: the Mothsilk, not Mossmere's Waxed Silk.
+      gearWater = c(() => h()?.loop?.gearWater, null),
+      lakeGear =
+        typeof gearWater == "string" && gearWater !== "mossmere" ? d().LOOP?.gear?.[gearWater] : null,
+      Ce = ["rod", "line", "reel"].map((st) => {
+        let tier = Math.max(0, Math.min(4, Math.floor(l(ke[st])))),
+          own = lakeGear?.[st]?.[tier]?.id;
+        return (own && d().TEXT_LOOP?.gearItems?.[own]) || d().TACKLE?.[st]?.[tier]?.name || "";
+      }),
       qe = K.item ?? null;
     return qe && Ce.push(X(qe)), Ce.filter(Boolean);
   }

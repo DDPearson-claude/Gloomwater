@@ -21,14 +21,16 @@
 //
 // With --lake sporewood it plays Sporewood's hunt (sporewood-plan.md) from a save whose barge is in Sporewood (by
 // default tools/fixtures/sporewood-crossed.json made into a first arrival: no Sporewood evening played yet), evening
-// after evening until the wandering island is landed and her ending tally is done. Its player: fishes by day in
-// the Lullaby (Sporewood's free place, where the earnings study's starter kit fished) to an earnings budget, landing
-// fish at the game's own size roll, fits Murk's Drift Float, sails to Burr's lamp at dusk until his almanac
-// is drawn, gathers three Capseeds in the seedfall (the raft put on floating pods), waits where the drift ends in
-// her time and follows the moss rafts in, casts there in her time (two ordinary casts, which may bring up a
-// cracked pod, then her own answer, fishHerCast, on Spore Cake until the refusal is drawn, then on a Capseed
-// under the Drift Float), and buys the Burl Hook, the Brass Trace, the Rootthread and the Mothsilk as the hunt
-// shows them. Its evenings in the summary are Sporewood's own.
+// after evening until the wandering island is landed and her ending tally is done. Its player is a keen one: on a
+// clock of the game's seconds (day 40 s, dusk 20 s, then night, home when the hold is full or at 300 s, as the
+// earnings study kept it) it fishes the best place and rig for the hour by value a cast (the game's own shares of the
+// bites, priced at Murk's price), with the game's own cast, bite, size and fight, and keeps every fish landed until
+// the hold is full, which Murk's tally sells. It buys Spore Cake for the next evening, then the rig's parts as Murk
+// shelves them (the Burl Hook, the Brass Trace, the Rootthread) and saves for the Mothsilk. It follows the clues: to
+// Burr's lamp at dusk once the tale has named him, until his almanac is drawn; three Capseeds gathered in the
+// seedfall (the raft put on floating pods); in her time to where the drift ends, following the moss rafts in; then
+// two ordinary casts by her eddy (which may bring up a cracked pod) and her own answer (fishHerCast) on Spore Cake
+// until the refusal is drawn, then on a Capseed under the Drift Float. Its evenings in the summary are Sporewood's own.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -231,6 +233,7 @@ async function hookAndPlay(s, id) {
       state: g.fishing.state,
       p: g.debug.fishChance(),
       loss: g.debug.fishPlay()?.loss ?? null,
+      end: g.debug.fishPlay()?.end ?? null,
       escaped: window.__pt.escaped.length,
       landed: window.__pt.landed.length,
       bob: g.debug.fishing()?.bob ?? null,
@@ -255,10 +258,19 @@ async function hookAndPlay(s, id) {
       const line = await s.eval(() =>
         [...document.querySelectorAll(".gw-strike-gear")].map((e) => e.textContent.trim()).join(" "),
       );
-      return { p: hooked.p, loss: hooked.loss, escape: now.last, line, bob: hooked.bob, raft: hooked.raft };
+      return {
+        p: hooked.p,
+        end: hooked.end,
+        loss: hooked.loss,
+        escape: now.last,
+        line,
+        bob: hooked.bob,
+        raft: hooked.raft,
+      };
     }
     if (hooked.p === 1 && now.card) return { find: true };
-    if (now.landed > hooked.landed && now.card) return { p: hooked.p, landed: now.lastLanded };
+    if (now.landed > hooked.landed && now.card)
+      return { p: hooked.p, end: hooked.end, landed: now.lastLanded };
     await press(s, /^Got it$/);
     await s.pause(400);
   }
@@ -762,11 +774,15 @@ async function main() {
 // ---- Sporewood's hunt (--lake sporewood) --------------------------------------------------------------------
 
 const SW_LEGEND = "drifting_grove";
-const SW_BUDGET = { plain: 178, root: 260 }; // clams an evening: the starter kit's measured earnings, more on Rootthread
 const BURR_NEAR = { x: 52, z: -25.5 };
 const SW_START = { x: 40, z: 22 };
-// Where the player fishes by day: the Lullaby, Sporewood's free place, as the earnings study's starter kit did.
-const SW_FISHING = { x: -51.5, z: -29 };
+// The keen player's evening, kept on a clock of the game's seconds as the earnings study kept it: day 40 s, dusk 20 s,
+// then night, which in Sporewood has no end; the player goes home when the hold is full or at 300 s. A cast costs
+// 1.5 s and its wait, a cast with no bite 0.6 s more to reel in, a fish its fight and 2 s for the card. On an evening
+// of her time the dusk and her time (to 181 s after the first sigh) go to the hunt.
+const SW_CLOCK = { day: 40, dusk: 20, evening: 300, herTimeEnds: 40 + 1 + 181 };
+const SW_PLACES = ["lullaby", "gill_harp", "veilwater", "mothers_cup", "drowned_greenhouse"];
+const SW_CAKE_KEPT = 15; // Spore Cake bought at each tally up to this many (tins of 10)
 
 const swState = (s) =>
   s.eval(() => {
@@ -829,6 +845,179 @@ const rollSwFish = (s, bait) =>
     for (const [id, c] of entries) if ((u -= c) <= 0) return id;
     return entries.at(-1)[0];
   }, bait);
+
+// The best place and rig for each light, by value a cast: the game's own shares of the bites (fishPoolRoll) at each
+// place the player can fish, on each bait held (Capseeds kept for her) and each lure owned, priced at Murk's price
+// for an ordinary size. The light and the rig are put back as they were.
+const bestSwSpots = (s) =>
+  s.eval((places) => {
+    const g = window.__gw,
+      d = g.debug,
+      run = g.state.run,
+      loop = g.progression.loop,
+      st = loop.state();
+    const was = {
+      phase: run.phase,
+      t: run.phaseTime,
+      lure: st.fitted.lure ?? null,
+      bait: st.fitted.bait ?? null,
+    };
+    const raft = { x: g.player.position.x, z: g.player.position.z };
+    const rigs = [
+      ...Object.entries(st.bait?.sporewood || {})
+        .filter(([id, n]) => n > 0 && id !== "capseed")
+        .map(([id]) => ({ bait: id })),
+      ...(st.lures || []).map((id) => ({ lure: id })),
+    ];
+    const price = {};
+    const value = (id) => (price[id] ??= Number(loop.priceOf?.({ speciesId: id, z: 0 })) || 0);
+    const best = {},
+      table = {};
+    try {
+      for (const light of ["calm", "dusk", "gloomtide"]) {
+        d.setPhase(light);
+        for (const place of places)
+          for (const rig of rigs) {
+            if (rig.bait) loop.fit("lure", null), loop.fit("bait", rig.bait);
+            else loop.fit("lure", rig.lure);
+            if (rig.lure && loop.state().fitted.lure !== rig.lure) continue; // not a lure for this water
+            const roll = d.fishPoolRoll(1, { place, bait: rig.bait ?? null });
+            if (!roll || roll.mist || roll.place !== place || !roll.shares) continue;
+            let ev = 0;
+            for (const [id, p] of Object.entries(roll.shares))
+              ev += p * (id === "drifting_grove" ? 0 : value(id));
+            const key = `${place}:${rig.bait || rig.lure}`;
+            table[`${light}|${key}`] = Math.round(ev * 10) / 10;
+            if (!best[light] || ev > best[light].ev)
+              best[light] = { place, ...rig, ev: Math.round(ev * 10) / 10 };
+          }
+      }
+    } finally {
+      d.setPhase(was.phase);
+      run.phaseTime = was.t;
+      if (was.lure) loop.fit("lure", was.lure);
+      else loop.fit("lure", null), was.bait && loop.fit("bait", was.bait);
+    }
+    for (const light of Object.keys(best)) {
+      const at = d.loop.at(best[light].place);
+      Object.assign(best[light], { x: at.x, z: at.z });
+    }
+    g.player.teleport(raft, 0);
+    return { best, table };
+  }, SW_PLACES);
+
+// Works the catch card: Keep while the hold has room and `keep`, else Let go. Returns what was done and any mark line.
+async function workCard(s, keep) {
+  for (const end = Date.now() + 30000; Date.now() < end; ) {
+    await s.pause(300);
+    const card = await s.eval(() => {
+      const keep = document.querySelector(".gw-cc-keep");
+      if (!(keep && keep.getBoundingClientRect().width > 0)) return null;
+      return {
+        full: window.__gw.progression.loop.holdFull?.() === true,
+        mark: document.querySelector(".gw-cc-markline")?.textContent ?? null,
+      };
+    });
+    if (!card) {
+      await press(s, /^Got it$/);
+      continue;
+    }
+    const did = keep && !card.full ? "keep" : "let go";
+    await press(s, did === "keep" ? /^\d?Keep\b/ : /^\d?Let go\b/);
+    await s.pause(400);
+    await s.closeGuides(2000);
+    return { did, mark: card.mark };
+  }
+  return { did: "no card" };
+}
+
+// The keen player fishes the best place for the light until the hold is full or the evening's clock reaches `until`:
+// the game's own cast and bite (castAt, then forceBite with the bait's natural roll, or a lure's own roll), the
+// fish struck with fishHook (its size and landing chance the game's own) and fought out by the game (fishPlayTo).
+async function keenFishSw(s, rec, ctx, until) {
+  let refreshed = false;
+  while (ctx.T < until) {
+    if (await s.eval(() => window.__gw.progression.loop.holdFull?.() === true)) {
+      rec.fullAt ??= Math.round(ctx.T);
+      break;
+    }
+    const light = ctx.T < SW_CLOCK.day ? "calm" : ctx.T < SW_CLOCK.day + SW_CLOCK.dusk ? "dusk" : "gloomtide";
+    const spot = ctx.spots.best[light];
+    if (!spot) break;
+    const key = `${light}:${spot.place}:${spot.bait || spot.lure}`;
+    if (rec.spotKey !== key) {
+      rec.spotKey = key;
+      rec.spots.push(`${light} ${spot.place} ${spot.bait || spot.lure} (${spot.ev})`);
+      await s.eval((spot) => {
+        const g = window.__gw,
+          loop = g.progression.loop;
+        if (spot.bait) loop.fit("lure", null), loop.fit("bait", spot.bait);
+        else loop.fit("lure", spot.lure);
+        g.player.teleport({ x: spot.x, z: spot.z + 6 }, 0);
+      }, spot);
+      await s.pause(800);
+      await s.closeGuides(1500);
+    }
+    const c = await s.eval(
+      ([light, spot]) => {
+        const g = window.__gw,
+          run = g.state.run;
+        // The day is the script's clock: the game's own is held short of dusk while the player fishes it.
+        if (run.phase !== light) g.debug.setPhase(light);
+        if (light === "calm" && run.phaseTime > 25) run.phaseTime = 5;
+        if (g.fishing.state !== "idle") return g.fishing.reelInQuiet?.(), { busy: g.fishing.state };
+        if (spot.bait && !(g.progression.loop.state().bait?.sporewood?.[spot.bait] > 0)) return { out: true };
+        let rolled = null;
+        if (spot.lure) {
+          const r = g.debug.fishPoolRoll(1, { place: spot.place });
+          rolled = Object.keys(r?.counts || {}).find((k) => k !== "none") || null;
+        }
+        const cast = g.debug.castAt(spot.x, spot.z, 0.6);
+        const ok = spot.lure
+          ? rolled
+            ? g.debug.forceBite({ speciesId: rolled })
+            : false
+          : g.debug.forceBite({ natural: true });
+        const f = g.debug.fishing();
+        return { cast, ok, species: spot.lure ? rolled : f.species, wait: spot.lure ? null : f.wait };
+      },
+      [light, spot],
+    );
+    if (c.out) {
+      // The bait ran out: the best of what is left.
+      if (refreshed) break;
+      refreshed = true;
+      ctx.spots = await bestSwSpots(s);
+      rec.notes.push(`out of ${spot.bait}`);
+      continue;
+    }
+    if (c.busy) {
+      rec.busy = (rec.busy || 0) + 1;
+      await press(s, /^Got it$/);
+      await press(s, /^\d?Let go\b/);
+      await s.pause(500);
+      ctx.T += 0.5;
+      if (rec.busy > 40) break;
+      continue;
+    }
+    rec.casts++;
+    ctx.T += 1.5 + (Number(c.wait) || 0);
+    if (!c.species || c.species === SW_LEGEND) {
+      await s.eval(() => window.__gw.fishing.reelInQuiet?.());
+      ctx.T += 0.6;
+      await settle(s);
+      continue;
+    }
+    const r = await hookAndPlay(s, c.species);
+    ctx.T += (Number(r.end) || 5) + 2;
+    // A sure landing (a chance of 1) comes back as hookAndPlay's `find`: its card is worked the same way.
+    if (r.landed || r.find) {
+      const got = await workCard(s, true);
+      rec.landed.push(`${c.species}:${got.did}${got.mark ? "*" : ""}`);
+    } else rec.landed.push(`${c.species}:${r.escape ? "lost" : "?"}`);
+    await settle(s);
+  }
+}
 
 // Sails the raft through the seedfall's floating pods until the pouch holds three Capseeds (the raft gathers a pod
 // within 3 m of it).
@@ -940,6 +1129,8 @@ async function playSporeEvening(s, n, ctx) {
     wanted: [],
     gifts: [],
     her: [],
+    spots: [],
+    casts: 0,
   };
   const before = await swState(s);
   rec.clamsAtStart = before.clams;
@@ -954,30 +1145,21 @@ async function playSporeEvening(s, n, ctx) {
   const h = () => st.hunt || {};
   const lake = await s.eval(() => window.__gw.state.run.lakeEvening ?? null);
   rec.lake = lake;
-  // 1. By day: fish the Lullaby to the budget, on Spore Cake (the Drift Float is a plain float there).
-  await teleport(s, SW_FISHING);
-  await s.pause(1500);
-  await s.closeGuides(3000);
-  const budget = st.tackle.line >= 1 ? SW_BUDGET.root : SW_BUDGET.plain;
-  rec.budget = budget;
-  const keepN = Math.max(1, Math.min(st.holdSlots || 3, Math.round(budget / Math.max(10, ctx.avgFish))));
-  await s.eval(() => window.__gw.progression.loop.fit?.("bait", "spore_cake"));
-  let kept = 0;
-  for (let casts = 0; casts < MAX_LANDED && kept < keepN; casts++) {
-    const id = await rollSwFish(s, "spore_cake");
-    if (!id) {
-      rec.notes.push("no bite roll for spore_cake");
-      break;
-    }
-    const got = await landFish(s, id, { rolled: true });
-    rec.landed.push(`${id}:${got.did}${got.mark ? "*" : ""}`);
-    if (got.did === "keep") kept++;
-  }
+  // 1. By day: the best place and rig for the day, until the hold is full or the day ends.
+  ctx.T = 0;
+  ctx.spots = await bestSwSpots(s);
+  rec.spotTable = ctx.spots.table;
+  await keenFishSw(s, rec, ctx, SW_CLOCK.day);
+  // Bait for her: Spore Cake on the Drift Float (her casts fit their own).
+  await s.eval(() => {
+    const loop = window.__gw.progression.loop;
+    loop.fit("lure", null), loop.fit("bait", "spore_cake");
+  });
   // 2. Dusk, from Sporewood's evening 2: Burr's lamp is lit; sail to him until his almanac is drawn.
   if (lake >= 2 && !h().landed) {
     await atSeedfall(s, -0.6);
     await s.closeGuides(3000);
-    if (!h().sketches?.map) {
+    if (!h().sketches?.map && h().taleAt > 0) {
       await teleport(s, BURR_NEAR);
       const lines = await hearHob(s, 25000);
       rec.hob.push(...lines);
@@ -1026,9 +1208,18 @@ async function playSporeEvening(s, n, ctx) {
       await settle(s);
     }
   }
+  // 5. The rest of the evening: the best place for the hour until the hold is full or the clock runs out. An evening
+  // with no hunt at dusk fishes the dusk too; one with her time fishes on from its end.
+  ctx.T = Math.max(
+    ctx.T,
+    rec.debugClock ? SW_CLOCK.herTimeEnds : lake >= 2 ? SW_CLOCK.day + SW_CLOCK.dusk : ctx.T,
+  );
+  if (lake >= 2 && !rec.debugClock) await atSeedfall(s, 181);
+  await keenFishSw(s, rec, ctx, SW_CLOCK.evening);
+  rec.clock = Math.round(ctx.T);
   rec.toasts.push(...(await takeToasts(s)));
   rec.scenes = await s.eval(() => window.__ptSw.scene.slice());
-  // 5. Home, and the tally.
+  // 6. Home, and the tally.
   rec.clamsBeforeTally = (await swState(s)).clams;
   const t = await tally(s);
   rec.murk.push(...t.murk);
@@ -1039,12 +1230,8 @@ async function playSporeEvening(s, n, ctx) {
   st = await swState(s);
   rec.clamsAfterTally = st.clams;
   if (t.trip?.gift) rec.gifts.push(t.trip.gift);
-  if (t.trip?.total && rec.landed.some((l) => /:keep\*?$/.test(l))) {
-    const keptN = rec.landed.filter((l) => /:keep\*?$/.test(l)).length;
-    const sale = t.trip.total - (t.trip.bounty || 0);
-    if (keptN && sale > 0) ctx.avgFish = 0.5 * ctx.avgFish + 0.5 * (sale / keptN);
-  }
-  // 6. At home: fit the Drift Float, buy what the hunt needs next, and fit the hunt's parts.
+  rec.sale = (t.trip?.total ?? 0) - (t.trip?.bounty || 0);
+  // 7. At home: fit the Drift Float, buy what the hunt needs next, and fit the hunt's parts.
   await shopSw(s, rec);
   rec.after = await swState(s);
   rec.notepad = await s.eval(() => {
@@ -1062,11 +1249,21 @@ async function shopSw(s, rec) {
     await s.eval(() => window.__gw.progression.loop.fitDepth("drift"));
     rec.notes.push("fitted the Drift Float");
   }
-  const cake = st.bait?.spore_cake ?? 0;
-  if (cake < 6) {
-    const r = await s.eval(() => window.__gw.progression.loop.buy("tin:spore_cake"));
-    if (r?.ok) rec.bought.push("Spore Cake");
-  }
+  // Spore Cake for the next evening's casts, in tins of 10, from the clams earned.
+  rec.baitSpent = await s.eval((kept) => {
+    const loop = window.__gw.progression.loop;
+    let spent = 0;
+    for (let k = 0; k < 4 && (loop.state().bait?.sporewood?.spore_cake | 0) < kept; k++) {
+      const it = loop
+        .shelf()
+        .tabs.flatMap((t) => t.items || [])
+        .find((i) => i.id === "tin:spore_cake");
+      if (!it || loop.state().clams < it.price || !loop.buy("tin:spore_cake")?.ok) break;
+      spent += it.price;
+    }
+    return spent;
+  }, SW_CAKE_KEPT);
+  if (rec.baitSpent) rec.bought.push(`Spore Cake (${rec.baitSpent})`);
   const shelf = await shelfNow(s);
   st = await swState(s);
   const want = [];
@@ -1168,7 +1365,9 @@ async function mainSporewood() {
         .join(",");
       say(
         `E${rec.lake ?? n}`,
-        `clams ${rec.clamsBeforeTally}->${rec.clamsAfterTally}`,
+        `clams ${rec.clamsBeforeTally}->${rec.clamsAfterTally} (sold ${rec.sale}, bait ${rec.baitSpent || 0})`,
+        `casts ${rec.casts} clock ${rec.clock}s${rec.fullAt != null ? ` full@${rec.fullAt}s` : ""}`,
+        `at ${rec.spots.join(" > ")}`,
         `fish ${rec.landed.join(" ")}`,
         rec.murk.length ? `Murk: ${rec.murk.map((m) => `"${short(m, 6)}"`).join(" ")}` : "",
         rec.hob.length ? `Burr: ${rec.hob.map((m) => `"${short(m, 6)}"`).join(" ")}` : "",
@@ -1191,10 +1390,14 @@ async function mainSporewood() {
   } finally {
     await browser.close();
   }
+  const sales = evenings.filter((e) => e.sale != null).map((e) => e.sale);
   const summary = {
     evenings: evenings.length,
     landedOn: milestones.landed ?? null,
     milestones,
+    sales,
+    meanSale: sales.length ? Math.round(sales.reduce((a, b) => a + b, 0) / sales.length) : null,
+    baitSpent: evenings.reduce((n, e) => n + (e.baitSpent || 0), 0),
     stopped,
     minutes: (Date.now() - t0) / 60000,
     errors: evenings.flatMap((e) => (e.errors || []).map((x) => `E${e.evening}: ${x}`)),
