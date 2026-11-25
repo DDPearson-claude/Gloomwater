@@ -246,6 +246,45 @@ Step 3b of the Sporewood plan: its rig grows from 3 parts to 8, as Mossmere's di
 - **Signs on the water:** Sporewood has its own (rises, swirls, ruffles, spray, strikes, bubble trails, tiny rings, silt clouds, knocks at the stems), each weighted by its makers' share of the bites at that spot and hour. Ten kinds can be sighted. As in Mossmere, signs carry no words.
 - **Mossmere is unchanged:** its 34 related checks give the same results, and a seeded run of its signs matches.
 
+## Sporewood's new fish, built 25 November 2026
+
+Step 4b of the Sporewood plan: four local kinds, the Seedfall Silver Dollar and one visitor from Mossmere. The
+Drowned Greenhouse and the Razorpane Piranha are step 4a, built apart.
+
+- **Four local kinds, by Mossmere's rules.** In its one home each takes 1 in 4 of its base fish's bites (3 in 8 with
+  Hob's Lamp while never caught), so nothing else's share changes: the Lantern Fry (the Netcloud Fry's, the
+  Veilwater, at night only, when it is a place), the Gillstring Barb (the Falsesmile Barb's, the Gill Harp), the Dewshell Crayfish (the Capshell
+  Crayfish's, the Lullaby) and the Cupwell Catfish (the Downcast Catfish's, the Mother's Cup). Measured by the game's
+  own roll on Spore Cake, of all bites there: 3.6% at night, 5.3% by day, 3.9% by day (5.0% at night) and 0.9% by day
+  (1.2% on the Root Jig). They keep the base fish's tags, baits and price, stay off the lake's list, the catch seal and
+  the Order Board, and show in the Journal's "Local kinds" strip. Each has its own drawing, portrait and field guide
+  entry: a row of lights along the fry's belly, threads from the barb's fins, a dew-beaded shell with no mushroom on
+  the crayfish, freckles on a spore-gold catfish.
+- **The Seedfall Silver Dollar**, a visitor: a small, round, silver seed-eater with teeth like a person's. It bites
+  only in the seedfall and her time, when the float lies in the evening's drift or within 4 m of its eddy, as a guest
+  15% of the time: 22.5% of bites there on a Capseed, 15% on Spore Cake, none on anything else. It is a drift fish,
+  so the riding Drift Float doubles it. Rare, it sells for 40 clams at an ordinary size. Its card's line is "Its
+  teeth look like a person's." It stays off the lake's list, the seal and the orders, and shows in the Journal's
+  guests row with no notebook. The Odds sheet does not list it: it reads no seedfall.
+- **The visitor from Mossmere is the Candlefin Koi.** It was bred for a garden pond, and Sporewood was the old
+  gardens, with still, shaded water and seeds to eat. Passed over: the Weeping Carp, which roots for worms in the
+  mere's mud, and the Lampsipper, which keeps to the mere's lamps after dark. It comes as Mossmere's guests come: the
+  Pond-Keeper's Notebook, a find in Sporewood, brings it to the lily rafts by day and at dusk (6% of bites there on
+  Spore Cake). Its record stays Mossmere's own, and it shows in Sporewood's guests row once the notebook is found
+  (most players will have caught it at home first).
+- **Murk's lines** at the first local kind sold and at each guest's first sale in Sporewood (said once each).
+- Gaps filled during the build: "never in the legend's water" holds by distance, since Sporewood's hunt has no
+  find yet and the four homes lie far from all four eddies. The notebook is Sporewood's one find of tackle, so it
+  takes the share of snags that Mossmere's six share (about half) until it is found, and a treasure is that much
+  rarer until then. A notebook's guest may now name its water; Mossmere's name none and bite as before.
+- **Earnings are unchanged,** measured with a seeded probe (the template study's method from `legend-sold.json`,
+  five evenings a kit, the bites, sizes and landings seeded so both builds roll the same): the starter kit 160 clams
+  an evening before and 159 after, the middle kit 629 and 629, the top kit 2,218 and 2,218. Both runs bit the same
+  fish, but where a Dewshell Crayfish took a Capshell Crayfish's bite, at the same price. Nothing was set to hold
+  them: a local kind sells as its base fish does, and the guests come where the kits do not fish. (Five evenings
+  swing with the giants; the template's 178, 490 and 1,257 came from more.)
+- **Mossmere is unchanged:** its local kinds and guest checks give the same results before and after.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.

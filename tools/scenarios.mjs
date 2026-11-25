@@ -8817,6 +8817,569 @@ const SCENARIOS = [
       return `${seen.join("; ")}; list ${after.have}/${after.need}`;
     },
   },
+  // ---- Sporewood's local kinds and guests (sporewood-plan.md "Fish", step 4b) ---------------------------------
+  {
+    name: "local kinds in Sporewood: in its one home each takes 1 in 4 of its base fish's bites (the Lantern Fry at night only), every other share is as it is without them, none bites anywhere else, and each keeps its base fish's tags",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      await session.eval(() => {
+        const g = window.__gw,
+          loop = g.progression.loop;
+        g.debug.loop.giveClams(9000);
+        for (const item of ["place:veilwater", "place:mothers_cup"]) loop.buy(item);
+        loop.markLifted("veilwater");
+        loop.markLifted("mothers_cup");
+      });
+      // The shares here with the local kinds, and with Sporewood's four taken out of the table.
+      const roll = (spot) =>
+        session.eval(
+          ([[, at, light, bait], ids]) => {
+            const g = window.__gw,
+              d = g.debug,
+              kinds = g.data.LOOP.localKinds.kinds,
+              loop = g.progression.loop;
+            loop.changeHook({ lure: null, bait });
+            if (at.x != null) g.player.teleport({ x: at.x, z: at.z }, 0);
+            d.setPhase(light);
+            const withKinds = d.fishPoolRoll(0, { place: at.place ?? null, bait });
+            const kept = Object.fromEntries(ids.map((id) => [id, kinds[id]]));
+            for (const id of ids) delete kinds[id];
+            const without = d.fishPoolRoll(0, { place: at.place ?? null, bait });
+            Object.assign(kinds, kept);
+            return { place: withKinds.place, with: withKinds.shares, without: without.shares };
+          },
+          [spot, Object.keys(SPORE_LOCAL_BASES)],
+        );
+      const seen = [];
+      for (const spot of SPORE_LOCAL_SPOTS) {
+        const [name, , , , home] = spot;
+        const r = await roll(spot);
+        const kinds = Object.keys(SPORE_LOCAL_BASES).filter((id) => r.with?.[id] > 0);
+        check(sameJson(kinds, home ? [home] : []), `${name}: local kinds ${JSON.stringify(kinds)}`);
+        for (const [id, p] of Object.entries(r.without)) {
+          const now = home && id === SPORE_LOCAL_BASES[home] ? r.with[id] + r.with[home] : r.with[id];
+          check(near(now, p, 1e-9), `${name}: ${id} has ${now} of the bites, ${p} without the local kinds`);
+        }
+        if (!home) continue;
+        const base = SPORE_LOCAL_BASES[home],
+          share = r.with[home] / (r.with[home] + r.with[base]);
+        check(near(share, 0.25, 1e-9), `${name}: ${home} takes ${share} of the ${base}'s bites`);
+        seen.push(`${home} ${(100 * r.with[home]).toFixed(1)}% at ${r.place}`);
+      }
+      // The rule: never another lake, place or light; the base fish's tags and baits.
+      const rule = await session.eval((bases) => {
+        const D = window.__gw.data,
+          at = D.localKindAt,
+          tags = (id) => ({
+            drift: D.rigBiteMult(id, "drift", null, "sporewood"),
+            trace: D.leaderTags(id, "brass_trace", "sporewood"),
+            snood: D.leaderTags(id, "mossthread_snood", "sporewood"),
+            baits: ["spore_cake", "capseed", "amber_larvae", "root_jig", "ember_minnow"].map((b) =>
+              D.hookGrade(id, { bait: b, water: "sporewood" }),
+            ),
+          });
+        return {
+          places: {
+            veilDay: at("netcloud_fry", { water: "sporewood", place: null, area: "deep", light: "calm" }),
+            veilNight: at("netcloud_fry", { water: "sporewood", place: "veilwater", light: "gloomtide" }),
+            harpOpen: at("falsesmile_barb", {
+              water: "sporewood",
+              place: null,
+              area: "stones",
+              light: "calm",
+            }),
+            lullabyInMossmere: at("capshell_crayfish", {
+              water: "mossmere",
+              place: "lullaby",
+              light: "calm",
+            }),
+            cup: at("downcast_catfish", { water: "sporewood", place: "mothers_cup", light: "dusk" }),
+            cupOther: at("cindertail_catfish", { water: "sporewood", place: "mothers_cup", light: "dusk" }),
+          },
+          same: Object.entries(bases).every(
+            ([id, base]) => JSON.stringify(tags(id)) === JSON.stringify(tags(base)),
+          ),
+          tags: tags("gillstring_barb"),
+        };
+      }, SPORE_LOCAL_BASES);
+      check(
+        sameJson(rule.places, {
+          veilDay: null,
+          veilNight: "lantern_fry",
+          harpOpen: null,
+          lullabyInMossmere: null,
+          cup: "cupwell_catfish",
+          cupOther: null,
+        }),
+        `the rule: ${JSON.stringify(rule.places)}`,
+      );
+      check(rule.same, `a local kind's tags differ from its base fish's: ${JSON.stringify(rule.tags)}`);
+      // The game's own roll, cast after cast in its home, until it bites; then it is landed there.
+      for (const [home, [place, light, bait]] of Object.entries(SPORE_LOCAL_ROLL)) {
+        const casts = await session.eval(
+          ([home, place, light, bait]) => {
+            const d = window.__gw.debug;
+            window.__gw.progression.loop.changeHook({ lure: null, bait });
+            d.setPhase(light);
+            d.fishSeed(41);
+            for (let n = 1; n <= 1500; n++) if (d.fishPoolRoll(1, { place, bait })?.counts?.[home]) return n;
+            return null;
+          },
+          [home, place, light, bait],
+        );
+        check(casts != null, `${home} never bit in 1500 casts at ${place}`);
+        await session.catchFish(home, { keep: false });
+        seen.push(`${home} cast ${casts}`);
+      }
+      return seen.join("; ");
+    },
+  },
+
+  {
+    name: "local kinds in Sporewood: catching each changes no list count, catch seal or order; the Journal's Local kinds strip shows it under its caught base fish, a ? until caught, and its entry says its one home; Murk's line at the first one sold",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withDriftFloat(false),
+    timeoutMs: 900_000,
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      const counts = () =>
+        session.eval(() => {
+          const loop = window.__gw.progression.loop;
+          return {
+            list: loop.listCount("sporewood"),
+            seals: JSON.stringify(loop.seals()),
+            page: loop.catalogue("sporewood").head,
+          };
+        });
+      // The four base fish caught first, so each one's strip shows.
+      for (const base of new Set(Object.values(SPORE_LOCAL_BASES)))
+        await session.catchFish(base, { keep: false });
+      const before = await counts();
+      const orders = await session.eval((bases) => {
+        const loop = window.__gw.progression.loop,
+          fish = (speciesId) => ({ uid: `o-${speciesId}`, speciesId, sizeClass: "keeper", length: 20 });
+        const out = {};
+        for (const [id, base] of Object.entries(bases)) {
+          loop.state().orders.push({ id: `ord-${base}`, speciesId: base, kind: "count", n: 1, have: 0 });
+          out[id] = [loop.orderFor(fish(base)), loop.orderFor(fish(id))];
+          loop.state().orders.pop();
+        }
+        return out;
+      }, SPORE_LOCAL_BASES);
+      for (const [id, [base, kind]] of Object.entries(orders))
+        check(base === `ord-${SPORE_LOCAL_BASES[id]}` && kind === null, `orders: ${JSON.stringify(orders)}`);
+      // Not yet caught: each a "?" under its base fish, and no name anywhere on the page.
+      await session.eval(() => window.__gw.ui.openJournal({ zone: "sporewood" }));
+      await session.pause(800);
+      const strips = () =>
+        session.eval(() =>
+          Object.fromEntries(
+            [...document.querySelectorAll("[data-loop=locals]")].map((s) => [
+              s.dataset.of,
+              [...s.querySelectorAll(".gw-cat-local")].map((b) =>
+                b.matches("button")
+                  ? `${b.dataset.species}:${b.textContent.trim()}:${!!b.querySelector("canvas")}`
+                  : `${b.dataset.species}:${b.textContent.trim()}`,
+              ),
+            ]),
+          ),
+        );
+      const unknown = await strips();
+      check(
+        Object.entries(SPORE_LOCAL_BASES).every(([id, base]) => sameJson(unknown[base], [`${id}:?`])),
+        `the strips before: ${JSON.stringify(unknown)}`,
+      );
+      const text = await session.eval(() => document.querySelector(".gw-cat-scroll")?.textContent ?? "");
+      check(
+        !Object.values(SPORE_LOCAL_NAMES).some((n) => text.includes(n)),
+        "a local kind is named before it is caught",
+      );
+      await session.eval(() => window.__gw.ui.closeAll());
+      // The first kept, to be sold at the tally; the others let go (the hold is small).
+      for (const [k, id] of Object.keys(SPORE_LOCAL_BASES).entries())
+        await session.catchFish(id, { keep: k === 0 });
+      const after = await counts();
+      check(sameJson(after, before), `the counts moved: ${JSON.stringify({ before, after })}`);
+      // The tally: Murk's line at the first local kind sold, once.
+      await session.goHomeAndTally();
+      const said = await session.eval(
+        () => window.__gw.progression.loop.state().said?.["at:sporewood:local"],
+      );
+      check(said === true, "Murk's line for the first local kind sold was not said");
+      await session.eval(() => window.__gw.ui.openJournal({ zone: "sporewood" }));
+      await session.pause(800);
+      const known = await strips();
+      check(
+        Object.entries(SPORE_LOCAL_BASES).every(([id, base]) =>
+          sameJson(known[base], [`${id}:${SPORE_LOCAL_NAMES[id]}:true`]),
+        ),
+        `the strips after: ${JSON.stringify(known)}`,
+      );
+      const entries = [];
+      for (const id of Object.keys(SPORE_LOCAL_BASES)) {
+        await session.eval(
+          (id) => document.querySelector(`button.gw-cat-local[data-species=${id}]`).click(),
+          id,
+        );
+        await session.pause(600);
+        const entry = await session.eval(() => ({
+          name: document.querySelector(".gw-cat-species h3")?.textContent ?? null,
+          where: document.querySelector(".gw-cat-species .gw-jr-where")?.textContent ?? null,
+        }));
+        check(
+          entry.name === SPORE_LOCAL_NAMES[id] && entry.where?.startsWith(SPORE_LOCAL_WHERE[id]),
+          `${id}'s entry: ${JSON.stringify(entry)}`,
+        );
+        entries.push(entry.where);
+        await session.eval(() => window.__gw.ui.closeAll());
+        await session.eval(() => window.__gw.ui.openJournal({ zone: "sporewood" }));
+        await session.pause(600);
+      }
+      return `list ${after.list.have}/${after.list.need} before and after; ${entries.join(" | ")}`;
+    },
+  },
+
+  {
+    name: "Seedfall Silver Dollar: it bites only in the seedfall and her time, along the evening's drift and at its eddy, a Capseed best and Spore Cake too; never out of the drift, before or after, by day, on a lure or in Mossmere; its card says its teeth look like a person's",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withDriftFloat(false),
+    timeoutMs: 600_000,
+    async run(session, { page, browser }) {
+      await session.sail({ water: "sporewood" });
+      await atDusk(session, SEEDFALL.at - 0.5, { evening: 4 });
+      const r = await session.eval(
+        ([id, sf]) => {
+          const g = window.__gw,
+            D = g.data,
+            d = g.debug,
+            loop = g.progression.loop,
+            run = g.state.run,
+            drift = D.sporeDriftOf(run.evening, "sporewood"),
+            mid = drift.pts[Math.floor(drift.pts.length / 2)];
+          // Capseeds in the pouch on this trip, as the seedfall gathers them.
+          run.bait.capseed = 3;
+          const share = (x, z, rig, phase, t) => {
+            g.player.teleport({ x, z }, 0);
+            loop.changeHook(rig);
+            if (run.phase !== phase) d.setPhase(phase);
+            run.phaseTime = t;
+            const roll = d.fishPoolRoll(0, { bait: rig.bait ?? null });
+            return roll?.shares?.[id] ?? 0;
+          };
+          const capseed = { lure: null, bait: "capseed" },
+            cake = { lure: null, bait: "spore_cake" };
+          return {
+            band: share(mid[0], mid[1], capseed, "dusk", sf.at + 5),
+            bandCake: share(mid[0], mid[1], cake, "dusk", sf.at + 5),
+            bandLarvae: share(mid[0], mid[1], { lure: null, bait: "amber_larvae" }, "dusk", sf.at + 5),
+            night: share(mid[0], mid[1], capseed, "gloomtide", 60),
+            eddy: share(drift.eddy.x + 3, drift.eddy.z, capseed, "gloomtide", 60),
+            off: share(mid[0] + 14, mid[1] + 14, capseed, "dusk", sf.at + 5),
+            before: share(mid[0], mid[1], capseed, "dusk", sf.at - 0.5),
+            after: share(mid[0], mid[1], capseed, "gloomtide", sf.at + sf.herTime - sf.dusk + 1),
+            day: share(mid[0], mid[1], capseed, "calm", 10),
+            // Last, as it puts a lure on.
+            bandLure: share(mid[0], mid[1], { lure: "seedpod_twirl" }, "dusk", sf.at + 5),
+            onList: loop.listCount("sporewood"),
+            rule: D.LOOP.seedfallGuest.sporewood,
+            mid,
+          };
+        },
+        [DOLLAR, SEEDFALL],
+      );
+      const p = r.rule.share;
+      check(
+        near(r.band, p * 1.5, 1e-9) && near(r.bandCake, p, 1e-9) && near(r.eddy, p * 1.5, 1e-9),
+        `its share in the drift and at its eddy: ${JSON.stringify(r)}`,
+      );
+      check(near(r.night, p * 1.5, 1e-9), `its share in her time after dark: ${JSON.stringify(r)}`);
+      check(
+        [r.bandLarvae, r.bandLure, r.off, r.before, r.after, r.day].every((x) => x === 0),
+        `it bites out of its niche: ${JSON.stringify(r)}`,
+      );
+      check(r.onList.need === 12, `the lake's list: ${JSON.stringify(r.onList)}`);
+      // The game's own roll in the drift on a Capseed, cast after cast, until it bites.
+      const casts = await session.eval(
+        ([id, mid, sf]) => {
+          const g = window.__gw,
+            d = g.debug,
+            run = g.state.run;
+          g.player.teleport({ x: mid[0], z: mid[1] }, 0);
+          g.progression.loop.changeHook({ lure: null, bait: "capseed" });
+          d.setPhase("dusk");
+          run.phaseTime = sf.at + 5;
+          d.fishSeed(23);
+          for (let n = 1; n <= 200; n++) if (d.fishPoolRoll(1, { bait: "capseed" })?.counts?.[id]) return n;
+          return null;
+        },
+        [DOLLAR, r.mid, SEEDFALL],
+      );
+      check(casts != null, "the Silver Dollar never bit in 200 casts in the drift on a Capseed");
+      // Its card, with its line under the picture, and no line on another fish's card.
+      const card = async (id) => {
+        await catchCard(session, id, 0);
+        const line = await session.eval(() => document.querySelector(".gw-cc-markline")?.textContent ?? null);
+        await session.clickButton(/^\d?Keep\b/);
+        await session.pause(600);
+        await session.closeGuides(6000);
+        return line;
+      };
+      const line = await card(DOLLAR);
+      check(line === DOLLAR_LINE, `its card's line: ${line}`);
+      const other = await card("netcloud_fry");
+      check(other === null, `another fish's card has a line: ${other}`);
+      // Mossmere: no Silver Dollar at dusk on the drift's ground.
+      const moss = await GameSession.open(browser, {
+        page,
+        save: JSON.stringify(readFixture("mid-mossmere")),
+        debug: true,
+        viewport: VIEWPORT,
+      });
+      try {
+        await moss.boot();
+        await moss.sail();
+        await atDusk(moss, SEEDFALL.at + 5, { evening: 4 });
+        const m = await moss.eval((id) => {
+          const g = window.__gw;
+          return {
+            guest: g.data.seedfallGuestsAt(g.data, g.state.run, 37, 9),
+            share: g.debug.fishPoolRoll(0, { bait: "mireworm" })?.shares?.[id] ?? 0,
+          };
+        }, DOLLAR);
+        check(m.guest === null && m.share === 0, `a Silver Dollar in Mossmere: ${JSON.stringify(m)}`);
+      } finally {
+        await moss.close();
+      }
+      return `${(100 * r.band).toFixed(1)}% on a Capseed and ${(100 * r.bandCake).toFixed(1)}% on Spore Cake in the drift in her time; first bite on cast ${casts}; "${line}"`;
+    },
+  },
+
+  {
+    name: "Seedfall Silver Dollar: it sells, stays off the lake's list and the catch seal, shows in the Journal's guests row with no book, its entry says when it comes, and Murk has a line at its first sale",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withDriftFloat(false),
+    timeoutMs: 600_000,
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      const before = await session.eval(() => ({
+        list: window.__gw.progression.loop.listCount("sporewood"),
+        seals: JSON.stringify(window.__gw.progression.loop.seals()),
+        price: window.__gw.progression.loop.priceOf({ speciesId: "seedfall_silver_dollar", z: 0 }),
+      }));
+      check(before.price > 0, `its price: ${before.price}`);
+      await session.catchFish(DOLLAR);
+      const tally = await session.goHomeAndTally();
+      const after = await session.eval(() => ({
+        list: window.__gw.progression.loop.listCount("sporewood"),
+        seals: JSON.stringify(window.__gw.progression.loop.seals()),
+        said: window.__gw.progression.loop.state().said?.["at:sporewood:dollar"] ?? null,
+      }));
+      check(
+        sameJson(after.list, before.list) && after.seals === before.seals,
+        `the list or seal moved: ${JSON.stringify({ before, after })}`,
+      );
+      check(after.said === true, `Murk's line at its first sale: ${JSON.stringify(after)}`);
+      await session.eval(() => window.__gw.ui.openJournal({ zone: "sporewood" }));
+      await session.pause(900);
+      const row = await session.eval(() => {
+        const sec = document.querySelector("[data-loop=guests]");
+        return sec
+          ? [...sec.querySelectorAll(".gw-cat-card")].map((c) => ({
+              name: c.querySelector(".gw-cat-name")?.textContent.trim() ?? "",
+              book: !!c.querySelector(".gw-cat-note"),
+            }))
+          : null;
+      });
+      check(
+        row?.length === 1 && row[0].name.includes("Seedfall Silver Dollar") && !row[0].book,
+        `the guests row: ${JSON.stringify(row)}`,
+      );
+      const listed = await session.eval(() =>
+        [...document.querySelectorAll(".gw-cat-list .gw-cat-card")].map(
+          (c) => c.querySelector(".gw-cat-name")?.textContent ?? "",
+        ),
+      );
+      check(!listed.some((n) => n.includes("Silver Dollar")), `on the lake's list: ${listed}`);
+      await session.eval(() => window.__gw.ui.closeAll());
+      await session.eval(() =>
+        window.__gw.ui.openJournal({ zone: "sporewood", sel: "seedfall_silver_dollar" }),
+      );
+      await session.waitFor("its page", 10_000, () => !!document.querySelector(".gw-jr-where"));
+      const where = await visibleText(session, ".gw-jr-where");
+      check(where.startsWith(DOLLAR_WHERE), `its Journal line: ${where}`);
+      return `sold for ${before.price} at z 0; tally ${tally.lastTrip?.total}; "${where}"`;
+    },
+  },
+
+  {
+    name: "Sporewood's visitor from Mossmere: the Pond-Keeper's Notebook brings the Candlefin Koi to the lily rafts by day and at dusk, as Mossmere's guests come; never at night, elsewhere or in Mossmere; the Journal and the Odds show it with the book, and its Mossmere record is unchanged",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session, { page, browser }) {
+      await session.sail({ water: "sporewood" });
+      const r = await session.eval(() => {
+        const g = window.__gw,
+          D = g.data,
+          d = g.debug,
+          loop = g.progression.loop,
+          koi = (phase, x, z, bait = "spore_cake") => {
+            g.player.teleport({ x, z }, 0);
+            loop.changeHook({ lure: null, bait });
+            d.setPhase(phase);
+            const roll = d.fishPoolRoll(0, { bait });
+            return { area: roll?.area ?? null, p: roll?.shares?.candlefin_koi ?? 0 };
+          };
+        const out = { without: koi("calm", -54, 32) };
+        loop.state().finds.got.pond_notebook = 1;
+        Object.assign(out, {
+          day: koi("calm", -54, 32),
+          dusk: koi("dusk", -54, 32),
+          night: koi("gloomtide", -54, 32),
+          open: koi("calm", 20, 30),
+          lullaby: koi("calm", -51.5, -35),
+          larvae: koi("calm", -54, 32, "amber_larvae"),
+          lines: D.lostTackleLines(D, "pond_notebook"),
+          rule: D.LOOP.lostTackle.pond_notebook.guest,
+          record: (({ zone, guestOf, hint, place, depth }) => ({
+            zone,
+            guestOf: guestOf ?? null,
+            hint,
+            place,
+            depth,
+          }))(D.SPECIES_BY_ID.candlefin_koi),
+          find: D.TEXT_LOOP.finds.items.pond_notebook,
+        });
+        return out;
+      });
+      const p = r.rule.share;
+      check(
+        r.without.p === 0 && near(r.day.p, p * 1.5, 1e-9) && near(r.dusk.p, p * 1.5, 1e-9),
+        `the koi in the lily rafts: ${JSON.stringify(r)}`,
+      );
+      check(near(r.larvae.p, p * 0.25, 1e-9), `on Amber Larvae: ${JSON.stringify(r.larvae)}`);
+      check(
+        r.night.p === 0 && r.open.p === 0 && r.lullaby.p === 0,
+        `it bites out of its niche: ${JSON.stringify(r)}`,
+      );
+      check(sameJson(r.lines, KOI_NOTEBOOK_LINES), `the notebook's lines: ${JSON.stringify(r.lines)}`);
+      check(
+        sameJson(r.record, KOI_MOSSMERE_RECORD),
+        `the Candlefin Koi's own record: ${JSON.stringify(r.record)}`,
+      );
+      // Caught, it shows in the guests row with the book, and on the Odds with the book.
+      await session.eval(() => {
+        const g = window.__gw;
+        g.player.teleport({ x: -54, z: 32 }, 0);
+        g.debug.setPhase("calm");
+      });
+      await session.catchFish("candlefin_koi");
+      await session.goHomeAndTally();
+      const said = await session.eval(
+        () => window.__gw.progression.loop.state().said?.["at:sporewood:koi"] ?? null,
+      );
+      check(said === true, "Murk's line at the koi's first sale was not said");
+      await session.eval(() => window.__gw.ui.openJournal({ zone: "sporewood" }));
+      await session.pause(900);
+      const row = await session.eval(() =>
+        [...(document.querySelector("[data-loop=guests]")?.querySelectorAll(".gw-cat-card") ?? [])].map(
+          (c) =>
+            `${c.querySelector(".gw-cat-name")?.textContent.trim()}:${!!c.querySelector(".gw-cat-note")}`,
+        ),
+      );
+      check(sameJson(row, ["Candlefin Koi:true"]), `the guests row: ${JSON.stringify(row)}`);
+      await session.eval(() => window.__gw.ui.closeAll());
+      // Mossmere with the Pond-Keeper's Notebook: its pads by day are as they are without it.
+      const moss = await GameSession.open(browser, {
+        page,
+        save: JSON.stringify(readFixture("mid-mossmere")),
+        debug: true,
+        viewport: VIEWPORT,
+      });
+      let m;
+      try {
+        await moss.boot();
+        await moss.sail();
+        m = await moss.eval(() => {
+          const g = window.__gw,
+            d = g.debug,
+            got = g.progression.loop.state().finds.got;
+          g.player.teleport({ x: 40, z: 28 }, 0);
+          d.setPhase("calm");
+          const shares = () => d.fishPoolRoll(0, { bait: "mireworm" })?.shares;
+          const without = shares();
+          got.pond_notebook = 1;
+          const withIt = shares();
+          return { without, withIt };
+        });
+        check(sameJson(m.withIt, m.without), `Mossmere's pads with the notebook: ${JSON.stringify(m)}`);
+      } finally {
+        await moss.close();
+      }
+      return `${(100 * r.day.p).toFixed(1)}% on Spore Cake in the lily rafts by day; "${r.lines.join(" ")}"`;
+    },
+  },
+
+  {
+    name: "Sporewood's new fish: old saves load unchanged: the lake lists, the Journal, the finds and the kit are as they were, and no new fish is in them",
+    fixture: "sporewood-crossed",
+    debug: true,
+    async run(session, { fixture, page, browser }) {
+      const seen = [];
+      for (const name of ["sporewood-crossed", "legend-sold", "mid-mossmere"]) {
+        const save = name === "sporewood-crossed" ? fixture : readFixture(name);
+        const s =
+          name === "sporewood-crossed"
+            ? session
+            : await GameSession.open(browser, {
+                page,
+                save: JSON.stringify(save),
+                debug: true,
+                viewport: VIEWPORT,
+              });
+        try {
+          if (s !== session) await s.boot();
+          await s.toHome();
+          const now = await s.eval(() => {
+            const g = window.__gw,
+              loop = g.progression.loop;
+            return {
+              journal: Object.keys(g.state.meta.journal).sort(),
+              finds: JSON.stringify(g.state.meta.loop.finds.got),
+              clams: loop.state().clams,
+              lists: ["mossmere", "sporewood"].map((w) => loop.listCount(w)),
+            };
+          });
+          check(
+            sameJson(now.journal, Object.keys(save.meta.journal).sort()),
+            `${name}: the Journal is not the save's: ${JSON.stringify(now.journal)}`,
+          );
+          check(
+            now.finds === JSON.stringify(save.meta.loop.finds?.got ?? {}) &&
+              now.clams === save.meta.loop.clams,
+            `${name}: the finds or clams moved: ${JSON.stringify(now)}`,
+          );
+          check(
+            now.lists[1].need === 12 && now.lists[0].need === 12,
+            `${name}: a lake list's length moved: ${JSON.stringify(now.lists)}`,
+          );
+          await s.collectGameErrors();
+          check(!s.errors.length, `${name}: errors: ${s.errors.join("; ")}`);
+          seen.push(`${name} ${now.lists.map((l) => `${l.have}/${l.need}`).join(" ")}`);
+        } finally {
+          if (s !== session) await s.close();
+        }
+      }
+      return seen.join("; ");
+    },
+  },
+
   {
     name: "guide in Sporewood: the first-play card about worms and the spoon does not come up after a cast and a catch there, on a save whose guide is not finished",
     fixture: "sporewood-crossed",
@@ -11971,6 +12534,51 @@ const LOCAL_SHARE_SPOTS = [
   ["her water at night", { place: "bell_pool" }, "gloomtide", "feather_fly", null],
   ["deep water at night", { x: -24, z: -10 }, "gloomtide", "lumen_moss", null],
 ];
+
+// Sporewood's local kinds (wo.localKinds): each one's base fish, name and Journal line.
+const SPORE_LOCAL_BASES = {
+  lantern_fry: "netcloud_fry",
+  gillstring_barb: "falsesmile_barb",
+  dewshell_crayfish: "capshell_crayfish",
+  cupwell_catfish: "downcast_catfish",
+};
+const SPORE_LOCAL_NAMES = {
+  lantern_fry: "Lantern Fry",
+  gillstring_barb: "Gillstring Barb",
+  dewshell_crayfish: "Dewshell Crayfish",
+  cupwell_catfish: "Cupwell Catfish",
+};
+const SPORE_LOCAL_WHERE = {
+  lantern_fry: "Only in the Veilwater, at night.",
+  gillstring_barb: "Only at the Gill Harp.",
+  dewshell_crayfish: "Only in the Lullaby.",
+  cupwell_catfish: "Only in the Mother's Cup.",
+};
+// Where the shares are read: [name, spot, light, bait, the local kind expected there or null].
+const SPORE_LOCAL_SPOTS = [
+  ["the Veilwater at night", { place: "veilwater", x: -86, z: 42 }, "gloomtide", "spore_cake", "lantern_fry"],
+  // By day the Veilwater is open water, no home.
+  ["the Veilwater by day", { x: -86, z: 42 }, "calm", "spore_cake", null],
+  ["the Gill Harp by day", { place: "gill_harp" }, "calm", "spore_cake", "gillstring_barb"],
+  ["the Lullaby at night", { place: "lullaby" }, "gloomtide", "spore_cake", "dewshell_crayfish"],
+  ["the Mother's Cup at dusk", { place: "mothers_cup" }, "dusk", "spore_cake", "cupwell_catfish"],
+  ["open water by day", { x: 20, z: 30 }, "calm", "spore_cake", null],
+  ["the spore drift at dusk", { x: 38, z: 8 }, "dusk", "spore_cake", null],
+];
+// Each one's home, light and bait for the seeded roll until it bites.
+const SPORE_LOCAL_ROLL = {
+  lantern_fry: ["veilwater", "gloomtide", "spore_cake"],
+  gillstring_barb: ["gill_harp", "calm", "spore_cake"],
+  dewshell_crayfish: ["lullaby", "calm", "spore_cake"],
+  cupwell_catfish: ["mothers_cup", "calm", "spore_cake"],
+};
+// The Seedfall Silver Dollar (wo.seedfallGuest): its card's line and its Journal line once caught.
+const DOLLAR = "seedfall_silver_dollar";
+const DOLLAR_LINE = "Its teeth look like a person's.";
+const DOLLAR_WHERE = "Only at the seedfall, along the spore drift and at its eddy.";
+// The Pond-Keeper's Notebook's lines, and the Candlefin Koi's own record as Mossmere has always had it.
+const KOI_NOTEBOOK_LINES = ["Candlefin Koi bite among the lily rafts by day and at dusk."];
+const KOI_MOSSMERE_RECORD = { zone: "mossmere", guestOf: null, depth: [0, 1] };
 
 // ---- the runner -----------------------------------------------------------------------------------------
 

@@ -30575,6 +30575,15 @@ Ic(vg, {
   // Where the local kinds bite (wo.localKinds), for the scenario tests.
   localKindAt: () => localKindAt,
   splitLocalKinds: () => splitLocalKinds,
+  // Sporewood's new fish, for the scenario tests: the seedfall's guest, a kind's tags and its grade on a bait, and a
+  // notebook's lines (wo.seedfallGuest, wo.localKinds, wo.lostTackle).
+  seedfallGuestsAt: () => seedfallGuestsAt,
+  rigBiteMult: () => rigBiteMult,
+  leaderTags: () => leaderTags,
+  hookGrade: () => Rl,
+  lostTackleLines: () => N5,
+  // A fish's ink drawing, as the catch card and the Journal draw it (for the pictures of new fish).
+  fishInk: () => Or,
   obstacleRadius: () => PS,
   placeAt: () => Tee,
   placeAtV3: () => Ste,
@@ -31391,7 +31400,7 @@ function N5(e, t, { names: n = {}, likes: o = null, classWord: a = null } = {}) 
     let h = s.guest;
     if (h && l.guest) {
       let m = _f(h.areas)
-          .map((p) => r.where?.[p] || p)
+          .map((p) => r.whereIn?.[h.water]?.[p] || r.where?.[p] || p)
           .join(", "),
         g = _f(h.lights).map((p) => r.lights?.[p] || p);
       u.push(
@@ -32135,6 +32144,9 @@ var Ph = [
     harpstring_eel: [0, 0, 0, 0, 0, 2, 1, 3, 0],
     festival_puffer: [0, 0, 0, 0, 0, 1, 2, 3, 0],
     drifting_grove: [null, null, null, null, null, null, null, null, null],
+    // The Seedfall Silver Dollar (a guest that comes with the seedfall, wo.seedfallGuest): Spore Cake, and a Capseed
+    // best (capseedGrades).
+    seedfall_silver_dollar: [0, 2, 0, 0, 0, 0, 0, 0, 0],
   },
   kS = Object.freeze({
     grade: 2,
@@ -32152,6 +32164,8 @@ var Ph = [
     cindertail_catfish: 1,
     capshell_crayfish: 1,
     netcloud_fry: 1,
+    // The Seedfall Silver Dollar, a seed-eater that comes with the seedfall: its best bait (wo.seedfallGuest).
+    seedfall_silver_dollar: 3,
   }),
   ZQ = (e, t) => {
     let n = Object.fromEntries(TS.slice(0, t.length).map((o, a) => [o, t[a]]));
@@ -33040,6 +33054,18 @@ function splitLocalKinds(rows, at, { key = "p", lamp = null, data = null } = {})
   }
   return out;
 }
+// The seedfall's guest (wo.seedfallGuest: Sporewood's Seedfall Silver Dollar) for a cast whose float lies at (x, z)
+// on `run`: in the seedfall and her time (herTimeOpen), in the evening's spore drift or within the rule's `eddy`
+// metres of its eddy, [{ sp, share }] for G5's guests; else null.
+function seedfallGuestsAt(data, run, x, z) {
+  let rule = typeof run?.zone == "string" ? wo.seedfallGuest?.[run.zone] : null;
+  if (!rule || !Number.isFinite(x) || !Number.isFinite(z) || !herTimeOpen(run)) return null;
+  let drift = sporeDriftOf(run.evening, run.zone);
+  if (!drift || !(inSporeDrift(drift, x, z) || w0(x - drift.eddy.x, z - drift.eddy.z) <= ka(rule.eddy, 0)))
+    return null;
+  let sp = data?.SPECIES_BY_ID?.[rule.id] || Sr(Ms).find((f) => f?.id === rule.id) || null;
+  return sp ? [{ sp, share: ka(rule.share, 0) }] : null;
+}
 function _7(e, t, n) {
   let o = ka(e, 1);
   return t === 0
@@ -33158,7 +33184,7 @@ function P7(
   return c;
 }
 var tee = [0, 0.25, 1, 1.5];
-function I7(e, t, { area: n = null, place: o = null, phase: a = "calm" } = {}) {
+function I7(e, t, { area: n = null, place: o = null, phase: a = "calm", water = null } = {}) {
   let s = typeof t == "string" ? [t] : Sr(t),
     r = e?.LOOP?.lostTackle || {},
     l = id(a),
@@ -33170,6 +33196,8 @@ function I7(e, t, { area: n = null, place: o = null, phase: a = "calm" } = {}) {
     for (let [h, m] of Object.entries(f.boost || {}))
       ka(m, 0) > 0 && ((i = i || {}), (i[h] = ka(i[h], 1) * ka(m)));
     let u = f.guest;
+    // A guest that names its water (Sporewood's Candlefin Koi) bites only there; Mossmere's name none.
+    if (u && u.water && u.water !== (water || "mossmere")) continue;
     if (u && !o && Sr(u.areas).includes(n) && Sr(u.lights).includes(l)) {
       let h = e?.SPECIES_BY_ID?.[u.id] || Sr(e?.SPECIES).find((m) => m?.id === u.id) || null;
       h && !c.some((m) => m.sp.id === h.id) && c.push({ sp: h, share: ka(u.share, 0) });
@@ -33210,11 +33238,13 @@ function G5(
     depth = null,
     leader = null,
     lamp = null,
+    // The seedfall's guest here and now (seedfallGuestsAt), or null.
+    seedfall = null,
   } = {},
 ) {
   let m = t?.place ?? null,
     g = e?.AUTOFISH?.signRule || { minSpecies: 2, maxShare: 0.8 },
-    p = u ? I7(e, u, { area: n, place: m, phase: o }) : null,
+    p = u ? I7(e, u, { area: n, place: m, phase: o, water: h }) : null,
     w = l1(t?.list, {
       area: n,
       place: m,
@@ -33264,7 +33294,7 @@ function G5(
     phase: o,
     wickId: r,
     D: e,
-    guests: p?.guests,
+    guests: seedfall?.length ? [...(p?.guests || []), ...seedfall] : p?.guests,
     water: h,
     depth,
     leader,
@@ -33345,7 +33375,7 @@ function zS(
   for (let w of hg) {
     let y = ka(d.shares?.[i]?.[w], 0);
     if (!(y > 0)) continue;
-    let v = r ? I7(e, r, { area: w, place: null, phase: i }) : null,
+    let v = r ? I7(e, r, { area: w, place: null, phase: i, water: f }) : null,
       b = l1(p.list, {
         area: w,
         place: null,
@@ -49430,8 +49460,9 @@ function ute(
     d = c && !(c.kind === "night" && i !== "night") ? { id: t, ...c } : null,
     f = s || c?.water || "mossmere",
     // A local kind is never in the pool: it takes its share of its base fish's bites afterwards (splitLocalKinds).
+    // Nor is a visitor (Sporewood's Seedfall Silver Dollar): it comes as a guest, with the seedfall only.
     u = (Array.isArray(e) ? e : []).filter(
-      (v) => v && v.zone === f && v.rarity !== "legendary" && !v.cove && !v.variantOf,
+      (v) => v && v.zone === f && v.rarity !== "legendary" && !v.cove && !v.variantOf && !v.visitor,
     ),
     h = (v) => !v.place && (!v.kind || v.kind === "open"),
     m = [],
@@ -50555,6 +50586,195 @@ Object.assign(Ca.orderWords.rig, {
   drift_float: "caught in the spore drift",
   seed_pouch: "taken on a Capseed",
 });
+// ---- Sporewood's local kinds and guests (sporewood-plan.md "Fish", order of work step 4b) ----------------------------
+// Four local kinds, each a quarter of one base fish's bites in one home, by Mossmere's rules (wo.localKinds); and two
+// guests (wo.guests.sporewood): the Seedfall Silver Dollar, which comes only with the seedfall, and the Candlefin Koi,
+// Mossmere's fish brought by a notebook found in Sporewood, as the Nightbloom Carp goes the other way. Their pictures
+// are with the portraits (merePortraits) and the Journal's drawings (Zde, iue, sue, due, nue); their fight is with
+// the other fights (registerLakeFight); the rest is here.
+//
+// The local kinds. The Veilwater is a place only at night, so the Lantern Fry is kept to the night, as the Buoy Rudd
+// is. None of the four homes lies near any of the drift's eddies, where the legend will feed in her time.
+Object.assign(wo.localKinds.kinds, {
+  lantern_fry: { of: "netcloud_fry", water: "sporewood", place: "veilwater", light: "night" },
+  gillstring_barb: { of: "falsesmile_barb", water: "sporewood", place: "gill_harp" },
+  dewshell_crayfish: { of: "capshell_crayfish", water: "sporewood", place: "lullaby" },
+  cupwell_catfish: { of: "downcast_catfish", water: "sporewood", place: "mothers_cup" },
+});
+// Their colours and marks on the base fish's drawing (the catch card and the Journal): the Lantern Fry's row of
+// bright dots along the belly in place of the tail spot ("lamps"), the Gillstring Barb's long threads from its fins
+// and its dark gill-lines ("threads"), the Dewshell Crayfish's bare shell beaded with dew in place of the mushroom
+// ("dew"), the Cupwell Catfish's spore-gold coat with dark freckles ("freckles").
+Object.assign(wo.localKinds.looks, {
+  lantern_fry: { body: 0xd6b97a, belly: 0xf1e2b8, fin: 0xd7c08c, tailSpot: null, lamps: 6 },
+  gillstring_barb: { body: 0xb7ad8e, belly: 0xeee4c8, fin: 0x6d6a55, threads: 4 },
+  dewshell_crayfish: { body: 0x6f8f86, belly: 0xd9e6d8, fin: 0x4b6a63, cap: null, dew: 18 },
+  cupwell_catfish: { body: 0xb08a3e, belly: 0xe8d3a0, fin: 0x6e5527, freckles: 26 },
+});
+Object.assign(Ca.localKinds.kinds, {
+  lantern_fry: {
+    name: "Lantern Fry",
+    lore: "It is a tiny clear fry with a row of gold dots along its belly. In the dark of the Veilwater they catch the light like lamps.",
+    where: "Only in the Veilwater, at night.",
+  },
+  gillstring_barb: {
+    name: "Gillstring Barb",
+    lore: "It is a pale barb with long threads that trail from its fins. It hides among the hanging gill-strings.",
+    where: "Only at the Gill Harp.",
+  },
+  dewshell_crayfish: {
+    name: "Dewshell Crayfish",
+    lore: "It is a small crayfish with a pale green shell that always looks wet with dew. Nothing grows on its back.",
+    where: "Only in the Lullaby.",
+  },
+  cupwell_catfish: {
+    name: "Cupwell Catfish",
+    lore: "It is a catfish the colour of falling spores, with dark freckles. It lies at the bottom of the Mother's Cup.",
+    where: "Only in the Mother's Cup.",
+  },
+});
+// Sporewood's guests (wo.guests: how Mossmere's come, and how they show in the Journal and the Odds). Each shows in
+// the Journal's guests row on Sporewood's page once caught (or once its notebook is found), and stays off the lake's
+// list, the catch seal and the Order Board.
+wo.guests.sporewood = ["seedfall_silver_dollar", "candlefin_koi"];
+// The Seedfall Silver Dollar: a small, round, silver seed-eater with teeth like a person's. It is a visitor (its
+// record is `visitor`: never in the pool, the lake's list, the catch seal or the Order Board) that comes only with
+// the seedfall: in the seedfall and her time (herTimeOpen), a cast whose float lies in the evening's spore drift or
+// within `eddy` metres of its eddy has it as a guest `share` of the time (P7's guest rule: half again on a Capseed,
+// its best bait; as often on Spore Cake; never on a bait it does not take). It feeds on what the drift carries
+// ("drift"), nibbles ("quick") and is wary of a heavy leader ("wary").
+wo.seedfallGuest = { sporewood: { id: "seedfall_silver_dollar", share: 0.15, eddy: 4 } };
+O5.fish.push({
+  id: "seedfall_silver_dollar",
+  name: "Seedfall Silver Dollar",
+  journal:
+    "It is small, round and silver, like a coin. It comes when the seed pods fall, and cracks them with its flat front teeth.",
+  haunt:
+    "It comes only with the seedfall, and bites along the spore drift and at its eddy until the pods sink. A Capseed suits it best.",
+  play: "Darter. Quick turns on its side, flashing silver.",
+  sizeModel: { L50: 14, sigma: 0.1 },
+  hours: "dusk, night",
+  place: "open",
+  placeName: null,
+  giant: !1,
+  rarity: "rare",
+  family: "bottom",
+  bodyPlan: "bream",
+  water: ["Sporewood Pools"],
+  favours: "A Capseed suits it best.",
+});
+Nf.push({
+  id: "seedfall_silver_dollar",
+  name: "Seedfall Silver Dollar",
+  zone: "sporewood",
+  rarity: "rare",
+  tier: 3,
+  value: 48,
+  food: 14,
+  oil: 12,
+  time: "dusk",
+  depth: [0, 1],
+  bait: null,
+  behavior: "darter",
+  difficulty: Ta(2, "darter"),
+  size: Ga(14, 0.1, "bream"),
+  family: "bottom",
+  prefers: "mist",
+  phase: 1,
+  src: "v3",
+  visitor: !0,
+  // The Journal's and the catch card's drawing: a bream drawn round (`round`), silver, with big, flat, square front
+  // teeth ("person_teeth"), in the coat of its portrait (merePortraits).
+  model: {
+    shape: "bream",
+    body: 0xa9b3b6,
+    belly: 0xeef1ec,
+    fin: 0x9a8f7c,
+    glow: null,
+    pattern: "scales",
+    eyes: "normal",
+    scale: 0.42,
+    round: !0,
+    jaw: "person_teeth",
+    tail: "fork",
+  },
+  hint: "It comes only with the seedfall, along the spore drift and at its eddy. A Capseed suits it best.",
+  lore: "It is small, round and silver, like a coin. It comes when the seed pods fall, and cracks them with its flat front teeth.",
+});
+Object.assign(bs.sporewood.drift, { seedfall_silver_dollar: "drift", candlefin_koi: "still" });
+Object.assign(bs.sporewood.hookSet, { seedfall_silver_dollar: "quick", candlefin_koi: "self" });
+Object.assign(bs.sporewood.leader, {
+  seedfall_silver_dollar: { brass_trace: "wary", mossthread_snood: "wary" },
+  candlefin_koi: { brass_trace: "rough" },
+});
+// The Candlefin Koi, Mossmere's fish: the Pond-Keeper's Notebook, found in Sporewood, brings it to the lily rafts by
+// day and at dusk, as the Lily Gardener's Notebook brings the Nightbloom Carp to Mossmere. Of Mossmere's fish it
+// suits Sporewood best: it was bred for a garden pond, and Sporewood was the old gardens, with still, shaded water
+// and seeds to eat. (Passed over: the Weeping Carp, which roots for worms in the mere's mud, and the Lampsipper,
+// which keeps to the mere's lamps after dark.) Its record stays Mossmere's own, unchanged: as a guest here it bites
+// by Sporewood's tables (bs.sporewood.hook.guests, in Sporewood's bait order) and the notebook's `water`.
+bs.sporewood.hook.guests.candlefin_koi = {
+  bare: 0,
+  spore_cake: 3,
+  amber_larvae: 1,
+  cut_strip: 0,
+  spore_moth: 1,
+  ember_minnow: 0,
+  root_jig: 0,
+  sporelamp_fly: 0,
+  seedpod_twirl: 0,
+  guard_button: 2,
+  capseed: 2,
+};
+wo.finds.items.push({
+  id: "pond_notebook",
+  water: "sporewood",
+  kind: "tackle",
+  slot: "notebook",
+  pose: "both",
+  size: 0.2,
+});
+wo.lostTackle.pond_notebook = {
+  slot: "notebook",
+  guest: {
+    id: "candlefin_koi",
+    from: "mossmere",
+    water: "sporewood",
+    areas: ["pads"],
+    lights: ["day", "dusk"],
+    share: 0.04,
+  },
+};
+Object.assign(Ca.finds.items, {
+  pond_notebook: {
+    name: "The Pond-Keeper's Notebook",
+    does: "It has notes on a koi from far away.",
+    line: "It names every koi in the old garden ponds.",
+  },
+});
+// Sporewood's own words for where a guest bites (Ca.lost.where is Mossmere's).
+Ca.lost.whereIn = { sporewood: { pads: "among the lily rafts" } };
+// The guests' hints on Sporewood's Journal page.
+Object.assign(Ca.log.hints, {
+  sporewood: {
+    ...Ca.log.hints.sporewood,
+    candlefin_koi: "It bites among the lily rafts by day and at dusk. Spore Cake suits it best.",
+  },
+});
+// The Silver Dollar's Journal line once caught (it bites only in the seedfall's few minutes, not all dusk and night),
+// and the line under its picture on the catch card.
+Ca.seedfallGuest = {
+  where: { seedfall_silver_dollar: "Only at the seedfall, along the spore drift and at its eddy." },
+};
+Ca.cardLines = { seedfall_silver_dollar: "Its teeth look like a person's." };
+// Murk, the first time a local kind and each guest is sold in Sporewood (said once, at the tally).
+Object.assign(Ca.murk.at.sporewood, {
+  local: "That one lives in one spot and nowhere else. It goes under its cousin in your Journal.",
+  dollar: "Silver dollars. They only come when the pods fall. Watch the drift at dusk.",
+  koi: "A Candlefin, this far from the mere. Those old notes were right.",
+});
+// Which of Murk's lines (above) each guest's first sale brings.
+wo.guestSold = { sporewood: { seedfall_silver_dollar: "dollar", candlefin_koi: "koi" } };
 Ca.tackle.screen = { rod: "Rod", line: "Line", reel: "Reel", done: "Done", hold: "Adds {n} Grip." };
 var Jr = ds.size;
 function ak(e, t = null) {
@@ -50947,7 +51167,9 @@ registerLakeFight(
 registerLakeFight("cindertail_catfish downcast_catfish velvet_ray", "hold", 1.18, 1.22, 1.5, 0, 0.65, 0.6);
 registerLakeFight("lostsea_mackerel", "runner", 1.1, 1.08, 1, 0.04, 1.35, 1.35);
 registerLakeFight("sleepspore_jelly", "pulse", 0.89, 0.74, -1, 0, 0.42, 0.72);
-// Mossmere's local kinds fight as their base fish do (wo.localKinds).
+// Sporewood's Seedfall Silver Dollar (wo.seedfallGuest): a small, quick dart and a turn on its side.
+registerLakeFight("seedfall_silver_dollar", "dart", 0.8, 0.72, -1.5, 0.02, 0.6, 1.3);
+// The local kinds, Mossmere's and Sporewood's, fight as their base fish do (wo.localKinds).
 for (const [id, kind] of Object.entries(wo.localKinds.kinds))
   lakeFightProfiles.set(id, lakeFightProfiles.get(kind.of));
 
@@ -51237,6 +51459,8 @@ if (Su) {
         ids: p,
       });
       for (let y of p) {
+        // A guest that is one of Mossmere's own fish (Sporewood's Candlefin Koi) keeps its Mossmere record.
+        if (c1.some((E) => E.id === y)) continue;
         let v = w.find((E) => E.id === y);
         if (!v) continue;
         vu[y]?.model && (v.model = { ...v.model, ...Ki(vu[y].model) }),
@@ -51254,7 +51478,9 @@ if (Su) {
     // Mossmere's local kinds (wo.localKinds): each its base fish's live record with its own id, name, lore and
     // Journal line, marked `variantOf` so the pool and the lake's list leave it out. Its look is its own portrait
     // (merePortraits). The Archshade Minnow runs smaller, so its weights are worked out again (V5).
+    // Sporewood's local kinds are made the same way once its own records are built (below).
     for (let [g, p] of Object.entries(wo.localKinds.kinds)) {
+      if (p.water !== "mossmere") continue;
       let w = Ms.find((y) => y.id === p.of),
         y = Ca.localKinds.kinds[g];
       if (!w || !y || Ms.some((v) => v.id === g)) continue;
@@ -51459,6 +51685,18 @@ if (Su) {
         O = c1.length,
         T = Ms.filter((x) => !E.has(x.id));
       (Ms.length = 0), Ms.push(...T.slice(0, O), ...L, ...T.slice(O));
+    }
+    // Sporewood's local kinds (wo.localKinds), as Mossmere's are made above: each its base fish's record, now that
+    // it is built, with its own id, name, lore and Journal line, marked `variantOf`, in its own look.
+    for (let [g, p] of Object.entries(wo.localKinds.kinds)) {
+      if (p.water === "mossmere") continue;
+      let w = Ms.find((y) => y.id === p.of),
+        y = Ca.localKinds.kinds[g];
+      if (!w || !y || Ms.some((v) => v.id === g)) continue;
+      let v = { ...Ki(w), id: g, name: y.name, lore: y.lore, hint: y.where, variantOf: p.of };
+      delete v.epithet;
+      v.model = { ...v.model, ...wo.localKinds.looks[g] };
+      Ms.push(V5(v));
     }
     {
       let g = wo.lures.sporelamp_fly,
@@ -91191,6 +91429,45 @@ Object.assign(merePortraits, {
     mark: "rudd",
   },
 });
+// Sporewood's local kinds (wo.localKinds) and its Seedfall Silver Dollar (wo.seedfallGuest). Each local kind is its
+// base fish's shape in a coat of Sporewood's tones and a mark of its own: `lamps`, a row of small lights along the
+// Lantern Fry's belly in place of the amber tail spot; `threads`, the Gillstring Barb's long fin threads and the dark
+// gill-lines down its flank; "dew", the Dewshell Crayfish's bare shell beaded with dew (no mushroom, no button);
+// `freckles`, the Cupwell Catfish's dark freckles on spore gold. The Silver Dollar is a round, flat silver disc
+// ("dollar" form) with teeth like a person's at the front of its mouth ("dollar" mark) and red-gold fin edges.
+Object.assign(merePortraits, {
+  lantern_fry: {
+    ...merePortraits.netcloud_fry,
+    coat: ["b8a06a", "e4d3a6", "f4ead0", "d0b27a", "f1dca0", "c9a25a"],
+    lamps: 7,
+  },
+  gillstring_barb: {
+    ...merePortraits.falsesmile_barb,
+    coat: ["6f6b55", "b9b08f", "efe6ca", "5c5a48", "a9a283", "3a362c"],
+    threads: 4,
+  },
+  dewshell_crayfish: {
+    ...merePortraits.capshell_crayfish,
+    coat: ["3f5c55", "6f8f86", "c9ddd2", "4b6a63", "9fbfb5", "2f4a44"],
+    mark: "dew",
+  },
+  cupwell_catfish: {
+    ...merePortraits.downcast_catfish,
+    coat: ["6e5527", "b08a3e", "e8d3a0", "7a5c2c", "c9a35c", "2e2214"],
+    freckles: 34,
+  },
+  seedfall_silver_dollar: {
+    form: "dollar",
+    w: 0.062,
+    h: 0.27,
+    coat: ["7f8a90", "c6ced0", "f1f3ee", "a49678", "c8743e", "3b4045"],
+    dorsal: [0.04, 0.2, 0.085],
+    tail: [0.15, 0.075],
+    eye: 0.03,
+    mark: "dollar",
+    speed: 5.6,
+  },
+});
 
 function buildMerePortrait(id) {
   const spec = merePortraits[id],
@@ -91319,6 +91596,8 @@ function buildMerePortrait(id) {
     puff: [0.15, 0.33, 0.76, 0.96, 1, 0.99, 0.91, 0.77, 0.57, 0.31, 0.08],
     // A puffer blown up round: a sphere from the tail's wrist to the beak.
     ball: [0.12, 0.22, 0.7, 0.96, 1, 0.94, 0.85, 0.69, 0.5, 0.26, 0.06],
+    // The Seedfall Silver Dollar: a deep, round disc from a short tail's wrist to a blunt face.
+    dollar: [0.13, 0.4, 0.82, 0.97, 1, 0.98, 0.92, 0.8, 0.62, 0.38, 0.08],
     anglerfish: [0.17, 0.28, 0.54, 0.82, 0.99, 1, 0.97, 0.91, 0.74, 0.41, 0.06],
     sliver: [0.13, 0.27, 0.54, 0.85, 1, 0.97, 0.83, 0.67, 0.48, 0.22, 0.025],
     surface: [0.17, 0.25, 0.52, 0.8, 0.99, 1, 0.9, 0.72, 0.46, 0.25, 0.035],
@@ -91598,6 +91877,20 @@ function buildMerePortrait(id) {
       c = mix(c, cream, 0.42 * exp(-((k + 0.48) ** 2) / 0.017));
     }
     if (mark === "festival") c = mix(c, color("4e3948"), 0.41 * (0.5 + 0.5 * cos(38 * z + 1.6 * k * k)) ** 9);
+    if (spec.threads) {
+      // The Gillstring Barb: thin dark lines hang down the flank like the gill-strings over the Gill Harp.
+      const line = (0.5 + 0.5 * cos(tau * (z * 13 + 0.06 * k + 0.2))) ** 14;
+      c = mix(
+        c,
+        ink,
+        0.6 * line * smooth(-0.86, -0.6, k) * smooth(-0.27, -0.2, z) * (1 - smooth(0.25, 0.3, z)),
+      );
+    }
+    if (mark === "dollar") {
+      // The Silver Dollar's mouth: a dark gap between its lips, where the teeth show.
+      const gap = smooth(0.415, 0.445, z) * (1 - smooth(0.05, 0.11, abs(k + 0.2)));
+      c = mix(c, dark, 0.92 * gap);
+    }
     if (mark === "lanterncap" || mark === "squarejaw") {
       const oral =
         smooth(mark === "lanterncap" ? 0.323 : 0.409, 0.448, z) *
@@ -92133,10 +92426,55 @@ function buildMerePortrait(id) {
   function sporeSide(s) {
     if (mark === "netglass") {
       eye(s, 0.355, 0.21, 0.038, "amber");
-      const p = flank(-0.279, 0.04, s, 0.004);
-      detail.oval(p, 0.005, 0.015, 0.019, brass);
-      detail.oval(p.clone().add(vec(s * 0.003, 0, 0)), 0.003, 0.009, 0.012, color("c5773b"));
+      if (spec.lamps)
+        // The Lantern Fry: a row of small lights along the belly, and no tail spot.
+        for (let i = 0; i < spec.lamps; i++) {
+          const p = flank(0.27 - (0.5 * i) / (spec.lamps - 1), -0.58, s, 0.003);
+          detail.oval(p, 0.004, 0.0085, 0.0085, mix(brass, cream, 0.3));
+          shine(p.clone().add(vec(s * 0.002, 0, 0)), [0.003, 0.0055, 0.0055], color("ffe08a"));
+        }
+      else {
+        const p = flank(-0.279, 0.04, s, 0.004);
+        detail.oval(p, 0.005, 0.015, 0.019, brass);
+        detail.oval(p.clone().add(vec(s * 0.003, 0, 0)), 0.003, 0.009, 0.012, color("c5773b"));
+      }
     }
+    if (mark === "dollar")
+      // Teeth like a person's: two rows of flat, square front teeth, upper and lower, in the mouth's gap.
+      for (const [row, k0] of [
+        [0, -0.09],
+        [1, -0.31],
+      ])
+        for (let i = 0; i < 3; i++) {
+          const z = 0.437 + 0.0175 * i - 0.004 * row;
+          detail.sheet(
+            4,
+            3,
+            (u, v) =>
+              flank(z + (u - 0.5) * 0.0148, k0 - (row ? -1 : 1) * 0.105 * v, s, 0.003 + 0.002 * sin(pi * u)),
+            (u, v) => mix(cream, color("d8cfb4"), 0.25 * v + 0.15 * abs(u - 0.5)),
+            false,
+            s > 0,
+          );
+        }
+    if (spec.freckles)
+      // The Cupwell Catfish: dark freckles over its spore-gold flank.
+      for (let i = 0; i < spec.freckles; i++) {
+        const z = -0.26 + 0.62 * rnd(),
+          k = -0.5 + 1.35 * rnd(),
+          r = 0.004 + 0.005 * rnd();
+        if (abs(z - 0.374) < 0.05 && abs(k + 0.41) < 0.2) continue;
+        flankPatch(
+          z,
+          k,
+          s,
+          r,
+          r / (cross(z).h || 0.05),
+          mix(ink, back, 0.2 * rnd()),
+          "oval",
+          mix(ink, side, 0.4),
+        );
+      }
     if (mark === "squarejaw") {
       for (let i = 0; i < 4; i++) {
         const z = 0.419 + 0.018 * i,
@@ -92566,6 +92904,32 @@ function buildMerePortrait(id) {
   }
 
   function signature() {
+    if (spec.threads) {
+      // The Gillstring Barb: long threads trail from the back of its dorsal and anal fins and from its pelvic fins.
+      const thread = (pts) =>
+        limb(detail, pts, 0.0032, 0.0007, mix(fin, edge, 0.4), mix(edge, cream, 0.3), 24, 5);
+      const [start, width, h] = spec.dorsal,
+        zd = start - width;
+      thread([
+        vec(0, crown(zd) + 0.75 * h, zd - 0.02),
+        vec(0.003, crown(zd - 0.1) + 0.6 * h, zd - 0.13),
+        vec(-0.002, crown(zd - 0.2) + 0.42 * h, zd - 0.27),
+        vec(0.002, crown(zd - 0.2) + 0.5 * h, zd - 0.42),
+      ]);
+      thread([
+        vec(0, keel(-0.235) - 0.05, -0.27),
+        vec(-0.003, keel(-0.3) - 0.07, -0.38),
+        vec(0.002, keel(-0.3) - 0.05, -0.52),
+        vec(0, keel(-0.3) - 0.075, -0.64),
+      ]);
+      for (const s of [-1, 1])
+        thread([
+          flank(0.0, -0.95, s),
+          vec(s * 0.03, keel(0) - 0.07, -0.06),
+          vec(s * 0.02, keel(0) - 0.13, -0.17),
+          vec(s * 0.025, keel(0) - 0.16, -0.3),
+        ]);
+    }
     if (mark === "chain") {
       for (let i = 0; i < 14; i++) {
         const z = -0.265 + 0.04 * i,
@@ -92884,6 +93248,20 @@ function buildMerePortrait(id) {
         );
       }
     }
+    if (mark === "dew") {
+      // The Dewshell Crayfish: its bare shell beaded with dew, and no mushroom or button.
+      for (let j = 0; j < 30; j++) {
+        const z = 0.005 + 0.26 * rnd(),
+          a = 0.35 + 2.45 * rnd(),
+          q = (z + 0.065) / 0.379,
+          r = sin(pi * q) ** 0.41,
+          d = 0.0035 + 0.0045 * rnd(),
+          p = vec(0.114 * r * cos(a), 0.016 + 0.103 * r * sin(a), z);
+        detail.oval(p, d, d * 0.75, d, mix(cream, color("d4ece4"), 0.55));
+        shine(p.clone().add(vec(0, d * 0.45, 0)), [d * 0.42, d * 0.32, d * 0.42], color("f2fffa"));
+      }
+      return;
+    }
     // A four-hole brass coat button nestled beside the left claw.
     if (mark === "cap") {
       const base = vec(0, 0.058, 0.086),
@@ -92961,13 +93339,16 @@ function buildMerePortrait(id) {
       translucent: mark === "netglass",
       opacity: mark === "netglass" ? 0.44 : 1,
       glowScale: 0,
-      glowCol: ["cinder", "strings", "lanterncap", "festival", "meadow"].includes(mark)
-        ? 0xffc278
-        : mark === "disc"
-          ? 0xc5acd9
-          : mark === "wax" || mark === "bloom"
-            ? 0xffc280
-            : 0xdacfff,
+      glowCol:
+        ["cinder", "strings", "lanterncap", "festival", "meadow"].includes(mark) || spec.lamps
+          ? 0xffc278
+          : mark === "disc"
+            ? 0xc5acd9
+            : mark === "wax" || mark === "bloom"
+              ? 0xffc280
+              : mark === "dew"
+                ? 0xe6fff6
+                : 0xdacfff,
     },
   };
 }
@@ -100643,8 +101024,9 @@ function mossmereSalvage(id) {
     }
     ell(0.033 * k, 0.027 * k, 0.033 * k, [x, y + 0.067 * k, z], light);
   }
-  function book(lily) {
-    const cover = lily ? 0x466b5c : 0x66434a,
+  // `coverColor`: another notebook's cover (Sporewood's Pond-Keeper's Notebook), drawn as the Veil Angler's.
+  function book(lily, coverColor = null) {
+    const cover = coverColor ?? (lily ? 0x466b5c : 0x66434a),
       binding = lily ? 0x344d45 : 0x3e353d;
     for (const x of [-0.095, 0.095]) box(0.031, 0.69, 0.94, [x, 0, 0], cover);
     box(0.19, 0.62, 0.89, [0, 0.008, 0], paper);
@@ -101320,6 +101702,10 @@ function mossmereSalvage(id) {
       break;
     case "lily_notebook":
       book(true);
+      break;
+    // Sporewood's Pond-Keeper's Notebook: a pond-green cover.
+    case "pond_notebook":
+      book(false, 0x35596a);
       break;
     default:
       return null;
@@ -111274,7 +111660,8 @@ function hF(
       land: gn,
       grade: Rl(re, { lure: g, bait: p, water: d }),
       cap: Lt ? Lt.cls : null,
-      ...(We?.guestOf ? { guest: !0 } : {}),
+      // A guest here: one made a guest (guestOf), or a fish of another lake (Sporewood's Candlefin Koi).
+      ...(We?.guestOf || (We?.zone && d && We.zone !== d) ? { guest: !0 } : {}),
     });
   }
   qt.sort((re, De) => De.share - re.share || (re.id < De.id ? -1 : 1));
@@ -112772,8 +113159,9 @@ function op(e, t) {
         r.rarity !== "epic" &&
         !r.giant &&
         !r.cove &&
-        // The local kinds stay off the lake's list (wo.localKinds).
+        // The local kinds stay off the lake's list (wo.localKinds), and so do visitors (wo.seedfallGuest).
         !r.variantOf &&
+        !r.visitor &&
         s(r) &&
         (!n.plainBaitOnly || !r.bait || r.bait === o),
     )
@@ -112913,8 +113301,9 @@ function $3(e, t, n) {
     r = new Set(Array.isArray(a.maps?.places) ? a.maps.places : []),
     // The thief gets no card, glyph or name on the lake page until she is landed.
     // The local kinds get no card of their own: they show under their base fish (`locals`, below).
+    // A visitor (wo.seedfallGuest) shows in the guests row instead (Ole).
     l = (t?.SPECIES || []).filter(
-      (L) => Ln(L) && L.zone === n && !L.cove && !L.variantOf && !thiefHidden(e, L.id),
+      (L) => Ln(L) && L.zone === n && !L.cove && !L.variantOf && !L.visitor && !thiefHidden(e, L.id),
     ),
     i = new Map(l.map((L) => [L.id, L])),
     // A caught base fish's local kinds (wo.localKinds), each caught or not, for its "Local kinds" strip.
@@ -112997,12 +113386,22 @@ function Ile(e, t) {
 function Ole(e, t, n) {
   let o = Ln(e?.journal) ? e.journal : {},
     a = Ln(e?.loop) ? e.loop : {};
-  return (Array.isArray(t?.LOOP?.guests?.[n]) ? t.LOOP.guests[n] : [])
-    .map((r) => ({
-      sp: t?.SPECIES_BY_ID?.[r] || (t?.SPECIES || []).find((l) => l?.id === r),
-      note: Ile(t, r),
-    }))
-    .filter((r) => Ln(r.sp) && r.sp.guestOf === n && (Ln(o[r.sp.id]) || (r.note && Zl(a, r.note))));
+  return (
+    (Array.isArray(t?.LOOP?.guests?.[n]) ? t.LOOP.guests[n] : [])
+      .map((r) => ({
+        sp: t?.SPECIES_BY_ID?.[r] || (t?.SPECIES || []).find((l) => l?.id === r),
+        note: Ile(t, r),
+      }))
+      // A guest from another lake that keeps its home record there (Sporewood's Candlefin Koi, often caught at
+      // home) shows here once its notebook is found.
+      .filter((r) =>
+        !Ln(r.sp)
+          ? !1
+          : r.sp.guestOf === n
+            ? Ln(o[r.sp.id]) || (r.note && Zl(a, r.note))
+            : r.sp.zone !== n && !!r.note && Zl(a, r.note),
+      )
+  );
 }
 function SF(e, t, n) {
   let o = e?.TEXT_LOOP?.gate,
@@ -118536,8 +118935,9 @@ function Kle(e) {
   }
   function re(ce) {
     let me = n(),
-      // The local kinds (wo.localKinds) count toward neither "half named" nor "every fish named".
-      ft = (t().SPECIES || []).filter(($n) => $n.zone === ce && !$n.variantOf),
+      // The local kinds (wo.localKinds) and visitors (wo.seedfallGuest) count toward neither "half named" nor
+      // "every fish named".
+      ft = (t().SPECIES || []).filter(($n) => $n.zone === ce && !$n.variantOf && !$n.visitor),
       Qt = ft.filter(($n) => (me.journal?.[$n.id]?.caught || 0) > 0).length,
       dn = a("journal"),
       wn = g(ce);
@@ -137372,6 +137772,11 @@ function Y0e(e) {
           leader: i.castLeader ?? null,
           // Hob's Lamp, once it is the player's: kinds never caught bite more often.
           lamp: p(() => lampOf(e.state?.meta)) ?? null,
+          // The seedfall's guest where the float lies (Sporewood's Seedfall Silver Dollar, wo.seedfallGuest).
+          seedfall: p(() => {
+            let at = i.rollAt || c.bob || i.cast;
+            return seedfallGuestsAt(t(), h(), at?.x, at?.z);
+          }),
         })
       : null;
   }
@@ -154994,6 +155399,16 @@ function HG(e, t, n, o, a, s, r) {
   );
 }
 function Zde(e, t, n, o, a, s) {
+  // The Cupwell Catfish (a Sporewood local kind, wo.localKinds): dark freckles over its spore-gold coat.
+  if (t.plan === "catfish" && Number(s?.freckles) > 0) {
+    e.fillStyle = "rgba(38,26,14,.72)";
+    for (let r = 0; r < Number(s.freckles); r++) {
+      let l = -0.5 + a() * 1.34,
+        i = Ir(t, l, -1) * (0.85 - a() * 1.55),
+        c = 0.011 + a() * 0.013;
+      e.beginPath(), e.ellipse(l, i, c * 1.2, c, 0, 0, 7), e.fill();
+    }
+  }
   if (t.inner) {
     iue(e, t, n, o, a, s);
     return;
@@ -155643,7 +156058,26 @@ function nue(e, t, n) {
               inner: !0,
               after: !0,
             }
-          : null;
+          : e === "bream" && n.round
+            ? // Sporewood's Seedfall Silver Dollar (wo.seedfallGuest): a bream drawn round as a coin, blunt-faced,
+              // with a soft dorsal fin, a long anal fin and a forked tail.
+              {
+                ...t,
+                top: 0.6,
+                bot: 0.58,
+                hx: 0.08,
+                ped: 0.045,
+                nose: 0.3,
+                tail: "fork",
+                tailLen: 0.3,
+                spread: 0.44,
+                dorsal: { x0: -0.34, x1: 0.1, h: 0.2, type: "soft" },
+                anal: { x0: -0.58, x1: 0.02, h: 0.15 },
+                pelvic: { x: 0.18, h: 0.08 },
+                pect: { x: 0.56, len: 0.18 },
+                eye: { x: 0.7, y: -0.1, r: 0.06 },
+              }
+            : null;
 }
 function oue(e, t, n, o) {
   let a = e.createLinearGradient(-0.66, 0, -0.68 - n.tailLen, 0);
@@ -155746,6 +156180,18 @@ function iue(e, t, n, o, a, s) {
     for (let r = -t.top, l = 0; r < t.bot; r += 0.055, l++)
       for (let i = -0.55 + (l % 2) * 0.04; i < 0.6; i += 0.08)
         e.beginPath(), e.arc(i, r, 0.045, Math.PI * 0.6, Math.PI * 1.4), e.stroke();
+    // The Gillstring Barb (a Sporewood local kind, wo.localKinds): thin dark lines hang down its flank like the
+    // gill-strings it hides among.
+    if (Number(s?.threads) > 0) {
+      (e.strokeStyle = "rgba(7,8,13,.62)"), (e.lineWidth = 1.3 * o), (e.lineCap = "round");
+      for (let r = 0; r < 7; r++) {
+        let l = 0.36 - r * 0.115;
+        e.beginPath(),
+          e.moveTo(l, Ir(t, l, -1) * 0.92),
+          e.quadraticCurveTo(l - 0.035, 0, l - 0.01, Ir(t, l, 1) * 0.9),
+          e.stroke();
+      }
+    }
   }
 }
 function sue(e, t, n, o, a, s, r) {
@@ -155780,6 +156226,46 @@ function sue(e, t, n, o, a, s, r) {
           e.fillRect(h - 0.014, m, 0.026, 0.018), e.strokeRect(h - 0.014, m, 0.026, 0.018);
         }
       (e.strokeStyle = Fs), (e.lineWidth = 1.5 * o), e.stroke(d);
+    } else if (!a && r.jaw === "person_teeth") {
+      // The Seedfall Silver Dollar (wo.seedfallGuest): lips parted on two rows of big, flat, square front teeth,
+      // like a person's.
+      let d = new Path2D(),
+        x = 1.02;
+      d.moveTo(x, -0.1),
+        d.quadraticCurveTo(x - 0.16, -0.09, x - 0.25, 0.02),
+        d.quadraticCurveTo(x - 0.16, 0.14, x, 0.15),
+        d.closePath(),
+        (e.fillStyle = "#120a0c"),
+        e.fill(d),
+        (e.fillStyle = "#f2ead6"),
+        (e.strokeStyle = Fs),
+        (e.lineWidth = 1.1 * o);
+      for (let f = 0; f < 3; f++)
+        for (let u of [-1, 1]) {
+          let w = 0.066 - f * 0.01,
+            h = x - 0.038 - f * 0.064,
+            t = 0.066 - f * 0.009,
+            m = u < 0 ? -0.083 + f * 0.016 : 0.132 - f * 0.016 - t;
+          e.fillRect(h - w / 2, m, w, t), e.strokeRect(h - w / 2, m, w, t);
+        }
+      (e.strokeStyle = Fs), (e.lineWidth = 1.6 * o), e.stroke(d);
+    }
+    // The Gillstring Barb (wo.localKinds): long threads trail from the back of its fins, past its tail.
+    if (!a && Number(r.threads) > 0) {
+      (e.strokeStyle = Gi(Hl(n.fin, "#ffffff", 0.2), 0.95)), (e.lineWidth = 1.3 * o), (e.lineCap = "round");
+      let l = [
+        [t.dorsal.x0 + 0.02, Ir(t, t.dorsal.x0, -1) - t.dorsal.h * 0.7, -1],
+        [t.anal.x0 + 0.02, Ir(t, t.anal.x0, 1) + t.anal.h * 0.7, 1],
+        [t.pelvic.x - 0.05, Ir(t, t.pelvic.x, 1) * 0.9 + t.pelvic.h * 0.9, 1],
+        [t.dorsal.x0 + 0.16, Ir(t, t.dorsal.x0 + 0.14, -1) - t.dorsal.h * 0.85, -1],
+      ].slice(0, Number(r.threads));
+      for (let [i, c, d] of l) {
+        let f = d * 0.03;
+        e.beginPath(),
+          e.moveTo(i, c),
+          e.bezierCurveTo(i - 0.18, c + f * 2, i - 0.32, c - f, i - 0.5, c + f * 1.5 + d * 0.04),
+          e.stroke();
+      }
     }
   } else if (t.plan === "catfish" && t.whiskers > 0 && !a) {
     (e.strokeStyle = Gi(Nl(r.whiskerCol, "#d8ccb8"), 0.95)), (e.lineCap = "round");
@@ -155817,7 +156303,19 @@ function sue(e, t, n, o, a, s, r) {
         (e.lineWidth = 2.2 * o),
         e.beginPath(),
         e.arc(t.eye.x, t.eye.y, t.eye.r * 1.22, 0, 7),
-        e.stroke());
+        e.stroke(),
+        // The Lantern Fry (a Sporewood local kind, wo.localKinds): a row of bright, ringed dots along its belly.
+        Number(r.lamps) > 0 &&
+          (e.save(),
+          (e.fillStyle = "#f4cf6a"),
+          (e.strokeStyle = "rgba(30,24,38,.95)"),
+          (e.lineWidth = 1 * o),
+          Array.from({ length: Number(r.lamps) }, (l, i) => {
+            let c = 0.48 - (i * 0.9) / Math.max(1, Number(r.lamps) - 1),
+              d = Ir(t, c, 1) * 0.58;
+            e.beginPath(), e.arc(c, d, 0.034, 0, 7), e.fill(), e.stroke();
+          }),
+          e.restore()));
 }
 function rue(e, t, n, o, a, s) {
   let r = s.meadow === !0,
@@ -156207,7 +156705,10 @@ function cue(e, t, n, o, a, s) {
   );
 }
 function due(e, t, n, o, a, s) {
-  let r = Nl(s.cap, "#d6ae76"),
+  // The Dewshell Crayfish (a Sporewood local kind, wo.localKinds): a bare, low shell beaded with dew in place of the
+  // mushroom cap, and claws in the shell's colour.
+  let dew = Number(s.dew) > 0,
+    r = dew ? t.body : Nl(s.cap, "#d6ae76"),
     l = Nl(s.freckle, "#5a3450"),
     i = Number(s.antennae) || 1,
     c = Number(s.claws) || 1;
@@ -156276,6 +156777,45 @@ function due(e, t, n, o, a, s) {
     t0(e, u, { ...t, body: Hl(r, "#000000", 0.2) }, [0.7, 1.1, 0.04, 0.16], n, o),
     Fl(e, u, n, o, 1.8);
   let g = new Path2D();
+  if (dew)
+    return (
+      g.moveTo(-0.16, 0.06),
+      g.bezierCurveTo(-0.17, -0.15, 0.38, -0.25, 0.72, -0.12),
+      g.bezierCurveTo(0.84, -0.06, 0.88, 0.02, 0.84, 0.07),
+      g.quadraticCurveTo(0.35, 0.11, -0.16, 0.06),
+      g.closePath(),
+      t0(e, g, { ...t, belly: Hl(t.body, "#ffffff", 0.3) }, [-0.2, 0.9, -0.26, 0.1], n, o),
+      o ||
+        (e.save(),
+        e.clip(g),
+        (e.strokeStyle = "rgba(7,8,13,.45)"),
+        (e.lineWidth = 1 * n),
+        e.beginPath(),
+        e.moveTo(0.3, -0.21),
+        e.quadraticCurveTo(0.27, -0.06, 0.32, 0.09),
+        e.stroke(),
+        Array.from({ length: Number(s.dew) }, () => {
+          let p = -0.1 + a() * 0.86,
+            w = -0.2 + a() * 0.22,
+            y = 0.012 + a() * 0.012;
+          (e.fillStyle = "rgba(236,246,240,.85)"),
+            (e.strokeStyle = "rgba(7,8,13,.6)"),
+            (e.lineWidth = 0.9 * n),
+            e.beginPath(),
+            e.arc(p, w, y, 0, 7),
+            e.fill(),
+            e.stroke(),
+            (e.fillStyle = "#ffffff"),
+            e.beginPath(),
+            e.arc(p - y * 0.35, w - y * 0.35, y * 0.3, 0, 7),
+            e.fill();
+        }),
+        e.restore()),
+      Cc(e, g, n, o),
+      Fl(e, g, n, o, 2.2),
+      kd(e, 0.8, 0.02, 0.026, s.eyes, t, n, o),
+      nu.capshell
+    );
   if (
     (g.moveTo(-0.16, 0.06),
     g.bezierCurveTo(-0.2, -0.36, 0.4, -0.5, 0.74, -0.24),
@@ -159690,6 +160230,25 @@ function Xz(e, t, { detail: n = !1 } = {}) {
           e.quadraticCurveTo(0.32, 0.56, 0.3, 0.42),
           e.moveTo(0.49, 0.62),
           e.quadraticCurveTo(0.66, 0.56, 0.68, 0.42),
+          e.moveTo(0.22, 0.06),
+          e.lineTo(0.22, 0.86)),
+        { aspect: 0.95 }
+      );
+    // Sporewood's Pond-Keeper's Notebook: a notebook with a koi drawn on its cover.
+    case "pond_notebook":
+      return (
+        a(0.16, 0.06, 0.66, 0.8),
+        e.moveTo(0.6, 0.86),
+        e.lineTo(0.64, 1),
+        e.lineTo(0.7, 0.92),
+        e.lineTo(0.74, 0.86),
+        e.closePath(),
+        n &&
+          (o(0.5, 0.46, 0.15, 0.075),
+          e.moveTo(0.36, 0.46),
+          e.lineTo(0.28, 0.4),
+          e.lineTo(0.28, 0.52),
+          e.closePath(),
           e.moveTo(0.22, 0.06),
           e.lineTo(0.22, 0.86)),
         { aspect: 0.95 }
@@ -164603,7 +165162,7 @@ const CATCH_MARK_CSS = `
 /* on a phone the card is one column: the line sits under the picture (the same order, after it) */
 .gw-cc-markline { order: 4; margin: 6px 4px 0; font: italic 400 15px/1.35 var(--f-body); color: var(--ink-dim, #c9c6d6); text-align: center; text-wrap: pretty; }
 `;
-function catchCardMark(art, fish, game, text) {
+function catchCardMark(art, fish, game, text, own = null) {
   if (!art || !fish || typeof document > "u") return;
   let words = text?.marks || {},
     mark = CATCH_MARKS.includes(fish.mark) ? fish.mark : null,
@@ -164619,6 +165178,9 @@ function catchCardMark(art, fish, game, text) {
       thiefHidden(meta, hunt.legend) &&
       (line = words.leaves?.[leaves]);
   }
+  // Else the fish's own line, if it has one (Ca.cardLines: the Seedfall Silver Dollar's teeth).
+  let ownLine = !line && typeof own?.[fish.speciesId] == "string" ? own[fish.speciesId] : null;
+  ownLine && (line = ownLine);
   if (!line) return;
   if (!document.getElementById("gw-cc-mark-css")) {
     let style = document.createElement("style");
@@ -164626,7 +165188,10 @@ function catchCardMark(art, fish, game, text) {
   }
   mark && (art.classList.add("gw-cc-marked"), art.insertAdjacentHTML("beforeend", catchMarkSvg(mark)));
   let p = document.createElement("p");
-  (p.className = "gw-cc-markline"), (p.dataset.mark = mark || "leaves"), (p.textContent = line), art.after(p);
+  (p.className = "gw-cc-markline"),
+    (p.dataset.mark = mark || (ownLine ? "own" : "leaves")),
+    (p.textContent = line),
+    art.after(p);
 }
 function QU({
   ctx: e,
@@ -172083,7 +172648,7 @@ function m4(e, t) {
       name: a.owned === !0 ? (a.name ?? null) : null,
       cards: ri(a.entries).map((s) => n(s, !1)),
     })),
-    guests: ri(e.guests).map((a) => ({ ...n(a, !1), guest: !0 })),
+    guests: ri(e.guests).map((a) => ({ ...n(a, !1), guest: !0, note: a.note ?? null })),
     finds: EU(e.finds, t),
   };
 }
@@ -172134,6 +172699,9 @@ function Xhe({
   brook: s = !1,
   water: r = null,
   at: l = null,
+  // The lake's own lines (Murk's `at`) that this tally's sales bring, in order: Sporewood's first local kind and
+  // each guest's first sale (wo.guestSold).
+  sold = [],
 } = {}) {
   let i = Oa(t) ? t : {};
   if ((s === !0 || ri(e).some((u) => u.find === "veil_notebook")) && !i.brook) return "brook";
@@ -172157,6 +172725,7 @@ function Xhe({
         ? "firstJackpot"
         : i.firstSale
           ? d ||
+            ri(sold).map(c).find(Boolean) ||
             (f.some((u) => u.find && u.kind === "tackle") && !i.firstTackle
               ? "firstTackle"
               : f.some((u) => u.find && (u.kind === "part" || u.kind === "look")) && !i.firstPart
@@ -175049,7 +175618,13 @@ function WV(e) {
       Tt = i("lastTrip")?.away === !0,
       Ft = ri(i("state")?.places?.revealed).includes("veilback_brook"),
       Ct = Yo(o()?.LOOP?.waters?.[qt]?.order, 1) > 1 && Oa(f().murk?.at?.[qt]) ? f().murk.at[qt] : null,
-      re = Xhe({ rows: _t, said: Ht, listDone: it, empty: Pt, away: Tt, brook: Ft, water: qt, at: Ct }),
+      // A local kind of this lake (wo.localKinds) or one of its guests (wo.guestSold) among the sales.
+      soldIds = ri(_t).map((row) => row?.speciesId),
+      sold = [
+        ...(soldIds.some((id) => o()?.LOOP?.localKinds?.kinds?.[id]?.water === qt) ? ["local"] : []),
+        ...soldIds.map((id) => o()?.LOOP?.guestSold?.[qt]?.[id]).filter(Boolean),
+      ],
+      re = Xhe({ rows: _t, said: Ht, listDone: it, empty: Pt, away: Tt, brook: Ft, water: qt, at: Ct, sold }),
       De = re ? i("sayOnce", re) : null;
     return {
       line: De || null,
@@ -178158,8 +178733,11 @@ function YV(e) {
       lines = [String(words.line || "It bites {hours}.").replace("{hours}", when)],
       // A local kind (wo.localKinds) says its one home first. A home kept to one light already says when.
       local = d().LOOP?.localKinds?.kinds?.[K.id],
-      where = local ? d().TEXT_LOOP?.localKinds?.kinds?.[K.id]?.where : null;
+      where = local ? d().TEXT_LOOP?.localKinds?.kinds?.[K.id]?.where : null,
+      // The seedfall's guest (wo.seedfallGuest) says when it comes in place of its hours.
+      seedfall = d().TEXT_LOOP?.seedfallGuest?.where?.[K.id];
     where && (lines = local.light ? [where] : [where, ...lines]);
+    seedfall && (lines = [seedfall]);
     lines.push(words.feeds?.[speciesFeedsAt(K.id, K.guestOf || K.zone)] || words.feeds?.any || "");
     K.bait && words.takes && lines.push(words.takes.replace("{bait}", e.baitData(K.bait)?.name || K.bait));
     return lines.filter(Boolean).join(" ");
@@ -179203,7 +179781,7 @@ function YV(e) {
           e.report("fishart", Qt);
         }
         no.appendChild(pi),
-          qe && catchCardMark(no, we, t, d().TEXT_LOOP?.hunts?.[u()?.zone]),
+          qe && catchCardMark(no, we, t, d().TEXT_LOOP?.hunts?.[u()?.zone], d().TEXT_LOOP?.cardLines),
           fpe(fn, Jt),
           fn.querySelector("[data-room]")?.addEventListener("click", () => {
             (zt.room = !zt.room), p("ui_click"), st.render();
@@ -180993,8 +181571,10 @@ function YV(e) {
       let Mt = n("div", "gw-cat-grid");
       for (let zt of te.guests) {
         let Ut = Ft(K, zt);
+        // The book is the notebook that brought it: a visitor of the seedfall has none.
         Ut.classList.add("gw-cat-guest"),
-          Ut.insertAdjacentHTML("beforeend", `<i class="gw-cat-note" aria-hidden="true">${m("book")}</i>`),
+          zt.note &&
+            Ut.insertAdjacentHTML("beforeend", `<i class="gw-cat-note" aria-hidden="true">${m("book")}</i>`),
           Mt.appendChild(Ut);
       }
       xt.appendChild(Mt), Ce.appendChild(xt);
