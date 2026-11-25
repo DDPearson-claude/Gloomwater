@@ -30206,6 +30206,7 @@ function bu(e = globalThis) {
   return kQ({ preset: e.GW_DEBUG, search: t, stored: n });
 }
 var r7 = Object.freeze([
+    "huntArt",
     "fishChance",
     "fishPlan",
     "fishOutcome",
@@ -43076,14 +43077,20 @@ var Nf = [
         eyeSpots: "amber",
       },
     },
+    // The Meadowback Pacu as drawn flat (the measuring card, the Journal) and held at the landing: a deep, round
+    // body with teeth like a person's, as the Seedfall Silver Dollar's, in her own dark coat. Her 3D model is her
+    // portrait (merePortraits).
     drifting_grove: {
       model: {
-        shape: "disc",
+        shape: "bream",
+        body: 0x363a2e,
+        belly: 0x94603f,
+        fin: 0x4a4234,
         pattern: "none",
         eyes: "normal",
-        snout: "point",
-        tail: "whip_barb",
-        meadow: !0,
+        round: !0,
+        jaw: "person_teeth",
+        tail: "fork",
       },
     },
   },
@@ -56790,6 +56797,39 @@ var kc = {
         });
       },
     },
+    // Sporewood's crunch (HUNT_SCENES.crunch): a hard seed pod cracked between flat teeth. A sharp snap, three short
+    // woody crackles as it gives, a dull knock under them and a soft grind after.
+    pod_crunch: {
+      gain: 0.7,
+      gap: 0.3,
+      max: 1,
+      pri: 2,
+      wet: 0.3,
+      fn(e, t, n, o) {
+        e.burst(t, { t: n, a: 8e-4, d: 0.035, peak: 0.6, ft: "highpass", f: 2600 * o, q: 0.8 });
+        for (let k = 0; k < 3; k++)
+          e.burst(t, {
+            t: n + 0.03 + k * 0.05,
+            a: 0.001,
+            d: 0.05 - k * 0.01,
+            peak: 0.48 - k * 0.1,
+            ft: "bandpass",
+            f: (1400 - k * 260) * o,
+            q: 1.5,
+          });
+        e.tone(t, { type: "sine", f: 150 * o, f2: 70 * o, glide: 0.08, t: n, a: 0.002, d: 0.12, peak: 0.32 });
+        e.burst(t, {
+          kind: "pink",
+          t: n + 0.17,
+          a: 0.02,
+          d: 0.22,
+          peak: 0.16,
+          ft: "lowpass",
+          f: 900 * o,
+          q: 0.7,
+        });
+      },
+    },
     // A seed pod gathered into the Seed Pouch: a small soft pop.
     pod_pop: {
       gain: 0.5,
@@ -64846,7 +64886,7 @@ function sporeDriftFx(e) {
     v3 = new He(),
     sc = new He(),
     size = new Rn(),
-    st = { on: !1, key: "", drift: null, pods: 0, seedfall: 0, t: 0 },
+    st = { on: !1, key: "", drift: null, pods: 0, seedfall: 0, t: 0, hush: 0 },
     zone = () => {
       try {
         return e.world?.getZone?.()?.id ?? e.state?.run?.zone ?? null;
@@ -64921,9 +64961,11 @@ function sporeDriftFx(e) {
     bandU.uNight.value = swirlU.uNight.value = night;
     bandU.uFogD.value = fogD;
     glows.uniforms.uFogD.value = fogD;
-    let lit = DRIFT_FX.alpha[hour] * (1 + 0.25 * st.seedfall);
+    // (a hunt scene hushes the band and the eddy while it plays: game.sceneHush, 0 to 1; they ease back after)
+    st.hush += ((Math.max(0, Math.min(1, Number(e.sceneHush) || 0)) || 0) - st.hush) * Math.min(1, dt * 2.5);
+    let lit = DRIFT_FX.alpha[hour] * (1 + 0.25 * st.seedfall) * (1 - 0.85 * st.hush);
     bandU.uAlpha.value += (lit - bandU.uAlpha.value) * Math.min(1, dt * 2);
-    swirlU.uAlpha.value = bandU.uAlpha.value * (hour === 2 ? 1 : 0.65);
+    swirlU.uAlpha.value = bandU.uAlpha.value * (hour === 2 ? 1 : 0.65) * (1 - 0.6 * st.hush);
     // Spores ride the band at the drift's pace, a little over the water.
     let q = e.render?.quality || "high",
       shown = Math.min(nMotes, os(DRIFT_FX.motes[q], DRIFT_FX.motes.low)),
@@ -78138,7 +78180,8 @@ function gwGreenhouse(
     }
     info.lamp = { x: hang.x, y: hang.y, z: hang.z, post: { x: lp.x, z: lp.z } };
     let bs = L.at(L.burr.s, L.burr.f);
-    info.burr = { x: +bs.x.toFixed(2), y: G.y, z: +bs.z.toFixed(2) };
+    // (yaw: the way he faces, out along the way into the water, for an object whose front is +Z: makeBurr's)
+    info.burr = { x: +bs.x.toFixed(2), y: G.y, z: +bs.z.toFixed(2), yaw: +Math.atan2(L.fx, L.fz).toFixed(3) };
     foot.push({ ...mid, r: 2.4 });
   }
   // ---- small glowing caps on the roofs, and the flotsam: pots afloat, a tray, shards of glass on the water
@@ -78251,6 +78294,1076 @@ function gwGreenhouseLamp(gh, { group, halos, anchor, keep, rimC, low = !1 }) {
       light && (light.intensity = 1.1 * k);
       halo >= 0 && (halos.setColor(halo, 1.0 * k, 0.6 * k, 0.27 * k), halos.touchColors());
     },
+  };
+}
+// ---- Sporewood's hunt, its pieces in 3D (sporewood-plan.md, step 5b; their interfaces in hunt-per-lake.md, "Sporewood's
+// pieces"): Burr at the Greenhouse door, the cracked pod, the moss raft and the meadow on the raft. Each returns its
+// group and an update, and a dispose that frees what it made. None of them adds a light: glows are sprites or unlit
+// colours, so the lake's shaders are untouched. The hunt's rules (which place, show and hide them) are not here.
+// Sporewood's colours, shared by the pieces: its moss (GW_SPORE_MOSS), its caps' cream and amber, its plum.
+const HUNT_ART_C = {
+  moss: 0x56602f,
+  mossLit: 0x7c8640,
+  mossDeep: 0x34402a,
+  mossDry: 0x9a8c4c,
+  lichen: 0x9aa07a,
+  cap: 0xd8a872,
+  capHi: 0xf0cc90,
+  capGlow: 0xffc87a,
+  cream: 0xece0bc,
+  plum: 0x5a3d5e,
+  wood: 0x6a4a30,
+  soil: 0x2e2418,
+  leaf: 0x7ea24a,
+  leafHi: 0xb8c86a,
+  pod: 0xc9a15e,
+  podDark: 0x8a6232,
+  podFlesh: 0xf0dcae,
+};
+// A little cap: a stem and a domed head, `h` tall and `r` across, standing at p (an array) on +y, leaning by `lean`.
+function huntArtCap(p, h, r, cap, { lean = [0, 0], stem = HUNT_ART_C.cream, seg = 7, rings = 4 } = {}) {
+  let top = new He(p[0] + lean[0] * h, p[1] + h, p[2] + lean[1] * h),
+    out = [
+      zn(
+        Fo(
+          [new He(p[0], p[1], p[2]), new He(p[0] + lean[0] * h * 0.4, p[1] + h * 0.55, p[2]), top],
+          r * 0.2,
+          Math.min(4, seg - 2),
+        ),
+        stem,
+      ),
+    ],
+    dome = new Ao(1, seg, rings, 0, Math.PI * 2, 0, Math.PI / 2);
+  dome.scale(r, r * 0.62, r), dome.translate(top.x, top.y - r * 0.12, top.z);
+  return out.push(zn(dome, cap)), out;
+}
+// Burr, the last seed-keeper (sporewood-plan.md, "The story"), as Hob is drawn: an old, stooped man in a long mossy coat
+// with a plum shawl, four seed pouches on his belt and a trowel tucked in it, a wide felt hat with small caps growing on
+// its brim, a lichen beard, glowing eyes like Hob's, and a seed tray of seedlings held in both hands. Local coordinates
+// face +Z with his feet at 0. `low` draws fewer segments, pouches, caps and seedlings.
+// update(dt, { raft, night }): a slow breath and sway, now and then a look down at his tray; when the raft (a point in
+// the world, x and z) comes within 14 m in front of him he turns his head to it, and his body a little. `night` (0 to 1)
+// is how strongly the caps on his brim glow (they glow a little even by day).
+function makeBurr({ low = !1 } = {}) {
+  const C = HUNT_ART_C,
+    root = new fo(),
+    body = new fo(),
+    head = new fo(),
+    seg = low ? 14 : 24,
+    rng = jc(51207),
+    cloth = sa({ color: 0xffffff, vertexColors: !0, side: ca, rim: 0.22, gloss: 0.08 }),
+    glowCap = new ua({ color: 0xffffff, vertexColors: !0, fog: !0, toneMapped: !1 });
+  (root.name = "Burr"), (body.name = "Burr's coat"), (head.name = "Burr's head");
+  root.add(body), body.add(head);
+  // the hips, from which he stoops; his neck, from which his head turns
+  body.position.set(0, 0.5, -0.04), (body.rotation.x = 0.42);
+  head.position.set(0, 0.55, 0.07);
+  const blob = (p, sz, c, rot = null, a = 10, b = 7) => zn(Co(...sz, p, a, b, rot), c),
+    cord = (pts, r, c, n = 6) =>
+      zn(
+        Fo(
+          pts.map((p) => new He(...p)),
+          r,
+          n,
+          { capStart: !0 },
+        ),
+        c,
+      ),
+    mount = (parent, name, parts, mat = cloth) => {
+      const mesh = new An(mo(parts), mat);
+      return (mesh.name = name), parent.add(mesh), mesh;
+    },
+    // a shaped panel round the y axis: rows of [y, rx, rz, cz, pitch]; colorFn(x, y, z) paints it
+    shell = (rows, colorFn, detail = seg, hem = 0) => {
+      const pos = [],
+        idx = [];
+      for (let j = 0; j < rows.length; j++) {
+        const [y, rx, rz, cz = 0, pitch = 0] = rows[j];
+        for (let k = 0; k < detail; k++) {
+          const a = (2 * Math.PI * k) / detail,
+            fold = 1 + (hem * Math.cos(7 * a)) / (j + 1);
+          pos.push(rx * Math.sin(a) * fold, y + pitch * Math.cos(a), cz + rz * Math.cos(a) * fold);
+          if (j) {
+            const a0 = (j - 1) * detail + k,
+              b = (j - 1) * detail + ((k + 1) % detail);
+            idx.push(a0, b, b + detail, a0, b + detail, a0 + detail);
+          }
+        }
+      }
+      const g = new lo();
+      return (
+        g.setAttribute("position", new eo(pos, 3)), g.setIndex(idx), g.computeVertexNormals(), zn(g, colorFn)
+      );
+    },
+    // moss green in patches, darker low down
+    mossy = (base, k = 0.55) => {
+      const a = new Vt(base),
+        m = new Vt(C.moss),
+        d = new Vt(C.mossDeep),
+        out = new Vt();
+      return (x, y, z) => {
+        const n = 0.5 + 0.5 * Math.sin(x * 23 + y * 17) * Math.sin(z * 19 - y * 11);
+        return out
+          .copy(a)
+          .lerp(m, k * Math.max(0, n - 0.35) * 1.6)
+          .lerp(d, Math.max(0, 0.1 - y) * 0.9);
+      };
+    };
+  // ---- legs and boots, under the coat's hem
+  const legs = [];
+  for (const s of [-1, 1])
+    legs.push(
+      cord(
+        [
+          [s * 0.085, 0.05, 0.02],
+          [s * 0.09, 0.3, 0.0],
+          [s * 0.08, 0.52, -0.02],
+        ],
+        0.055,
+        0x3e3434,
+      ),
+      blob([s * 0.09, 0.045, 0.05], [0.07, 0.05, 0.115], 0x34281f),
+    );
+  const boots = mount(root, "Burr's boots", legs);
+  // ---- the coat (in the body's frame: the hips at 0), its moss, shawl, belt, pouches, strap and trowel
+  const coat = [
+    shell(
+      [
+        [-0.46, 0.27, 0.25, 0.02],
+        [-0.3, 0.25, 0.22, 0.01],
+        [-0.05, 0.2, 0.17],
+        [0.18, 0.21, 0.18, -0.01],
+        [0.36, 0.23, 0.19, -0.04],
+        [0.48, 0.2, 0.16, -0.04],
+        [0.56, 0.1, 0.09, 0.02],
+      ],
+      mossy(0x56663a, 0.8),
+      seg,
+      0.05,
+    ),
+    // the plum shawl over his shoulders, its points hanging at the front
+    shell(
+      [
+        [0.3, 0.255, 0.215, -0.02, -0.05],
+        [0.4, 0.25, 0.205, -0.04],
+        [0.5, 0.2, 0.16, -0.04],
+        [0.56, 0.115, 0.1, 0.02],
+      ],
+      mossy(C.plum, 0.25),
+      seg,
+      0.04,
+    ),
+    // the belt
+    zn(
+      Wn(new aa(0.205, 0.018, 5, seg), { p: [0, 0.0, 0], r: [Math.PI / 2, 0, 0], s: [1, 0.86, 1] }),
+      0x3a2a20,
+    ),
+    // the strap from his left shoulder across to his right hip
+    cord(
+      [
+        [0.17, 0.46, 0.08],
+        [0.05, 0.3, 0.2],
+        [-0.12, 0.1, 0.19],
+        [-0.2, 0.0, 0.08],
+      ],
+      0.012,
+      0x6a4a34,
+      5,
+    ),
+  ];
+  // seed pouches on the belt: small tied bags of sacking and leather, one hanging lower on a cord
+  const pouches = low
+    ? [
+        [-0.17, 0.12, 0x9c8458],
+        [0.19, -0.05, 0x7a5638],
+      ]
+    : [
+        [-0.17, 0.12, 0x9c8458],
+        [-0.21, -0.2, 0x7a5638],
+        [0.19, -0.05, 0xa48a5c],
+        [0.12, 0.17, 0x6e4c34],
+      ];
+  for (const [x, z, c] of pouches) {
+    const y = -0.07 - (Math.abs(z) > 0.18 ? 0.05 : 0);
+    coat.push(
+      blob([x, y, z], [0.042, 0.055, 0.038], c),
+      blob([x, y + 0.055, z], [0.022, 0.014, 0.02], new Vt(c).multiplyScalar(0.7).getHex()),
+      cord(
+        [
+          [x * 0.95, 0.0, z * 0.95],
+          [x, y + 0.06, z],
+        ],
+        0.005,
+        0x3a2a20,
+        4,
+      ),
+    );
+  }
+  // the trowel tucked in his belt at his right side: its handle up, its blade down
+  coat.push(
+    cord(
+      [
+        [-0.205, 0.1, 0.03],
+        [-0.215, 0.0, 0.02],
+      ],
+      0.013,
+      0x7a5436,
+      5,
+    ),
+    blob([-0.215, -0.08, 0.02], [0.012, 0.07, 0.035], 0x8a8a84, [0, 0, 0.05]),
+  );
+  // moss and lichen on his shoulders and upper back, and a few strands hanging from them
+  const tufts = low ? 6 : 12;
+  for (let i = 0; i < tufts; i++) {
+    const s = i % 2 ? 1 : -1,
+      a = rng() * 1.2,
+      x = s * (0.08 + 0.13 * rng()),
+      y = 0.44 + 0.08 * rng(),
+      z = -0.06 - 0.1 * a + 0.04;
+    coat.push(
+      blob(
+        [x, y, z],
+        [0.035 + 0.025 * rng(), 0.018, 0.035 + 0.02 * rng()],
+        i % 3 ? C.mossLit : C.lichen,
+        null,
+        7,
+        4,
+      ),
+    );
+  }
+  if (!low)
+    for (let i = 0; i < 5; i++) {
+      const x = -0.16 + 0.08 * i,
+        z = -0.13 + 0.02 * Math.abs(i - 2);
+      coat.push(
+        cord(
+          [
+            [x, 0.47, z],
+            [x + 0.01, 0.36, z - 0.03],
+            [x - 0.01, 0.24 - 0.03 * (i % 2), z - 0.04],
+          ],
+          0.006,
+          i % 2 ? C.lichen : C.moss,
+          4,
+        ),
+      );
+    }
+  // ---- arms and hands, holding the seed tray in front of him at his waist
+  const arms = [];
+  for (const s of [-1, 1])
+    arms.push(
+      cord(
+        [
+          [s * 0.21, 0.44, 0.0],
+          [s * 0.235, 0.26, 0.07],
+          [s * 0.2, 0.13, 0.2],
+          [s * 0.17, 0.1, 0.27],
+        ],
+        (t) => 0.058 - 0.012 * t,
+        0x4c5634,
+        7,
+      ),
+      blob([s * 0.165, 0.095, 0.3], [0.04, 0.032, 0.05], 0xc5ab82),
+    );
+  // the tray: shallow, wooden, full of soil, with rows of seedlings
+  arms.push(
+    zn(Wn(new Eo(0.36, 0.045, 0.24), { p: [0, 0.07, 0.36] }), C.wood),
+    zn(Wn(new Eo(0.33, 0.012, 0.21), { p: [0, 0.095, 0.36] }), C.soil),
+  );
+  const rows = low ? [2, 3] : [3, 5];
+  for (let r = 0; r < rows[0]; r++)
+    for (let c = 0; c < rows[1]; c++) {
+      const x = -0.12 + (0.24 * c) / (rows[1] - 1),
+        z = 0.3 + (0.12 * r) / Math.max(1, rows[0] - 1),
+        h = 0.03 + 0.025 * rng(),
+        leaf = new Vt(C.leaf).lerp(new Vt(C.leafHi), rng()).getHex();
+      arms.push(
+        cord(
+          [
+            [x, 0.1, z],
+            [x, 0.1 + h, z],
+          ],
+          0.0035,
+          0x5e7a36,
+          3,
+        ),
+        blob([x - 0.016, 0.1 + h, z], [0.02, 0.006, 0.012], leaf, [0, 0, 0.3], 6, 3),
+        blob([x + 0.016, 0.1 + h, z], [0.02, 0.006, 0.012], leaf, [0, 0, -0.3], 6, 3),
+      );
+    }
+  // (one mesh for the coat, arms and tray, one for the head and hat, one for what glows: he is four draw calls)
+  mount(body, "Burr's coat, arms and seed tray", [...coat, ...arms]);
+  // ---- the head (in its own frame: the neck at 0): a waxen face with an ink face plate, a lichen beard
+  const face = [
+    blob([0, 0.11, 0.01], [0.12, 0.135, 0.115], 0xc5ab82),
+    blob([0, 0.1, 0.075], [0.105, 0.1, 0.06], 0x2a2530),
+    // the nose: a soft knob
+    blob([0, 0.085, 0.13], [0.022, 0.026, 0.024], 0xb2946e),
+  ];
+  // the beard: a full lichen beard from his chin and cheeks, hanging forward and down, with a few long strands
+  face.push(
+    blob([0, 0.02, 0.1], [0.085, 0.085, 0.05], 0x8e967a, [0.25, 0, 0]),
+    blob([0, -0.05, 0.115], [0.055, 0.07, 0.04], 0x7c8468, [0.35, 0, 0]),
+  );
+  const strands = low ? 3 : 6;
+  for (let i = 0; i < strands; i++) {
+    const u = i / (strands - 1) - 0.5,
+      x = u * 0.11,
+      len = 0.12 + 0.05 * (1 - Math.abs(u) * 1.6) + 0.03 * rng();
+    face.push(
+      cord(
+        [
+          [x, 0.0, 0.13],
+          [x * 1.1, -0.05, 0.14],
+          [x * 0.8, 0.02 - len, 0.13],
+        ],
+        (t) => 0.014 * (1 - 0.8 * t),
+        i % 2 ? C.lichen : 0xb4b496,
+        5,
+      ),
+    );
+  }
+  // the hat: a wide, soft felt brim drooping a little at its edge, a low crown and a band
+  const felt = mossy(0x4a3a3c, 0.35);
+  face.push(
+    shell(
+      [
+        [0.19, 0.32, 0.32, 0.01, -0.015],
+        [0.205, 0.3, 0.3, 0.01],
+        [0.215, 0.15, 0.15],
+        [0.3, 0.135, 0.135, -0.005],
+        [0.34, 0.1, 0.1],
+        [0.35, 0.03, 0.03],
+      ],
+      felt,
+      seg,
+    ),
+    // the brim's underside, so it is not hollow from below
+    shell(
+      [
+        [0.188, 0.318, 0.318, 0.01, -0.015],
+        [0.2, 0.15, 0.15],
+      ],
+      () => new Vt(0x2e2428),
+      seg,
+    ),
+    zn(Wn(new aa(0.142, 0.014, 4, seg), { p: [0, 0.235, 0], r: [Math.PI / 2, 0, 0] }), 0x6a4a3a),
+  );
+  const eyes = [
+    blob([-0.045, 0.125, 0.128], [0.018, 0.026, 0.012], 0xffd48a),
+    blob([0.045, 0.125, 0.128], [0.018, 0.026, 0.012], 0xffd48a),
+  ];
+  // small caps growing on the brim, in a cluster at the front left and a pair behind; the paler ones glow
+  const caps = [],
+    glows = [],
+    capSpots = low
+      ? [
+          [-0.2, 0.22, 0.05, 1],
+          [-0.26, 0.1, 0.038, 0],
+          [0.24, 0.14, 0.044, 1],
+        ]
+      : [
+          [-0.2, 0.22, 0.05, 1],
+          [-0.26, 0.1, 0.038, 0],
+          [-0.11, 0.27, 0.032, 0],
+          [0.24, 0.14, 0.044, 1],
+          [0.27, -0.06, 0.032, 0],
+          [0.05, -0.29, 0.04, 1],
+          [-0.27, -0.12, 0.03, 0],
+        ];
+  for (const [x, z, r, g] of capSpots) {
+    const y = 0.205 - 0.015 * (Math.hypot(x, z) / 0.32) ** 2,
+      parts = huntArtCap([x, y, z], r * 1.2, r, g ? C.capHi : C.cap, {
+        lean: [x * 0.6, z * 0.6],
+        seg: low ? 6 : 8,
+      });
+    caps.push(parts[0]), (g ? glows : caps).push(parts[1]);
+  }
+  mount(head, "Burr's face, beard, hat and its caps", [...face, ...caps]);
+  mount(head, "Burr's eyes and the glowing caps", [...eyes, ...glows], glowCap);
+  // ---- the idle and the look
+  let t = rng() * 10,
+    look = 0,
+    turn = 0,
+    nod = 0,
+    peek = 0,
+    shownGlow = -1;
+  const v = new He();
+  function update(dt = 0, { raft = null, night = 0 } = {}) {
+    dt = Math.min(0.1, Math.max(0, Number(dt) || 0));
+    t += dt;
+    // where the raft is, turned into his own frame: its bearing from his face (0 ahead, + to his left)
+    let want = 0;
+    if (raft && Number.isFinite(raft.x) && Number.isFinite(raft.z)) {
+      root.updateWorldMatrix(!0, !1);
+      v.set(raft.x, root.position.y, raft.z);
+      root.worldToLocal(v);
+      const d = Math.hypot(v.x, v.z);
+      if (d < 14 && v.z > -2) want = Math.max(-1.15, Math.min(1.15, Math.atan2(v.x, v.z)));
+      // from over 40 m away he would be a speck, and he is not drawn (the lamp's halo marks the place)
+      body.visible = boots.visible = d < 40;
+    }
+    look += (want - look) * Math.min(1, dt * 1.6);
+    turn += (want * 0.25 - turn) * Math.min(1, dt * 0.8);
+    // now and then, while nothing is near, he looks down at his tray for a while
+    let down = want === 0 && t % 13 > 9.5 ? 1 : 0;
+    peek += (down - peek) * Math.min(1, dt * 1.5);
+    body.rotation.y = turn;
+    body.rotation.z = 0.018 * Math.sin(t * 0.45);
+    body.scale.y = 1 + 0.01 * Math.sin(t * 1.5);
+    // (he lifts his head a little to look at the raft)
+    nod = 0.04 * Math.sin(t * 0.7) + 0.32 * peek - 0.1 * Math.min(1, Math.abs(look) * 3 + (want ? 0.5 : 0));
+    head.rotation.set(-0.12 + nod, look - turn + 0.05 * Math.sin(t * 0.31), 0.04 * Math.sin(t * 0.53));
+    // his eyes' and the caps' glow: a little by day, warm at night, with a slow breath
+    const g = Math.round((0.6 + 0.4 * Math.max(0, Math.min(1, night)) + 0.06 * Math.sin(t * 1.9)) * 50) / 50;
+    if (g !== shownGlow) (shownGlow = g), glowCap.color.setScalar(g * 1.3);
+  }
+  update(0);
+  return {
+    root,
+    update,
+    dispose() {
+      root.removeFromParent?.();
+      root.traverse((o) => o.isMesh && o.geometry?.dispose?.());
+      cloth.dispose(), glowCap.dispose();
+    },
+  };
+}
+// The Mother Cap's seed pod, the seedfall's own size and colour (its pods are 0.22 by 0.17 by 0.34 m), as two halves
+// hinged at the stalk: closed it is a whole pod, open it is cracked clean through, its pale flesh and the empty seed
+// bed showing. Bitten (`marks`, the default), the bitten end carries the `person` marks: two rows of square, flat
+// dents, one row on each half, the way a person's front teeth leave them, and square notches along the crack.
+// setOpen(k): 0 shut to 1 wide open (the halves turn apart about the stalk). update(dt, { height }) bobs it on the
+// water at its own x and z when `height` (the water's surface there) is given; else it hangs still.
+function makeCrackedPod({ open = 0.55, marks = !0, low = !1, glow = !1 } = {}) {
+  const C = HUNT_ART_C,
+    group = new fo(),
+    mat = sa({
+      color: 0xffffff,
+      vertexColors: !0,
+      side: ca,
+      rim: glow ? 0.6 : 0.4,
+      rimColor: 0xf6e2a8,
+      steps: 3,
+      emissive: glow ? 0x5a3610 : 0,
+      emissiveIntensity: glow ? 0.9 : 1,
+    }),
+    rx = 0.11,
+    ry = 0.0825,
+    rz = 0.17,
+    seg = low ? 10 : 16,
+    halves = [];
+  group.name = "Cracked pod";
+  // the skin's colour: tan, darker towards the stalk, with faint ribs along it
+  const skin = (x, y, z) => {
+    const c = new Vt(C.pod).lerp(new Vt(C.podDark), Math.max(0, -z / rz) * 0.55);
+    return c.lerp(new Vt(C.podDark), 0.25 * Math.max(0, Math.sin(Math.atan2(y, x) * 7)) ** 6);
+  };
+  for (const s of [-1, 1]) {
+    const pivot = new fo(),
+      parts = [],
+      // the half's outer skin: half an ellipsoid on the side s of x, the hinge at the stalk (z = -rz)
+      shell = new Ao(1, seg, low ? 6 : 10, s > 0 ? 0 : Math.PI, Math.PI);
+    shell.scale(rx, ry, rz), shell.translate(0, 0, rz);
+    parts.push(zn(shell, (x, y, z) => skin(x, y, z - rz)));
+    // its cut face: pale flesh, and the hollow where the seed lay
+    const face = new Al(1, seg);
+    face.rotateY((s * Math.PI) / 2), face.scale(1, ry * 0.97, rz * 0.97), face.translate(s * 0.002, 0, rz);
+    parts.push(
+      zn(face, (x, y, z) => {
+        const u = y / ry,
+          w = (z - rz) / rz,
+          r = Math.hypot(u / 0.55, (w - 0.08) / 0.62);
+        return r < 1 ? new Vt(0x6e4a26).lerp(new Vt(C.podDark), r * r) : new Vt(C.podFlesh);
+      }),
+    );
+    if (marks) {
+      // the person marks: a row of square dents across the skin near the bitten end (the upper teeth on one half,
+      // the lower on the other), and square notches cut into the crack's edge there
+      const n = low ? 3 : 4,
+        w = 0.62,
+        z = rz + rz * w,
+        sx = rx * Math.sqrt(1 - w * w),
+        ang = Math.atan2(sx / (rx * rx), (rz * w) / (rz * rz));
+      for (let i = 0; i < n; i++) {
+        const y = (i - (n - 1) / 2) * 0.034 + s * 0.006;
+        parts.push(
+          zn(Wn(new Eo(0.024, 0.024, 0.008), { p: [s * (sx + 0.002), y, z], r: [0, s * ang, 0] }), 0x4a2a14),
+          zn(Wn(new Eo(0.012, 0.022, 0.022), { p: [s * 0.004, y * 0.9, rz + rz * 0.86] }), 0x3a2010),
+        );
+      }
+    }
+    pivot.add(new An(mo(parts), mat));
+    // the hinge at the stalk: the half turns out about it
+    pivot.position.set(0, 0, -rz);
+    group.add(pivot), halves.push({ pivot, s });
+  }
+  // the stalk
+  const stalk = new An(
+    zn(
+      Fo(
+        [new He(0, 0, -rz + 0.01), new He(0.01, 0.015, -rz - 0.03), new He(0.005, 0.03, -rz - 0.055)],
+        0.012,
+        5,
+      ),
+      0x5a4024,
+    ),
+    mat,
+  );
+  group.add(stalk);
+  let k = 0,
+    t = 0;
+  // (`glow`: a warm halo on it, so it reads in a scene at dusk)
+  const halo = glow ? Js({ color: HUNT_ART_C.capGlow, size: 0.6, opacity: 0.3 }) : null;
+  halo && (halo.position.set(0, 0.04, 0.02), group.add(halo));
+  // past half open the halves come apart as well as turning: cracked clean through
+  function setOpen(v) {
+    k = Math.max(0, Math.min(1, Number(v) || 0));
+    for (const h of halves)
+      (h.pivot.rotation.y = -h.s * 0.7 * k), (h.pivot.position.x = h.s * 0.16 * Math.max(0, k - 0.5) * 2);
+  }
+  setOpen(open);
+  return {
+    group,
+    setOpen,
+    get open() {
+      return k;
+    },
+    update(dt = 0, { height = null } = {}) {
+      t += Math.min(0.1, Math.max(0, Number(dt) || 0));
+      if (!Number.isFinite(height)) return;
+      group.position.y = height + 0.03 + 0.02 * Math.sin(t * 2.1);
+      group.rotation.x = 0.08 * Math.sin(t * 1.7);
+      group.rotation.z = 0.06 * Math.sin(t * 1.3 + 1);
+    },
+    dispose() {
+      group.removeFromParent?.();
+      group.traverse((o) => o.isMesh && o.geometry?.dispose?.());
+      mat.dispose(), halo?.material?.dispose?.();
+    },
+  };
+}
+// One moss raft: a small drifting clump of moss and caps, about 0.8 m across, with a tuft of grass. Every raft shares
+// one geometry and one material (made once, never freed: they are small), so each is one draw call: eight on the
+// water at once cost eight calls. `low`: about 120 triangles, and no glow; otherwise about 400, and one shared glow
+// sprite on the pale cap. update(dt, { height, night }) bobs and turns it slowly on the water at its own x and z.
+// dispose() takes it off the scene; the shared parts stay.
+const MOSS_RAFT_SHARED = {};
+function mossRaftShared(low) {
+  const key = low ? "low" : "full";
+  if (MOSS_RAFT_SHARED[key]) return MOSS_RAFT_SHARED[key];
+  const C = HUNT_ART_C,
+    rng = jc(low ? 7711 : 7712),
+    parts = [],
+    mat =
+      MOSS_RAFT_SHARED.mat ||
+      (MOSS_RAFT_SHARED.mat = sa({ color: 0xffffff, vertexColors: !0, side: ca, rim: 0.12, gloss: 0.02 }));
+  // the clump: a lumpy, flattened mound, dark and wet at its rim, lighter on its humps
+  const mound = new Ao(1, low ? 8 : 16, low ? 3 : 7, 0, Math.PI * 2, 0, Math.PI / 2);
+  T0(mound, 0.3, 4, 3);
+  mound.scale(0.5, 0.17, 0.4), mound.translate(0, -0.05, 0);
+  parts.push(
+    zn(mound, (x, y) =>
+      new Vt(C.mossDeep)
+        .lerp(
+          new Vt(C.moss),
+          Math.max(0, Math.min(1, (y + 0.02) / 0.12)) * (0.6 + 0.4 * Math.sin(x * 31 + y * 17)),
+        )
+        .lerp(new Vt(0x1e2a20), Math.max(0, -y / 0.05) * 0.8),
+    ),
+  );
+  // a few lumps of moss on it
+  for (let i = 0; i < (low ? 1 : 5); i++) {
+    const a = rng() * Math.PI * 2,
+      r = 0.12 + 0.12 * rng();
+    parts.push(
+      zn(
+        Co(
+          0.08 + 0.05 * rng(),
+          0.05,
+          0.07 + 0.05 * rng(),
+          [Math.cos(a) * r, 0.07, Math.sin(a) * r],
+          low ? 5 : 8,
+          low ? 3 : 4,
+        ),
+        i % 2 ? C.mossLit : C.mossDry,
+      ),
+    );
+  }
+  // small caps, in a cluster
+  const caps = low
+    ? [[0.08, 0.05, 0.05, 0.08, C.capHi]]
+    : [
+        [0.08, 0.05, 0.05, 0.08, C.capHi],
+        [0.16, 0.1, 0.03, 0.05, C.cap],
+        [0.03, 0.14, 0.032, 0.045, C.cap],
+        [-0.14, -0.05, 0.035, 0.055, C.cap],
+      ];
+  for (const [x, z, r, h, c] of caps)
+    parts.push(...huntArtCap([x, 0.09, z], h * 1.6, r * 1.3, c, { seg: low ? 5 : 7, rings: low ? 2 : 4 }));
+  // a tuft of grass
+  if (!low)
+    for (let j = 0; j < 5; j++) {
+      const a = j * 1.3,
+        x = -0.06 + 0.03 * Math.cos(a),
+        z = -0.1 + 0.03 * Math.sin(a);
+      parts.push(
+        zn(
+          Fo(
+            [
+              new He(x, 0.08, z),
+              new He(x + 0.03 * Math.cos(a), 0.2, z + 0.03 * Math.sin(a)),
+              new He(x + 0.07 * Math.cos(a), 0.3, z + 0.07 * Math.sin(a)),
+            ],
+            (t) => 0.009 * (1 - 0.8 * t),
+            3,
+          ),
+          new Vt(C.leaf).lerp(new Vt(C.leafHi), j / 5).getHex(),
+        ),
+      );
+    }
+  return (MOSS_RAFT_SHARED[key] = { geo: mo(parts), mat });
+}
+function makeMossRaft({ low = !1 } = {}) {
+  const { geo, mat } = mossRaftShared(low),
+    group = new fo(),
+    mesh = new An(geo, mat),
+    glow = low ? null : Js({ color: HUNT_ART_C.capGlow, size: 0.45, opacity: 0.5 });
+  (group.name = "Moss raft"), group.add(mesh);
+  glow && (glow.position.set(0.08, 0.2, 0.05), group.add(glow));
+  let t = Math.random() * 10,
+    spin = (Math.random() - 0.5) * 0.3;
+  group.rotation.y = Math.random() * Math.PI * 2;
+  return {
+    group,
+    update(dt = 0, { height = null, night = 0 } = {}) {
+      dt = Math.min(0.1, Math.max(0, Number(dt) || 0));
+      t += dt;
+      group.rotation.y += spin * dt;
+      if (Number.isFinite(height)) group.position.y = height + 0.015 * Math.sin(t * 1.6);
+      group.rotation.x = 0.04 * Math.sin(t * 1.2);
+      group.rotation.z = 0.04 * Math.sin(t * 0.9 + 2);
+      glow && ((glow.visible = night > 0.05), (glow.material.opacity = 0.5 * Math.min(1, night)));
+    },
+    dispose() {
+      group.removeFromParent?.();
+      glow?.material?.dispose?.();
+    },
+  };
+}
+// Burr's Seed on the raft (wo.relics.burrs_seed), mounted as Hob's Lamp is: a small wooden planter box at the stern,
+// full of soil and moss, with grass, a few small caps (they glow softly after dark) and the seedling grown from his
+// seed, a small sapling, in the middle. In the deck's own units (as the raft's other parts): the box is 0.5 by 0.3 m.
+// update(dt, { night }) sways the sapling and the grass a little and sets the caps' glow (0 to 1).
+function makeMeadowOnRaft({ low = !1 } = {}) {
+  const C = HUNT_ART_C,
+    group = new fo(),
+    sway = new fo(),
+    rng = jc(30113),
+    mat = sa({ color: 0xffffff, vertexColors: !0, side: ca, rim: 0.25, gloss: 0.06 }),
+    glowMat = new ua({ color: 0xffffff, vertexColors: !0, fog: !0, toneMapped: !1 }),
+    box = [],
+    plants = [],
+    glows = [],
+    W = 0.5,
+    D = 0.3,
+    H = 0.14;
+  group.name = "relic:burrsSeed";
+  // the box: four planks and a base, and iron corner bands
+  const plank = (w, h, d, p, c = C.wood) =>
+    zn(Wn(new Eo(w, h, d), { p }), (x, y) =>
+      new Vt(c).lerp(new Vt(0x3e2a1c), Math.max(0, 0.5 - (y + h / 2) / h) * 0.6),
+    );
+  box.push(
+    plank(W, 0.02, D, [0, 0.01, 0]),
+    plank(W, H, 0.025, [0, H / 2, D / 2 - 0.0125]),
+    plank(W, H, 0.025, [0, H / 2, -D / 2 + 0.0125]),
+    plank(0.025, H, D - 0.05, [W / 2 - 0.0125, H / 2, 0]),
+    plank(0.025, H, D - 0.05, [-W / 2 + 0.0125, H / 2, 0]),
+    zn(Wn(new Eo(W - 0.05, 0.02, D - 0.05), { p: [0, H - 0.025, 0] }), C.soil),
+  );
+  for (const sx of [-1, 1])
+    for (const sz of [-1, 1])
+      box.push(
+        zn(
+          Wn(new Eo(0.032, H + 0.004, 0.032), { p: [sx * (W / 2 - 0.012), H / 2, sz * (D / 2 - 0.012)] }),
+          0x2c2a2a,
+        ),
+      );
+  // moss over the soil, spilling over the rim in two places
+  for (let i = 0; i < (low ? 5 : 10); i++) {
+    const x = (rng() - 0.5) * (W - 0.1),
+      z = (rng() - 0.5) * (D - 0.08);
+    box.push(
+      zn(
+        Co(0.05 + 0.03 * rng(), 0.022, 0.04 + 0.02 * rng(), [x, H - 0.01, z], 8, 4),
+        i % 3 ? C.moss : C.mossLit,
+      ),
+    );
+  }
+  box.push(
+    zn(Co(0.07, 0.03, 0.025, [0.12, H - 0.02, D / 2 + 0.005], 8, 4, [0.5, 0, 0]), C.mossLit),
+    zn(Co(0.025, 0.04, 0.05, [-W / 2 - 0.005, H - 0.03, -0.05], 8, 4, [0, 0, 0.4]), C.moss),
+  );
+  // grass
+  for (let i = 0; i < (low ? 6 : 14); i++) {
+    const x = (rng() - 0.5) * (W - 0.12),
+      z = (rng() - 0.5) * (D - 0.1),
+      h = 0.1 + 0.1 * rng(),
+      a = rng() * Math.PI * 2;
+    plants.push(
+      zn(
+        Fo(
+          [
+            new He(x, H, z),
+            new He(x + 0.01 * Math.cos(a), H + h * 0.6, z + 0.01 * Math.sin(a)),
+            new He(x + 0.03 * Math.cos(a), H + h, z + 0.03 * Math.sin(a)),
+          ],
+          (t) => 0.006 * (1 - 0.8 * t),
+          3,
+        ),
+        new Vt(C.leaf).lerp(new Vt(C.leafHi), rng()).getHex(),
+      ),
+    );
+  }
+  // the sapling from Burr's seed: a thin crooked stem, a few leaves, and its seed husk at its foot
+  const stem = [
+    new He(0.02, H, 0),
+    new He(0.04, H + 0.16, -0.01),
+    new He(0.0, H + 0.32, 0.01),
+    new He(0.03, H + 0.46, 0),
+  ];
+  plants.push(
+    zn(
+      Fo(stem, (t) => 0.012 * (1 - 0.7 * t), 5),
+      0x5a4630,
+    ),
+  );
+  const curve = new Ch(stem);
+  for (let j = 0; j < (low ? 5 : 9); j++) {
+    const t = 0.35 + 0.65 * (j / (low ? 4 : 8)),
+      q = curve.getPoint(t),
+      a = j * 2.4,
+      c = [q.x + 0.05 * Math.cos(a), q.y + 0.01, q.z + 0.05 * Math.sin(a)];
+    plants.push(
+      zn(
+        Co(0.055, 0.009, 0.03, c, 7, 3, [0, -a, 0.25]),
+        new Vt(0x6f9a3e).lerp(new Vt(C.leafHi), rng()).getHex(),
+      ),
+    );
+  }
+  box.push(zn(Co(0.03, 0.02, 0.04, [0.0, H + 0.005, 0.03], 7, 4, [0.3, 0.5, 0]), C.podDark));
+  // small caps in the moss: two pale ones glow
+  for (const [x, z, r, g] of [
+    [-0.17, 0.07, 0.022, 1],
+    [-0.13, 0.09, 0.016, 0],
+    [0.17, -0.08, 0.02, 1],
+    [0.2, -0.04, 0.014, 0],
+  ].slice(0, low ? 2 : 4)) {
+    const p = huntArtCap([x, H, z], r * 1.8, r, g ? C.capHi : C.cap, { seg: low ? 5 : 7 });
+    box.push(p[0]), (g ? glows : box).push(p[1]);
+  }
+  const boxMesh = new An(mo(box), mat);
+  boxMesh.name = "Burr's meadow box";
+  group.add(boxMesh, sway);
+  sway.add(new An(mo(plants), mat));
+  const glowMesh = glows.length ? new An(mo(glows), glowMat) : null;
+  glowMesh && group.add(glowMesh);
+  let t = 0,
+    shown = -1;
+  return {
+    group,
+    update(dt = 0, { night = 0 } = {}) {
+      t += Math.min(0.1, Math.max(0, Number(dt) || 0));
+      sway.rotation.set(0.03 * Math.sin(t * 1.3), 0, 0.03 * Math.sin(t * 1.1 + 1));
+      const g = Math.round((0.3 + 0.9 * Math.max(0, Math.min(1, night))) * 40) / 40;
+      g !== shown && ((shown = g), glowMat.color.setScalar(g * 1.5));
+    },
+    dispose() {
+      group.removeFromParent?.();
+      group.traverse((o) => o.isMesh && o.geometry?.dispose?.());
+      mat.dispose(), glowMat.dispose();
+    },
+  };
+}
+// Where Burr's Seed stands on the raft, in the deck's units (as Hob's Lamp stands at the bow, 0.6, 0.24, -1.02): at the
+// stern's other corner from the brazier (-0.64, 0.84), clear of the vane's post (0.86, 1.02).
+const HUNT_ART_MOUNT = { meadow: [0.4, 0.24, 0.8], meadowScale: 1 };
+// Sporewood's hunt pieces on their own (the debug hook huntArt, ?debug=1 only), since the rules that call them are
+// built apart: show(piece) puts one in the world (Burr at his spot by the Greenhouse door, the Pacu, a cracked pod, moss
+// rafts on the water, the meadow box on the raft), scene(kind) plays HUNT_SCENES[kind] from a forced start (with `hold`,
+// held at that second), and pad(key), card(mark) and relic() draw the notepad's sketches, a catch card's mark and
+// Burr's Seed's tally picture in a plain overlay. clear() takes everything away again.
+function huntArtDebug(game) {
+  let shown = [],
+    raf = 0,
+    director = null,
+    overlay = null;
+  const quality = () => {
+      try {
+        return game.render?.getQuality?.() || "high";
+      } catch {
+        return "high";
+      }
+    },
+    waterY = (x, z) => {
+      try {
+        return Number(game.water?.getHeight?.(x, z)) || 0;
+      } catch {
+        return 0;
+      }
+    },
+    night = () => {
+      let p = game.state?.run?.phase;
+      return p === "gloomtide" ? 1 : p === "dusk" ? 0.5 : 0;
+    },
+    raftDeck = () => game.render?.scene?.getObjectByName?.("raft")?.children?.[0]?.children?.[0] ?? null;
+  function tick() {
+    raf = 0;
+    let dt = Math.min(0.1, Number(game.time?.dt) || 0.016);
+    for (let s of shown)
+      try {
+        s.tick?.(dt);
+      } catch (err) {
+        game.errors?.push?.(`huntArt.${s.name}: ${err?.message || err}`);
+      }
+    if (director)
+      try {
+        director.hold == null ? director.d.update(dt) : director.d.seek?.(director.hold);
+        director.d.state() || (director = null);
+      } catch (err) {
+        game.errors?.push?.(`huntArt.scene: ${err?.message || err}`), (director = null);
+      }
+    (shown.length || director) && (raf = requestAnimationFrame(tick));
+  }
+  const run = () => raf || (raf = requestAnimationFrame(tick));
+  // Burr's spot by the Greenhouse door, as the arena keeps it (gwGreenhouse's info.burr)
+  function burrSpot() {
+    let L = gwGreenhouseLayout(game.data?.loopPlace?.("drowned_greenhouse")?.greenhouse);
+    if (!L) return null;
+    let p = L.at(L.burr.s, L.burr.f);
+    return { x: p.x, y: L.landing.y, z: p.z, yaw: Math.atan2(L.fx, L.fz) };
+  }
+  function show(piece, o = {}) {
+    let scene = game.render?.scene,
+      low = (o.quality || quality()) === "low",
+      raft = game.player?.position,
+      at = { x: Number(o.x ?? raft?.x ?? 0), z: Number(o.z ?? raft?.z ?? 0) },
+      add = (name, obj, tick, dispose) => (
+        scene.add(obj), shown.push({ name, obj, tick, dispose }), run(), name
+      );
+    if (!scene) return null;
+    if (piece === "burr") {
+      let b = makeBurr({ low }),
+        spot = o.x != null ? { ...at, y: o.y ?? waterY(at.x, at.z), yaw: o.yaw ?? 0 } : burrSpot();
+      if (!spot) return null;
+      b.root.position.set(spot.x, spot.y, spot.z), (b.root.rotation.y = spot.yaw);
+      return add(
+        "burr",
+        b.root,
+        (dt) => b.update(dt, { raft: o.still ? null : game.player?.position, night: night() }),
+        () => b.dispose(),
+      );
+    }
+    if (piece === "pacu") {
+      let f = game.models?.createFish?.("drifting_grove", { lengthCm: o.cm ?? 330 });
+      if (!f) return null;
+      f.object3d.position.set(at.x, (o.y ?? 0) + waterY(at.x, at.z), at.z),
+        (f.object3d.rotation.y = o.yaw ?? 0);
+      f.setWet?.(o.wet ?? 0);
+      let t = 0;
+      return add(
+        "pacu",
+        f.object3d,
+        (dt) => f.update(dt, (t += dt), { swim: o.swim ?? 0.4 }),
+        () => f.dispose(),
+      );
+    }
+    if (piece === "pod") {
+      let p = makeCrackedPod({ low, open: o.open ?? 0.55 });
+      p.group.position.set(at.x, (o.y ?? 0.4) + waterY(at.x, at.z), at.z), (p.group.rotation.y = o.yaw ?? 0);
+      o.scale && p.group.scale.setScalar(o.scale);
+      return add(
+        "pod",
+        p.group,
+        (dt) => p.update(dt, o.float ? { height: waterY(p.group.position.x, p.group.position.z) } : {}),
+        () => p.dispose(),
+      );
+    }
+    if (piece === "mossRafts") {
+      let n = o.n ?? 8,
+        list = [];
+      for (let i = 0; i < n; i++) {
+        let m = makeMossRaft({ low }),
+          a = (i / n) * Math.PI * 2 + 0.4,
+          r = (o.r ?? 2.5) * (0.6 + 0.4 * ((i * 7) % 5) * 0.25);
+        m.group.position.set(at.x + Math.cos(a) * r, 0, at.z + Math.sin(a) * r), list.push(m);
+      }
+      let g = new fo();
+      g.name = "debug:mossRafts";
+      for (let m of list) g.add(m.group);
+      return add(
+        "mossRafts",
+        g,
+        (dt) => {
+          for (let m of list)
+            m.update(dt, { height: waterY(m.group.position.x, m.group.position.z), night: night() });
+        },
+        () => list.forEach((m) => m.dispose()),
+      );
+    }
+    if (piece === "meadow") {
+      let deck = raftDeck(),
+        m = makeMeadowOnRaft({ low });
+      if (!deck) return null;
+      let p = o.at || HUNT_ART_MOUNT.meadow;
+      m.group.position.set(p[0], p[1], p[2]), m.group.scale.setScalar(o.scale ?? HUNT_ART_MOUNT.meadowScale);
+      deck.add(m.group),
+        shown.push({
+          name: "meadow",
+          obj: m.group,
+          tick: (dt) => m.update(dt, { night: night() }),
+          dispose: () => m.dispose(),
+        });
+      return run(), "meadow";
+    }
+    return null;
+  }
+  function clear() {
+    for (let s of shown) {
+      try {
+        s.obj.removeFromParent?.(), s.dispose?.();
+      } catch {}
+    }
+    shown = [];
+    director && (director.d.stop(), (director = null));
+    overlay && (overlay.remove(), (overlay = null));
+  }
+  // Plays a scene from a forced start at { x, z } (else the evening's eddy); `hold` holds it at that second.
+  function playScene(kind, o = {}) {
+    let make = HUNT_SCENES[kind];
+    if (!make) return !1;
+    director && director.d.stop();
+    let d = make(game, { report: (what, err) => game.errors?.push?.(`${what}: ${err?.message || err}`) }),
+      ok = d.begin({ x: o.x, z: o.z, force: !0 });
+    if (!ok) return !1;
+    director = { d, hold: Number.isFinite(o.hold) ? o.hold : null };
+    run();
+    return !0;
+  }
+  // The overlays: a notepad page, a catch card, the tally's gift. Their words are stand-ins for these pictures only
+  // (the lake's own come with its hunt).
+  function box(html, { top = !1 } = {}) {
+    overlay && overlay.remove();
+    overlay = document.createElement("div");
+    overlay.dataset.huntArt = "overlay";
+    overlay.style.cssText = `position:fixed;inset:0;z-index:99999;display:flex;justify-content:center;align-items:${top ? "flex-start" : "center"};padding:16px;box-sizing:border-box;background:rgba(10,8,14,.6);overflow:auto`;
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    return !0;
+  }
+  const PAD_TEXT = {
+    lake: "Sporewood Pools",
+    titles: {
+      map: "Where the spores gather",
+      taken: "The island rises",
+      lineup: "The line-up",
+      swirl: "The refusal",
+      back: "What came back",
+    },
+    pages: { where: "Where", suspects: "Suspects", gear: "Gear" },
+    labels: { cup: "Mother's Cup", eddies: "eddies", greenhouse: "Burr", home: "home" },
+    map: "The pods ride the drift to one of four eddies. She feeds where they gather.",
+    taken: "A meadow rose out of the water here, and sank again.",
+    swirl: { left: "It nosed {bait} and turned away. It wants a seed, riding the drift." },
+    back: {
+      hook: "The hook came back crushed flat.",
+      leader: "The knot came back bitten halfway through.",
+      line: "The line wore thin by the rod and parted.",
+      held: "Everything held.",
+    },
+    lineup: {
+      head: "These five can crack a seed pod.",
+      frame: "It isn't any of these, so far.",
+      none: "It's none of them.",
+      fish: {
+        festival_puffer: { name: "Festival Puffer", why: "A beak. It nips two bites out of a pod." },
+        sporebelly_puffer: { name: "Sporebelly Puffer", why: "A beak too. Two nips, no teeth marks." },
+        velvet_ray: { name: "Velvet Ray", why: "Flat plates. It crushes a pod flat." },
+        razorpane_piranha: { name: "Razorpane Piranha", why: "Razor teeth. Neat rows of cuts." },
+        cindertail_catfish: { name: "Cindertail Catfish", why: "Pads. It scrubs a pod rough." },
+      },
+      marks: {
+        person: { open: "A cracked pod. Square marks, like a person's teeth." },
+        beak: { open: "Two nips, from a beak." },
+        plates: { open: "Crushed flat, from plates." },
+        razor: { open: "Rows of cuts, from razor teeth." },
+        pads: { open: "Scrubbed rough, from pads." },
+      },
+    },
+  };
+  function pad(key = "map", o = {}) {
+    const n = { map: 1, taken: 2, lineup: 3, swirl: 4, back: 5 }[key] || 1,
+      page = n < 3 ? "Where" : n === 3 ? "Suspects" : "Gear",
+      view = {
+        water: "sporewood",
+        crossed: o.crossed ?? ["festival_puffer", "velvet_ray", "razorpane_piranha"],
+        marks: o.marks ?? ["person", "beak", "plates", "razor", "pads"],
+        back: o.back ?? ["hook", "leader", "line"],
+        swirlKind: "left",
+        swirlRig: { bait: o.bait ?? "spore_cake" },
+      },
+      panels = PAD_ART.sporewood?.(key, PAD_TEXT, null, view, []);
+    if (!panels) return !1;
+    return box(
+      `<div class="gw-pad" style="width:min(100%,400px);${key === "lineup" ? "zoom:.62" : ""}"><svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="gw-pad-pencil" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="4" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.2 1.75" result="g"/><feComposite in="SourceGraphic" in2="g" operator="in"/></filter></defs></svg>` +
+        `<div class="gw-pad-sheet"><div class="gw-pad-coils">${padCoils()}</div><section class="gw-pad-page gw-on"><div class="gw-pad-head"><h2>${page}</h2><small>${PAD_TEXT.lake}</small></div>` +
+        `<figure class="gw-pad-fig" data-drawn="1" data-sketch="${key}"><div class="gw-pad-fig-h"><span class="n">${n}</span>${PAD_TEXT.titles[key]}</div><div class="gw-pad-panels">${panels}</div></figure></section></div></div>`,
+      { top: key === "lineup" },
+    );
+  }
+  const CARD_FISH = {
+    beak: "festival_puffer",
+    plates: "velvet_ray",
+    razor: "razorpane_piranha",
+    pads: "cindertail_catfish",
+    person: "seedfall_silver_dollar",
+  };
+  function card(mark = "person", fish = null) {
+    const m = PAD_MARKS[mark],
+      sp = game.data?.SPECIES_BY_ID?.[fish || CARD_FISH[mark]];
+    if (!m || !sp) return !1;
+    box(
+      `<div style="width:440px;padding:18px 20px;border-radius:14px;background:rgb(30,26,38);color:#ece8f4;font:600 20px/1.3 var(--f-body,serif);text-align:center"><div style="margin-bottom:8px">${padEsc(sp.name)}</div><div class="gw-cc-art gw-cc-marked" style="position:relative;width:400px;height:170px;margin:0 auto"></div><p style="font:italic 400 15px/1.35 var(--f-body,serif);color:#c9c6d6;margin:8px 0 0">${padEsc(PAD_TEXT.lineup.marks[mark].open)}</p></div>`,
+    );
+    const art = overlay.querySelector(".gw-cc-art"),
+      cv = document.createElement("canvas");
+    try {
+      Or(cv, sp, { w: 400, h: 170, pad: 0.05, color: "#ece8f4" });
+    } catch {}
+    return art.appendChild(cv), art.insertAdjacentHTML("beforeend", m.card), !0;
+  }
+  function relic() {
+    return box(
+      `<div style="width:420px;padding:22px;border-radius:14px;background:rgb(30,26,38);color:#ece8f4;text-align:center;font:400 17px/1.4 var(--f-body,serif)"><span style="display:block;width:200px;height:150px;margin:0 auto;color:#efd9a6">${RELIC_ART.burrs_seed}</span><b style="display:block;font-size:22px;margin-top:6px">Burr's Seed</b><p style="margin:6px 0 0">It grows into a little meadow on your raft.</p></div>`,
+    );
+  }
+  return {
+    show,
+    clear,
+    pad,
+    card,
+    relic,
+    burrSpot,
+    scene: playScene,
+    // a director of its own, driven by the caller (for the tests)
+    make: (kind) =>
+      HUNT_SCENES[kind]?.(game, {
+        report: (what, err) => game.errors?.push?.(`${what}: ${err?.message || err}`),
+      }) ?? null,
+    sceneState: () => director?.d.state() ?? null,
+    skip: () => director?.d.skip() ?? !1,
+    shown: () => shown.map((s) => s.name),
   };
 }
 function eN({
@@ -92236,12 +93349,18 @@ Object.assign(merePortraits, {
     mark: "festival",
     speed: 4.0,
   },
+  // The Meadowback Pacu, "the wandering island" (Sporewood's legend): a huge, deep pacu ("pacu" form), dark olive
+  // above with an amber-red throat and belly, teeth like a person's, and a meadow on her back ("meadow" mark): a mantle
+  // of moss spilling down her flanks, with grass, small caps and seedlings growing in it. Lying still with the water at
+  // her flanks she reads as a mossy islet.
   drifting_grove: {
-    form: "ray",
-    w: 0.43,
-    h: 0.074,
-    coat: ["353b39", "655665", "d4c3b7", "675a67", "c39d88", "9eac81"],
-    eye: 0.014,
+    form: "pacu",
+    w: 0.1,
+    h: 0.235,
+    coat: ["3a4430", "aeaa98", "d2562c", "5a4c3c", "b06c44", "23241c"],
+    dorsal: [-0.02, 0.15, 0.05],
+    tail: [0.17, 0.06],
+    eye: 0.032,
     mark: "meadow",
     speed: 2.45,
   },
@@ -92491,6 +93610,8 @@ function buildMerePortrait(id) {
     ball: [0.12, 0.22, 0.7, 0.96, 1, 0.94, 0.85, 0.69, 0.5, 0.26, 0.06],
     // The Seedfall Silver Dollar: a deep, round disc from a short tail's wrist to a blunt face.
     dollar: [0.13, 0.4, 0.82, 0.97, 1, 0.98, 0.92, 0.8, 0.62, 0.38, 0.08],
+    // The Meadowback Pacu: deep and round-backed, from a thick tail's wrist to a steep, blunt face.
+    pacu: [0.17, 0.42, 0.8, 0.97, 1, 0.99, 0.95, 0.86, 0.72, 0.48, 0.13],
     anglerfish: [0.17, 0.28, 0.54, 0.82, 0.99, 1, 0.97, 0.91, 0.74, 0.41, 0.06],
     sliver: [0.13, 0.27, 0.54, 0.85, 1, 0.97, 0.83, 0.67, 0.48, 0.22, 0.025],
     surface: [0.17, 0.25, 0.52, 0.8, 0.99, 1, 0.9, 0.72, 0.46, 0.25, 0.035],
@@ -92788,6 +93909,23 @@ function buildMerePortrait(id) {
         ink,
         0.6 * line * smooth(-0.86, -0.6, k) * smooth(-0.27, -0.2, z) * (1 - smooth(0.25, 0.3, z)),
       );
+    }
+    if (form === "pacu") {
+      // The pacu: dark olive along the back, silver-bronze down the flanks with a brighter band along the middle, an
+      // orange-red throat and belly, the top of the back stained green where the moss grows, and the mouth's gap.
+      // her own gradient over the default one: silver-bronze flanks under a dark olive back, the orange-red low on the
+      // belly and up the throat
+      let g = mix(side, back, smooth(0.2, 0.78, k));
+      g = mix(g, color("c8b48a"), 0.3 * exp(-((k - 0.02) ** 2) / 0.05));
+      const red =
+        (1 - smooth(-0.82, -0.5, k)) * smooth(-0.36, -0.08, z) +
+        (1 - smooth(-0.4, 0.05, k)) * smooth(0.24, 0.36, z);
+      g = mix(g, belly, min(1, red));
+      c = mix(c, g, 0.88);
+      const stain = 0.5 + 0.5 * sin(41 * z + 6 * k) * cos(23 * k - 17 * z);
+      c = mix(c, mix(color("2e4224"), color("4e6630"), stain), 0.75 * smooth(0.48, 0.72, k));
+      const gap = smooth(0.418, 0.446, z) * (1 - smooth(0.05, 0.11, abs(k + 0.2)));
+      c = mix(c, dark, 0.92 * gap);
     }
     if (mark === "dollar") {
       // The Silver Dollar's mouth: a dark gap between its lips, where the teeth show.
@@ -93342,7 +94480,7 @@ function buildMerePortrait(id) {
         detail.oval(p.clone().add(vec(s * 0.003, 0, 0)), 0.003, 0.009, 0.012, color("c5773b"));
       }
     }
-    if (mark === "dollar")
+    if (mark === "dollar" || form === "pacu")
       // Teeth like a person's: two rows of flat, square front teeth, upper and lower, in the mouth's gap.
       for (const [row, k0] of [
         [0, -0.09],
@@ -94030,6 +95168,192 @@ function buildMerePortrait(id) {
         }
     }
   }
+  // The Meadowback Pacu's meadow (form "pacu"): a thick, lumpy mantle of moss over her back from behind the head to the
+  // tail's wrist, spilling down her flanks to a dark wet hem, with cushions of moss, tufts of grass, small caps (a few
+  // glowing, as Sporewood's caps do), seedlings with two leaves, two saplings and a few pale flowers. Some moss creeps
+  // onto her forehead. All of it is in her own units (her length is 1).
+  function meadowBack() {
+    // (a cheap oval, 48 triangles, for the meadow's many small things)
+    const bead = (c, rx, ry, rz, col) =>
+      detail.sheet(
+        6,
+        4,
+        (u, v) => {
+          const a = tau * u,
+            b = pi * (0.001 + 0.998 * v);
+          return vec(c.x + rx * cos(a) * sin(b), c.y + ry * cos(b), c.z + rz * sin(a) * sin(b));
+        },
+        () => col,
+        true,
+      );
+    const z0 = -0.28,
+      z1 = 0.35,
+      spread = 1.22,
+      mossDeep = color("2f5228"),
+      mossLit = color("74a83c"),
+      mossDry = color("a8c052"),
+      mossWet = color("1e3a24"),
+      grassLo = color("2f6420"),
+      grassHi = color("78b440"),
+      // a point on her skin at (z, a), pushed out along its normal by `out`, and that normal
+      onBack = (z, a, out = 0) => {
+        const f = cross(z),
+          n = vec(cos(a) / max(0.01, f.w), sin(a) / max(0.01, f.h), 0).normalize();
+        return {
+          p: vec(f.x + f.w * cos(a) + n.x * out, f.y + f.h * sin(a) + n.y * out, z),
+          n,
+        };
+      },
+      lump = (z, a) => 0.5 + 0.5 * sin(z * 57 + 3 * cos(a * 5)) * cos(a * 7 - z * 21),
+      // the mantle's thickness, nothing at its edges, a mound along the spine
+      // (how far down her flanks it reaches, ragged along her length, so its hem is not a ruled line)
+      sp = (z) => spread * (0.86 + 0.1 * sin(z * 41 + 1) + 0.06 * sin(z * 97 + 2)),
+      thick = (z, a) => {
+        const u = sat((z - z0) / (z1 - z0)),
+          v = sat((a - (pi / 2 - sp(z))) / (2 * sp(z)));
+        return 0.0015 + 0.058 * sin(pi * u) ** 0.5 * sin(pi * v) ** 0.9 * (0.68 + 0.64 * lump(z, a));
+      },
+      top = (z, a) => onBack(z, a, thick(z, a)),
+      mossAt = (z, a) => {
+        const v = sat((a - (pi / 2 - sp(z))) / (2 * sp(z))),
+          hem = 1 - smooth(0.04, 0.2, min(v, 1 - v)),
+          l = lump(z, a);
+        let c = mix(mossDeep, mossLit, smooth(0.2, 0.9, l));
+        c = mix(c, mossDry, 0.45 * smooth(0.75, 1, l) * sin(pi * v));
+        return mix(c, mossWet, 0.6 * hem);
+      };
+    detail.sheet(
+      34,
+      52,
+      (u, v) => {
+        const z = z0 + (z1 - z0) * v;
+        return top(z, pi / 2 - sp(z) + 2 * sp(z) * u).p;
+      },
+      (u, v) => {
+        const z = z0 + (z1 - z0) * v;
+        return mossAt(z, pi / 2 - sp(z) + 2 * sp(z) * u);
+      },
+      false,
+    );
+    // a spot on the meadow, kept off its hem
+    const spot = (edge = 0.8, zr = [z0 + 0.03, z1 - 0.04]) => {
+      const z = zr[0] + (zr[1] - zr[0]) * rnd(),
+        a = pi / 2 + (rnd() * 2 - 1) * spread * edge;
+      return top(z, a);
+    };
+    // cushions of moss
+    for (let i = 0; i < 30; i++) {
+      const { p, n } = spot(0.85),
+        r = 0.008 + 0.026 * rnd() ** 2;
+      bead(p.addScaledVector(n, r * 0.15), r * 1.2, r * 0.5, r * 1.3, mix(mossLit, mossDry, rnd() * 0.6));
+    }
+    // moss on the forehead, thinning towards the eyes
+    for (let i = 0; i < 9; i++) {
+      const z = z1 - 0.01 + 0.07 * rnd(),
+        a = pi / 2 + (rnd() * 2 - 1) * 0.5 * (1 - (z - z1) / 0.08),
+        { p } = onBack(z, a, 0.002),
+        r = 0.008 + 0.008 * rnd();
+      bead(p, r, r * 0.45, r * 1.2, mix(mossDeep, mossLit, rnd()));
+    }
+    // tufts of grass: a few thin blades, leaning
+    for (let i = 0; i < 58; i++) {
+      const { p, n } = spot(i < 36 ? 0.45 : 0.82),
+        lean = vec((rnd() - 0.5) * 0.6, 0, (rnd() - 0.5) * 0.6),
+        blades = 5 + Math.floor(rnd() * 4);
+      for (let j = 0; j < blades; j++) {
+        const h = (i < 36 ? 0.06 : 0.035) + 0.06 * rnd(),
+          b = p.clone().add(vec((rnd() - 0.5) * 0.008, -0.002, (rnd() - 0.5) * 0.008)),
+          dir = n
+            .clone()
+            .add(lean)
+            .add(vec((rnd() - 0.5) * 0.7, 0, (rnd() - 0.5) * 0.7))
+            .normalize(),
+          end = b.clone().addScaledVector(dir, h);
+        end.y -= h * 0.15 * rnd();
+        limb(
+          detail,
+          [b, b.clone().lerp(end, 0.55).addScaledVector(n, 0.003), end],
+          0.0048,
+          0.0008,
+          grassLo,
+          mix(grassHi, color("a8c858"), rnd() * 0.4),
+          4,
+          3,
+        );
+      }
+    }
+    // seedlings: a thin stem and two leaves
+    for (let i = 0; i < 14; i++) {
+      const { p } = spot(0.6),
+        h = 0.022 + 0.022 * rnd(),
+        tip = p.clone().add(vec((rnd() - 0.5) * 0.004, h, (rnd() - 0.5) * 0.004)),
+        turn = rnd() * pi,
+        leaf = mix(color("7ea24a"), color("c4cf78"), rnd());
+      limb(detail, [p, p.clone().lerp(tip, 0.5), tip], 0.0011, 0.0008, grassLo, leaf, 3, 3);
+      for (const sgn of [-1, 1]) {
+        const c = tip.clone().add(vec(sgn * 0.009 * cos(turn), 0.002, sgn * 0.009 * sin(turn)));
+        bead(c, 0.01, 0.0018, 0.0055, leaf);
+      }
+    }
+    // two saplings: a crooked stem with a few leaves
+    for (let i = 0; i < 2; i++) {
+      const { p } = top(i ? -0.08 : 0.17, pi / 2 + (i ? 0.25 : -0.2)),
+        h = 0.11 + 0.025 * i,
+        stem = [
+          p,
+          p.clone().add(vec(0.004, h * 0.4, -0.003)),
+          p.clone().add(vec(-0.003, h * 0.75, 0.004)),
+          p.clone().add(vec(0.002, h, 0)),
+        ];
+      limb(detail, stem, 0.0035, 0.0012, color("4a3a2a"), color("6a5a3a"), 6, 4);
+      for (let j = 0; j < 6; j++) {
+        const t = 0.45 + 0.55 * (j / 5),
+          q = new T.CatmullRomCurve3(stem).getPoint(t),
+          a = j * 2.4 + i,
+          c = q.add(vec(0.017 * cos(a), 0.006, 0.017 * sin(a)));
+        bead(c, 0.017, 0.003, 0.01, mix(color("6f8f3e"), color("b8c46a"), rnd()));
+      }
+    }
+    // small caps: three of the game's own (one glowing), and more, simpler, in clusters
+    for (let i = 0; i < 2; i++) {
+      const { p } = spot(0.55, [z0 + 0.08, z1 - 0.1]);
+      mushroom(
+        p,
+        0.05 + 0.02 * rnd(),
+        0.02 + 0.01 * rnd(),
+        mix(color("b88a62"), color("e0b07a"), rnd()),
+        i === 0,
+        0.12,
+      );
+    }
+    for (let i = 0; i < 9; i++) {
+      const { p } = spot(0.7),
+        h = 0.016 + 0.02 * rnd(),
+        r = 0.007 + 0.008 * rnd(),
+        glow = i % 4 === 0,
+        cap = mix(color("c99b6a"), color("efc98e"), rnd()),
+        head = p.clone().add(vec(r * 0.2, h, 0));
+      limb(
+        detail,
+        [p, p.clone().lerp(head, 0.5), head],
+        r * 0.22,
+        r * 0.18,
+        mix(cream, mossDry, 0.4),
+        cream,
+        3,
+        4,
+      );
+      bead(head, r, r * 0.55, r, cap);
+      if (glow) shine(head.clone().add(vec(0, -r * 0.3, 0)), [r * 0.75, r * 0.3, r * 0.75], color("ffd49a"));
+    }
+    // a few pale flowers
+    for (let i = 0; i < 8; i++) {
+      const { p, n } = spot(0.7),
+        c = p.clone().addScaledVector(n, 0.012 + 0.01 * rnd());
+      limb(detail, [p, c], 0.0012, 0.001, grassLo, grassLo, 2, 3);
+      bead(c, 0.0055, 0.0028, 0.0055, i % 3 ? cream : color("eeb0c8"));
+    }
+  }
   function crayfish() {
     // Vaulted carapace, six interlocking tail plates and a splayed five-leaf tail fan.
     skin.sheet(
@@ -94230,6 +95554,7 @@ function buildMerePortrait(id) {
     sideDetails(1);
     signature();
     sporeFinish();
+    form === "pacu" && meadowBack();
   } else crayfish();
   return {
     body: skin.finish(),
@@ -111946,6 +113271,457 @@ function birdSceneDirector(game, { report = () => {} } = {}) {
     state: () => (scene ? { t: Math.round(scene.t * 100) / 100, x: scene.x, z: scene.z } : null),
   };
 }
+// ---- Sporewood's two scenes (sporewood-plan.md beats 9 and 10), directors with the bird's contract: made with
+// (game, { report }), they offer begin, update, skip, stop and state. begin(at) plays at once if the game can show a
+// scene now (on the water, no other scene or lift): the hunt's rules decide when, and call it only then. `at` is
+// where ({ x, z }); left out, the evening's eddy (sporeDriftOf). She comes up at that spot, or, when the raft is
+// nearer to it than `near` metres, that far from the raft towards it, so she never rises under the raft. The scene
+// stops the evening's clock (game.cinematic), frames her with the landmark camera, and on its end (played out or
+// skipped) shows the line Ca.hunts[water].time[rule.line] if there is one. Its timing is HUNT_SCENE_RULES[kind],
+// with any of it overridden by the lake's entry (wo.hunts[water].scenes[kind]). Events on the bus:
+// "hunt:islandScene" and "hunt:crunchScene", { phase: "start" | "crunch" | "end", x, z, skipped }.
+// What it builds (her model, a few pods, their material) is made at begin and freed at its end, so it costs
+// nothing while it does not play.
+const HUNT_SCENE_RULES = {
+  // The island rises: the water bulges, a meadow rises with water streaming off its moss, an eye shows as she lifts
+  // her head, her broad tail as she dives, and the pods swirl in her wake.
+  island: {
+    length: 10,
+    near: 8,
+    cm: 520,
+    bulgeAt: 0.3,
+    riseAt: 1.2,
+    riseEnd: 3.8,
+    lookAt: 4.3,
+    lookEnd: 5.8,
+    diveAt: 5.9,
+    diveEnd: 8.6,
+    pods: { high: 9, medium: 7, low: 5 },
+    frame: { r: 2.4, dist: 6.2, elev: 24, turn: 0.75 },
+    back: 0.9,
+    line: "islandRose",
+  },
+  // The crunch: her back breaks the surface among the pods, her blunt head comes up at one, she cracks it (a crunch
+  // you hear) and slips under.
+  crunch: {
+    length: 7.2,
+    near: 7,
+    cm: 520,
+    podScale: 1.7,
+    riseAt: 0.4,
+    riseEnd: 1.9,
+    headAt: 1.9,
+    crunchAt: 3.3,
+    sinkAt: 4.4,
+    sinkEnd: 6.2,
+    pods: { high: 8, medium: 6, low: 4 },
+    frame: { r: 1.4, dist: 5.6, elev: 18, turn: 0.75 },
+    back: 0.8,
+    line: "crunched",
+  },
+};
+function sporeSceneDirector(kind, game, { report = () => {} } = {}) {
+  const base = HUNT_SCENE_RULES[kind],
+    event = `hunt:${kind}Scene`;
+  let scene = null;
+  const tmp = { m4: new Lo(), qt: new ea(), e3: new Ai(), p3: new He(), sc: new He(1, 1, 1) },
+    safe = (what, fn) => {
+      try {
+        return fn();
+      } catch (err) {
+        report(`${kind}Scene.${what}`, err);
+      }
+    },
+    emit = (name, payload) => safe("emit", () => game.bus?.emit?.(name, payload)),
+    ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x)),
+    span = (t, a, b) => ease((t - a) / Math.max(0.001, b - a)),
+    waterY = (x, z) => safe("water", () => Number(game.water?.getHeight?.(x, z)) || 0) || 0,
+    quality = () => safe("quality", () => game.render?.getQuality?.()) || "high";
+  // Where she comes up: `at`, or the evening's eddy; kept `near` metres from the raft.
+  function spot(at, rule) {
+    let run = game.state?.run,
+      p = at && Number.isFinite(at.x) && Number.isFinite(at.z) ? at : null;
+    if (!p) {
+      let drift = safe("drift", () => sporeDriftOf(run?.evening, run?.zone));
+      p = drift?.eddy ? { x: drift.eddy.x, z: drift.eddy.z } : null;
+    }
+    if (!p) return null;
+    let raft = game.player?.position,
+      rx = Number.isFinite(raft?.x) ? raft.x : p.x,
+      rz = Number.isFinite(raft?.z) ? raft.z : p.z + 1,
+      dx = p.x - rx,
+      dz = p.z - rz,
+      d = Math.hypot(dx, dz);
+    if (d < 0.5) {
+      // on top of it: out ahead of the raft
+      let yaw = Number(game.player?.heading) || 0;
+      (dx = -Math.sin(yaw)), (dz = -Math.cos(yaw)), (d = 1);
+    }
+    let k = d < rule.near ? rule.near / d : 1;
+    return { x: rx + dx * k, z: rz + dz * k, ux: dx / d, uz: dz / d };
+  }
+  function begin(at = null) {
+    let run = game.state?.run;
+    if (scene || !base || game.flow !== "playing" || game.cinematic === !0 || !run) return !1;
+    let rule = { ...base, ...(wo.hunts?.[run.zone]?.scenes?.[kind] || {}) },
+      where = spot(at, rule),
+      root = game.render?.scene;
+    if (!where || !root) return !1;
+    // she lies across the camera's view, side on, her head to the camera's right
+    let yaw = Math.atan2(where.ux, where.uz) - Math.PI / 2,
+      q = quality(),
+      low = q === "low",
+      fish = safe("fish", () => game.models?.createFish?.("drifting_grove", { lengthCm: rule.cm }));
+    if (!fish?.object3d) return !1;
+    fish.object3d.name = `huntScene:${kind}`;
+    root.add(fish.object3d);
+    // the pods about her: a few seed pods, the seedfall's own shape and colour, as one instanced mesh
+    let nPods = Math.max(0, Math.trunc(rule.pods?.[q] ?? rule.pods?.low ?? 0)),
+      podGeo = new Ao(0.11, 7, 5),
+      podMat = sa({ color: DRIFT_FX.pod, rim: 0.4, rimColor: 0xf6e2a8, steps: 3 }),
+      pods = new Xi(podGeo, podMat, Math.max(1, nPods)),
+      rng = jc(kind === "island" ? 9301 : 9302),
+      list = [];
+    podGeo.scale(1, 0.75, 1.55);
+    (pods.name = `huntScene:${kind}:pods`), (pods.frustumCulled = !1), (pods.count = nPods);
+    Ws(pods, { cast: !1, reflect: !1 });
+    for (let i = 0; i < nPods; i++)
+      list.push({
+        a: (i / Math.max(1, nPods)) * Math.PI * 2 + rng() * 0.5,
+        r: kind === "island" ? 2.6 + 2 * rng() : 0.9 + 1.6 * rng(),
+        spin: rng() * 6,
+        ph: rng() * 6,
+      });
+    root.add(pods);
+    // the crunch's pod: the one she cracks, at her mouth when her head comes up
+    let pod = kind === "crunch" ? safe("pod", () => makeCrackedPod({ open: 0, low, glow: !0 })) : null;
+    // (larger than the drifting pods, so it reads at her mouth)
+    pod && (pod.group.scale.setScalar(rule.podScale ?? 1.7), root.add(pod.group));
+    // the pieces it breaks into: small shards of shell, flung out and floating
+    let shards = null;
+    if (pod) {
+      let n = low ? 4 : 8,
+        geo = Co(0.075, 0.03, 0.1, [0, 0, 0], 6, 4),
+        mat = sa({
+          color: HUNT_ART_C.podFlesh,
+          rim: 0.5,
+          rimColor: 0xf6e2a8,
+          emissive: 0x5a3810,
+          emissiveIntensity: 0.8,
+        }),
+        mesh = new Xi(geo, mat, n);
+      (mesh.name = `huntScene:${kind}:shards`), (mesh.frustumCulled = !1), (mesh.count = 0), root.add(mesh);
+      shards = { mesh, geo, mat, list: [] };
+      for (let i = 0; i < n; i++) {
+        let a = (i / n) * Math.PI * 2 + rng() * 0.6;
+        shards.list.push({ a, v: 0.9 + 0.9 * rng(), up: 1.4 + 1.2 * rng(), spin: rng() * 6 });
+      }
+    }
+    scene = {
+      t: 0,
+      x: where.x,
+      z: where.z,
+      ux: where.ux,
+      uz: where.uz,
+      yaw,
+      rule,
+      low,
+      fish,
+      pods,
+      podGeo,
+      podMat,
+      list,
+      pod,
+      shards,
+      fired: {},
+      drip: 0,
+      cracked: null,
+      words: huntTimeWords(run.zone),
+      len: fish.length || rule.cm / 100,
+    };
+    game.cinematic = !0;
+    // the spore drift's band and eddy fade down while she is up, and come back after (sporeDriftFx reads it)
+    game.sceneHush = 1;
+    // the camera looks at her from the raft's side, turned off the line from the raft so the raft is out of the way
+    // (`side` is the way from her to the camera)
+    let turn = rule.frame?.turn ?? 0.6,
+      sx = -where.ux * Math.cos(turn) + where.uz * Math.sin(turn),
+      sz = -where.ux * Math.sin(turn) - where.uz * Math.cos(turn);
+    // (the crunch is framed on her mouth where it cracks the pod, ahead of her middle along her heading)
+    let lead = kind === "crunch" ? 0.62 * (rule.cm / 100) : 0,
+      hx = Math.sin(yaw) * lead,
+      hz = Math.cos(yaw) * lead;
+    safe("frame", () =>
+      game.render?.frameLandmark?.(
+        { x: where.x + hx, y: 0.4, z: where.z + hz, ...rule.frame, side: [sx, sz] },
+        { dur: rule.length - rule.back, back: rule.back },
+      ),
+    );
+    pose(0, 0);
+    emit(event, { phase: "start", x: where.x, z: where.z });
+    return !0;
+  }
+  // Where her middle is (x, y, z) and how she is turned, at time t; and the pods.
+  function pose(t, dt) {
+    let s = scene,
+      { rule, x, z, len } = s,
+      o = s.fish.object3d,
+      w = waterY(x, z),
+      // (her body's top is about a quarter of her length above her middle: lying still, the water is at her flanks)
+      still = w - 0.13 * len,
+      deep = w - 0.45 * len,
+      y = deep,
+      pitch = 0,
+      roll = 0,
+      ahead = 0;
+    if (kind === "island") {
+      let up = span(t, rule.riseAt, rule.riseEnd),
+        heave = Math.sin(
+          Math.min(1, Math.max(0, (t - rule.riseAt) / (rule.riseEnd - rule.riseAt + 0.8))) * Math.PI,
+        );
+      y = deep + (still - deep) * up + 0.06 * len * heave * (1 - up * 0.6);
+      // she lifts her head: her eye shows; then she dives, her tail rising as her head goes down
+      let look = span(t, rule.lookAt, rule.lookAt + 0.6) * (1 - span(t, rule.lookEnd - 0.4, rule.lookEnd)),
+        dive = span(t, rule.diveAt, rule.diveEnd);
+      pitch = -0.26 * look + 0.85 * Math.sin(Math.min(1, dive * 1.6) * Math.PI * 0.5) * (1 - 0.45 * dive);
+      y += 0.05 * len * look - (still - deep + 0.1 * len) * dive ** 1.7;
+      roll = 0.06 * look;
+      ahead = 0.25 * len * dive;
+      t < rule.riseAt && (y = deep);
+    } else {
+      let up = span(t, rule.riseAt, rule.riseEnd),
+        head = span(t, rule.headAt, rule.headAt + 1.1),
+        sink = span(t, rule.sinkAt, rule.sinkEnd),
+        chew = t > rule.crunchAt && t < rule.sinkAt ? 0.04 * Math.sin((t - rule.crunchAt) * 14) : 0;
+      // only her back breaks the surface; then her head comes up, and she slips under nose first
+      y = deep + (w - 0.2 * len - deep) * up;
+      pitch = -0.55 * head * (1 - sink) + chew + 0.4 * sink;
+      y += 0.09 * len * head * (1 - sink) - (w - 0.2 * len - deep + 0.1 * len) * sink ** 1.3;
+      ahead = 0.18 * len * up + 0.2 * len * sink;
+    }
+    // her heading is along +z turned by yaw; `ahead` moves her forward along it
+    let fx = Math.sin(s.yaw),
+      fz = Math.cos(s.yaw);
+    o.position.set(x + fx * ahead, y, z + fz * ahead);
+    o.rotation.set(pitch, s.yaw, roll, "YXZ");
+    s.fish.setWet?.(y > deep + 0.1 ? 1 : 0);
+    s.fish.update(dt, t, { swim: 0.25 });
+    // the pods: bobbing on the water about her; when she goes down they swirl in her wake
+    let { m4, qt, e3, p3, sc } = tmp,
+      swirl =
+        kind === "island" ? span(t, rule.diveAt, rule.diveAt + 1.2) : span(t, rule.sinkAt, rule.sinkAt + 0.8),
+      settle = kind === "island" ? span(t, rule.length - 1.5, rule.length + 2) : 0;
+    for (let i = 0; i < s.list.length; i++) {
+      let p = s.list[i],
+        push =
+          kind === "crunch"
+            ? 0.8 * span(t, rule.riseAt, rule.riseEnd)
+            : 0.6 * span(t, rule.riseAt, rule.riseEnd),
+        turn =
+          swirl *
+          (1.8 + 0.4 * i) *
+          (t - (kind === "island" ? rule.diveAt : rule.sinkAt)) *
+          (1 - 0.5 * settle),
+        r = (p.r + push) * (1 - 0.45 * swirl * (1 - settle)),
+        a = p.a + Math.max(0, turn) * 0.6,
+        px = x + Math.cos(a) * r,
+        pz = z + Math.sin(a) * r;
+      e3.set(0.25 * Math.sin(t * 1.4 + p.ph), p.spin + a * 1.5, 0.2);
+      qt.setFromEuler(e3);
+      p3.set(px, waterY(px, pz) + 0.04 + 0.025 * Math.sin(t * 2 + p.ph) - 0.06 * swirl * (1 - settle), pz);
+      s.pods.setMatrixAt(i, m4.compose(p3, qt, sc));
+    }
+    s.pods.instanceMatrix.needsUpdate = !0;
+    // the crunch's pod, at her mouth: whole until she cracks it, then two halves turning apart on the water
+    if (s.pod) {
+      let nose = 0.6 * len,
+        mx = o.position.x + fx * nose * Math.cos(pitch),
+        mz = o.position.z + fz * nose * Math.cos(pitch),
+        float = waterY(mx, mz) + 0.05;
+      if (t < rule.crunchAt) {
+        let lift = span(t, rule.headAt + 0.4, rule.crunchAt - 0.1);
+        s.pod.group.position.set(mx, float + 0.28 * lift, mz);
+        s.pod.group.rotation.set(0.3 * lift, s.yaw + Math.PI / 2, 0.15 * Math.sin(t * 2));
+        s.pod.setOpen(0);
+      } else {
+        let k = span(t, rule.crunchAt, rule.crunchAt + 0.35),
+          drift = span(t, rule.crunchAt, rule.length) * 0.6;
+        s.pod.setOpen(k);
+        s.pod.group.position.set(
+          mx + fx * drift,
+          float + 0.1 * (1 - span(t, rule.crunchAt + 0.3, rule.crunchAt + 1)),
+          mz + fz * drift,
+        );
+        s.pod.group.rotation.set(0.3 * (1 - k), s.yaw + Math.PI / 2 + 0.5 * k, 0.1 * Math.sin(t * 2.3));
+      }
+    }
+    if (s.shards && s.cracked) {
+      let { mesh, list } = s.shards,
+        k = t - rule.crunchAt,
+        c = s.cracked;
+      mesh.count = list.length;
+      for (let i = 0; i < list.length; i++) {
+        let p = list[i],
+          px = c.x + Math.cos(p.a) * p.v * Math.min(k, 0.9),
+          pz = c.z + Math.sin(p.a) * p.v * Math.min(k, 0.9),
+          wy = waterY(px, pz) + 0.02,
+          py = Math.max(wy + 0.015 * Math.sin(t * 3 + i), c.y + p.up * k - 4.5 * k * k);
+        tmp.e3.set(p.spin * k, p.spin + k * 2, 0.4 * Math.sin(t + i));
+        tmp.qt.setFromEuler(tmp.e3);
+        tmp.p3.set(px, py, pz);
+        mesh.setMatrixAt(i, tmp.m4.compose(tmp.p3, tmp.qt, tmp.sc));
+      }
+      mesh.instanceMatrix.needsUpdate = !0;
+    }
+    return { y, w, mx: o.position.x, mz: o.position.z, fx, fz, pitch };
+  }
+  // Moments (once each) and what runs while she is up (water off her moss); `frameDt` drives the water's drops.
+  function step(dt, frameDt = dt) {
+    let s = scene,
+      { rule, x, z, len } = s,
+      once = (key, at, fn) => !s.fired[key] && s.t >= at && ((s.fired[key] = !0), safe(key, fn));
+    s.t += dt;
+    let t = s.t,
+      at = pose(t, frameDt),
+      fx3 = game.fishing?.fx,
+      drops = s.low ? 1 : 3;
+    if (kind === "island") {
+      once("bulge", rule.bulgeAt, () => {
+        game.water?.addRipple?.(x, z, 0.8, { kind: "boil", size: 3.2 });
+        game.audio?.play?.("splash_small", { volume: 0.5, pitch: 0.45 });
+      });
+      once("bulge2", rule.bulgeAt + 0.6, () => game.water?.addRipple?.(x, z, 0.7));
+      once("break", rule.riseAt + 0.8, () => {
+        game.water?.splash?.(at.mx, at.mz, { size: 2, count: s.low ? 18 : 34 });
+        game.water?.addRipple?.(x, z, 0.9);
+        game.audio?.play?.("splash_big", { volume: 0.7, pitch: 0.55 });
+      });
+      once("ring", rule.riseEnd - 0.4, () => game.water?.addRipple?.(x, z, 0.6, 0.5));
+      once("dive", rule.diveAt + 0.9, () => {
+        game.water?.splash?.(at.mx - at.fx * 0.4 * len, at.mz - at.fz * 0.4 * len, {
+          size: 1.6,
+          count: s.low ? 14 : 26,
+        });
+        game.audio?.play?.("splash_big", { volume: 0.55, pitch: 0.7 });
+      });
+      once("under", rule.diveEnd - 0.4, () => {
+        game.water?.addRipple?.(x, z, 0.9);
+        game.water?.addRipple?.(x, z, 0.8, { kind: "boil", size: 2.6 });
+      });
+      // water streams off her moss while she is up: drops falling from along the meadow's edges
+      if (fx3 && t > rule.riseAt + 0.9 && t < rule.diveAt + 1.2 && frameDt > 0) {
+        s.drip += frameDt * (t < rule.riseEnd + 1 ? 14 : 5) * (s.low ? 0.4 : 1);
+        for (; s.drip >= 1; s.drip--) {
+          let u = Math.random() - 0.5,
+            side = Math.random() < 0.5 ? -1 : 1,
+            px = at.mx + at.fx * u * 0.55 * len + Math.cos(s.yaw) * side * 0.06 * len,
+            pz = at.mz + at.fz * u * 0.55 * len - Math.sin(s.yaw) * side * 0.06 * len,
+            top = at.y + 0.26 * len * (1 - 2.4 * u * u);
+          top > at.w + 0.05 &&
+            safe("drip", () =>
+              fx3.burst(px, top, pz, {
+                color: 0xcfe2e0,
+                color2: 0x9fbcb8,
+                count: drops,
+                spread: 0.25,
+                up: 0.1,
+                gravity: 8,
+                size: 0.05,
+                life: 0.6,
+                drag: 0.4,
+                radius: 0.12,
+              }),
+            );
+        }
+      }
+    } else {
+      once("back", rule.riseAt + 0.6, () => {
+        game.water?.addRipple?.(at.mx, at.mz, 0.8);
+        game.water?.splash?.(at.mx, at.mz, { size: 1, count: s.low ? 10 : 18 });
+      });
+      once("head", rule.headAt + 0.5, () =>
+        game.water?.addRipple?.(at.mx + at.fx * 0.4 * len, at.mz + at.fz * 0.4 * len, 0.6),
+      );
+      once("crunch", rule.crunchAt, () => {
+        let p = s.pod?.group?.position || { x: at.mx, y: at.w, z: at.mz };
+        s.cracked = { x: p.x, y: p.y, z: p.z };
+        game.audio?.play?.("pod_crunch", { volume: 1 });
+        fx3?.burst?.(p.x, p.y + 0.05, p.z, {
+          color: HUNT_ART_C.podFlesh,
+          color2: HUNT_ART_C.pod,
+          count: s.low ? 10 : 24,
+          spread: 1.1,
+          up: 1.8,
+          gravity: 7,
+          size: 0.07,
+          life: 0.8,
+          drag: 0.8,
+          radius: 0.08,
+        });
+        game.water?.splash?.(p.x, p.z, { size: 1.2, count: s.low ? 12 : 24 });
+        game.water?.addRipple?.(p.x, p.z, 0.9);
+        emit(event, { phase: "crunch", x: p.x, z: p.z });
+      });
+      once("sink", rule.sinkAt + 0.5, () => {
+        game.water?.addRipple?.(at.mx, at.mz, 0.8);
+        game.water?.splash?.(at.mx, at.mz, { size: 0.9, count: s.low ? 8 : 14 });
+      });
+      once("under", rule.sinkEnd - 0.3, () => game.water?.addRipple?.(x, z, 0.7, 0.4));
+    }
+  }
+  function update(dt) {
+    if (!scene) return;
+    if (game.flow !== "playing" || !game.state?.run) return void stop();
+    if (game.paused || !(dt > 0)) return;
+    step(Math.min(dt, 0.25));
+    scene.t >= scene.rule.length && finish(!1);
+  }
+  // Everything she brought is put away and freed.
+  function putAway() {
+    let s = scene;
+    scene = null;
+    if (!s) return;
+    safe("free", () => {
+      s.fish.dispose();
+      s.pods.removeFromParent(), s.podGeo.dispose(), s.podMat.dispose(), s.pods.dispose?.();
+      s.pod?.dispose();
+      s.shards && (s.shards.mesh.removeFromParent(), s.shards.geo.dispose(), s.shards.mat.dispose());
+    });
+    game.sceneHush = 0;
+    game.cinematic = !1;
+    return s;
+  }
+  function finish(skipped) {
+    if (!scene) return !1;
+    let { rule, words, x, z } = scene;
+    skipped && safe("frame", () => game.render?.frameLandmark?.(null, { back: rule.back }));
+    putAway();
+    rule.line && words?.[rule.line] && emit("toast", { text: words[rule.line], kind: "lore" });
+    emit(event, { phase: "end", skipped, x, z });
+    return !0;
+  }
+  function stop() {
+    if (!scene) return;
+    let { rule } = scene;
+    safe("frame", () => game.render?.frameLandmark?.(null, { back: rule.back }));
+    putAway();
+  }
+  return {
+    begin,
+    update,
+    skip: () => finish(!0),
+    stop,
+    state: () => (scene ? { kind, t: Math.round(scene.t * 100) / 100, x: scene.x, z: scene.z } : null),
+    // (for pictures and tests: plays on to second t and holds there, the water still running)
+    seek(t) {
+      if (!scene) return !1;
+      for (let n = 0; scene.t < t - 1e-6 && n < 400; n++) step(Math.min(0.1, t - scene.t));
+      return step(0, Math.min(0.1, Number(game.time?.dt) || 0.016)), !0;
+    },
+  };
+}
+HUNT_SCENES.island = (game, opts) => sporeSceneDirector("island", game, opts);
+HUNT_SCENES.crunch = (game, opts) => sporeSceneDirector("crunch", game, opts);
 // One roll of a legend's bite for a cast, at its chance per cast (legendBaitChance). 1 or more always bites.
 function rollLegendBite(chance, rng) {
   return chance >= 1 || rng() < chance;
@@ -175233,6 +177009,935 @@ function tallyHuntBlock(h, text, beat, now) {
 const HOBS_LAMP_ART =
   '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 8V20" stroke-width="2.4"/><path d="M88 30L100 20L112 30Z" stroke-width="3.2"/><path d="M90 30H110V62H90Z" stroke-width="3.6"/><path d="M100 38C95 44 95 50 100 54C105 50 105 44 100 38Z" stroke-width="2.4"/><path d="M86 62H114" stroke-width="3.6"/><path d="M100 62V132" stroke-width="4"/><path d="M84 132H116" stroke-width="3.2"/><path d="M70 44C66 40 66 34 70 30M130 44C134 40 134 34 130 30" stroke-width="1.6" stroke-opacity=".5"/><path d="M60 140H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>';
 const RELIC_ART = { hobs_lamp: HOBS_LAMP_ART };
+// ---- Sporewood's notepad (PAD_ART.sporewood): its five sketches in the same pencil as Mossmere's, by the same keys
+// (map, taken, lineup, swirl, back; almanac, island and refusal are taken as map, taken and swirl). Its words come
+// from the lake's own (Ca.hunts.sporewood.pad), its labels from text.labels: cup, eddies, greenhouse, home (sketch
+// 1); its line-up from the hunt's lineup, with PAD_MARKS for the marks strip. Nothing on it shows or names her.
+// The five crushers, traced once from their field-guide portraits as Mossmere's were (200 units long, `h` high),
+// and their eyes, gills, fins and marks.
+Object.assign(PAD_FISH, {
+  festival: {
+    h: 92.3,
+    p: "0,30 37,40 46,34 58,25 57,23 56,18 57,11 58,7 60,3 63,1 65,0 71,0 82,4 86,9 99,6 113,4 146,5 153,6 165,9 176,14 185,20 191,26 195,32 198,41 200,49 197,62 192,69 185,76 173,82 161,86 151,87 137,87 108,85 101,88 90,92 89,92 89,91 97,83 96,83 88,82 77,79 73,82 66,84 62,84 57,83 54,80 54,76 54,65 47,60 37,54 0,64 3,48",
+  },
+  sporebelly: {
+    h: 137.3,
+    p: "0,53 36,57 37,60 40,59 45,56 52,48 49,42 48,34 48,25 51,20 55,19 63,21 67,26 82,13 102,3 115,0 133,0 153,5 164,11 175,19 183,26 190,37 195,48 199,65 200,66 199,68 200,72 199,73 196,89 187,105 177,115 165,125 151,130 138,133 123,134 107,132 96,136 90,137 95,128 84,123 77,119 68,122 61,121 57,119 54,113 53,109 53,91 44,80 37,78 36,81 0,86 3,68",
+  },
+  velvet: {
+    h: 134.6,
+    p: "0,1 8,8 16,13 24,17 25,17 23,16 37,23 47,24 66,25 83,27 88,27 96,19 102,15 109,11 120,6 129,3 145,0 157,0 170,3 181,10 188,17 193,23 197,33 200,47 200,62 198,80 194,90 192,96 189,100 182,106 175,110 164,114 147,119 110,132 100,135 88,134 82,131 75,123 70,113 69,108 68,99 68,84 70,65 74,50 80,39 73,35 64,32 45,29 33,25 26,21 13,13 9,10",
+  },
+  razorpane: {
+    h: 98.9,
+    p: "0,23 35,49 37,49 47,44 70,31 80,26 81,26 80,24 80,17 82,10 85,6 88,2 92,0 96,0 103,1 116,8 121,15 145,14 153,15 173,20 185,25 189,28 195,34 199,43 200,52 200,61 199,70 196,78 191,84 186,87 171,92 159,94 148,96 121,95 108,93 96,98 91,99 90,98 97,91 97,90 78,83 67,88 63,89 57,89 55,88 53,85 53,72 37,64 0,90 10,70 14,56 10,43",
+  },
+  cindertail: {
+    h: 72.3,
+    p: "0,13 37,35 62,29 66,22 73,26 94,23 93,11 96,3 98,1 105,0 120,10 126,19 157,20 173,23 189,28 198,34 200,42 196,49 188,54 172,60 150,63 123,60 113,60 110,58 112,53 108,52 107,53 90,60 98,51 80,47 67,54 58,57 55,56 54,53 54,44 40,42 36,42 0,64 11,49 16,39",
+  },
+});
+Object.assign(PAD_FISH_DETAIL, {
+  festival: [
+    "c169,42,3.3",
+    "M145 28Q137 51 149 80",
+    "c104,46,8",
+    "c104,46,3.6",
+    "M108 69L130 60L124 75",
+    "f M37 49L98 50",
+    "f M70 20L71 22M120 20L121 22M150 25L151 27M88 70L89 72M140 74L141 76",
+  ],
+  sporebelly: [
+    "c175,50,4.4",
+    "M150 30Q143 75 154 111",
+    "c69,25,2.4",
+    "c95,23,2.6",
+    "c122,18,2.4",
+    "c60,49,2.6",
+    "c84,58,2.8",
+    "c110,49,2.6",
+    "c132,42,2.4",
+    "c74,79,2.4",
+    "c101,80,2.6",
+    "M118 87L138 78L134 96",
+    "f M96 112L95 116M120 116L119 120M140 108L139 112",
+  ],
+  velvet: [
+    "c118,21,2.4",
+    "c133,27,2.4",
+    "c149,12,2.4",
+    "c158,32,2.4",
+    "c178,43,2.4",
+    "c156,58,2.4",
+    "c90,65,2.4",
+    "c102,74,2.4",
+    "c144,75,2.4",
+    "c121,90,2.4",
+    "c93,101,2.4",
+    "c142,100,2.4",
+    "c174,66,3.2",
+    "c159,90,3.2",
+    "f M88 27Q130 50 178 96",
+  ],
+  razorpane: [
+    "c175,44,3.4",
+    "M148 25Q143 51 152 80",
+    "M180 67L183 63L186 67L189 63L192 66L195 62L198 64",
+    "M117 77L138 63L136 74",
+    "f M37 52L140 55",
+    "f M60 45L64 43M80 40L84 38M100 38L104 36M120 36L124 34",
+  ],
+  cindertail: [
+    "c173,37,2.6",
+    "M150 27Q145 41 152 54",
+    "M188 50Q170 62 140 80",
+    "M190 51Q174 66 150 86",
+    "M186 52Q176 64 162 78",
+    "f M37 40L150 38",
+    "f M60 38L61 40M75 38L76 40M90 37L91 39M105 37L106 39M120 37L121 39",
+  ],
+});
+Object.assign(PAD_LU.art, {
+  festival_puffer: { name: "festival", w: 118 },
+  sporebelly_puffer: { name: "sporebelly", w: 96 },
+  velvet_ray: { name: "velvet", w: 104 },
+  razorpane_piranha: { name: "razorpane", w: 128 },
+  cindertail_catfish: { name: "cindertail", w: 150 },
+});
+// ---- The marks (PAD_MARKS): what each crusher's mouth leaves on a seed pod, and hers. Each is drawn on a pod lying
+// on its side (cx, cy, rx, ry: its middle and half sizes, its stalk on the left), as two lists of strokes in the
+// notepad's code: the pod, and the mark. beak: a puffer's two chisel bites, wedges nipped from the end; plates: a
+// ray's flat crush, the pod pressed flat and crazed, with no tooth marks; razor: the piranha's neat rows of small
+// cuts; pads: a catfish's rasped scuff, a patch scrubbed rough; person: the pod cracked clean through, with two rows
+// of square, flat dents along the crack, the way a person's front teeth bite.
+function padPodMark(mark, cx, cy, rx, ry) {
+  const P = (u, v) => [cx + u * rx, cy + v * ry],
+    path = (pts) => padPath(pts.map(([u, v]) => P(u, v))),
+    flat = mark === "plates",
+    hy = flat ? 0.62 : 1,
+    // the pod's outline: an egg, fuller towards the bitten end (right), and its stalk on the left
+    outline = [];
+  for (let i = 0; i <= 28; i++) {
+    const a = (i / 28) * PAD_TAU,
+      u = Math.cos(a),
+      v = Math.sin(a) * hy * (1 + 0.12 * u);
+    outline.push([u, v]);
+  }
+  let pod = [
+      "w" + path(outline) + "Z",
+      "p" + path(outline),
+      "p" +
+        path([
+          [-1, 0],
+          [-1.14, -0.12],
+          [-1.22, -0.32],
+        ]),
+      "f" +
+        path([
+          [-0.8, -0.1 * hy],
+          [-0.2, -0.3 * hy],
+          [0.5, -0.28 * hy],
+        ]),
+    ],
+    out = [];
+  if (mark === "beak")
+    for (const v0 of [-0.42, 0.32])
+      out.push(
+        "b" +
+          path([
+            [1.02, v0 - 0.2],
+            [0.66, v0 + 0.02],
+            [1.02, v0 + 0.24],
+          ]),
+        "_h40,1.4|" + padPtsStr([P(1.02, v0 - 0.2), P(0.66, v0 + 0.02), P(1.02, v0 + 0.24)]),
+      );
+  else if (mark === "plates")
+    out.push(
+      "b" +
+        path([
+          [-0.55, -0.05],
+          [-0.1, 0.06],
+          [0.35, -0.04],
+          [0.8, 0.05],
+        ]),
+      "p" +
+        path([
+          [-0.1, 0.06],
+          [-0.22, 0.5],
+        ]) +
+        path([
+          [0.35, -0.04],
+          [0.5, -0.5],
+        ]) +
+        path([
+          [0.35, -0.04],
+          [0.42, 0.5],
+        ]),
+      "p" +
+        path([
+          [-0.1, 0.06],
+          [-0.3, -0.5],
+        ]) +
+        path([
+          [0.8, 0.05],
+          [0.9, 0.42],
+        ]),
+      "f" +
+        path([
+          [-0.9, 0.0],
+          [-0.6, -0.04],
+        ]),
+    );
+  else if (mark === "razor") {
+    for (const v0 of [-0.3, 0.22]) {
+      let pts = [];
+      for (let i = 0; i <= 10; i++) pts.push([0.05 + i * 0.085, v0 + (i % 2 ? -0.16 : 0)]);
+      out.push("b" + path(pts));
+    }
+    out.push(
+      "f" +
+        path([
+          [0.05, -0.3],
+          [0.9, -0.3],
+        ]) +
+        path([
+          [0.05, 0.22],
+          [0.9, 0.22],
+        ]),
+    );
+  } else if (mark === "pads") {
+    const blob = padEllPts(0, 0, 0.42, 0.5, 0, 360).map(([u, v]) => [0.45 + u, v * hy]);
+    out.push(
+      "_h-30,1|" + padPtsStr(blob.map(([u, v]) => P(u, v))),
+      "_h50,1.3|" + padPtsStr(blob.map(([u, v]) => P(u, v))),
+    );
+    const R = padRng(91);
+    let d = "";
+    for (let i = 0; i < 14; i++) {
+      const u = 0.1 + 0.72 * R(),
+        v = (R() - 0.5) * 0.8;
+      d += path([
+        [u, v],
+        [u + 0.06, v + 0.03],
+      ]);
+    }
+    out.push("f" + d);
+  } else if (mark === "person") {
+    // cracked clean through: the crack, and the halves a little apart at the bitten end
+    out.push(
+      "b" +
+        path([
+          [1.03, 0.02],
+          [0.7, -0.06],
+          [0.35, 0.05],
+          [0, -0.03],
+          [-0.35, 0.04],
+          [-0.75, -0.02],
+          [-1, 0],
+        ]),
+      "w" +
+        path([
+          [1.03, -0.05],
+          [0.7, -0.12],
+          [0.6, 0.12],
+          [1.03, 0.1],
+        ]) +
+        "Z",
+    );
+    // two rows of square dents along the crack, upper and lower
+    for (const [v0, dv] of [
+      [-0.2, -0.3],
+      [0.18, 0.3],
+    ])
+      for (let i = 0; i < 4; i++) {
+        const u0 = 0.2 + i * 0.17,
+          sq = [
+            [u0, v0],
+            [u0 + 0.12, v0],
+            [u0 + 0.12, v0 + dv],
+            [u0, v0 + dv],
+          ];
+        out.push("b" + path(sq) + "Z", "_h45,0.9|" + padPtsStr(sq.map(([u, v]) => P(u, v))));
+      }
+  }
+  return { pod, mark: out };
+}
+// The catch card's drawing of a mark: an inset in the picture's lower left corner (the card's fish faces right), the
+// pod in the card's own ink and the mark in red, drawn plainly over the picture in its units (100 by 40). Its own
+// style, so it needs no sheet.
+function padMarkCardSvg(mark) {
+  const { pod, mark: lines } = padPodMark(mark, 15, 32.5, 11.5, 5),
+    d = (list, kinds) =>
+      list
+        .filter((raw) => kinds.includes(raw.replace(/^_/, "")[0]))
+        .map((raw) => {
+          const k = raw.replace(/^_/, "")[0],
+            body = raw.replace(/^_/, "").slice(1);
+          return k === "h"
+            ? padPath(padHatch(padParsePts(body.split("|")[1]), Number(body.split(",")[0]), 1.1))
+            : padPolylines(body)
+                .map((pl) => padPath(pl))
+                .join("");
+        })
+        .join("");
+  return (
+    `<svg class="gw-cc-mark gw-cc-mark--${mark}" viewBox="0 0 100 40" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible">` +
+    `<path d="${d(pod, "w")}" fill="rgb(28,24,34)" fill-opacity=".72"/>` +
+    `<path d="${d(pod, "pf")}" fill="none" stroke="rgb(236,232,244)" stroke-width=".55" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".9"/>` +
+    `<path d="${d(lines, "pbfh")}" fill="none" stroke="rgb(226,116,94)" stroke-width=".7" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  );
+}
+// PAD_MARKS[key]: strokes (the notepad's marks strip, in PAD_LU.markVb, 120 by 42: the pod with the mark on it) and
+// card (the catch card's inset, an <svg> string to append to the card's picture box).
+const PAD_MARKS = {};
+for (const key of ["beak", "plates", "razor", "pads", "person"]) {
+  const { pod, mark } = padPodMark(key, 62, 21, 42, 14);
+  PAD_MARKS[key] = { strokes: [...pod, ...mark], card: padMarkCardSvg(key) };
+}
+// The order the strip shows them in: hers first, then the crushers'.
+const PAD_MARK_ORDER = ["person", "beak", "plates", "razor", "pads"];
+// ---- Sketch 1: Burr's almanac page of Sporewood: the lake's own shore (its arena's outline, LP), its islands, the
+// Mother's Cup with the Mother Cap over it, the drift running from the Cup to its four eddies (each a little whirl),
+// the Greenhouse with Burr's lamp, home, and in a corner the Cap seen from the side letting its pods fall.
+function padSporeShoreTicks(pts, R) {
+  // ticks on the land side of each stretch of shore (the outline's winding tells which side that is)
+  let area = 0,
+    d = "";
+  for (let i = 0; i < pts.length; i++) {
+    const [x0, y0] = pts[i],
+      [x1, y1] = pts[(i + 1) % pts.length];
+    area += x0 * y1 - x1 * y0;
+  }
+  const out = area > 0 ? -1 : 1;
+  for (let i = 0; i < pts.length; i++) {
+    const [x0, y0] = pts[i],
+      [x1, y1] = pts[(i + 1) % pts.length],
+      L = Math.hypot(x1 - x0, y1 - y0) || 1,
+      nx = (out * (y1 - y0)) / L,
+      ny = (-out * (x1 - x0)) / L;
+    for (let k = 0; k < L / 3.2; k++) {
+      if (R() < 0.25) continue;
+      const t = (k + 0.5) / Math.ceil(L / 3.2),
+        x = x0 + (x1 - x0) * t + nx * 1,
+        y = y0 + (y1 - y0) * t + ny * 1,
+        l = 1.4 + R() * 2;
+      d += padPath([
+        [x, y],
+        [x + nx * l, y + ny * l],
+      ]);
+    }
+  }
+  return d;
+}
+function padSporeAlmanac(labels = {}) {
+  const shore = (LP?.outline || []).map(([x, z]) => [x, z]),
+    drift = bs.sporewood?.geometry?.drift,
+    cap = wo.seedfall?.sporewood?.cap || { x: 51.6, z: 8, r: 11 },
+    cup = (LP?.deepPools || [])[0] || { x: 48, z: 6, r: 6 },
+    list = ["p" + padPath(shore.concat([shore[0]])), "f" + padSporeShoreTicks(shore, padRng(83))];
+  for (const [i, isl] of (LP?.islands || []).entries()) {
+    const d = padBlob(isl.x, isl.z, isl.r, isl.r * 0.8, 31 + i * 7, i * 23);
+    list.push("w" + d, "p" + d);
+  }
+  // the Mother's Cup, dark and deep, and the Mother Cap over it: its rim and the lines of its gills
+  const cupPts = padBlobPts(cup.x, cup.z, cup.r, cup.r * 0.85, 7, 10, 0.08);
+  list.push("p" + padPath(cupPts) + "Z", "_h-35,1.1|" + padPtsStr(cupPts));
+  let gills = "";
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * PAD_TAU;
+    gills += padPath([
+      [cap.x + Math.cos(a) * cap.r * 0.25, cap.z + Math.sin(a) * cap.r * 0.25],
+      [cap.x + Math.cos(a) * cap.r * 0.92, cap.z + Math.sin(a) * cap.r * 0.92],
+    ]);
+  }
+  list.push("d" + padEll(cap.x, cap.z, cap.r, cap.r), "f" + gills);
+  // the drift: from the Cup to each of its four eddies, and a whirl at each
+  for (const e of drift?.eddies || []) {
+    const pts = [[drift.from.x, drift.from.z], ...e.via, [e.x, e.z]],
+      curve = new Ch(pts.map(([x, z]) => new He(x, 0, z)))
+        .getPoints(Math.max(8, pts.length * 6))
+        .map((p) => [p.x, p.z]);
+    list.push("p" + padDashes(curve, 2.2, 1.6));
+    // a few chevrons along it, pointing the way it runs
+    for (const t of [0.35, 0.7]) {
+      const i = Math.floor(t * (curve.length - 1)),
+        [x0, y0] = curve[i],
+        [x1, y1] = curve[i + 1],
+        L = Math.hypot(x1 - x0, y1 - y0) || 1,
+        ux = (x1 - x0) / L,
+        uy = (y1 - y0) / L;
+      list.push(
+        "f" +
+          padPath([
+            [x0 - ux * 1.6 - uy * 1.3, y0 - uy * 1.6 + ux * 1.3],
+            [x0, y0],
+            [x0 - ux * 1.6 + uy * 1.3, y0 - uy * 1.6 - ux * 1.3],
+          ]),
+      );
+    }
+    list.push("b" + padSpiral(e.x, e.z, 4.4, 1, 1.8, padHash(e.id) % 6, 0.85));
+  }
+  // the Greenhouse in the south-east bay: a glasshouse's gable, its rows of panes, and Burr's lamp at its door
+  const gh = wo.places?.drowned_greenhouse?.greenhouse || { x: 52, z: -31.3 },
+    gx = gh.x,
+    gz = gh.z - 3;
+  list.push(
+    "p" +
+      padPath([
+        [gx - 5, gz + 2.4],
+        [gx - 5, gz - 1],
+        [gx, gz - 4],
+        [gx + 5, gz - 1],
+        [gx + 5, gz + 2.4],
+        [gx - 5, gz + 2.4],
+      ]),
+    "f" +
+      padPath([
+        [gx - 2.5, gz + 2.4],
+        [gx - 2.5, gz - 2.5],
+      ]) +
+      padPath([
+        [gx + 2.5, gz + 2.4],
+        [gx + 2.5, gz - 2.5],
+      ]) +
+      padPath([
+        [gx, gz + 2.4],
+        [gx, gz - 4],
+      ]),
+    "pM" + padR1(gx - 6.6) + " " + padR1(gz + 3.4) + "L" + padR1(gx - 6.6) + " " + padR1(gz - 1.2),
+    "p" + padEll(gx - 6.6, gz - 2.1, 0.9, 1.1),
+    "f" + padEll(gx - 6.6, gz - 2.1, 2.2, 2.2, 200, 340),
+  );
+  // home: Murk's hut by the dock
+  const dock = (LP?.docks || [])[0] || { x: 36.6, z: 32.5 },
+    hx = dock.x - 6,
+    hz = dock.z + 3;
+  list.push(
+    "p" +
+      padPath([
+        [hx - 3, hz + 3],
+        [hx - 3, hz - 1],
+        [hx, hz - 3.6],
+        [hx + 3, hz - 1],
+        [hx + 3, hz + 3],
+        [hx - 3, hz + 3],
+      ]),
+    "pM" + padR1(dock.x - 1.5) + " " + padR1(dock.z) + "L" + padR1(dock.x + 2) + " " + padR1(dock.z - 3),
+  );
+  // the Cap from the side, in the top left corner, its pods falling like snow
+  const vx = -80,
+    vy = -40;
+  list.push(
+    "p" +
+      `M${vx - 9} ${vy - 1}Q${vx - 7} ${vy - 8} ${vx} ${vy - 8.5}Q${vx + 7} ${vy - 8} ${vx + 9} ${vy - 1}Q${vx} ${vy + 0.8} ${vx - 9} ${vy - 1}`,
+    "p" + `M${vx - 1.2} ${vy}L${vx - 1.6} ${vy + 9}M${vx + 1.2} ${vy}L${vx + 1.6} ${vy + 9}`,
+    "f" +
+      `M${vx - 7} ${vy - 0.6}L${vx - 6} ${vy + 0.4}M${vx - 4} ${vy}L${vx - 3.4} ${vy + 0.9}M${vx + 4} ${vy}L${vx + 3.4} ${vy + 0.9}M${vx + 7} ${vy - 0.6}L${vx + 6} ${vy + 0.4}`,
+    "f" + `M${vx - 12} ${vy + 9}L${vx + 12} ${vy + 9}`,
+  );
+  for (const [px, py] of [
+    [-6, 3],
+    [-3.5, 6.2],
+    [4.2, 2.6],
+    [6.8, 6],
+    [1, 4.8],
+    [-8.4, 7.2],
+  ])
+    list.push("p" + padEll(vx + px, vy + py, 0.7, 0.45, 0, 360, 30));
+  // the labels, in Burr's hand
+  labels.cup && list.push(`t${cup.x - 2},${cup.z + cup.r + 9},7|${labels.cup}`);
+  labels.eddies && list.push(`t${-18},${-6},7|${labels.eddies}`);
+  labels.greenhouse && list.push(`t${gx - 15},${gz - 3},7|${labels.greenhouse}`);
+  labels.home && list.push(`t${hx - 12},${hz + 3},7|${labels.home}`);
+  return list;
+}
+// ---- Sketch 2: the island rises. The water at the evening's eddy, the far shore and the Mother Cap far off for
+// bearings; on the water a low mound of moss, grass, small caps and seedlings, water streaming off its sides, broken
+// rings round it and seed pods about it, and at its near end, just above the water, an eye.
+function padIslandRises() {
+  const W = 62,
+    mound = [],
+    R = padRng(404);
+  for (let i = 0; i <= 26; i++) {
+    const t = i / 26,
+      x = 28 + 104 * t,
+      bump = Math.sin(Math.PI * t) ** 0.65 * 19 + 2.2 * Math.sin(t * 23) * Math.sin(Math.PI * t);
+    mound.push([x, W - bump]);
+  }
+  const list = [
+    // the far shore, and the Mother Cap far off on it
+    "f" + padWave(0, 18, 160, 0.8, 11),
+    "fM118 18Q119 9 120 7M122 18Q122.6 9 123.4 7",
+    "pM110 8Q113 2 121.6 1.6Q130 2 133 8Q121.6 9.4 110 8",
+    // the water, and its rings round the mound
+    "p" + padWave(0, W, 160, 0.7, 9),
+    "w" + padPath(mound) + "Z",
+    "h38,1.7|" + padPtsStr(mound),
+    "b" + padPath(mound),
+    "f" + padEll(80, W + 1, 66, 4.6, 10, 170) + padEll(80, W + 1, 76, 7.4, 20, 160),
+    "p" + padEll(80, W + 0.6, 58, 2.6, 0, 180),
+  ];
+  // grass tufts, small caps and seedlings along its top
+  let grass = "",
+    caps = [];
+  for (let i = 0; i < 16; i++) {
+    const t = 0.08 + 0.84 * (i / 15) + (R() - 0.5) * 0.03,
+      j = Math.min(25, Math.round(t * 26)),
+      [x, y] = mound[j];
+    for (let k = -1; k <= 1; k++)
+      grass += padPath([
+        [x + k * 0.8, y + 0.4],
+        [x + k * 1.6 + (R() - 0.5), y - 3.2 - 2.4 * R()],
+      ]);
+    if (i % 5 === 2) caps.push([x + 1.8, y]);
+  }
+  list.push("p" + grass);
+  for (const [x, y] of caps)
+    list.push(
+      `pM${padR1(x)} ${padR1(y + 0.4)}L${padR1(x)} ${padR1(y - 3.4)}`,
+      "p" + padEll(x, y - 3.6, 2.4, 1.3, 180, 360) + `L${padR1(x - 2.4)} ${padR1(y - 3.6)}`,
+    );
+  // a seedling with two leaves, and a sapling
+  const [sx, sy] = mound[9],
+    [tx, ty] = mound[16];
+  list.push(
+    `pM${padR1(sx)} ${padR1(sy)}L${padR1(sx)} ${padR1(sy - 5)}`,
+    "p" +
+      padEll(sx - 1.6, sy - 5.4, 1.7, 0.8, 0, 360, -20) +
+      padEll(sx + 1.6, sy - 5.4, 1.7, 0.8, 0, 360, 20),
+    `pM${padR1(tx)} ${padR1(ty)}Q${padR1(tx + 1.4)} ${padR1(ty - 6)} ${padR1(tx)} ${padR1(ty - 11)}`,
+    "p" +
+      padEll(tx - 2.2, ty - 8, 2.2, 1, 0, 360, -25) +
+      padEll(tx + 2.2, ty - 10, 2.2, 1, 0, 360, 25) +
+      padEll(tx - 1.4, ty - 11.6, 1.8, 0.9, 0, 360, -40),
+  );
+  // water streaming off its sides
+  let streams = "";
+  for (const x of [32, 37, 44, 120, 125, 129]) {
+    const y0 = mound[Math.round(((x - 28) / 104) * 26)][1] + 1;
+    streams += `M${x} ${padR1(y0)}Q${x + 0.8} ${padR1((y0 + W) / 2)} ${x - 0.3} ${W - 0.5}`;
+  }
+  list.push(
+    "p" + streams,
+    "f" + padEll(30, W + 2.6, 1, 0.6) + padEll(127, W + 2.4, 1, 0.6) + padEll(41, W + 3, 0.8, 0.5),
+  );
+  // an eye at its near end, just clear of the water
+  list.push(
+    "w" + padEll(123, W - 3.8, 3, 2.6) + "Z",
+    "b" + padEll(123, W - 3.8, 3, 2.6),
+    "b" + padEll(123.6, W - 3.8, 1.1, 1.1),
+  );
+  // seed pods floating about it
+  for (const [x, y] of [
+    [10, W + 4],
+    [18, W + 9],
+    [144, W + 5],
+    [151, W + 11],
+    [60, W + 12],
+    [98, W + 14],
+  ])
+    list.push(
+      "p" + padEll(x, y, 2.4, 1.2, 0, 360, -12),
+      "fM" + padR1(x - 2.4) + " " + padR1(y) + "L" + padR1(x - 3.6) + " " + padR1(y - 0.8),
+    );
+  // the dark water under it
+  list.push("f" + padWave(4, W + 20, 156, 0.6, 14), "fM20 90Q50 86 80 90Q110 94 140 90");
+  return list;
+}
+// ---- Sketch 4: the refusal. A slice through the water at dusk: the rig as it was refused (rig: { bait }, kind
+// "lure" for a lure) under its float, a great blunt head nosing up to it out of the dark, hatched with no face, and
+// curling away; and an arrow on from the turn to what she takes, a seed riding under a float in the drift.
+function padRefusal(kind, rig = {}) {
+  const bait = rig.bait || "spore_cake",
+    head = [
+      [160, 52],
+      [128, 48],
+      [104, 52],
+      [90, 60],
+      [86, 72],
+      [92, 84],
+      [110, 92],
+      [136, 96],
+      [160, 98],
+    ],
+    rigStrokes =
+      kind === "lure"
+        ? [
+            "pM60 0L60 50",
+            "p" + padEll(61.6, 54.6, 2.6, 4.8, 0, 360, -24),
+            "_h60,1.1|" + padPtsStr(padEllPts(61.6, 54.6, 2.6, 4.8, 0, 360, -24)),
+            "pM63.4 59L64.2 64.4Q64.6 67 62.4 67Q60.6 67 60.8 65.2",
+          ]
+        : [
+            "p" + padEll(60, 24.4, 3.2, 5.6),
+            "pM60 18.8L60 11.6",
+            "p" + padEll(60, 10.8, 0.9, 0.9),
+            "f" + padEll(60, 25, 8.5, 1.6, 0, 180),
+            "pM60 30L60 50",
+            "pM60 50L60 54.6Q60 58.6 56.6 58.6Q53.2 58.6 53.2 55.2L53.2 53.8L55.2 56",
+            ...padBaitAt(bait, 56, 56.6),
+          ];
+  return [
+    "p" + padWave(2, 24, 158, 0.9, 9),
+    "f" + padCrescent(16, 9, 4.6),
+    ...rigStrokes,
+    // the great blunt head out of the dark, close under the bait, and its turn away and down
+    "w" + padPath(head) + "Z",
+    "h-20,1.5|" + padPtsStr(head),
+    "h40,2.6|" + padPtsStr(head),
+    "b" + padPath(head.slice(1, 8)),
+    "pM84 70Q78 64 70 62M83 76Q76 74 70 70",
+    "pM96 96C84 102 78 110 84 114",
+    "pM81 109L84 115L89 110",
+    "fM140 104Q148 108 156 106",
+    // the arrow on to what it wants: a seed under a float in the drift
+    "pM70 82C52 92 36 88 30 74",
+    "pM27 79L30 73L35 78",
+    "p" + padEll(26, 33, 2.4, 4.4),
+    "pM26 29L26 23",
+    "pM26 37.4L26 54",
+    "p" + padEll(26, 58, 3.4, 2.4, 0, 360, 20),
+    "fM24.4 57L27.4 59",
+    "fM4 26Q14 27 22 26M30 26Q40 27 50 26M2 30Q12 31 18 30",
+    "p" + padWave(2, 114, 158, 0.8, 13),
+  ];
+}
+// ---- Sketch 5, one small drawing per part that came back: the Mere Hook crushed flat, with the dents of square
+// teeth; the Plain Knot bitten through halfway, its end squared off with tooth nicks; the line by the rod worn
+// thin and furred before it parted. And "What held": the line, the leader and the hook whole, each ticked.
+function padSporeBack(part, labels = {}) {
+  if (part === "hook")
+    return [
+      "pM50 1L50 25",
+      "p" + padEll(50, 26.6, 2.3, 1.1) + padEll(50, 29, 2.3, 1.1) + padEll(50, 31.4, 2.3, 1.1),
+      "p" + padEll(50, 35.6, 2.4, 3.2),
+      // the shank pressed flat and bent, the bend squashed out of shape, with square dents in it
+      "bM50 38.8L50 58L53 64L46 72L38 76L31 72L29 64",
+      "bM29 64L26.6 60.4",
+      "pM46.6 46L53.4 46L53.4 51L46.6 51ZM46.6 53.6L53.4 53.6L53.4 58.6L46.6 58.6Z",
+      "h45,0.9|46.6,46 53.4,46 53.4,51 46.6,51",
+      "h45,0.9|46.6,53.6 53.4,53.6 53.4,58.6 46.6,58.6",
+      "fM58 56L64 54M58 62L64 64",
+      "fM36 88L35 92M42 88L42.4 92M30 86.4L28.6 90",
+    ];
+  if (part === "leader")
+    return [
+      "bM50 2L50 40",
+      // the knot, and below it the line bitten through halfway: a square end with tooth nicks
+      "p" + padEll(50, 44, 3.4, 2.4) + padEll(50, 47.6, 3.4, 2.4),
+      "bM50 50L50 66",
+      "pM45 66L55 66",
+      "pM45.6 66L45.6 69.4L49 69.4L49 66M51 66L51 69.4L54.4 69.4L54.4 66",
+      "h45,0.9|45.6,66 49,66 49,69.4 45.6,69.4",
+      "fM56 60L64 60M56 64L62 64",
+      "fM40 76L38 80M50 78L50 82M60 76L62 80",
+      `t50,98,10|${labels.bitten || ""}`,
+    ];
+  if (part === "line") {
+    const gd = (t) => [2 + 58 * t, 102 - 82 * t],
+      g1 = gd(0.36),
+      g2 = gd(0.72);
+    return [
+      "bM0 98L59 16.6",
+      "pM6.6 103L61.4 18.4",
+      "p" + padEll(62.4, 15.2, 2.6, 2.6),
+      "p" +
+        padPath([
+          [g1[0] + 3.6, g1[1] + 2],
+          [g1[0] + 6.8, g1[1] + 5.2],
+        ]) +
+        padEll(g1[0] + 8.4, g1[1] + 6.8, 2.2, 2.2),
+      "p" +
+        padPath([
+          [g2[0] + 3, g2[1] + 1.6],
+          [g2[0] + 5.6, g2[1] + 4.2],
+        ]) +
+        padEll(g2[0] + 7, g2[1] + 5.6, 1.9, 1.9),
+      "f" +
+        padPath([
+          [14, 104],
+          [g1[0] + 8.4, g1[1] + 6.8],
+          [g2[0] + 7, g2[1] + 5.6],
+          [62.4, 15.2],
+        ]),
+      // the line below the tip, worn pale and furred where it rubbed, and parted
+      "bM64.6 16.8Q67 26 67.4 32",
+      ...padWornEnd((u, v) => [67.4 + v * 0.3, u], 32, 56, 1.9, 53),
+    ];
+  }
+  // What held: the line, then the leader, then the hook, all whole, each with a tick beside it.
+  return [
+    "pM40 1L40 30",
+    "p" + padEll(40, 31.6, 1.8, 1) + padEll(40, 33.6, 1.8, 1),
+    "bM40 35L40 52",
+    "p" + padEll(40, 55, 2.2, 2.8),
+    "bM40 57.8L40 76Q40 89 29 89Q19 89 19 79L19 68",
+    "bM19 68L19 64.6",
+    "bM19 70.2L23.6 76.4",
+    "pM60 16L63 20L70 10",
+    "pM60 44L63 48L70 38",
+    "pM60 76L63 80L70 70",
+    `t40,101.5,11|${labels.mine || ""}`,
+  ];
+}
+// Sketch 3's panel for Sporewood: its five crushers in the hunt's order, each crossed out on its first catch with
+// its mouth and the mark it leaves on a pod drawn large beside it; the empty frame; and the marks strip (PAD_MARKS),
+// hers first. As padLineupPanel: view.crossed and view.marks say what is drawn; `at` draws it all in, `fresh` lists
+// the crossings ("cross:<id>") and marks ("mark:<mark>") that draw in now.
+function padSporeReason(id) {
+  const pod = (mark, cx, cy) => {
+    const p = padPodMark(mark, cx, cy, 30, 10.5);
+    return [...p.pod, ...p.mark];
+  };
+  if (id === "festival_puffer" || id === "sporebelly_puffer") {
+    // a puffer's beak: two fused plates, upper and lower, at the front of a round head
+    const big = id === "festival_puffer";
+    return [
+      `pM6 ${big ? 66 : 64}Q30 ${big ? 50 : 46} 58 ${big ? 66 : 62}Q66 72 70 82`,
+      "pM70 92Q64 104 40 110Q20 112 6 104",
+      "pM70 82L80 80Q84 84 80 87L70 87ZM70 88L80 88Q84 91 80 95L70 93Z",
+      "_h20,1|80,80 84,84 80,87 70,87 70,82",
+      "p" + padEll(52, 74, 3, 3),
+      "f" + (big ? padEll(30, 86, 6, 6) : "M24 72L25 74M34 68L35 70M30 92L31 94"),
+      ...pod("beak", 124, 88),
+    ];
+  }
+  if (id === "velvet_ray")
+    // its mouth from below, paved with flat plates, and a pod pressed flat
+    return [
+      "pM4 96Q40 64 76 96Q40 112 4 96",
+      "p" +
+        padPath([
+          [26, 92],
+          [54, 92],
+          [54, 100],
+          [26, 100],
+          [26, 92],
+        ]),
+      "fM33 92L33 100M40 92L40 100M47 92L47 100M26 96L54 96",
+      "p" + padEll(26, 80, 2, 3) + padEll(54, 80, 2, 3),
+      ...pod("plates", 124, 90),
+    ];
+  if (id === "razorpane_piranha")
+    // a deep jaw full of small triangular teeth, and a pod cut with neat rows of nicks
+    return [
+      "pM6 74Q40 62 64 78Q72 84 74 90",
+      "pM74 96Q60 110 34 110Q16 108 6 100",
+      "p" + padTeeth(44, 88, 74, 90, 6, 3.6),
+      "p" + padTeeth(44, 99, 74, 96, 6, -3.6),
+      "pM44 88Q40 94 44 99",
+      "p" + padEll(54, 78, 2.6, 2.6),
+      ...pod("razor", 124, 90),
+    ];
+  // the Cindertail Catfish: a wide mouth lined with pads of tiny teeth, barbels, and a pod rasped rough
+  return [
+    "pM4 80Q36 70 66 84Q74 88 76 92",
+    "pM76 98Q60 108 30 106Q14 104 4 98",
+    "p" +
+      padPath([
+        [50, 90],
+        [76, 92],
+        [76, 96],
+        [50, 96],
+        [50, 90],
+      ]),
+    "_h70,0.8|50,90 76,92 76,96 50,96",
+    "pM70 90Q60 96 46 108M74 92Q66 102 58 112",
+    "p" + padEll(56, 80, 2, 2),
+    ...pod("pads", 124, 90),
+  ];
+}
+function padSporeCrossing(id, ringed = !0) {
+  const f = padLineupFishAt(id),
+    list = [
+      "r" +
+        padPath([
+          [f.x + 2, f.y + f.h + 3],
+          [f.x + f.w, f.y - 3],
+        ]),
+    ],
+    reason = padSporeReason(id, ringed),
+    bb = padStrokesBox(reason),
+    slot = PAD_LU.why,
+    k = Math.min((slot.x1 - slot.x0) / (bb.x1 - bb.x0), (slot.y1 - slot.y0) / (bb.y1 - bb.y0), 2.6),
+    cx = (slot.x0 + slot.x1) / 2,
+    cy = (slot.y0 + slot.y1) / 2,
+    mx = (bb.x0 + bb.x1) / 2,
+    my = (bb.y0 + bb.y1) / 2;
+  return list.concat(padMoveStrokes(reason, ([x, y]) => [cx + (x - mx) * k, cy + (y - my) * k], k));
+}
+function padSporeLineupPanel(text, view, at = null, fresh = []) {
+  let lu = text.lineup || {},
+    crossed = Sr(view.crossed),
+    marks = Sr(view.marks),
+    t = at,
+    freshEnd = 0.6,
+    timeFor = (isNew) => (t != null ? t : isNew ? 0.6 : null),
+    advance = (sk) => t != null && (t = sk.end + 0.2),
+    cap = (cls, words, when) =>
+      `<p class="gw-pad-cap ${cls}${when == null ? " gw-pad-still" : ""}"${when == null ? "" : ` style="--d:${when.toFixed(2)}s"`}>${padEsc(words || "")}</p>`,
+    sketch = (id, vb, list, when, label, still) => {
+      let sk = padSketchSvg(id, vb, list, { sw: 1.25, amp: 0.45, label, at: when, speed: 3 });
+      return {
+        html: still ? sk.html.replace('class="gw-pad-sk', 'class="gw-pad-sk gw-pad-still') : sk.html,
+        end: sk.end,
+      };
+    },
+    html = cap("gw-pad-lu-head", lu.head || "", t);
+  t != null && (t += 0.6);
+  let hunt = huntOf(view.water) || wo.hunts?.[view.water],
+    ids = (Sr(hunt?.lineup).length ? Sr(hunt.lineup) : PAD_SPORE_LINEUP).filter((id) => PAD_LU.art[id]);
+  for (let id of ids) {
+    let art = PAD_LU.art[id],
+      words = lu.fish?.[id] || {},
+      out = crossed.includes(id),
+      isNew = out && fresh.includes(`cross:${id}`),
+      at0 = padLineupFishAt(id),
+      fish = sketch(
+        `lu-${art.name}`,
+        PAD_LU.vb,
+        padFishStrokes(art.name, at0.x, at0.y, art.w),
+        t,
+        words.name || "",
+        t == null,
+      );
+    advance(fish);
+    let mark = "",
+      why = "";
+    if (out) {
+      let when = timeFor(isNew),
+        x = sketch(
+          `lu-x-${art.name}`,
+          PAD_LU.vb,
+          padSporeCrossing(id),
+          when,
+          lu.art?.out || "",
+          when == null,
+        );
+      advance(x), (mark = x.html), (why = cap("gw-pad-why", words.why || "", when == null ? null : x.end));
+      isNew && t == null && (freshEnd = Math.max(freshEnd, x.end));
+    }
+    html += `<figure class="gw-pad-lu-row${out ? " gw-out" : ""}" data-fish="${id}"><span class="gw-pad-lu-nm">${padEsc(words.name || "")}</span><div class="gw-pad-lu-box">${fish.html}${mark}</div>${why}</figure>`;
+  }
+  let all = ids.length > 0 && ids.every((id) => crossed.includes(id)),
+    frameWhen = t,
+    frame = sketch(
+      "lu-q",
+      PAD_LU.frameVb,
+      [
+        "p" +
+          padPath([
+            [52, 6],
+            [348, 4],
+            [350, 64],
+            [50, 66],
+            [52, 4],
+          ]),
+        "t200,54,50|?",
+      ],
+      frameWhen,
+      lu.art?.frame || "",
+      frameWhen == null,
+    );
+  advance(frame);
+  let lastNew = fresh.some((k) => k.startsWith("cross:")),
+    frameCapWhen = frameWhen != null ? frame.end : all && lastNew ? freshEnd : null,
+    frameWords = view.landed ? lu.landed || lu.none : all ? lu.none : lu.frame;
+  html += `<figure class="gw-pad-lu-row gw-pad-lu-q" data-fish="?"><div class="gw-pad-lu-box">${frame.html}</div>${cap("gw-pad-why", frameWords, frameCapWhen)}</figure>`;
+  // the marks strip: hers first, then each crusher's once it is known; a mark's line changes once its maker is crossed
+  let strip = "";
+  for (let k of PAD_MARK_ORDER) {
+    if (!marks.includes(k)) continue;
+    let by = hunt?.marks?.leftBy?.[k],
+      makers = Array.isArray(by) ? by : by ? [by] : [],
+      matched = makers.some((m) => crossed.includes(m)),
+      words =
+        (view.landed && lu.marks?.[k]?.landed) ||
+        (matched && lu.marks?.[k]?.match) ||
+        lu.marks?.[k]?.open ||
+        "",
+      isNew = fresh.includes(`mark:${k}`),
+      when = timeFor(isNew),
+      sk = sketch(`mk-${k}`, PAD_LU.markVb, PAD_MARKS[k].strokes, when, lu.art?.[k] || "", when == null);
+    advance(sk);
+    let rewritten = matched && makers.some((m) => fresh.includes(`cross:${m}`)),
+      capWhen = when != null ? sk.end : rewritten ? freshEnd : null;
+    strip += `<figure class="gw-pad-mark" data-mark="${k}"><div class="gw-pad-box">${sk.html}</div>${cap("", words, capWhen)}</figure>`;
+  }
+  strip && (html += `<div class="gw-pad-marks">${strip}</div>`);
+  return `<div class="gw-pad-pnl gw-pad-lu">${html}</div>`;
+}
+// The five crushers in the plan's order, drawn when the hunt names none.
+const PAD_SPORE_LINEUP = [
+  "festival_puffer",
+  "sporebelly_puffer",
+  "velvet_ray",
+  "razorpane_piranha",
+  "cindertail_catfish",
+];
+// The panels of a drawn Sporewood sketch, by the keys of padPanels (and their own names).
+const PAD_SPORE_KEYS = { almanac: "map", island: "taken", refusal: "swirl" };
+function sporePadPanels(key, text, at, view = {}, fresh = []) {
+  key = PAD_SPORE_KEYS[key] || key;
+  const cap = (words, t) =>
+    `<p class="gw-pad-cap"${t == null ? "" : ` style="--d:${t.toFixed(2)}s"`}>${padEsc(words || "")}</p>`;
+  if (key === "lineup") return padSporeLineupPanel(text, view, at, fresh);
+  if (key === "map") {
+    const sk = padSketchSvg("sw1-0", [-98, -52, 184, 104], padSporeAlmanac(text.labels || {}), {
+      sw: 0.5,
+      amp: 0.3,
+      label: text.art?.map || "",
+      at,
+      speed: 2,
+    });
+    return `<div class="gw-pad-pnl"><div class="gw-pad-box">${sk.html}</div>${cap(text.map, at == null ? null : sk.end)}</div>`;
+  }
+  if (key === "taken") {
+    const sk = padSketchSvg("sw2-0", [0, 0, 160, 96], padIslandRises(), {
+      sw: 0.9,
+      amp: 0.35,
+      label: text.art?.taken || "",
+      at,
+    });
+    return `<div class="gw-pad-pnl"><div class="gw-pad-box">${sk.html}</div>${cap(text.taken, at == null ? null : sk.end)}</div>`;
+  }
+  if (key === "swirl") {
+    const kind = view.swirlKind || "left",
+      rig = view.swirlRig || {},
+      sk = padSketchSvg("sw4-0", [0, 0, 160, 118], padRefusal(kind, rig), {
+        sw: 1,
+        amp: 0.4,
+        label: text.art?.swirl || "",
+        at,
+      }),
+      words = (text.swirl?.[kind] || text.swirl?.left || "").replace(
+        "{bait}",
+        herBaitWords(rig.bait || huntOf(view.water)?.pad?.oldSwirl?.bait || "", view.water).the,
+      );
+    return `<div class="gw-pad-pnl"><div class="gw-pad-box">${sk.html}</div>${cap(words, at == null ? null : sk.end)}</div>`;
+  }
+  if (key !== "back") return null;
+  let parts = Array.isArray(view.back) && view.back.length ? view.back : ["held"],
+    t = at,
+    out = "";
+  for (let part of parts) {
+    const sk = padSketchSvg(`sw5-${part}`, [0, 0, 100, 104], padSporeBack(part, text.back || {}), {
+      sw: 1.1,
+      amp: 0.32,
+      label: text.art?.[part] || "",
+      at: t,
+    });
+    out += `<div class="gw-pad-pnl gw-pad-row"><div class="gw-pad-box">${sk.html}</div>${cap(text.back?.[part], t == null ? null : sk.end)}</div>`;
+    t != null && (t = sk.end + 0.4);
+  }
+  return out;
+}
+PAD_ART.sporewood = sporePadPanels;
+// Burr's Seed on the tally (RELIC_ART.burrs_seed), in the plain line style of the tackle Murk hands over: a seed
+// split at its top, a sprout with two leaves coming out of it, on a little ground with moss.
+const BURRS_SEED_ART =
+  '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 130C80 130 70 114 72 98C74 82 88 72 96 69M104 69C112 72 126 82 128 98C130 114 120 130 100 130" stroke-width="3.6"/><path d="M93 70L100 63L107 70" stroke-width="2.6"/><path d="M100 74C95 90 95 112 100 128M87 80C83 94 85 112 92 124M113 80C117 94 115 112 108 124" stroke-width="1.5" stroke-opacity=".5"/><path d="M100 63C101 52 97 44 100 32" stroke-width="3"/><path d="M99 44C88 32 75 33 70 39C79 47 91 47 99 44Z" stroke-width="2.8"/><path d="M100 36C109 22 125 20 132 26C125 36 111 38 100 36Z" stroke-width="2.8"/><path d="M76 39C84 40 91 42 98 44M128 26C120 29 111 32 101 35" stroke-width="1.3" stroke-opacity=".5"/><path d="M48 138H152" stroke-width="1.6" stroke-opacity=".45"/><path d="M62 138C63 132 67 131 69 138M73 138C74 134 77 134 78 138M126 138C127 132 131 131 133 138M136 138C137 134 140 134 141 138" stroke-width="1.6" stroke-opacity=".6"/></g></svg>';
+RELIC_ART.burrs_seed = BURRS_SEED_ART;
 const NOTEPAD_CSS = `
 .gw-m-notepad .gw-modal-body { max-width: none; width: 100%; }
 .gw-pad-wrap { box-sizing: border-box; width: 100%; max-height: 100dvh; overflow-y: auto; padding: 18px 16px calc(16px + var(--sab, 0px)); display: flex; justify-content: center; }
@@ -188428,6 +191133,8 @@ function of(e, t = null) {
     return t;
   }
 }
+// Sporewood's hunt pieces on their own (?debug=1 only, as r7 keeps it): huntArtDebug.
+$t.debug.huntArt = huntArtDebug($t);
 var ege = typeof $t.debug.v3 == "function" ? $t.debug.v3 : null;
 Object.assign($t.debug, {
   timeScale(e = 1) {

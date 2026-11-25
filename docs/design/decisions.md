@@ -334,6 +334,55 @@ Step 4a of the Sporewood plan: the lake's fifth place, Burr's home, and its own 
   results but for two timings measured in real time. Sporewood's 17 checks of the drift, the float, the seedfall, its
   list, signs, orders and sheet pass as before.
 
+## Sporewood's hunt, its look, built 25 November 2026
+
+Step 5b of the Sporewood plan: what is seen in the hunt, built apart from its rules, words and flow (5a), behind the
+names those call. Their interfaces are in `hunt-per-lake.md`, "Sporewood's pieces"; each can be shown on its own with
+`?debug=1` (`__gw.debug.huntArt`) and in `tools/scenery-shots.mjs --lake sporewood`.
+
+- **Burr** (`makeBurr`): an old, stooped seed-keeper in Hob's style: a long mossy coat with moss and lichen on his
+  shoulders, a plum shawl, seed pouches and a trowel at his belt, a wide felt hat with small caps growing on its brim
+  (the pale ones glow, more after dark), a lichen beard, glowing eyes, and a tray of seedlings held in both hands. He
+  breathes and sways, now and then looks down at his tray, and turns his head to the raft within 14 m. He stands at the
+  spot the Greenhouse keeps for him, which now also says the way he faces (out along the aisle). Placing and showing
+  him is the rules' part.
+- **The Meadowback Pacu**: the legend's 3D model is now a deep, blunt-faced pacu, dark olive along the back,
+  silver-bronze down the flanks, with an orange-red throat and belly and teeth like a person's, and a living meadow on
+  her back: a thick green mantle of moss with a ragged hem spilling down her flanks, grass, and a few small caps
+  (some glowing), seedlings and two saplings. Lying still with the water at her flanks she is a mossy islet.
+  It is the model every 3D view of `drifting_grove` uses, so the fight shows her too; her flat drawing (the measuring
+  card) is now a deep, round fish with teeth like a person's, and she is held at the landing as a fish, not a ray.
+- **The island rises** (`HUNT_SCENES.island`, about 10 s), framed close so she fills about a third of the picture at
+  her peak, with the drift's band and eddy faded down while it plays: rings and a boil at the spot, the meadow comes up
+  with water running off its moss, she lifts her head so an eye shows, then dives head first with her tail coming up, and the
+  pods about her swirl in her wake. **The crunch** (`HUNT_SCENES.crunch`, about 7 s): her back breaks the water among
+  the pods, her blunt head comes up at one (the pod lit and larger than the drifting ones, framed close), she cracks it
+  in two, its pieces flying and a splash, with a crunch (a new sound, `pod_crunch`, made as the game's
+  others are: a snap, three woody crackles and a knock) and slips under. Both are skippable and stop the evening's
+  clock, as the bird is.
+- **The notepad** (`PAD_ART.sporewood`), in Mossmere's pencil: Burr's almanac page (the lake's own shore, its islands,
+  the Mother's Cup under the Cap, the drift running to its four eddies, the Greenhouse with his lamp, home, and the Cap
+  letting fall its pods in a corner); the meadow on the water with an eye at its end; the line-up of the five crushers,
+  traced from their portraits, each crossed out with its mouth and the mark it leaves on a pod; the refusal, a great
+  hatched blunt head nosing the bait and turning, with an arrow to a seed under a float in the drift; and what came
+  back: a hook crushed flat with square dents, a knot bitten halfway, a line worn thin by the rod, or the whole rig
+  ticked.
+- **The marks** (`PAD_MARKS`): each drawn on a seed pod: a puffer's two chisel nips, a ray's flat crush, the piranha's
+  rows of cuts, a catfish's rasped scuff, and hers, the pod cracked through with two rows of square dents. On a catch
+  card the pod is an inset in the picture's lower left corner, the mark in red.
+- **The cracked pod, moss rafts, Burr's Seed** (`makeCrackedPod`, `makeMossRaft`, `makeMeadowOnRaft`,
+  `RELIC_ART.burrs_seed`): the seedfall's pod in two halves hinged at the stalk, with the square marks; a clump of moss
+  with caps and grass about 1 m across, eight of which share one geometry and material (one draw call each); a planter
+  box at the raft's stern, across from the brazier, with moss, grass, glowing caps and the sapling grown from the seed;
+  and on the tally a seed split at its top with a sprout.
+- Gaps filled during the build: the scenes do not judge when they are due (the rules call them then), and take where
+  (`at`), else the evening's eddy; she rises 8 m from the raft (7 m for the crunch) when it is nearer, never under it,
+  and is drawn 5.2 m long in them (the legend's middle size is 3 m), as she must read as an islet. A line at a scene's end is read from the lake's
+  words if it has one (`time.islandRose`, `time.crunched`). The notepad's keys are Mossmere's (map, taken, lineup,
+  swirl, back), and its labels on sketch 1 are `cup`, `eddies`, `greenhouse` and `home`. Burr is not drawn while the
+  raft is over 40 m from him. The Sporewood field guide draws her new model and a new portrait of it, side on, as the
+  other Sporewood fish; its name and line for her, and when it shows her, were left to the hunt's rules and words.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.

@@ -51,6 +51,9 @@ const option = (name, fallback) => {
   return i < 0 ? fallback : args[i + 1];
 };
 const SPEED = args.includes("--speed");
+// --speed --art (Sporewood): each place measured again with Burr standing at the Greenhouse door (on screen only in the
+// Greenhouse), and the set-out spot with eight moss rafts and Burr's Seed's meadow box on the raft (on screen)
+const ART = args.includes("--art");
 const OUT = option("--out", null);
 const ONLY = option("--only", null)
   ?.split(",")
@@ -293,7 +296,136 @@ const SPOREWOOD_VIEWS = [
     cam: { x: 52.6, y: 1.1, z: -30.9, side: [0.25, 0.97], elev: 22, dist: 6 },
   },
 ];
-const VIEWS = LAKE === "sporewood" ? SPOREWOOD_VIEWS : MOSSMERE_VIEWS;
+// Sporewood's hunt pieces on their own (the debug hook huntArt, as the hunt's rules that call them are built apart):
+// `art` lists pieces to show ([piece, options], options as huntArt.show takes them, `ahead` and `right` in metres from
+// the raft as the view puts it), a scene to play (`scene`, held at second `hold`) or an overlay to draw (`overlay`,
+// with `hud` so the page shows). Burr at his spot by the Greenhouse door at dusk and at night, close and from the
+// fishing camera in the aisle; the Pacu's model on her own; the island rising (three moments) and the crunch (two);
+// the cracked pod; eight moss rafts; Burr's Seed's meadow box on the raft; the notepad's five sketches, the catch
+// card's five marks and Burr's Seed at the tally.
+// (aimed a little in front of him, so the step's own obstacle does not turn the camera into the glasshouse)
+const BURR_CAM = { x: 52.9, y: 0.95, z: -30.4, side: [-0.4, 0.92], elev: 12, dist: 2.6 };
+const HUNT_ART_VIEWS = [
+  ...["dusk", "night"].map((hour) => ({
+    name: `burr-${hour}`,
+    session: "ghfound",
+    at: "greenhouse",
+    hour,
+    art: { show: [["burr"]] },
+    cam: BURR_CAM,
+  })),
+  { name: "burr-aisle-dusk", session: "ghfound", at: "greenhouse", hour: "dusk", art: { show: [["burr"]] } },
+  {
+    name: "pacu-model-day",
+    session: "crossed",
+    at: "open",
+    hour: "day",
+    art: { show: [["pacu", { ahead: 8, y: 1.6, swim: 0.2, wet: 1, yawSide: true }]] },
+    artCam: { ahead: 8, y: 1.6, elev: 6, dist: 5 },
+  },
+  {
+    name: "pacu-model-dusk",
+    session: "crossed",
+    at: "open",
+    hour: "dusk",
+    art: { show: [["pacu", { ahead: 8, y: 1.6, swim: 0.2, wet: 1, yawSide: true }]] },
+    artCam: { ahead: 8, y: 1.6, elev: 24, dist: 5 },
+  },
+  // the scenes at the evening's eddy (the save's: the north-west one) in the dusk of the seedfall, and the island once
+  // more after dark
+  ...[
+    ["island-1-rise", 3.0, "podsFalling"],
+    ["island-2-meadow", 4.9, "podsFalling"],
+    ["island-3-dive", 6.9, "podsFalling"],
+    ["island-2-meadow-night", 4.9, "gathered"],
+  ].map(([name, hold, hour]) => ({
+    name,
+    session: "crossed",
+    at: "eddy",
+    hour,
+    art: { scene: "island", hold },
+  })),
+  ...[
+    ["crunch-1-back", 2.6],
+    ["crunch-2-crack", 3.7],
+  ].map(([name, hold]) => ({
+    name,
+    session: "crossed",
+    at: "eddy",
+    hour: "podsFalling",
+    art: { scene: "crunch", hold },
+  })),
+  {
+    name: "pod-close-dusk",
+    session: "crossed",
+    at: "open",
+    hour: "dusk",
+    art: { show: [["pod", { ahead: 3, y: 0.7, open: 0.55 }]] },
+    artCam: { ahead: 3, y: 0.7, elev: 18, dist: 1.5 },
+  },
+  {
+    name: "pod-line-dusk",
+    session: "crossed",
+    at: "open",
+    hour: "dusk",
+    art: { show: [["pod", { ahead: 2.2, y: 0.9, open: 0.55 }]] },
+  },
+  ...["dusk", "night"].map((hour) => ({
+    name: `moss-rafts-${hour}`,
+    session: "crossed",
+    at: "open",
+    hour,
+    art: { show: [["mossRafts", { ahead: 7, n: 8, r: 3.2 }]] },
+  })),
+  {
+    name: "moss-raft-close-dusk",
+    session: "crossed",
+    at: "open",
+    hour: "dusk",
+    art: { show: [["mossRafts", { ahead: 4, n: 1, r: 0 }]] },
+    artCam: { ahead: 4, y: 0.1, elev: 30, dist: 2.2 },
+  },
+  ...["dusk", "night"].map((hour) => ({
+    name: `meadow-raft-${hour}`,
+    session: "crossed",
+    at: "open",
+    hour,
+    art: { show: [["meadow"]] },
+  })),
+  {
+    name: "meadow-raft-close-dusk",
+    session: "crossed",
+    at: "open",
+    hour: "dusk",
+    art: { show: [["meadow"]] },
+    artCam: { ahead: -0.8, right: 0.4, y: 0.45, elev: 28, dist: 2.4, from: [0.35, -1] },
+  },
+  ...["map", "taken", "lineup", "swirl", "back"].map((key) => ({
+    name: `pad-${key}`,
+    session: "crossed",
+    at: "open",
+    hour: "dusk",
+    hud: true,
+    art: { overlay: ["pad", key] },
+  })),
+  ...["beak", "plates", "razor", "pads", "person"].map((mark) => ({
+    name: `card-${mark}`,
+    session: "crossed",
+    at: "open",
+    hour: "dusk",
+    hud: true,
+    art: { overlay: ["card", mark] },
+  })),
+  {
+    name: "relic-tally",
+    session: "crossed",
+    at: "open",
+    hour: "dusk",
+    hud: true,
+    art: { overlay: ["relic"] },
+  },
+];
+const VIEWS = LAKE === "sporewood" ? [...SPOREWOOD_VIEWS, ...HUNT_ART_VIEWS] : MOSSMERE_VIEWS;
 const PLACES_HERE = LAKE === "sporewood" ? SPOREWOOD_PLACES : PLACES;
 
 // ---- the page's fixed clock and seeded random, installed before the game's own scripts run -------------------
@@ -523,6 +655,44 @@ async function stage(s, view, setout) {
   );
   await frames(s, 10);
   await s.closeGuides(1500);
+  // Sporewood's hunt pieces (HUNT_ART_VIEWS): shown, played or drawn, with the landmark camera on them (`artCam`, in
+  // metres from the raft as the view puts it)
+  const artOut = await s.eval(
+    ([art, place, cam]) => {
+      const g = window.__gw,
+        h = g.debug.huntArt;
+      if (!h) return art || cam ? "no huntArt debug hook" : null;
+      h.clear();
+      if (!art) return null;
+      const fx = -Math.sin(place.yaw),
+        fz = -Math.cos(place.yaw),
+        rel = (o) => {
+          if (o?.ahead == null && o?.right == null) return o || {};
+          const a = o.ahead || 0,
+            r = o.right || 0;
+          const x = place.x + fx * a - fz * r,
+            z = place.z + fz * a + fx * r;
+          return { ...o, x, z, yaw: o.yawSide ? place.yaw : o.yaw };
+        };
+      for (const [piece, o] of art.show || []) if (!h.show(piece, rel(o))) return `could not show ${piece}`;
+      if (art.scene && !h.scene(art.scene, { hold: art.hold })) return `could not play ${art.scene}`;
+      if (art.overlay && !h[art.overlay[0]]?.(...art.overlay.slice(1)))
+        return `could not draw ${art.overlay}`;
+      if (cam) {
+        // `from`: where the camera is from its target, [right, ahead] of the raft (the landmark camera's `side`)
+        const at = rel(cam),
+          [r, a] = cam.from || [1, 0],
+          side = [-fz * r + fx * a, fx * r + fz * a];
+        g.render.frameLandmark(
+          { x: at.x, y: cam.y, z: at.z, r: 1, side, elev: cam.elev, dist: cam.dist },
+          { dur: 600 },
+        );
+      }
+      return null;
+    },
+    [view.art || null, place, view.artCam || null],
+  );
+  if (artOut) throw new Error(artOut);
   if (view.cam) {
     await s.eval((cam) => window.__gw.render.frameLandmark(cam, { dur: 600 }), view.cam);
   } else if (view.frame) {
@@ -748,6 +918,41 @@ async function speed() {
         `${name}: ${out[name].toFixed(1)} ms a frame (60 frames, 480x270, ${q});` +
           ` ${info.calls} draw calls, ${info.triangles} triangles`,
       );
+      if (!ART) continue;
+      const extra = [["with Burr at the door", ["burr"]]];
+      if (view.at === "setout")
+        extra.push([
+          "with eight moss rafts and the meadow box",
+          ["mossRafts", { ahead: 6, n: 8, r: 3 }],
+          ["meadow"],
+        ]);
+      for (const [what, ...pieces] of extra) {
+        await s.eval(
+          ([pieces, place]) => {
+            const g = window.__gw,
+              h = g.debug.huntArt,
+              p = g.player.position,
+              yaw = Number(g.player.heading) || 0;
+            h.clear();
+            for (const [piece, o] of pieces)
+              h.show(
+                piece,
+                o?.ahead ? { ...o, x: p.x - Math.sin(yaw) * o.ahead, z: p.z - Math.cos(yaw) * o.ahead } : o,
+              );
+          },
+          [pieces.map((x) => (Array.isArray(x) ? x : [x])), null],
+        );
+        await frames(s, 20);
+        const ms = await measure(),
+          info2 = await s.eval(() => {
+            const r = window.__gw.render.renderer.info.render;
+            return { calls: r.calls, triangles: r.triangles };
+          });
+        console.log(
+          `${name}, ${what}: ${ms.toFixed(1)} ms a frame; ${info2.calls} draw calls, ${info2.triangles} triangles`,
+        );
+        await s.eval(() => window.__gw.debug.huntArt.clear());
+      }
     }
     await s.close();
   } finally {

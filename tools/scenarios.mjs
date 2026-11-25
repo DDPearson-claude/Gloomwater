@@ -12803,6 +12803,275 @@ const SCENARIOS = [
       return `144 against 60 Hz: dusk ${ms(fast.dusk)}/${ms(slow.dusk)} ms, strike window ${ms(fast.window)}/${ms(slow.window)}, fight ${ms(fast.fight)}/${ms(slow.fight)}, landing ${ms(fast.landing)}/${ms(slow.landing)}, sailing ${fast.sail.toFixed(2)}/${slow.sail.toFixed(2)} m/s`;
     },
   },
+
+  // ---- Sporewood's hunt art (sporewood-plan.md step 5b; hunt-per-lake.md "Sporewood's pieces"), through the debug
+  // hook huntArt, as the hunt's rules that call these pieces are built apart.
+  {
+    name: "Sporewood's hunt art: Burr, the Pacu, a cracked pod, eight moss rafts and the meadow box build at low, medium and best with no error, run, and are freed whole (built and cleared twice, nothing is left behind)",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session, { fixture }) {
+      await continueToPlay(session, fixture);
+      const r = await session.eval(async () => {
+        const g = window.__gw,
+          h = g.debug.huntArt,
+          frame = () => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))),
+          tris = (name) => {
+            const o = g.render.scene.getObjectByName(name);
+            let n = 0;
+            o?.traverse((m) => {
+              if (!m.isMesh || !m.geometry) return;
+              const c = m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count;
+              n += (c / 3) * (m.isInstancedMesh ? m.count : 1);
+            });
+            return Math.round(n);
+          },
+          out = {};
+        for (const q of ["low", "medium", "high"]) {
+          g.state.meta.settings.quality = q;
+          g.render.setQuality(q);
+          const passes = [];
+          for (let pass = 0; pass < 2; pass++) {
+            const kids = g.render.scene.children.length,
+              p = g.player.position,
+              shown = [
+                h.show("burr"),
+                h.show("pacu", { x: p.x + 6, z: p.z, y: 0.5 }),
+                h.show("pod", { x: p.x + 3, z: p.z }),
+                h.show("mossRafts", { x: p.x - 5, z: p.z, n: 8 }),
+                h.show("meadow"),
+              ];
+            for (let i = 0; i < 6; i++) await frame();
+            const counts = {
+              burr: tris("Burr"),
+              pacu: tris("fish:drifting_grove"),
+              pod: tris("Cracked pod"),
+              rafts: tris("debug:mossRafts"),
+              meadow: tris("relic:burrsSeed"),
+            };
+            h.clear();
+            for (let i = 0; i < 3; i++) await frame();
+            passes.push({
+              shown,
+              counts,
+              kidsBack: g.render.scene.children.length === kids,
+              left: [
+                "Burr",
+                "fish:drifting_grove",
+                "Cracked pod",
+                "debug:mossRafts",
+                "relic:burrsSeed",
+              ].filter((n) => g.render.scene.getObjectByName(n)),
+              geos: g.render.renderer.info.memory.geometries,
+            });
+          }
+          out[q] = passes;
+        }
+        return { out, errors: g.errors.slice() };
+      });
+      const lines = [];
+      for (const [q, [a, b]] of Object.entries(r.out)) {
+        check(
+          a.shown.every(Boolean) && b.shown.every(Boolean),
+          `${q}: not all shown: ${JSON.stringify(a.shown)}`,
+        );
+        check(
+          Object.values(a.counts).every((n) => n > 0),
+          `${q}: a piece drew nothing: ${JSON.stringify(a.counts)}`,
+        );
+        check(
+          a.kidsBack && b.kidsBack && !a.left.length && !b.left.length,
+          `${q}: left in the scene: ${b.left}`,
+        );
+        check(b.geos <= a.geos, `${q}: geometries grew from ${a.geos} to ${b.geos} after the second clear`);
+        lines.push(
+          `${q} ${Object.entries(a.counts)
+            .map(([k, n]) => `${k} ${n}`)
+            .join(", ")}`,
+        );
+      }
+      const low = r.out.low[0].counts,
+        high = r.out.high[0].counts;
+      check(
+        low.burr < high.burr && low.rafts < high.rafts,
+        `low is not lighter: ${JSON.stringify({ low, high })}`,
+      );
+      check(low.rafts / 8 <= 150, `a moss raft on low is ${low.rafts / 8} triangles`);
+      check(!r.errors.length, `game errors: ${r.errors.join("; ")}`);
+      return `triangles: ${lines.join("; ")}`;
+    },
+  },
+
+  {
+    name: "Sporewood's scenes: the island and the crunch each play to their end (about 10 and 7 seconds) with the clock stopped and the drift hushed, put away all they built, lift the hush and say so on the bus; skipped they end at once; stopped they leave nothing; neither starts twice",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 600_000,
+    async run(session, { fixture }) {
+      await continueToPlay(session, fixture);
+      const r = await session.eval(() => {
+        const g = window.__gw,
+          h = g.debug.huntArt,
+          out = {};
+        for (const kind of ["island", "crunch"]) {
+          const events = [],
+            name = `huntScene:${kind}`;
+          g.bus.on(`hunt:${kind}Scene`, (e) => events.push(e.phase + (e.skipped ? ":skipped" : "")));
+          const d = h.make(kind),
+            ok = d.begin(),
+            cin = g.cinematic === true,
+            hush = g.sceneHush === 1,
+            built = !!g.render.scene.getObjectByName(name),
+            twice = d.begin();
+          let n = 0;
+          while (d.state() && n < 400) d.update(0.05), n++;
+          const played = {
+            ok,
+            cin,
+            built,
+            twice,
+            secs: Math.round(n * 5) / 100,
+            left: !!g.render.scene.getObjectByName(name) || !!g.render.scene.getObjectByName(`${name}:pods`),
+            cinAfter: g.cinematic === true,
+            hush,
+            hushAfter: g.sceneHush,
+          };
+          const ok2 = d.begin();
+          d.update(0.5);
+          const skipped = d.skip(),
+            afterSkip = {
+              ok2,
+              skipped,
+              state: d.state(),
+              cin: g.cinematic === true,
+              hush: g.sceneHush,
+              left: !!g.render.scene.getObjectByName(name),
+            };
+          const ok3 = d.begin();
+          d.update(0.5);
+          d.stop();
+          const afterStop = {
+            ok3,
+            state: d.state(),
+            cin: g.cinematic === true,
+            hush: g.sceneHush,
+            left: !!g.render.scene.getObjectByName(name),
+          };
+          // while another scene holds the camera it does not start
+          g.cinematic = !0;
+          const busy = d.begin();
+          g.cinematic = !1;
+          out[kind] = { played, afterSkip, afterStop, busy, events };
+        }
+        return { out, errors: g.errors.slice() };
+      });
+      for (const [kind, o] of Object.entries(r.out)) {
+        const [lo, hi] = kind === "island" ? [9, 12] : [6, 8];
+        check(
+          o.played.ok && o.played.cin && o.played.built && !o.played.twice,
+          `${kind} begin: ${JSON.stringify(o.played)}`,
+        );
+        check(o.played.secs >= lo && o.played.secs <= hi, `${kind} ran ${o.played.secs} s`);
+        check(
+          !o.played.left && !o.played.cinAfter,
+          `${kind} left something at its end: ${JSON.stringify(o.played)}`,
+        );
+        // the spore drift is hushed while it plays, and the hush is lifted at its end, on a skip and on a stop
+        check(
+          o.played.hush && !o.played.hushAfter && !o.afterSkip.hush && !o.afterStop.hush,
+          `${kind} hush: ${JSON.stringify({ during: o.played.hush, after: o.played.hushAfter, skip: o.afterSkip.hush, stop: o.afterStop.hush })}`,
+        );
+        check(
+          o.afterSkip.ok2 &&
+            o.afterSkip.skipped &&
+            !o.afterSkip.state &&
+            !o.afterSkip.cin &&
+            !o.afterSkip.left,
+          `${kind} skip: ${JSON.stringify(o.afterSkip)}`,
+        );
+        check(
+          o.afterStop.ok3 && !o.afterStop.state && !o.afterStop.cin && !o.afterStop.left,
+          `${kind} stop: ${JSON.stringify(o.afterStop)}`,
+        );
+        check(!o.busy, `${kind} started while another scene held the camera`);
+        const want =
+          kind === "crunch"
+            ? ["start", "crunch", "end", "start", "end:skipped", "start"]
+            : ["start", "end", "start", "end:skipped", "start"];
+        check(JSON.stringify(o.events) === JSON.stringify(want), `${kind} events ${o.events.join(", ")}`);
+      }
+      check(!r.errors.length, `game errors: ${r.errors.join("; ")}`);
+      return `island ${r.out.island.played.secs} s, crunch ${r.out.crunch.played.secs} s; skip and stop clean`;
+    },
+  },
+
+  {
+    name: "Sporewood's notepad art: its five sketches draw as pencil SVG with their words, the line-up crosses its five crushers out with their reasons and shows the five marks, never naming her; each mark draws on a catch card, and Burr's Seed on the tally",
+    fixture: "sporewood-crossed",
+    debug: true,
+    async run(session) {
+      const r = await session.eval(() => {
+        const g = window.__gw,
+          h = g.debug.huntArt,
+          out = {},
+          box = () => document.querySelector('[data-hunt-art="overlay"]');
+        for (const key of ["map", "taken", "lineup", "swirl", "back", "almanac", "island", "refusal"]) {
+          const ok = h.pad(key),
+            el = box();
+          out[key] = {
+            ok,
+            svgs: el?.querySelectorAll("svg.gw-pad-sk").length ?? 0,
+            paths: el?.querySelectorAll("svg.gw-pad-sk path").length ?? 0,
+            caps: [...(el?.querySelectorAll(".gw-pad-cap") || [])].filter((p) => p.textContent.trim()).length,
+            crossed: el?.querySelectorAll(".gw-pad-lu-row.gw-out").length ?? 0,
+            rows: el?.querySelectorAll(".gw-pad-lu-row").length ?? 0,
+            marks: [...(el?.querySelectorAll(".gw-pad-mark") || [])].map((m) => m.dataset.mark),
+            names: /pacu|meadowback|drifting|wandering island/i.test(el?.innerHTML || ""),
+          };
+        }
+        for (const mark of ["beak", "plates", "razor", "pads", "person"]) {
+          const ok = h.card(mark),
+            el = box();
+          out[`card-${mark}`] = {
+            ok,
+            svg: !!el?.querySelector(`svg.gw-cc-mark--${mark} path[stroke="rgb(226,116,94)"]`),
+            fish: !!el?.querySelector(".gw-cc-art canvas"),
+          };
+        }
+        const relic = h.relic();
+        out.relic = { ok: relic, svg: !!box()?.querySelector("svg.cat-eng path") };
+        h.clear();
+        return { out, left: !!box(), errors: g.errors.slice() };
+      });
+      const o = r.out;
+      for (const key of ["map", "taken", "lineup", "swirl", "back"])
+        check(
+          o[key].ok && o[key].svgs > 0 && o[key].paths > 20 && o[key].caps > 0 && !o[key].names,
+          `${key}: ${JSON.stringify(o[key])}`,
+        );
+      for (const [alias, key] of [
+        ["almanac", "map"],
+        ["island", "taken"],
+        ["refusal", "swirl"],
+      ])
+        check(o[alias].paths === o[key].paths, `${alias} is not ${key}`);
+      check(o.back.svgs === 3, `What came back drew ${o.back.svgs} parts`);
+      check(
+        o.lineup.rows === 6 && o.lineup.crossed === 3,
+        `line-up rows ${o.lineup.rows}, crossed ${o.lineup.crossed}`,
+      );
+      check(o.lineup.marks.join(",") === "person,beak,plates,razor,pads", `marks strip ${o.lineup.marks}`);
+      for (const mark of ["beak", "plates", "razor", "pads", "person"])
+        check(
+          o[`card-${mark}`].ok && o[`card-${mark}`].svg && o[`card-${mark}`].fish,
+          `card ${mark}: ${JSON.stringify(o[`card-${mark}`])}`,
+        );
+      check(o.relic.ok && o.relic.svg && !r.left, `relic: ${JSON.stringify(o.relic)}`);
+      check(!r.errors.length, `game errors: ${r.errors.join("; ")}`);
+      return `sketch paths: ${["map", "taken", "lineup", "swirl", "back"].map((k) => `${k} ${o[k].paths}`).join(", ")}`;
+    },
+  },
 ];
 
 // The local kinds, their base fish and homes, as in wo.localKinds.
