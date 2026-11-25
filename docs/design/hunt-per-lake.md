@@ -2,8 +2,13 @@
 
 The monster hunt's code works for any lake that has an entry in `wo.hunts` (its rules) and `Ca.hunts` (its
 words), both keyed by the water's id. A lake with no entry has no hunt: every hunt check there says no.
-Mossmere's entry is the only one. Sporewood has none yet. The save keeps one hunt record per lake in
-`loop.hunt[water]`, as it always has.
+Mossmere's entry is the only whole hunt. The save keeps one hunt record per lake in `loop.hunt[water]`, as it
+always has.
+
+A lake may supply pieces before its whole hunt. An entry with no `legend` is not a hunt (`huntOf` says no, so
+there is no record, tale, character, find, rig or ending there), and only the pieces it names work. Sporewood's
+entry supplies its time clue alone, the seedfall: `huntTimeOf` and `huntTimeWords` read the `time` piece of any
+entry, whole hunt or not.
 
 ## What a lake's rules must supply (`wo.hunts[water]`)
 
@@ -12,7 +17,7 @@ Mossmere's entry is the only one. Sporewood has none yet. The save keeps one hun
 - `taleEvening`: the first tally evening Murk may tell the tale.
 - `character`: the one who gives the first clue: `island` (its name in the lake's arena), `lampEvening`, `reach`, `leave`.
 - `part`: the patch of lake on his map, as `padBlobPts` numbers. Being in it in her time starts the nudges.
-- `time`: the time clue: `fromEvening`, `at`, `strokes`, `strokeGap`, `herTime`, `tries`, `sound`, `pitch`, `volume`, `late`, `flare`, `roostFlock`, `roostNear`.
+- `time`: the time clue: `fromEvening`, `at`, `strokes`, `strokeGap`, `herTime`, `tries`, `sound`, `pitch`, `volume`, `late`, `flare`, `roostFlock`, `roostNear`. `phase` "dusk" strikes by the dusk's clock, running on into the night (Sporewood's seedfall); with no `phase` it is the night's. `tries`, `flare` and `roostFlock` may be left out.
 - `find`: her water: `place`, `x`, `z`, `theft`, the boils (`boilSpread`, `boilEvery`, `boilSeen`, `boilClose`, `nudgedEvery`, `nudgedSeen`), `corkOffset`.
 - `scene`: the cutscene after the find: `kind` names its director in `HUNT_SCENES`; the rest is its own timing.
 - `rig`: `order` (fight order), `right`, `at`, `cause`, `takeNeeds`, and `wire` (the leader she feels and lets go).
@@ -30,7 +35,7 @@ Mossmere's entry is the only one. Sporewood has none yet. The save keeps one hun
 - `hob`: the character's talk (`tag`, `first`, `nights`, `greeting`, `after`, `next`, `ok`).
 - `pad`: the notepad's words, with `lake` (the name at the head of each page) and `tab`.
 - `refusal`, `ending` (the measuring card, the bounty row, Murk's lines, the relic's name and line, the rod).
-- `time`: the time clue's lines (`strikes`, `missing`, `still`, `birds`, `birdTaken`, `odds`, `holdFull`, `bites`, `feeds`).
+- `time`: the time clue's lines (`strikes`, `missing`, `still`, `birds`, `birdTaken`, `odds`, `holdFull`, `bites`, `feeds`). `first`, when given, is said at the lake's very first time clue in place of `strikes` (kept in `said["time:<water>:first"]`); `missing` is said only by a hunt that has her water.
 - `seal`: what the chart her landing opens calls her until she is landed.
 
 ## Other per-lake tables the hunt leans on
@@ -39,7 +44,9 @@ Mossmere's entry is the only one. Sporewood has none yet. The save keeps one hun
   `quiet`), what a quiet tally waits for (`quietAfter`) and what Murk says when an arrival brings one part of several
   (`alone`). The hunt's own beats name an arrival (`beats.map`, `theft`, `ring`). Sporewood's three (the Burl Hook,
   the Brass Trace, the Mossthread Snood) come on quiet tallies until its hunt supplies Burr's almanac and the first
-  cracked pod as their beats.
+  cracked pod as their beats, and wait on quiet tallies for Murk's gifts. Its `gifts` are Murk's
+  gifts there, in order (the first at the first tally with a sale in that lake, each later one at the tally after the
+  one before it; Sporewood's Drift Float and Seed Pouch). Mossmere's lead and tin keep their own older rule.
 - `wo.orders.practice[water]`: practice orders (first, after, max, parts). No entry: no practice orders.
 - `bs[water]`: the lake's bite tables, among them the rig parts' tags (`leader`, `hookSet`), the parts a loss on the
   Plain Knot or the Mere Hook names (`lossParts`), and its signs on the water (`tells`, `sight`).

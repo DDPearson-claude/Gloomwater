@@ -10,7 +10,9 @@
 //
 // --lake sporewood: Sporewood Pools' own views (SPOREWOOD_VIEWS) from tools/fixtures/sporewood-crossed.json, a save
 // with the barge at Sporewood, the Lullaby and the Gill Harp free and the Veilwater and the Mother's Cup still locked
-// under their mist. --rod is for Mossmere's rods only.
+// under their mist. Among them: the spore drift by the hour, the seedfall from far and near, its pods in the evening's
+// eddy and the Drift Float riding the drift (its trip is evening 7, so the drift and the seedfall are that evening's).
+// --rod is for Mossmere's rods only.
 //
 // --rod: the "found" save owns and fits that Mossmere rod (willow_switch, ashwood_rod, whalebone_rod, or the found
 // lamp_pole), and each picture's name gains "-<rod id>". --raft top: the save has every raft part at its top level
@@ -113,6 +115,11 @@ const HOURS = {
   day: { phase: "calm", t: 36 },
   dusk: { phase: "dusk", t: 7 },
   night: { phase: "gloomtide", t: 30 },
+  // Sporewood's seedfall (its time clue strikes 1 s into dusk, ten sighs 2.2 s apart): mid-seedfall, with pods in the
+  // air and the Mother Cap glowing; and about 100 s after its first sigh, the pods gathered in the evening's eddy.
+  seedfall: { phase: "dusk", t: 12 },
+  podsFalling: { phase: "dusk", t: 16 },
+  gathered: { phase: "gloomtide", t: 81 },
 };
 
 // yaw that turns the raft at `from` to face `to` (the game's own convention, as its sail plans use)
@@ -141,6 +148,18 @@ const SPOREWOOD_PLACES = {
   veil: { at: { x: -66, z: 29.5 }, look: { x: -84, z: 36.5 } }, // the moss curtain over the Veilwater's mouth
   cup: { at: { x: 35, z: 11 }, look: { x: 48, z: 6 } }, // the Mother's Cup under the Mother Cap
   open: { at: { x: 30, z: -6 }, look: { x: 44, z: -14 } }, // the open East Pool
+  // The spore drift on the save's evening (evening 7: it runs from the Cup west to the eddy south of Murk's barge). The
+  // fishing camera sits south of the raft (+z) whatever way it faces, so the drift crosses its frame: the raft in the
+  // drift, facing down it; north of it (the Drift Float's cast puts the raft a cast's length off the drift, on this side,
+  // clear of Murk's barge to the south, and the camera drawn back with the line out takes in the float and the raft);
+  // and in the drift's last metres, with the eddy to its left.
+  drift: { at: { x: 37, z: 9.4 }, look: { x: 26, z: 10 } },
+  driftSide: { at: { x: 34, z: 2 }, look: { x: 35, z: 9 } },
+  eddy: { at: { x: 30, z: 11.5 }, look: { x: 26, z: 10 } },
+  // The seedfall from far off (by the Lullaby, facing the Mother Cap) and from near the Mother's Cup (south of it, so the
+  // Cup is in the fishing camera's frame).
+  lullabyCap: { at: { x: -44, z: -21 }, look: { x: 51, z: 8 } },
+  cupNear: { at: { x: 44, z: 16 }, look: { x: 48, z: 6 } },
 };
 
 // The views, in the order they are taken. `session` names the save they need; `at` a place above or "setout" (the
@@ -212,6 +231,35 @@ const SPOREWOOD_VIEWS = [
     hour,
   })),
   { name: "raft-line-out-dusk", session: "crossed", at: "setout", hour: "dusk", act: "cast" },
+  // The spore drift by the hour from the fishing camera, the seedfall from far and near, the pods gathered in the
+  // evening's eddy, and the Drift Float riding the drift (from the fishing camera and close).
+  ...["day", "dusk", "night"].map((hour) => ({
+    name: `drift-${hour}`,
+    session: "crossed",
+    at: "drift",
+    hour,
+  })),
+  { name: "seedfall-lullaby", session: "crossed", at: "lullabyCap", hour: "seedfall" },
+  { name: "seedfall-cup", session: "crossed", at: "cupNear", hour: "podsFalling" },
+  // the Mother's Cup bought and lifted, a camera held west of it that takes in the Mother Cap over the Cup: pods in the
+  // air and the first on the water
+  {
+    name: "seedfall-cap",
+    session: "cup",
+    at: "cupNear",
+    hour: "podsFalling",
+    cam: { x: 50, y: 8.5, z: 7, side: [-0.86, -0.5], elev: 9, dist: 34 },
+  },
+  { name: "pods-eddy-night", session: "crossed", at: "eddy", hour: "gathered" },
+  { name: "drift-float-dusk", session: "crossed", at: "driftSide", hour: "dusk", act: "driftCast" },
+  {
+    name: "drift-float-close-dusk",
+    session: "crossed",
+    at: "driftSide",
+    hour: "dusk",
+    act: "driftCast",
+    floatClose: { elev: 16, dist: 3.2, side: 0.6 },
+  },
 ];
 const VIEWS = LAKE === "sporewood" ? SPOREWOOD_VIEWS : MOSSMERE_VIEWS;
 const PLACES_HERE = LAKE === "sporewood" ? SPOREWOOD_PLACES : PLACES;
@@ -325,7 +373,17 @@ function crossedSave(quality) {
   return JSON.stringify(save);
 }
 
-const SAVES = { found: foundSave, locked: lockedSave, crossed: crossedSave };
+// Sporewood with the Mother's Cup bought and its mist lifted, so the seedfall's pods are seen falling into it.
+function cupSave(quality) {
+  const save = JSON.parse(crossedSave(quality)),
+    loop = save.meta.loop;
+  loop.places = loop.places || { revealed: [] };
+  for (const list of [loop.maps.places, loop.places.revealed, (loop.lifted = loop.lifted || [])])
+    list.includes("mothers_cup") || list.push("mothers_cup");
+  return JSON.stringify(save);
+}
+
+const SAVES = { found: foundSave, locked: lockedSave, crossed: crossedSave, cup: cupSave };
 
 // ---- steps on the page ---------------------------------------------------------------------------------------------
 
@@ -452,6 +510,43 @@ async function stage(s, view, setout) {
         );
       },
       [place, view.close || null],
+    );
+  } else if (view.act === "driftCast") {
+    // Sporewood's Drift Float owned and fitted (as Murk's gift leaves it), cast into the spore drift past halfway
+    // down it, the raft 9 m to its side facing it; with floatClose the landmark camera is held on the float.
+    await s.eval(
+      ([p0, close]) => {
+        const g = window.__gw,
+          loop = g.state.meta.loop,
+          D = g.data,
+          drift = D.sporeDriftOf(g.state.run.evening, "sporewood"),
+          q = D.driftAt(drift, drift.len * 0.55),
+          x = q.x,
+          z = q.z,
+          side = (p0.x - x) * -q.dz + (p0.z - z) * q.dx >= 0 ? 1 : -1,
+          rx = x - q.dz * 9 * side,
+          rz = z + q.dx * 9 * side,
+          p = { x: rx, z: rz, yaw: Math.atan2(-(x - rx), -(z - rz)) };
+        g.player.teleport({ x: p.x, z: p.z }, p.yaw);
+        for (const id of ["drift_float", "seed_pouch"]) loop.parts.includes(id) || loop.parts.push(id);
+        g.progression.loop.fitDepth("drift");
+        g.debug.castAt(x, z, 0.6);
+        if (!close) return;
+        const [ux, uz] = [Math.cos(p.yaw), -Math.sin(p.yaw)];
+        g.render.frameLandmark(
+          {
+            x,
+            y: 0.1,
+            z,
+            r: 0.5,
+            side: [ux * close.side + Math.sin(p.yaw), uz * close.side + Math.cos(p.yaw)],
+            elev: close.elev,
+            dist: close.dist,
+          },
+          { dur: 600 },
+        );
+      },
+      [place, view.floatClose || null],
     );
   } else if (view.act === "hook") {
     await s.eval(() => {

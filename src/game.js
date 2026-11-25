@@ -30561,6 +30561,17 @@ Ic(vg, {
   // Hob's Lamp's bite rule (B5), for the scenario tests.
   lampBiteMult: () => lampBiteMult,
   lampOf: () => lampOf,
+  // Sporewood's spore drift, its Drift Float and its seedfall, for the scenario tests.
+  sporeDriftOf: () => sporeDriftOf,
+  inSporeDrift: () => inSporeDrift,
+  driftAt: () => driftAt,
+  depthBiteMult: () => depthBiteMult,
+  seedfallPods: () => seedfallPods,
+  seedfallPodAt: () => seedfallPodAt,
+  huntClock: () => huntClock,
+  herTimeOpen: () => herTimeOpen,
+  lakeGiftAtTally: () => lakeGiftAtTally,
+  castRigMatches: () => castRigMatches,
   // Where the local kinds bite (wo.localKinds), for the scenario tests.
   localKindAt: () => localKindAt,
   splitLocalKinds: () => splitLocalKinds,
@@ -32084,6 +32095,8 @@ var Ph = [
     "sporelamp_fly",
     "seedpod_twirl",
     "guard_button",
+    // Appended last so every earlier position keeps its meaning: the Capseed, gathered at the seedfall.
+    "capseed",
   ],
   VQ = ["spore_moth", "ember_minnow", "root_jig", "sporelamp_fly", "seedpod_twirl", "guard_button"],
   jQ = ["spore_cake", "amber_larvae", "cut_strip"],
@@ -32127,8 +32140,22 @@ var Ph = [
     grade: 2,
     not: Object.freeze(["harpstring_eel", "festival_puffer", "threadling_eel", "sleepspore_jelly"]),
   }),
+  // The Capseed's column (the seedfall's pods, gathered in the Seed Pouch): seed-eaters and crushers take it best, and
+  // none depends on it. A fish missing here never takes it; the legend's row stays all null.
+  capseedGrades = Object.freeze({
+    sporebelly_puffer: 3,
+    velvet_ray: 2,
+    hushcap_koi: 2,
+    nightbloom_carp: 2,
+    falsesmile_barb: 2,
+    festival_puffer: 1,
+    cindertail_catfish: 1,
+    capshell_crayfish: 1,
+    netcloud_fry: 1,
+  }),
   ZQ = (e, t) => {
     let n = Object.fromEntries(TS.slice(0, t.length).map((o, a) => [o, t[a]]));
+    n.capseed = t.every((o) => o === null) ? null : (capseedGrades[e] ?? 0);
     return (n.guard_button = t.every((o) => o === null) ? null : kS.not.includes(e) ? 0 : kS.grade), n;
   };
 bs.sporewood = {
@@ -32187,6 +32214,12 @@ bs.mossmere.depth = {
 // or null (the Cork Float, today's rig, which changes nothing). It never falls below the floor, so the lead
 // stops no fish that could bite on the float.
 function depthBiteMult(speciesId, depth, water) {
+  // The Drift Float while it rides Sporewood's spore drift (depth "drift"): its tags (bs[water].drift).
+  if (depth === "drift")
+    return ka(
+      wo?.depthMult?.drift?.[(water == null ? y0 : bs[water])?.drift?.[localKindBase(speciesId)] || "any"],
+      1,
+    );
   if (depth !== "lead") return 1;
   // A null water is the home lake, as in Ih().
   let feeds = (water == null ? y0 : bs[water])?.depth?.[localKindBase(speciesId)] || "any",
@@ -32314,6 +32347,77 @@ bs.sporewood.laneAvoid = [
   [0, 6.5, 10],
 ];
 bs.sporewood.laneFallback = { x: -38, z: 12 };
+// ---- Sporewood's spore drift (sporewood-plan.md, order of work step 3) ---------------------------------------------
+// A slow current from the Mother's Cup to one of four eddies. Each evening its end moves to another eddy, by the game's
+// seeded evening roll (B5, as the wind lane), never the eddy of the evening before. It is the wind lane's successor in
+// Sporewood: by day and at dusk (`phases`) its band is the "lane" bite area, with the lane's share and column of the
+// raw table. It is drawn at every hour and quality (sporeDriftFx). `from`: where it leaves the Cup. Each eddy: its
+// centre and the water the drift crosses to it (`via`), all in free water, reachable by raft, 33 m or more apart, and
+// well clear of the buoys, Murk's barge and the old giant spot off Rootknot, so nothing but the drift marks them.
+// `w`: the band's width; `wobble`: how far each inner point strays, by evening; `pace`: how fast a Drift Float rides it
+// (metres a second); `podPace`: the seed pods; `swirl`: the evening's eddy's radius; `samples`: points along it.
+bs.sporewood.geometry.drift = {
+  from: { x: 47, z: 4 },
+  eddies: [
+    {
+      id: "east",
+      x: 66,
+      z: -14,
+      via: [
+        [56, -2],
+        [63, -9],
+      ],
+    },
+    {
+      id: "southwest",
+      x: 34,
+      z: -24,
+      via: [
+        [40, -8],
+        [36, -16],
+      ],
+    },
+    {
+      id: "northwest",
+      x: 26,
+      z: 10,
+      via: [
+        [40, 8],
+        [32, 10],
+      ],
+    },
+    {
+      id: "neck",
+      x: -16,
+      z: 6,
+      via: [
+        [34, 6],
+        [18, 8],
+        [4, 10],
+        [-6, 9],
+      ],
+    },
+  ],
+  w: 4,
+  wobble: 1.5,
+  pace: 0.3,
+  podPace: 0.6,
+  swirl: 3.2,
+  phases: ["day", "dusk"],
+  samples: 48,
+};
+// The Drift Float's tags (sporewood-plan.md "Tackle"), from each fish's lore: "drift" fish feed on what the drift
+// carries and bite twice as often while the float rides it; "still" fish keep to quiet water and bite half as often
+// (wo.depthMult.drift). A fish missing here is untagged, as are the giants and the legend.
+bs.sporewood.drift = {
+  netcloud_fry: "drift",
+  falsesmile_barb: "drift",
+  lostsea_mackerel: "drift",
+  sleepspore_jelly: "drift",
+  hushcap_koi: "still",
+  downcast_catfish: "still",
+  mildew_angler: "still",
+};
 bs.sporewood.shares = {
   day: {
     margin: 0.226,
@@ -32620,6 +32724,8 @@ function i1(e) {
 }
 function JQ(e, t, n) {
   if (!e) return !1;
+  // Sporewood's spore drift: its band along its path.
+  if (e.pts) return driftReach(e, t, n).d <= e.w / 2;
   let o = t - e.x,
     a = n - e.z,
     s = Math.cos(e.h),
@@ -32688,6 +32794,9 @@ var B5 = (e, t) => {
   );
 };
 function r1(e, t = null, n = null) {
+  // Sporewood: the spore drift is its lane, a bite area by day and at dusk.
+  if (SS(n).geometry.drift)
+    return t != null && !SS(n).geometry.drift.phases.includes(id(t)) ? null : sporeDriftOf(e, n);
   let o = SS(n),
     a = o.geometry.lane;
   if (t != null && !a.phases.includes(id(t))) return null;
@@ -32714,6 +32823,134 @@ function r1(e, t = null, n = null) {
     evening: s,
   };
 }
+// The spore drift of `water` on an evening (its geometry.drift), or null for a water without one. The evening's eddy is
+// rolled by evening, never the one of the evening before (the first evening's is rolled freely), and the path to it
+// strays a little each evening. Returns { evening, eddy: { id, index, x, z }, pts (centre line, [x, z] evenly spaced),
+// at (each point's distance along it), len, w, swirl, pace, podPace }. The same every time for an evening.
+var sporeDrifts = new Map();
+function sporeDriftOf(evening, water = "sporewood") {
+  let rule = typeof water == "string" ? bs[water]?.geometry?.drift : null;
+  if (!rule || !Array.isArray(rule.eddies) || !rule.eddies.length) return null;
+  let e = Math.max(1, Math.trunc(ka(evening, 1))),
+    key = `${water}:${e}`,
+    known = sporeDrifts.get(key);
+  if (known) return known;
+  // (the roll's second number also steps with the evening: with a fixed one the first evenings went back and forth
+  // between two eddies)
+  let n = rule.eddies.length,
+    roll = (k) => B5(k, k * 31 + 4401),
+    pick = Math.floor(roll(1) * n) % n;
+  for (let k = 2; k <= e; k++) pick = (pick + 1 + Math.floor(roll(k) * Math.max(1, n - 1))) % n;
+  let eddy = rule.eddies[pick],
+    ctrl = [[rule.from.x, rule.from.z], ...eddy.via.map((p) => [p[0], p[1]]), [eddy.x, eddy.z]];
+  // Each inner point strays across the way, by evening.
+  for (let i = 1; i < ctrl.length - 1; i++) {
+    let dx = ctrl[i + 1][0] - ctrl[i - 1][0],
+      dz = ctrl[i + 1][1] - ctrl[i - 1][1],
+      l = w0(dx, dz) || 1,
+      off = (B5(e, 4410 + i) - 0.5) * 2 * ka(rule.wobble, 0);
+    ctrl[i] = [ctrl[i][0] - (dz / l) * off, ctrl[i][1] + (dx / l) * off];
+  }
+  // A smooth curve through them (Catmull-Rom), then points evenly spaced along it.
+  let dense = [];
+  for (let i = 0; i < ctrl.length - 1; i++) {
+    let p0 = ctrl[Math.max(0, i - 1)],
+      p1 = ctrl[i],
+      p2 = ctrl[i + 1],
+      p3 = ctrl[Math.min(ctrl.length - 1, i + 2)];
+    for (let s = 0; s < 16; s++) {
+      let t = s / 16,
+        t2 = t * t,
+        t3 = t2 * t;
+      dense.push(
+        [0, 1].map(
+          (k) =>
+            0.5 *
+            (2 * p1[k] +
+              (p2[k] - p0[k]) * t +
+              (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 +
+              (3 * p1[k] - p0[k] - 3 * p2[k] + p3[k]) * t3),
+        ),
+      );
+    }
+  }
+  dense.push(ctrl[ctrl.length - 1]);
+  let acc = [0];
+  for (let i = 1; i < dense.length; i++)
+    acc.push(acc[i - 1] + w0(dense[i][0] - dense[i - 1][0], dense[i][1] - dense[i - 1][1]));
+  let len = acc[acc.length - 1],
+    m = Math.max(4, Math.trunc(ka(rule.samples, 48))),
+    pts = [],
+    at = [];
+  for (let j = 0, i = 0; j <= m; j++) {
+    let s = (len * j) / m;
+    for (; i < dense.length - 2 && acc[i + 1] < s; ) i++;
+    let f = Math.min(1, Math.max(0, (s - acc[i]) / Math.max(1e-6, acc[i + 1] - acc[i])));
+    pts.push([
+      Math.round((dense[i][0] + (dense[i + 1][0] - dense[i][0]) * f) * 100) / 100,
+      Math.round((dense[i][1] + (dense[i + 1][1] - dense[i][1]) * f) * 100) / 100,
+    ]);
+    at.push(Math.round(s * 100) / 100);
+  }
+  let drift = {
+    water,
+    evening: e,
+    eddy: { id: eddy.id, index: pick, x: eddy.x, z: eddy.z },
+    pts,
+    at,
+    len: Math.round(len * 100) / 100,
+    w: ka(rule.w, 4),
+    swirl: ka(rule.swirl, 3),
+    pace: ka(rule.pace, 0.3),
+    podPace: ka(rule.podPace, 0.6),
+  };
+  sporeDrifts.size > 64 && sporeDrifts.clear();
+  sporeDrifts.set(key, drift);
+  return drift;
+}
+// Where (x, z) lies against a drift's centre line: its distance from it (d), how far along it is (s), the way the drift
+// runs there (dx, dz) and which side it lies (side: its signed distance, positive to the drift's left).
+function driftReach(drift, x, z) {
+  let best = { d: 1 / 0, s: 0, dx: 1, dz: 0, side: 0 },
+    p = drift?.pts || [];
+  for (let i = 0; i + 1 < p.length; i++) {
+    let ax = p[i][0],
+      az = p[i][1],
+      ux = p[i + 1][0] - ax,
+      uz = p[i + 1][1] - az,
+      l2 = ux * ux + uz * uz || 1e-6,
+      t = Math.min(1, Math.max(0, ((x - ax) * ux + (z - az) * uz) / l2)),
+      px = ax + ux * t,
+      pz = az + uz * t,
+      d = w0(x - px, z - pz);
+    if (d < best.d) {
+      let l = Math.sqrt(l2);
+      best = {
+        d,
+        s: drift.at[i] + (drift.at[i + 1] - drift.at[i]) * t,
+        dx: ux / l,
+        dz: uz / l,
+        side: ((x - px) * -uz + (z - pz) * ux) / l,
+      };
+    }
+  }
+  return best;
+}
+// The point `s` metres along a drift's centre line, with the way it runs there.
+function driftAt(drift, s) {
+  let p = drift.pts,
+    at = drift.at,
+    k = Math.min(Math.max(0, s), drift.len),
+    i = 0;
+  for (; i < p.length - 2 && at[i + 1] < k; ) i++;
+  let f = (k - at[i]) / Math.max(1e-6, at[i + 1] - at[i]),
+    ux = p[i + 1][0] - p[i][0],
+    uz = p[i + 1][1] - p[i][1],
+    l = w0(ux, uz) || 1;
+  return { x: p[i][0] + ux * f, z: p[i][1] + uz * f, dx: ux / l, dz: uz / l };
+}
+// Whether (x, z) is in the drift's band.
+var inSporeDrift = (drift, x, z) => !!drift && driftReach(drift, x, z).d <= drift.w / 2;
 function QQ(e, t, n, o) {
   let a = Ih(o),
     s = a.raw?.[e];
@@ -44120,6 +44357,8 @@ var pP = {
       cut_strip: { kind: "bait", hold: 4, family: "predator" },
       // A bait the player catches (mossmere-gear.md B2): it grips hunters as Cut Strip does.
       live_minnow: { kind: "bait", hold: 4, family: "predator" },
+      // Sporewood's Capseed, gathered at the seedfall: a plain bait (its fish are set with Sporewood's table).
+      capseed: { kind: "bait", hold: 4 },
       feather_fly: { kind: "lure", hold: 5, family: "insect" },
       glimmer_spoon: { kind: "lure", hold: 6, family: "predator" },
       bone_jig: { kind: "lure", hold: 6, family: "bottom" },
@@ -47685,6 +47924,22 @@ wo.orders = {
         chafe_gut: { rig: { leader: "chafe_gut" }, fish: ["overbold_bass"] },
       },
     },
+    sporewood: {
+      first: 0.5,
+      after: 1 / 6,
+      max: 1,
+      parts: {
+        // Murk's two gifts: a drift fish caught while the Drift Float rode the spore drift, a fish taken on a Capseed.
+        drift_float: {
+          rig: { depth: "drift" },
+          fish: ["netcloud_fry", "falsesmile_barb", "lostsea_mackerel"],
+        },
+        seed_pouch: {
+          rig: { bait: "capseed" },
+          fish: ["sporebelly_puffer", "falsesmile_barb", "velvet_ray"],
+        },
+      },
+    },
   },
 };
 Object.assign(Ca.shelf, {
@@ -47813,6 +48068,11 @@ wo.arrivals = {
     },
     pike_wire: { parts: ["pike_wire"], fish: ["reedjaw_pike"] },
     leaders: { parts: ["pike_wire", "chafe_gut"] },
+  },
+  sporewood: {
+    // Murk's two gifts in Sporewood, in order (lakeGiftAtTally): the Drift Float at the first tally with a sale there,
+    // the Seed Pouch at the tally after it.
+    gifts: ["drift_float", "seed_pouch"],
   },
 };
 Ca.depth = {
@@ -48083,7 +48343,8 @@ bs.sporewood.lossParts = { toothy: "brass_trace", rough: "brass_trace", self: "b
 //   brass_trace: the first toothy fish landed or lost (`fish`), as Pike Wire's first pike. Alone.
 //   mossthread_snood: a quiet tally for now. The hunt's beat for the leaders, when it is built, is Burr's almanac
 //     (as Hob's map is Mossmere's: the hunt's beats.map); give it an arrival of both leaders then, with `alone`.
-wo.arrivals.sporewood ??= { order: [] };
+wo.arrivals.sporewood ??= {};
+wo.arrivals.sporewood.order ??= [];
 Object.assign(wo.arrivals.sporewood, {
   quietAfter: ["drift_float", "seed_pouch"],
   burl_hook: {
@@ -50063,18 +50324,20 @@ var PP = Object.freeze({
       // shadows) and the caps beginning to glow. Night is deep blue-teal: a cool dim key, dark water, the caps, spores and the
       // lantern carrying the scene.
       lights: Object.freeze({
+        // (the drift pass: open water by day read dim and olive, like an overcast evening; its air, fill, water and
+        // tint were lifted towards a soft green-gold, the exposure a little; dusk and night are as they were)
         day: Object.freeze({
-          fog: 0x4c5236,
-          horizon: 0xd8c47c,
-          key: 0xffe4a0,
-          keyI: 2.7,
-          amb: 0x5e6c4a,
-          ambI: 0.9,
-          water: 0x223424,
-          deep: 0x0a120e,
-          tint: 0x50582e,
-          tintAmt: 0.1,
-          exposure: 1.12,
+          fog: 0x6e6e42,
+          horizon: 0xe4d48a,
+          key: 0xffe6a4,
+          keyI: 2.8,
+          amb: 0x78845c,
+          ambI: 1.1,
+          water: 0x3a4c2c,
+          deep: 0x131e15,
+          tint: 0x6a6634,
+          tintAmt: 0.08,
+          exposure: 1.24,
           sat: 1.06,
           stars: 0.02,
           neb: 0.2,
@@ -50201,6 +50464,97 @@ wo.ambient.sporewood = {
     ],
   },
 };
+// ---- Sporewood's spore drift, Drift Float, seedfall, Seed Pouch and Capseeds (sporewood-plan.md step 3) -----------
+// The drift itself (bs.sporewood.geometry.drift), its tags (bs.sporewood.drift) and the Capseed's column are with
+// Sporewood's bite tables; the gifts' order (wo.arrivals.sporewood.gifts) and practice orders (wo.orders.practice) are
+// with Mossmere's. This is the rest.
+// While the Drift Float rides the spore drift, fish tagged "drift" bite twice as often and "still" fish half as
+// often, on every bite path, as the Sounding Lead does with "bottom" and "high".
+wo.depthMult.drift = { drift: 2, still: 0.5, any: 1 };
+// The Drift Float goes in the float's place (the Depth part), Murk's gift at the first tally with a sale in Sporewood;
+// the Seed Pouch, his gift at the tally after it, lets the raft gather Capseeds from the seedfall's pods. Neither is
+// sold, and neither ever leaves Sporewood's kit.
+Object.assign(wo.rig.parts, {
+  drift_float: { slot: "depth", fit: "drift", gift: "firstSale", water: "sporewood" },
+  seed_pouch: { slot: "pouch", gift: "afterDrift", water: "sporewood" },
+});
+// Sporewood's time clue, the seedfall (sporewood-plan.md beat 3): from evening 2, once an evening, at dusk. The Mother
+// Cap glows and sighs ten times, 2.2 seconds apart, the first 1 second into dusk. Dusk lasts 20 seconds, so the last
+// sigh comes as night falls; her time runs three minutes from the first sigh, as Mossmere's, well into the night.
+// Only the time clue is supplied: with no legend Sporewood has no hunt yet (huntOf), so every other hunt piece stays
+// off there, and its legend bites as she always has. The Cap's glow is drawn from the same clock (sporeDriftFx).
+wo.hunts.sporewood = {
+  time: {
+    fromEvening: 2,
+    phase: "dusk",
+    at: 1,
+    strokes: 10,
+    strokeGap: 2.2,
+    herTime: 180,
+    sound: "seedfall_sigh",
+    pitch: 1,
+    volume: 0.8,
+    late: 1.5,
+  },
+};
+// The seedfall's pods (seedfallPods), by lake: `pods` fall like snow from under the Mother Cap (`cap`: its middle, the
+// height of its gills and its reach) onto the Cup's water (`land`), `fall` metres a second, swaying `sway` metres.
+// Then they float off along the evening's drift at its podPace, joining its band over `settle` metres, and circle in
+// the eddy (`turn` radians a second) until her time ends; then they sink, over `sink` seconds. With the Seed Pouch
+// (`part`), sailing within `reach` metres of a floating pod gathers it as a Capseed (`bait`), `pouch` at most; they
+// spoil at the tally.
+wo.seedfall = {
+  sporewood: {
+    pods: 14,
+    cap: { x: 51.6, y: 18, z: 8, r: 11 },
+    land: { x: 48, z: 6, r: 4.5 },
+    fall: 1.3,
+    sway: 0.45,
+    settle: 8,
+    turn: 0.22,
+    sink: 4,
+    reach: 3,
+    pouch: 3,
+    part: "seed_pouch",
+    bait: "capseed",
+  },
+};
+// The seedfall's words (the time clue's, as Mossmere's bell has): the first seedfall ever, every later one, a full
+// hold before it, and the end of her time.
+Ca.hunts.sporewood = {
+  time: {
+    first: "The Mother Cap sighs, and its seed pods fall. Watch where the drift carries them.",
+    strikes: "The Mother Cap sighs. Its seed pods fall like snow.",
+    holdFull: "Your hold is full. You can still fish and let them go. The Mother Cap sighs at dusk.",
+    still: "The last pods sink, and the drift goes quiet.",
+  },
+};
+// The Drift Float's names and lines (the Depth part's, as the lead's), and Murk's line when he gives it.
+Object.assign(Ca.depth.names, { drift_float: "Drift Float" });
+Object.assign(Ca.depth.good, {
+  drift_float:
+    "Cast it into the spore drift and it rides along. Fish that feed in the drift bite more often.",
+});
+Object.assign(Ca.depth.cost, { drift_float: "Fish that like still water bite less often while it rides." });
+Ca.depth.gifts = {
+  drift_float: "That pale ribbon of spores is a current. Cast this float into it and let it ride.",
+};
+// The Seed Pouch and its Capseeds: Murk's line when he gives it, the first Capseed gathered, and the tally's line when
+// Capseeds spoil.
+Ca.seedPouch = {
+  name: "Seed Pouch",
+  gift: "At dusk the Mother Cap drops its seed pods. Sail through them, and this pouch holds three.",
+  first: "You scoop up a seed pod. It is a Capseed now, and it fits on your hook.",
+  spoiled: "Your Capseeds went soft. They only keep for one evening.",
+};
+Ca.gearItems.capseed = "Capseed";
+Object.assign(Ca.rig.good, { capseed: "Seed eaters and crushers, such as puffers and rays, take it." });
+Object.assign(Ca.rig.cost, { capseed: "You gather it at the seedfall, and it spoils at the tally." });
+// How the two practice orders for Murk's gifts must be taken (wo.orders.practice.sporewood).
+Object.assign(Ca.orderWords.rig, {
+  drift_float: "caught in the spore drift",
+  seed_pouch: "taken on a Capseed",
+});
 Ca.tackle.screen = { rod: "Rod", line: "Line", reel: "Reel", done: "Done", hold: "Adds {n} Grip." };
 var Jr = ds.size;
 function ak(e, t = null) {
@@ -50952,6 +51306,20 @@ if (Su) {
         icon: "strip",
         bonus: {},
       });
+    // The Capseed is never sold either: the Seed Pouch gathers it from the seedfall's pods (wo.seedfall).
+    x0.some((c) => c.id === "capseed") ||
+      x0.push({
+        id: "capseed",
+        name: "Capseed",
+        price: 0,
+        count: 0,
+        zoneMin: 0,
+        zone: "sporewood",
+        unlock: null,
+        legend: !1,
+        icon: "strip",
+        bonus: {},
+      });
     for (let c of Object.values(wo.tins).flat()) ds.favour.tackle.bait[c] = wo.baitRule.favour;
     for (let c of c1)
       for (let d of c.baits || []) {
@@ -51122,6 +51490,7 @@ if (Su) {
       let g = Wi.items.cut_strip;
       g && (g.species = [...(g.species || []).filter((p) => !u.has(p)), ...h("cut_strip")]);
     }
+    Wi.items.capseed && (Wi.items.capseed.species = h("capseed"));
   }
   let l = Wr[0];
   Object.assign(l.palette, Mu.palette),
@@ -55995,6 +56364,63 @@ var kc = {
           r = [0.5, 0.55, 0.42, 0.25, 0.32, 0.18];
         for (let i = 0; i < a.length; i++)
           e.tone(t, { type: "sine", f: 196 * o * a[i], t: n, a: 0.004, d: s[i], peak: r[i] * 0.3 });
+      },
+    },
+    // One of the Mother Cap's ten sighs at the seedfall, made as the midnight bell's strokes are (one call a sigh, no
+    // jitter, voices enough to overlap): a soft breath of noise that swells and falls in a low band, over a low hum.
+    seedfall_sigh: {
+      gain: 0.5,
+      gap: 1,
+      max: 3,
+      pri: 2,
+      wet: 0.7,
+      vj: 0,
+      pj: 0,
+      fn(e, t, n, o) {
+        e.burst(t, {
+          kind: "pink",
+          t: n,
+          a: 0.6,
+          hold: 0.2,
+          d: 1.2,
+          peak: 0.3,
+          ft: "bandpass",
+          f: 620 * o,
+          f2: 300 * o,
+          glide: 1.7,
+          q: 1.3,
+        });
+        e.tone(t, {
+          type: "sine",
+          f: 98 * o,
+          f2: 82 * o,
+          glide: 1.6,
+          t: n + 0.15,
+          a: 0.5,
+          d: 1.3,
+          peak: 0.1,
+        });
+      },
+    },
+    // A seed pod gathered into the Seed Pouch: a small soft pop.
+    pod_pop: {
+      gain: 0.5,
+      gap: 0.08,
+      max: 2,
+      pri: 1,
+      wet: 0.3,
+      fn(e, t, n, o) {
+        e.tone(t, {
+          type: "sine",
+          f: 520 * o,
+          f2: 260 * o,
+          glide: 0.08,
+          t: n,
+          a: 0.004,
+          d: 0.12,
+          peak: 0.35,
+        });
+        e.burst(t, { t: n, a: 0.002, d: 0.05, peak: 0.12, ft: "lowpass", f: 1800 * o, q: 0.7 });
       },
     },
     heal: {
@@ -63825,6 +64251,424 @@ function xoe(e, t, n) {
     calls: () => (c.on ? 1 : 0),
     dispose() {
       n.remove(i), r.dispose(), l.dispose();
+    },
+  };
+}
+// ---- Sporewood's spore drift on the water (sporewood-plan.md "The drift is drawn ... at every quality setting") ------
+// What the player reads: the evening's drift (sporeDriftOf) as a band of pale streaks and speckles flowing from the
+// Mother's Cup to its eddy, with spores drifting just above it; a slow swirl on the evening's eddy (the other three
+// are quiet); and at the seedfall (wo.seedfall, the time clue's clock) the Mother Cap's glow and its pods, falling,
+// riding the drift and circling in the eddy. Drawn at every quality, in Sporewood only: the band, the swirl and the
+// glows are three draw calls, the pods a fourth while they are out. The band glows softly at night.
+var DRIFT_FX = {
+  // spores over the band, by quality; their size (m)
+  motes: { high: 56, medium: 40, low: 24 },
+  moteSize: [0.14, 0.24],
+  // the band: its colour by day and its glow at night, and how strong it reads by hour (day, dusk, night)
+  pale: 0xe6dcb0,
+  glow: 0xc9dc9a,
+  // (the third round: by day and at dusk the band read too faintly against the water's own pale rings on low)
+  alpha: [0.85, 0.7, 0.5],
+  // the spores' and pods' glow by hour, and the Cap's glow points under its gills
+  moteLit: [0.32, 0.5, 0.95],
+  pod: 0xc9a15e,
+  podGlow: [0.95, 0.78, 0.42],
+  capGlow: [0.95, 0.86, 0.5],
+  capPoints: 7,
+  // the Cap's breath of spores at the seedfall, falling like snow around the raft wherever it is (`snow` points within
+  // `snowR` metres of a spot between the raft and the camera, from `snowH` metres up), so the seedfall is seen from
+  // anywhere on the lake (the drift pass's third round: 40 points over 13 m left only a few in the fishing camera's
+  // frame, and from the Lullaby the seedfall did not read)
+  snow: { high: 90, medium: 70, low: 48 },
+  snowR: 9,
+  snowH: 5,
+  snowLit: [1.25, 1.12, 0.72],
+};
+function sporeDriftFx(e) {
+  let scene = e?.render?.scene;
+  if (!scene || e.render.isStub || !bs.sporewood?.geometry?.drift) return null;
+  let m = Math.max(4, Math.trunc(os(bs.sporewood.geometry.drift.samples, 48))) + 1,
+    pos = new Float32Array(m * 2 * 3),
+    uv = new Float32Array(m * 2 * 2),
+    idx = [];
+  // (wound to face up, as the water does)
+  for (let k = 0; k + 1 < m; k++) {
+    let a = k * 2;
+    idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+  }
+  let bandGeo = new lo();
+  bandGeo.setAttribute("position", new Kn(pos, 3).setUsage(fa));
+  bandGeo.setAttribute("aUv", new Kn(uv, 2).setUsage(fa));
+  bandGeo.setIndex(idx);
+  let fogVert = `
+      uniform float uFogD;
+      varying float vFog;`,
+    bandU = {
+      uTime: { value: 0 },
+      uLen: { value: 1 },
+      uPace: { value: 0.5 },
+      uAlpha: { value: 0 },
+      uNight: { value: 0 },
+      uCol: { value: new Vt(DRIFT_FX.pale) },
+      uGlow: { value: new Vt(DRIFT_FX.glow) },
+      uFogD: { value: 0.02 },
+    },
+    bandMat = new Wo({
+      uniforms: bandU,
+      vertexShader: `
+      attribute vec2 aUv;${fogVert}
+      varying vec2 vUv;
+      void main(){
+        vUv = aUv;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        float z = -mv.z;
+        vFog = exp(-uFogD * uFogD * z * z * 0.45);
+        gl_Position = projectionMatrix * mv;
+      }`,
+      fragmentShader: `
+      uniform float uTime, uLen, uPace, uAlpha, uNight;
+      uniform vec3 uCol, uGlow;
+      varying vec2 vUv;
+      varying float vFog;
+      float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      void main(){
+        float c = vUv.y;
+        float s = vUv.x - uTime * uPace;
+        float edge = 1.0 - smoothstep(0.2, 1.0, abs(c));
+        float ends = smoothstep(0.0, 4.0, vUv.x) * (1.0 - smoothstep(uLen - 3.0, uLen, vUv.x));
+        // (thin broken streaks that wander across the band, and a faint body only between them, so it reads as a
+        // current, not a painted strip)
+        float lanes = 0.0;
+        for (int k = 0; k < 4; k++) {
+          float fk = float(k);
+          float off = (fk - 1.5) * 0.36 + 0.16 * sin(s * 0.21 + fk * 2.3);
+          float line = 1.0 - smoothstep(0.025, 0.08, abs(c - off));
+          float brk = smoothstep(0.38, 0.8, 0.5 + 0.5 * sin(s * (0.7 + 0.13 * fk) + fk * 1.9 + sin(s * 0.27 + fk) * 2.0));
+          lanes += line * brk;
+        }
+        vec2 g = vec2(s * 3.0, c * 7.0);
+        vec2 f = fract(g) - 0.5;
+        float sp = step(0.88, h21(floor(g))) * (1.0 - smoothstep(0.05, 0.16, length(f)));
+        float a = edge * ends * (0.08 + 0.6 * min(lanes, 1.0) + 0.4 * sp) * uAlpha * vFog;
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(mix(uCol, uGlow, uNight) * (1.0 + 0.12 * uNight), a);
+      }`,
+      transparent: !0,
+      depthWrite: !1,
+      fog: !1,
+      toneMapped: !1,
+    }),
+    band = new An(bandGeo, bandMat);
+  (band.name = "sporeDrift"), (band.frustumCulled = !1), (band.renderOrder = 2), (band.visible = !1);
+  Ws(band, { cast: !1, receive: !1, reflect: !1 });
+  scene.add(band);
+  // The evening's eddy: a slow swirl of pale arms, its own small disc.
+  let swirlGeo = new lo(),
+    sp = [0, 0, 0],
+    sIdx = [];
+  for (let k = 0; k <= 32; k++) {
+    let a = (k / 32) * Math.PI * 2;
+    sp.push(Math.cos(a), 0, Math.sin(a));
+    k < 32 && sIdx.push(0, k + 2, k + 1);
+  }
+  swirlGeo.setAttribute("position", new Kn(new Float32Array(sp), 3));
+  swirlGeo.setIndex(sIdx);
+  let swirlU = {
+      uTime: { value: 0 },
+      uAlpha: { value: 0 },
+      uNight: { value: 0 },
+      uCol: bandU.uCol,
+      uGlow: bandU.uGlow,
+      uFogD: bandU.uFogD,
+    },
+    swirlMat = new Wo({
+      uniforms: swirlU,
+      vertexShader: `${fogVert}
+      varying vec2 vP;
+      void main(){
+        vP = position.xz;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        float z = -mv.z;
+        vFog = exp(-uFogD * uFogD * z * z * 0.45);
+        gl_Position = projectionMatrix * mv;
+      }`,
+      fragmentShader: `
+      uniform float uTime, uAlpha, uNight;
+      uniform vec3 uCol, uGlow;
+      varying vec2 vP;
+      varying float vFog;
+      void main(){
+        float r = length(vP);
+        float ang = atan(vP.y, vP.x);
+        float arms = smoothstep(0.45, 0.95, 0.5 + 0.5 * sin(ang * 3.0 + r * 7.0 - uTime * 0.9));
+        float ring = (1.0 - smoothstep(0.75, 1.0, r)) * smoothstep(0.08, 0.35, r);
+        float a = arms * ring * 0.5 * uAlpha * vFog;
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(mix(uCol, uGlow, uNight) * (1.0 + 0.35 * uNight), a);
+      }`,
+      transparent: !0,
+      depthWrite: !1,
+      fog: !1,
+      toneMapped: !1,
+    }),
+    swirl = new An(swirlGeo, swirlMat);
+  (swirl.name = "sporeEddy"), (swirl.frustumCulled = !1), (swirl.renderOrder = 2), (swirl.visible = !1);
+  Ws(swirl, { cast: !1, receive: !1, reflect: !1 });
+  scene.add(swirl);
+  // The spores over the band, the pods' glow and the Cap's glow: one set of glow points.
+  let seeds = wo.seedfall?.sporewood,
+    nPods = Math.max(0, os(seeds?.pods, 0) | 0),
+    nMotes = Math.max(...Object.values(DRIFT_FX.motes)),
+    nCap = DRIFT_FX.capPoints,
+    nSnow = Math.max(...Object.values(DRIFT_FX.snow)),
+    glows = E1(nMotes + nPods + nCap + nSnow),
+    rng = jc(4410221),
+    motes = [];
+  for (let k = 0; k < nMotes; k++) {
+    motes.push({ u: rng(), side: rng() * 2 - 1, h: 0.12 + rng() * 0.45, ph: rng() * 6.283 });
+    glows.add(
+      0,
+      -50,
+      0,
+      [0, 0, 0],
+      DRIFT_FX.moteSize[0] + rng() * (DRIFT_FX.moteSize[1] - DRIFT_FX.moteSize[0]),
+    );
+  }
+  for (let k = 0; k < nPods; k++) glows.add(0, -50, 0, [0, 0, 0], 0.55);
+  for (let k = 0; k < nCap; k++) glows.add(0, -50, 0, [0, 0, 0], k === 0 ? 9 : 4.5, k * 1.3);
+  let snow = [];
+  for (let k = 0; k < nSnow; k++) {
+    snow.push({ a: rng() * 6.283, r: Math.sqrt(rng()), h: rng(), ph: rng() * 6.283, v: 0.45 + rng() * 0.3 });
+    glows.add(0, -50, 0, [0, 0, 0], 0.24 + rng() * 0.16);
+  }
+  glows.commit();
+  (glows.points.name = "sporeDriftGlows"), (glows.points.visible = !1);
+  scene.add(glows.points);
+  // The pods themselves: small seed pods, a few, drawn while they are out.
+  let podGeo = new Ao(0.11, 7, 5);
+  podGeo.scale(1, 0.75, 1.55);
+  let podMat = sa({ color: DRIFT_FX.pod, rim: 0.4, rimColor: 0xf6e2a8, steps: 3 }),
+    pods = new Xi(podGeo, podMat, Math.max(1, nPods));
+  (pods.name = "seedfallPods"), (pods.frustumCulled = !1), (pods.visible = !1), (pods.count = 0);
+  Ws(pods, { cast: !1, reflect: !1 });
+  scene.add(pods);
+  let mat4 = new Lo(),
+    quat = new ea(),
+    eul = new Ai(),
+    v3 = new He(),
+    sc = new He(),
+    size = new Rn(),
+    st = { on: !1, key: "", drift: null, pods: 0, seedfall: 0, t: 0 },
+    zone = () => {
+      try {
+        return e.world?.getZone?.()?.id ?? e.state?.run?.zone ?? null;
+      } catch {
+        return null;
+      }
+    },
+    waterY = (x, z) => {
+      try {
+        return e.water && !e.water.isStub ? os(e.water.getHeight?.(x, z), 0) : 0;
+      } catch {
+        return 0;
+      }
+    },
+    evening = () => {
+      let n = Number(e.state?.run?.evening);
+      return n > 0 ? Math.trunc(n) : Math.max(0, Math.trunc(Number(e.state?.meta?.loop?.evenings) || 0)) + 1;
+    };
+  // The band's vertices along the evening's drift, made again when the evening changes.
+  function lay(drift) {
+    for (let k = 0; k < m; k++) {
+      let p = drift.pts[Math.min(k, drift.pts.length - 1)],
+        q = drift.pts[Math.min(k + 1, drift.pts.length - 1)],
+        o = drift.pts[Math.max(k - 1, 0)],
+        dx = q[0] - o[0],
+        dz = q[1] - o[1],
+        l = Math.hypot(dx, dz) || 1,
+        nx = (-dz / l) * (drift.w / 2),
+        nz = (dx / l) * (drift.w / 2),
+        y = waterY(p[0], p[1]) + 0.05;
+      pos.set([p[0] + nx, y, p[1] + nz, p[0] - nx, y, p[1] - nz], k * 6);
+      uv.set(
+        [drift.at[Math.min(k, drift.at.length - 1)], 1, drift.at[Math.min(k, drift.at.length - 1)], -1],
+        k * 4,
+      );
+    }
+    bandGeo.attributes.position.needsUpdate = !0;
+    bandGeo.attributes.aUv.needsUpdate = !0;
+    bandU.uLen.value = drift.len;
+    swirl.position.set(drift.eddy.x, waterY(drift.eddy.x, drift.eddy.z) + 0.06, drift.eddy.z);
+    swirl.scale.set(drift.swirl * 1.25, 1, drift.swirl * 1.25);
+  }
+  function update(dt = 0.016, { show = !1 } = {}) {
+    let flow = e.flow,
+      on =
+        e.data?.LOOP_ENABLED === !0 &&
+        zone() === "sporewood" &&
+        (flow === "playing" || flow === "home") &&
+        !show;
+    st.on = on;
+    band.visible = swirl.visible = glows.points.visible = on;
+    if (!on) return void (pods.visible = !1);
+    let ev = evening(),
+      key = `sporewood:${ev}`;
+    if (st.key !== key) {
+      let drift = sporeDriftOf(ev, "sporewood");
+      if (!drift) return void (band.visible = swirl.visible = glows.points.visible = pods.visible = !1);
+      (st.key = key), (st.drift = drift), lay(drift);
+    }
+    let drift = st.drift;
+    st.t += Math.min(0.1, Math.max(0, os(dt, 0)));
+    let info = null;
+    try {
+      info = e.survival?.getPhaseInfo?.() || null;
+    } catch {}
+    let phase = info?.phase || e.state?.run?.phase || "calm",
+      hour = phase === "gloomtide" ? 2 : phase === "dusk" ? 1 : 0,
+      night = phase === "gloomtide" ? 1 : phase === "dusk" ? 0.35 * os(info?.k, 0.5) : 0,
+      fogD = os(scene.fog?.density, 0.0055);
+    bandU.uTime.value = swirlU.uTime.value = glows.uniforms.uTime.value = st.t;
+    bandU.uPace.value = drift.podPace;
+    bandU.uNight.value = swirlU.uNight.value = night;
+    bandU.uFogD.value = fogD;
+    glows.uniforms.uFogD.value = fogD;
+    let lit = DRIFT_FX.alpha[hour] * (1 + 0.25 * st.seedfall);
+    bandU.uAlpha.value += (lit - bandU.uAlpha.value) * Math.min(1, dt * 2);
+    swirlU.uAlpha.value = bandU.uAlpha.value * (hour === 2 ? 1 : 0.65);
+    // Spores ride the band at the drift's pace, a little over the water.
+    let q = e.render?.quality || "high",
+      shown = Math.min(nMotes, os(DRIFT_FX.motes[q], DRIFT_FX.motes.low)),
+      ml = DRIFT_FX.moteLit[hour];
+    // (a glow point not shown is parked far past the camera's reach: one of colour nought would still be drawn at its
+    // size, and the Cap's are metres across)
+    let park = (idx) => (glows.setPos(idx, 0, -1e5, 0), glows.setColor(idx, 0, 0, 0));
+    for (let k = 0; k < nMotes; k++) {
+      if (k >= shown) {
+        park(k);
+        continue;
+      }
+      let mo = motes[k],
+        s = (((mo.u * drift.len + st.t * drift.pace * 1.4) % drift.len) + drift.len) % drift.len,
+        p = driftAt(drift, s),
+        side = mo.side * drift.w * 0.42,
+        x = p.x - p.dz * side,
+        z = p.z + p.dx * side,
+        fade = Math.min(1, s / 4, (drift.len - s) / 3),
+        b = ml * Math.max(0, fade);
+      glows.setPos(k, x, waterY(x, z) + mo.h + Math.sin(st.t * 0.8 + mo.ph) * 0.06, z);
+      glows.setColor(k, 0.95 * b, 0.9 * b, 0.62 * b);
+    }
+    // The seedfall: the Cap's glow and the pods, by the time clue's clock.
+    let run = e.state?.run,
+      hunt = run ? huntEvening(run) : null,
+      set = hunt && seeds ? seedfallPods("sporewood", run.evening) : null,
+      t = set ? huntClock(run, hunt.time) : null,
+      tau = t == null ? -1 : t - hunt.time.at,
+      sighs = set ? hunt.time.strokes * hunt.time.strokeGap : 0,
+      taken = Array.isArray(run?.midnight?.podsTaken) ? run.midnight.podsTaken : [],
+      glow = 0;
+    if (set && t != null && tau > -1.5 && tau < sighs + 6) {
+      let since = tau < 0 ? 0 : tau % hunt.time.strokeGap,
+        pulse = tau >= 0 && tau < sighs ? Math.exp(-since / 0.9) : 0;
+      glow =
+        Math.min(1, (tau + 1.5) / 1.5) *
+        Math.min(1, Math.max(0, (sighs + 6 - tau) / 6)) *
+        (0.55 + 0.45 * pulse);
+    }
+    st.seedfall = Math.round(glow * 100) / 100;
+    let cap = seeds?.cap;
+    for (let k = 0; k < nCap; k++) {
+      let idx = nMotes + nPods + k,
+        a = (k / Math.max(1, nCap - 1)) * Math.PI * 2,
+        r = k === 0 ? 0 : cap.r * 0.45,
+        g = glow * (k === 0 ? 0.55 : 0.8);
+      if (!(g > 0.004)) {
+        park(idx);
+        continue;
+      }
+      glows.setPos(idx, cap.x + Math.cos(a) * r, cap.y + 0.6, cap.z + Math.sin(a) * r);
+      glows.setColor(idx, DRIFT_FX.capGlow[0] * g, DRIFT_FX.capGlow[1] * g, DRIFT_FX.capGlow[2] * g);
+    }
+    let n = 0;
+    for (let k = 0; k < nPods; k++) {
+      let at = set && tau >= 0 && !taken.includes(k) ? seedfallPodAt(set, k, tau) : null,
+        idx = nMotes + k;
+      if (!at || at.state === "wait" || at.state === "gone") {
+        park(idx);
+        continue;
+      }
+      let y =
+          (at.state === "fall" ? at.y : waterY(at.x, at.z) + 0.04 + at.y) + (at.state === "fall" ? 0 : 0.02),
+        k2 = at.k ?? 1;
+      eul.set(
+        Math.sin(st.t * 0.7 + k) * 0.3,
+        st.t * (0.3 + 0.05 * k) + k,
+        at.state === "fall" ? st.t * 1.5 + k : 0.2,
+      );
+      quat.setFromEuler(eul);
+      sc.setScalar(Math.max(1e-4, k2));
+      pods.setMatrixAt(n++, mat4.compose(v3.set(at.x, y, at.z), quat, sc));
+      let g = (at.state === "fall" ? 0.9 : 0.6) * k2 * (0.55 + 0.45 * night);
+      glows.setPos(idx, at.x, y + 0.08, at.z);
+      glows.setColor(idx, DRIFT_FX.podGlow[0] * g, DRIFT_FX.podGlow[1] * g, DRIFT_FX.podGlow[2] * g);
+    }
+    // The Cap's breath: spores falling like snow around the raft while it sighs, centred a little towards the camera so
+    // most of them fall in its frame (fewer on the lower settings, and none within the camera's last metres, where they
+    // would be faded out and yet drawn large).
+    let raft = e.player?.position,
+      cam = e.render?.camera?.position,
+      sl = glow * (0.8 + 0.2 * night),
+      snowShown = Math.min(nSnow, os(DRIFT_FX.snow[q], DRIFT_FX.snow.low)),
+      cx = raft ? raft.x + (cam ? (cam.x - raft.x) * 0.35 : 0) : 0,
+      cz = raft ? raft.z + (cam ? (cam.z - raft.z) * 0.35 : 0) : 0;
+    for (let k = 0; k < nSnow; k++) {
+      let idx = nMotes + nPods + nCap + k;
+      if (!(sl > 0.01) || !raft || k >= snowShown) {
+        park(idx);
+        continue;
+      }
+      let f = snow[k],
+        y = DRIFT_FX.snowH * (1 - ((f.h + st.t * f.v * 0.12) % 1)),
+        r = DRIFT_FX.snowR * f.r,
+        x = cx + Math.cos(f.a) * r + Math.sin(st.t * 0.7 + f.ph) * 0.4,
+        z = cz + Math.sin(f.a) * r + Math.cos(st.t * 0.6 + f.ph) * 0.4,
+        b = sl * Math.min(1, y / 1.2);
+      if (cam && Math.hypot(x - cam.x, y - cam.y, z - cam.z) < 2.5) {
+        park(idx);
+        continue;
+      }
+      glows.setPos(idx, x, y, z);
+      glows.setColor(idx, DRIFT_FX.snowLit[0] * b, DRIFT_FX.snowLit[1] * b, DRIFT_FX.snowLit[2] * b);
+    }
+    st.pods = n;
+    pods.count = n;
+    pods.visible = n > 0;
+    n > 0 && (pods.instanceMatrix.needsUpdate = !0);
+    glows.touchPositions(), glows.touchColors();
+    let r = e.render?.renderer;
+    r?.getDrawingBufferSize && (r.getDrawingBufferSize(size), (glows.uniforms.uViewH.value = size.y || 720));
+  }
+  return {
+    update,
+    state: () => ({
+      on: st.on,
+      eddy: st.drift?.eddy?.id ?? null,
+      evening: st.drift?.evening ?? null,
+      len: st.drift?.len ?? null,
+      bandShown: band.visible,
+      swirlShown: swirl.visible,
+      swirlAt: { x: +swirl.position.x.toFixed(2), z: +swirl.position.z.toFixed(2) },
+      motes: Math.min(nMotes, os(DRIFT_FX.motes[e.render?.quality || "high"], 0)),
+      pods: st.pods,
+      seedfall: st.seedfall,
+      calls: st.on ? 3 + (pods.visible ? 1 : 0) : 0,
+    }),
+    calls: () => (st.on ? 3 + (pods.visible ? 1 : 0) : 0),
+    dispose() {
+      scene.remove(band), scene.remove(swirl), scene.remove(glows.points), scene.remove(pods);
+      bandGeo.dispose(), bandMat.dispose(), swirlGeo.dispose(), swirlMat.dispose();
+      glows.geo.dispose(), glows.mat.dispose(), podGeo.dispose(), podMat.dispose();
     },
   };
 }
@@ -76364,7 +77208,9 @@ function gwHarpStrings(list, from, cap, rng, low, onWay) {
   for (let i = from; i < list.length; i++) {
     let it = list[i],
       len = Math.max(it.sy * it.s, it.y - tipAt(it.x, it.z));
-    (it.s *= 0.45), (it.sy = len / it.s); // (finer: a long string as broad as the short one read as a pale plank)
+    // (finer: a long string as broad as the short one read as a pale plank; the drift pass made them finer again, so the
+    // ones nearest the fishing camera read as strings, not broad pale sticks)
+    (it.s *= 0.3), (it.sy = len / it.s);
   }
   for (let i = 0, n = low ? 8 : 18; i < n; i++) {
     let a = rng() * Math.PI * 2,
@@ -76372,7 +77218,7 @@ function gwHarpStrings(list, from, cap, rng, low, onWay) {
       x = cap.x + Math.cos(a) * r,
       z = cap.z + Math.sin(a) * r,
       y = cap.y - cap.ch * 0.06 * (r / cap.r) - 0.05,
-      s = rng.range(0.4, 0.6);
+      s = rng.range(0.26, 0.38);
     list.push({
       k: rng() < 0.85 ? "gill" : "strand",
       x,
@@ -94932,12 +95778,43 @@ function GN() {
     f = new An(new Ao(0.022, 8, 6), d);
   f.name = "painted float tip";
   (f.position.y = 0.2), t.add(f);
+  let lures = makeWaterLures(t),
+    cork = [i, c, f],
+    // Sporewood's Drift Float, shown in the cork's place when it is the cast's (setBobber drift): a long pale quill,
+    // a dark band and a spore-gold top, with a little moss sail. Made after the lures so their swap leaves it alone.
+    quill = new fo(),
+    qPale = sa({ color: 0xdccba2, rim: 0.3 }),
+    qGold = sa({ color: 0xf0c25a, rim: 0.35 }),
+    qBand = sa({ color: 0x3a2b1e, rim: 0.2 }),
+    qMoss = sa({ color: 0x6f8f3c, rim: 0.25, side: ca }),
+    qGeos = [
+      new Xn(0.011, 0.016, 0.3, 6),
+      new Xn(0.0115, 0.0118, 0.035, 6),
+      new Xn(0.007, 0.011, 0.14, 6),
+      new Ao(0.02, 8, 6),
+      new Eo(0.1, 0.085, 0.006),
+    ],
+    qPart = (geo, mat, y, name) => {
+      let m = new An(geo, mat);
+      return (m.position.y = y), (m.name = name), quill.add(m), m;
+    };
+  quill.name = "drift float";
+  Gr(qPart(qGeos[0], qPale, -0.04, "drift float quill"), { thickness: 0.01 });
+  qPart(qGeos[1], qBand, 0.128, "drift float band");
+  Gr(qPart(qGeos[2], qGold, 0.215, "drift float top"), { thickness: 0.008 });
+  qPart(qGeos[3], qGold, 0.29, "drift float tip");
+  let sail = qPart(qGeos[4], qMoss, 0.21, "drift float sail");
+  (sail.position.x = 0.058), (sail.rotation.y = 0.35), (sail.rotation.z = -0.12);
+  quill.visible = !1;
+  t.add(quill);
   return {
     group: e,
     tilt: t,
-    lures: makeWaterLures(t),
-    mats: [l, c.material, d],
-    geos: [n, c.geometry, f.geometry],
+    lures,
+    cork,
+    quill,
+    mats: [l, c.material, d, qPale, qGold, qBand, qMoss],
+    geos: [n, c.geometry, f.geometry, ...qGeos],
   };
 }
 var js = 0.24,
@@ -106131,10 +107008,12 @@ function qre(e) {
       depth = 0,
       dip = 0,
       live = false,
+      drift = false,
     } = {}) {
       let Qe = b.bob;
       Qe.retrieving = retrieving;
       Qe.lead = !!lead;
+      Qe.drift = !!drift;
       Qe.live = !!live;
       Qe.depth = Number.isFinite(depth) ? depth : 0;
       Qe.dip = Number.isFinite(dip) ? dip : 0;
@@ -106414,6 +107293,9 @@ function qre(e) {
           ($ = Math.sin(ve * 1.3) * 0.08),
           (de = Math.cos(ve * 1.1) * 0.06);
     }
+    // The Drift Float shows its quill in the cork's place (under a lure neither shows).
+    l.quill.visible = !!oe.drift && !l.lures.active;
+    if (!l.lures.active) for (let part of l.cork) part.visible = !oe.drift;
     // A live minnow tows the float in slow, small loops while it waits (drawn only: the bite spot stays put).
     oe.live &&
       (oe.state === "floating" || oe.state === "nibble") &&
@@ -108079,7 +108961,7 @@ function castRigMatches(rig, cast) {
     key === "bait"
       ? cast.bait === want
       : key === "depth"
-        ? want === "bottom" && cast.lead === !0
+        ? (want === "bottom" && cast.lead === !0) || (want === "drift" && cast.drift === !0)
         : key === "hook"
           ? cast.hook === want
           : key === "leader"
@@ -108905,13 +109787,28 @@ var Mle = (e, t) => ({
   };
 // ---- The hunts' lookups (wo.hunts and Ca.hunts, by the water's id) -----------------------------------------------
 // A lake's hunt rules, or null for a lake with no hunt. Plain checks, so it works before the shared helpers exist.
+// An entry with no legend yet supplies only the pieces it names (Sporewood: its time clue, read by huntTimeOf) and
+// is not a hunt: every other hunt check there says no.
 function huntOf(water) {
   let hunt = typeof water == "string" && wo.hunts ? wo.hunts[water] : null;
-  return hunt && typeof hunt == "object" && !Array.isArray(hunt) ? hunt : null;
+  return hunt && typeof hunt == "object" && !Array.isArray(hunt) && hunt.legend ? hunt : null;
+}
+// A lake's entry when it supplies a time clue (its `time`), whole hunt or not: Mossmere's midnight bell, Sporewood's
+// seedfall.
+function huntTimeOf(water) {
+  let hunt = typeof water == "string" && wo.hunts ? wo.hunts[water] : null;
+  return hunt && typeof hunt == "object" && !Array.isArray(hunt) && hunt.time && typeof hunt.time == "object"
+    ? hunt
+    : null;
 }
 // A lake's hunt words, or none.
 function huntWords(water) {
   let words = huntOf(water) && Ca.hunts ? Ca.hunts[water] : null;
+  return words && typeof words == "object" && !Array.isArray(words) ? words : {};
+}
+// A lake's time clue's words (Ca.hunts[water].time), whole hunt or not.
+function huntTimeWords(water) {
+  let words = huntTimeOf(water) && Ca.hunts ? Ca.hunts[water]?.time : null;
   return words && typeof words == "object" && !Array.isArray(words) ? words : {};
 }
 // The lakes with a hunt, in the table's order.
@@ -108930,12 +109827,12 @@ function huntWaterOfRelic(relicId) {
   return (relicId && huntWaters().find((water) => huntOf(water).relic === relicId)) || null;
 }
 // ---- Her time (the time clue: Mossmere's midnight bell; mossmere-hunt-2.md, section 1 and B2) -------------------
-// The time clue strikes `time.at` seconds into the night phase's own clock, and her time runs `time.herTime`
-// seconds from its first stroke: the legend takes only inside it. The evening's flags live on the run
-// (run.midnight). Returns the hunt of the run's water on a trip from the evening its time clue first comes (the
-// evenings Mossmere's bell strikes), or null.
+// The time clue strikes `time.at` seconds into its phase's own clock (the night's, or `time.phase`'s: Sporewood's
+// seedfall comes at dusk), and her time runs `time.herTime` seconds from its first stroke: the legend takes only
+// inside it. The evening's flags live on the run (run.midnight). Returns the entry of the run's water (huntTimeOf)
+// on a trip from the evening its time clue first comes (the evenings Mossmere's bell strikes), or null.
 function huntEvening(run) {
-  let hunt = run && run.outing === "trip" ? huntOf(run.zone) : null;
+  let hunt = run && run.outing === "trip" ? huntTimeOf(run.zone) : null;
   return hunt && Math.trunc(Number(run.evening) || 0) >= hunt.time.fromEvening ? hunt : null;
 }
 function midnightFlags(run) {
@@ -108951,6 +109848,17 @@ function midnightFlags(run) {
 function nightClock(run) {
   return run?.phase === "gloomtide" ? Math.max(0, Number(run.phaseTime) || 0) : null;
 }
+// The clock a time clue strikes by: the night's (nightClock), or for a clue that comes at dusk (time.phase "dusk",
+// Sporewood's seedfall) seconds since dusk began, running on through the night; null before its phase.
+function huntClock(run, time) {
+  if (time?.phase !== "dusk") return nightClock(run);
+  let t = Math.max(0, Number(run?.phaseTime) || 0);
+  return run?.phase === "dusk"
+    ? t
+    : run?.phase === "gloomtide"
+      ? Math.max(0.5, Number(wo.evening?.dusk) || 20) + t
+      : null;
+}
 // Her time: from the first stroke of the time clue for herTime seconds, closed early for the night once she has
 // been hooked or her tries are used up. Outside it she never takes.
 function herTimeOpen(run) {
@@ -108958,7 +109866,7 @@ function herTimeOpen(run) {
   if (!hunt || run.midnight?.hooked === !0) return !1;
   let time = hunt.time;
   if ((Number(run.midnight?.tries) || 0) >= time.tries) return !1;
-  let t = nightClock(run);
+  let t = huntClock(run, time);
   return t != null && t >= time.at && t <= time.at + time.herTime;
 }
 function noteHerHookup(run) {
@@ -108973,8 +109881,8 @@ function updateHuntTime(game, run) {
   let time = hunt.time,
     m = midnightFlags(run),
     say = (text) => text && game.bus?.emit?.("toast", { text, kind: "lore" }),
-    words = huntWords(run.zone).time || {},
-    t = nightClock(run);
+    words = huntTimeWords(run.zone),
+    t = huntClock(run, time);
   if (!m.holdFullSaid && (t == null || t < time.at)) {
     let full = !1;
     try {
@@ -108994,11 +109902,21 @@ function updateHuntTime(game, run) {
       } catch {}
       if (m.struck === 0 && !m.said) {
         m.said = !0;
-        say(words.strikes);
-        huntWaterLifted(game, hunt) || say(words.missing);
+        // A lake's very first time clue may have its own line (words.first, Sporewood's first seedfall), kept in
+        // said["time:<water>:first"].
+        let said = game.state?.meta?.loop?.said,
+          firstKey = `time:${run.zone}:first`;
+        words.first && said && typeof said == "object" && !said[firstKey]
+          ? ((said[firstKey] = !0), say(words.first))
+          : say(words.strikes);
+        // Only a hunt that has her water (find) says the time clue is when things go missing there.
+        hunt.find && !huntWaterLifted(game, hunt) && say(words.missing);
         let scattered = 0;
         try {
-          scattered = game.waterBirds?.scatterRoost?.(time.roostFlock, time.roostNear) || 0;
+          scattered =
+            time.roostFlock == null
+              ? 0
+              : game.waterBirds?.scatterRoost?.(time.roostFlock, time.roostNear) || 0;
         } catch {}
         scattered > 0 && !m.birdsSaid && ((m.birdsSaid = !0), say(words.birds));
         markHerTimeStart(game, m, run);
@@ -109018,6 +109936,125 @@ function updateHuntTime(game, run) {
   if (!m.stillSaid && t > time.at + time.herTime) {
     m.stillSaid = !0;
     huntLanded(game.state?.meta?.loop, run.zone) || say(words.still);
+  }
+}
+// ---- The seedfall's pods (Sporewood: wo.seedfall) ------------------------------------------------------------------
+// Each pod's own numbers on an evening, the same every time: where it lands in the Cup, when it drops (with the sigh
+// it falls on), where it rides in the drift's band and its ring in the eddy. Null for a lake with no seedfall.
+var seedfallSets = new Map();
+function seedfallPods(water, evening) {
+  let rule = typeof water == "string" ? wo.seedfall?.[water] : null,
+    hunt = huntTimeOf(water);
+  if (!rule || !hunt) return null;
+  let e = Math.max(1, Math.trunc(Number(evening) || 1)),
+    key = `${water}:${e}`,
+    known = seedfallSets.get(key);
+  if (known) return known;
+  let time = hunt.time,
+    drift = sporeDriftOf(e, water);
+  if (!drift) return null;
+  let n = Math.max(0, Math.trunc(Number(rule.pods) || 0)),
+    pods = [];
+  for (let i = 0; i < n; i++) {
+    let r = (k) => B5(e * 131 + i, 5200 + k),
+      a = r(0) * Math.PI * 2,
+      rr = rule.land.r * Math.sqrt(r(1)),
+      drop = Math.floor((i * time.strokes) / Math.max(1, n)) * time.strokeGap + r(2) * 0.8;
+    pods.push({
+      lx: rule.land.x + Math.cos(a) * rr,
+      lz: rule.land.z + Math.sin(a) * rr,
+      drop,
+      land: drop + rule.cap.y / rule.fall,
+      side: (r(3) - 0.5) * drift.w * 0.7,
+      ring: drift.swirl * (0.3 + 0.55 * r(4)),
+      turn: r(5) * Math.PI * 2,
+      sway: r(6) * Math.PI * 2,
+    });
+  }
+  let set = { water, evening: e, drift, pods, rule, time };
+  seedfallSets.size > 16 && seedfallSets.clear();
+  seedfallSets.set(key, set);
+  return set;
+}
+// Where pod `i` of a set is `tau` seconds after the first sigh: { state, x, y, z, k }. state: "wait" (not dropped),
+// "fall", "float" (riding the drift), "eddy" (circling there), "sink" (her time is over) or "gone"; y is its height
+// above the water and k its size (1, shrinking as it sinks).
+function seedfallPodAt(set, i, tau) {
+  let p = set.pods[i],
+    rule = set.rule,
+    drift = set.drift,
+    end = set.time.herTime;
+  if (!p || tau < p.drop) return { state: "wait" };
+  if (tau > end + rule.sink) return { state: "gone" };
+  if (tau < p.land) {
+    let f = tau - p.drop;
+    return {
+      state: "fall",
+      x: p.lx + Math.sin(f * 1.3 + p.sway) * rule.sway,
+      y: Math.max(0, rule.cap.y - f * rule.fall),
+      z: p.lz + Math.cos(f * 1.1 + p.sway) * rule.sway * 0.6,
+      k: 1,
+    };
+  }
+  let s = (tau - p.land) * drift.podPace,
+    q = driftAt(drift, s),
+    on = Math.min(1, s / rule.settle),
+    x = q.x - q.dz * p.side * on + (p.lx - drift.pts[0][0]) * (1 - on),
+    z = q.z + q.dx * p.side * on + (p.lz - drift.pts[0][1]) * (1 - on),
+    state = "float";
+  if (s >= drift.len) {
+    // In the eddy: from the drift's end onto its ring, then round.
+    let tt = (s - drift.len) / drift.podPace,
+      a = p.turn + tt * rule.turn,
+      ease = Math.min(1, tt / 3);
+    x += (drift.eddy.x + Math.cos(a) * p.ring - x) * ease;
+    z += (drift.eddy.z + Math.sin(a) * p.ring - z) * ease;
+    state = "eddy";
+  }
+  return tau > end
+    ? { state: "sink", x, y: -0.1 * (tau - end), z, k: Math.max(0, 1 - (tau - end) / rule.sink) }
+    : { state, x, y: 0, z, k: 1 };
+}
+// Called every frame from the phase clock with the run, after the time clue: in the seedfall and her time, the raft
+// gathers each floating pod it sails within reach of as a Capseed, while the Seed Pouch is owned and holds fewer than
+// its fill. Each goes with a small soft pop; the first ever has its line (said "seedPouch:first").
+function updateSeedfall(game, run) {
+  let hunt = huntEvening(run),
+    rule = hunt ? wo.seedfall?.[run.zone] : null;
+  if (!rule) return;
+  let t = huntClock(run, hunt.time);
+  if (t == null || t < hunt.time.at || t > hunt.time.at + hunt.time.herTime) return;
+  let loop = game.state?.meta?.loop,
+    bait = run.bait && typeof run.bait == "object" ? run.bait : null,
+    raft = game.player?.position;
+  if (!bait || !Array.isArray(loop?.parts) || !loop.parts.includes(rule.part)) return;
+  if (!raft || !Number.isFinite(raft.x) || (Number(bait[rule.bait]) || 0) >= rule.pouch) return;
+  let set = seedfallPods(run.zone, run.evening),
+    m = midnightFlags(run),
+    taken = Array.isArray(m.podsTaken) ? m.podsTaken : (m.podsTaken = []),
+    tau = t - hunt.time.at;
+  for (let i = 0; set && i < set.pods.length; i++) {
+    if (taken.includes(i)) continue;
+    let at = seedfallPodAt(set, i, tau);
+    if (
+      (at.state !== "float" && at.state !== "eddy") ||
+      Math.hypot(at.x - raft.x, at.z - raft.z) > rule.reach
+    )
+      continue;
+    taken.push(i);
+    bait[rule.bait] = (Number(bait[rule.bait]) || 0) + 1;
+    try {
+      game.water?.splash?.(at.x, at.z, { size: 0.3, count: 6 });
+      game.water?.addRipple?.(at.x, at.z, 0.6);
+      game.audio?.play?.("pod_pop", { volume: 0.6 });
+    } catch {}
+    let said = loop.said && typeof loop.said == "object" ? loop.said : (loop.said = {});
+    said["seedPouch:first"] ||
+      ((said["seedPouch:first"] = !0),
+      game.bus?.emit?.("toast", { text: Ca.seedPouch?.first, kind: "lore" }));
+    game.bus?.emit?.("seedfall:gather", { pod: i, x: at.x, z: at.z, count: bait[rule.bait] });
+    game.bus?.emit?.("bait:change", { baitId: run.equippedBait ?? null });
+    if (bait[rule.bait] >= rule.pouch) break;
   }
 }
 // Her water counts as found once her place is owned and its mist lifted: the same test the cast makes.
@@ -109112,7 +110149,7 @@ function bearingWord(game, raft, x, z) {
 // map is drawn: notes being in his part (for the nudges), and raises a boil over her water every boilEvery
 // seconds (20 to 30 s on Mossmere), with a word when the raft is near enough to see it.
 function updateHerWater(game, run) {
-  if (!herTimeOpen(run)) return;
+  if (!herTimeOpen(run) || !huntOf(run.zone)?.find) return;
   let water = run.zone,
     hunt = huntOf(water),
     find = hunt.find,
@@ -109161,7 +110198,7 @@ function updateHerWater(game, run) {
 // a fish hooked within `theft` metres of her centre is taken. The caller checks that it is an ordinary fish on
 // bait.
 function thiefTakes(game, run, x, z) {
-  if (!herTimeOpen(run) || !Number.isFinite(x) || !Number.isFinite(z)) return !1;
+  if (!herTimeOpen(run) || !huntOf(run.zone)?.find || !Number.isFinite(x) || !Number.isFinite(z)) return !1;
   let water = run.zone,
     find = huntOf(water).find,
     loop = game.state?.meta?.loop,
@@ -109272,7 +110309,12 @@ function noteHerLanded(record, evening) {
 // off. A piece with a tick is never notched later. Landing her clears every notch.
 function rigPieceNow(loop, part) {
   let fitted = Ln(loop?.fitted) ? loop.fitted : {};
-  if (part === "depth") return fitted.depth === "lead" ? "sounding_lead" : "cork_float";
+  if (part === "depth")
+    return fitted.depth === "lead"
+      ? "sounding_lead"
+      : fitted.depth === "drift"
+        ? "drift_float"
+        : "cork_float";
   if (part === "leader" || part === "hook")
     return Sr(loop?.parts).includes(fitted[part])
       ? fitted[part]
@@ -109438,7 +110480,7 @@ function thiefLanded(game, hunt) {
 // first stroke, on a night after the one her water was found, not yet seen, and never for a save that has not
 // found her water.
 function huntSceneDue(game, run) {
-  if (!herTimeOpen(run)) return !1;
+  if (!herTimeOpen(run) || !huntOf(run.zone)) return !1;
   let hunt = huntOf(run.zone),
     t = nightClock(run),
     record = huntRecordOf(game?.state?.meta?.loop, run.zone);
@@ -109812,7 +110854,7 @@ function hF(
     y = qi(c.lures).filter(
       (re) => typeof re == "string" && tp(t?.LOOP?.lures?.[re]) && $c(t, re, (f && n.zone) || d),
     ),
-    b = [...qi(t?.LOOP?.tins?.[d]), "cut_strip", "live_minnow", U3(t, d)]
+    b = [...qi(t?.LOOP?.tins?.[d]), "cut_strip", "live_minnow", "capseed", U3(t, d)]
       .filter(Boolean)
       .map((re) => ({ id: re, count: Math.max(0, ki(w[re])) }))
       .filter((re) => re.count > 0 || re.id === p),
@@ -110669,6 +111711,8 @@ function yF(e) {
     eveningsAt: { [il(e)]: 0 },
     // Each lake's monster hunt (wo.hunts), by lake.
     hunt: Object.fromEntries(huntWaters().map((water) => [water, freshHuntRecord(water)])),
+    // The lakes where a tally has sold fish: Murk's first gift in a lake waits for one (lakeGiftAtTally).
+    sold: [],
     // The unique items lake monsters gave (wo.relics), by id. They belong to the save, not a lake, so a tow
     // never touches them.
     relics: [],
@@ -110696,7 +111740,7 @@ function cleanRig(rig, plain = { leader: "plain_knot", hook: "mere_hook" }) {
   return {
     lure,
     bait: !lure && typeof from.bait == "string" ? from.bait : null,
-    depth: from.depth === "lead" ? "lead" : "float",
+    depth: from.depth === "lead" || from.depth === "drift" ? from.depth : "float",
     leader: part("leader"),
     hook: part("hook"),
   };
@@ -110801,7 +111845,7 @@ function normaliseLakeKit(kit, D, water) {
   );
   kit.activeRig = qy(kit.activeRig, 0, RIG_COUNT - 1);
   let fitted = cleanRig(kit.fitted, fresh.fitted);
-  (fitted.depth === "lead" && kit.parts.includes("sounding_lead")) || (fitted.depth = "float");
+  depthPartOwned(fitted.depth, kit.parts) || (fitted.depth = "float");
   for (let slot of ["leader", "hook"])
     kit.parts.includes(fitted[slot]) || (fitted[slot] = fresh.fitted[slot]);
   kit.fitted = fitted;
@@ -111064,6 +112108,27 @@ function huntTallyBeat(loop, trip, rule = huntOf(trip?.zone), { quiet = !1, jour
   (beat.tale || record.padUnseen.length) && (record.padDue = !0);
   return beat.tale || beat.murk || beat.lineup ? beat : null;
 }
+// Whether a Depth part that fits as `depth` ("float", "lead" or "drift") is among `parts`.
+function depthPartOwned(depth, parts) {
+  return Sr(parts).some((id) => wo.rig.parts[id]?.slot === "depth" && wo.rig.parts[id].fit === depth);
+}
+// Whether a Depth part works in a water: the Cork Float everywhere, the Sounding Lead where the water has a depth
+// table, the Drift Float where it has a spore drift.
+function depthPartWorks(id, water) {
+  let fit = wo.rig.parts[id]?.slot === "depth" ? wo.rig.parts[id].fit : null;
+  return fit === "float" || (fit === "lead" && !!bs[water]?.depth) || (fit === "drift" && !!bs[water]?.drift);
+}
+// The Drift Float fishes when it is owned and fitted, in a water with a spore drift (bs[water].drift), and no lure is
+// on. Cast into the drift it rides it; anywhere else it is a plain float.
+function driftFloatFishes(loop, water, lure) {
+  return (
+    loop?.fitted?.depth === "drift" &&
+    !lure &&
+    Sr(loop.parts).includes("drift_float") &&
+    typeof water == "string" &&
+    !!bs[water]?.drift
+  );
+}
 // The Sounding Lead fishes when it is owned and fitted, in a water with a depth table, and no lure is on (a lure
 // swims at its own depth). Otherwise the rig fishes under the Cork Float, as it always has.
 function soundingLeadFishes(loop, water, lure) {
@@ -111148,6 +112213,33 @@ function notePracticeTally(loop, fills, rule = { parts: practicePartsAll() }) {
   record.ready = Object.keys(rule.parts).filter((id) =>
     (Array.isArray(loop.parts) ? loop.parts : []).includes(id),
   );
+}
+// Murk's gift at this tally in a lake whose arrivals list gifts (wo.arrivals[water].gifts, in order: Sporewood's Drift
+// Float, then its Seed Pouch), given as the Sounding Lead and the minnow tin are in Mossmere: the first at the first
+// tally with a sale there (`sale`), or at the next tally for a save that sold there before it existed (loop.sold);
+// each later one at a tally after the one before it, never with it. Owning it is the record, so each is given once.
+// Returns the part's id or null.
+function lakeGiftAtTally(loop, water, sale) {
+  let gifts = typeof water == "string" ? Sr(wo.arrivals?.[water]?.gifts) : [];
+  if (!gifts.length || !Ln(loop)) return null;
+  let owned = Sr(loop.parts),
+    next = gifts.findIndex((id) => !owned.includes(id));
+  return next < 0 ? null : next > 0 || sale || Sr(loop.sold).includes(water) ? gifts[next] : null;
+}
+// The lakes an older save had sold in, for loop.sold: the first lake once Murk has paid for a catch, and any other
+// lake with a tally there and one of its own fish in the Journal.
+function lakesSoldBefore(loop, journal, D) {
+  let home = il(D),
+    out = loop?.said?.firstSale === !0 ? [home] : [],
+    zoneOf = (id) => Sr(D?.SPECIES).find((sp) => sp?.id === id)?.zone;
+  for (let [water, n] of Object.entries(Ln(loop?.eveningsAt) ? loop.eveningsAt : {}))
+    water !== home &&
+      ha(n) > 0 &&
+      Object.entries(Ln(journal) ? journal : {}).some(
+        ([id, rec]) => ha(rec?.caught) > 0 && zoneOf(id) === water,
+      ) &&
+      out.push(water);
+  return out;
 }
 // What reaches Murk's shelf at this tally (mossmere-review-addendum.md section 2), called only on a tally with no
 // gift from Murk: { gift, giftSay } with gift one of the lake's arrivals (Mossmere's "turnback_hook", "pike_wire"
@@ -111252,6 +112344,8 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
   Ln(e.loop) || (e.loop = o);
   let c = e.loop,
     d = c.sheetSeen === void 0;
+  // The lakes where a tally has sold fish (lakeGiftAtTally): an older save's are read from what it holds.
+  Array.isArray(c.sold) || (c.sold = lakesSoldBefore(c, e.journal, t));
   if (d)
     try {
       c.sheetSeen = Y3(c, t);
@@ -111353,7 +112447,7 @@ function a8(e, t, { hasTrip: n = !1 } = {}) {
   // Rig parts: known ids only, the Cork Float always owned; the fitted depth must be an owned part's.
   c.parts = c.parts.filter((g, p, w) => typeof t?.LOOP?.rig?.parts?.[g] == "object" && w.indexOf(g) === p);
   c.parts.includes("cork_float") || c.parts.unshift("cork_float");
-  (c.fitted.depth === "lead" && c.parts.includes("sounding_lead")) || (c.fitted.depth = "float");
+  depthPartOwned(c.fitted.depth, c.parts) || (c.fitted.depth = "float");
   // The Plain Knot and the Mere Hook are everyone's (old saves gain them); the fitted leader and hook must be
   // owned parts of their slot, else the default is fitted.
   for (let [id, part] of Object.entries(t?.LOOP?.rig?.parts || {}))
@@ -111470,8 +112564,10 @@ function xF(e, t, n, o = {}) {
       n?.zone &&
         (Ln(e.bait) || (e.bait = {}),
         (e.bait[n.zone] = Ln(n.bait) ? { ...n.bait } : {}),
-        // Live Minnows last one evening: the tin empties at the tally (mossmere-gear.md B4).
+        // Live Minnows last one evening: the tin empties at the tally (mossmere-gear.md B4). So do Capseeds: they
+        // spoil, and the tally card says so (lastTrip.spoiled).
         delete e.bait[n.zone].live_minnow,
+        delete e.bait[n.zone].capseed,
         Ln(e.eveningsAt) || (e.eveningsAt = {}),
         (e.eveningsAt[n.zone] = Math.max(0, ha(e.eveningsAt[n.zone])) + 1));
   }
@@ -112539,6 +113635,8 @@ function CF(e) {
     if (Ln(H.lastTrip) && ze.id != null && H.lastTrip.id === ze.id) return { ...H.lastTrip, already: !0 };
     let Ee = Array.isArray(ze.creel) ? ze.creel : [];
     for (let Ce of Ee) Ln(Ce) && !Number.isFinite(Number(Ce.clams)) && (Ce.clams = M(Ce));
+    // Capseeds still in the pouch spoil at this tally (xF empties them): the card says how many.
+    let spoiled = Math.max(0, ha(ze.bait?.capseed));
     let je = Je(H, Ee),
       { lines: K, total: we } = xF(H, Ee, ze, { D: n(), saleOf: A });
     if (je) for (let Ce of K) je.fills.has(Ce.uid) && (Ce.order = !0);
@@ -112587,6 +113685,16 @@ function CF(e) {
       let hunters = Sle(f().live?.hunters);
       giftSay = Sle(x(ze).landedKinds).some((id) => hunters.includes(id)) ? "hunter" : "plain";
     }
+    // Murk's gifts in a lake whose arrivals list them (Sporewood's Drift Float, then its Seed Pouch), by the same
+    // rules (lakeGiftAtTally).
+    if (!gift && !ending) {
+      let lakeGift = lakeGiftAtTally(H, ze.zone, K.length > 0);
+      lakeGift && (gift = lakeGift);
+    }
+    // The lakes where a tally has sold fish (loop.sold).
+    K.length > 0 &&
+      typeof ze.zone == "string" &&
+      (Array.isArray(H.sold) || (H.sold = []), H.sold.includes(ze.zone) || H.sold.push(ze.zone));
     gift && (Array.isArray(H.parts) || (H.parts = ["cork_float"]), H.parts.push(gift));
     // With no gift from Murk, a leader or the Turnback Hook may reach his shelf instead: one new piece of tackle
     // a tally at most (wo.arrivals).
@@ -112596,7 +113704,11 @@ function CF(e) {
     }
     // A Live Minnow left on the hook is gone with the tin's last minnows: the hook goes back to the first bait
     // still in stock, so the next evening does not start on a bare hook.
-    if (H.fitted?.bait === "live_minnow" && !(ha(H.bait?.[ze.zone]?.live_minnow) > 0)) {
+    // Capseeds spoil at the tally in the same way (the card's line counts them).
+    if (
+      (H.fitted?.bait === "live_minnow" || H.fitted?.bait === "capseed") &&
+      !(ha(H.bait?.[ze.zone]?.[H.fitted.bait]) > 0)
+    ) {
       let stock = H.bait?.[ze.zone] || {};
       H.fitted.bait = [...Sle(f().tins?.[ze.zone]), "cut_strip"].find((id) => ha(stock[id]) > 0) ?? null;
     }
@@ -112618,6 +113730,7 @@ function CF(e) {
         ...(x(ze).capLost ? { away: !0 } : {}),
         ...(gift ? { gift } : {}),
         ...(giftSay ? { giftSay } : {}),
+        ...(spoiled > 0 ? { spoiled } : {}),
         ...(huntBeat ? { hunt: huntBeat } : {}),
         ...(ending ? { bounty: ending.bounty } : {}),
       }),
@@ -112833,7 +113946,9 @@ function CF(e) {
     let je = a(),
       K = r(je);
     if (H != null) {
-      let ke = typeof H == "string" && (XA(n(), H) != null || H === "cut_strip" || H === "live_minnow");
+      let ke =
+        typeof H == "string" &&
+        (XA(n(), H) != null || H === "cut_strip" || H === "live_minnow" || H === "capseed");
       if (typeof H != "string" || (!ve(H) && !ke) || oe(H, Ee) <= 0) return { ok: !1 };
     }
     let we = H ?? null,
@@ -113161,6 +114276,14 @@ function CF(e) {
       ? soundingLeadFishes(ze, H.zone, H.lure)
       : soundingLeadFishes(ze, ze?.barge?.water, ze?.fitted?.lure);
   }
+  // Whether the Drift Float fishes right now, as leadFishes asks it of the lead.
+  function driftFishes() {
+    let ze = p(),
+      H = a();
+    return r(H)
+      ? driftFloatFishes(ze, H.zone, H.lure)
+      : driftFloatFishes(ze, ze?.barge?.water, ze?.fitted?.lure);
+  }
   // The leader and the hook the rig fishes right now (null for the Plain Knot and the Mere Hook): on a trip in the
   // trip's water with the run's lure, at home in the barge's water with the fitted lure.
   function rigPartNow(slot) {
@@ -113220,7 +114343,7 @@ function CF(e) {
       was = { ...H.fitted };
     (H.fitted.lure = lureOk ? rig.lure : null),
       (H.fitted.bait = lureOk ? null : rig.bait),
-      (H.fitted.depth = rig.depth === "lead" && owned.includes("sounding_lead") ? "lead" : "float"),
+      (H.fitted.depth = depthPartOwned(rig.depth, owned) ? rig.depth : "float"),
       (H.fitted.leader = partOk("leader") ? rig.leader : "plain_knot"),
       (H.fitted.hook = partOk("hook") ? rig.hook : "mere_hook"),
       (H.activeRig = want);
@@ -113280,7 +114403,7 @@ function CF(e) {
       qe != null &&
         qe !== ke &&
         (typeof qe == "string" &&
-        (!!ve(qe) || XA(n(), qe) != null || qe === "cut_strip" || qe === "live_minnow")
+        (!!ve(qe) || XA(n(), qe) != null || qe === "cut_strip" || qe === "live_minnow" || qe === "capseed")
           ? oe(qe, Ee) + (te === qe && !ve(te) ? 1 : 0)
           : 0) <= 0)
     )
@@ -113852,6 +114975,7 @@ function CF(e) {
     unfitFound: Ge,
     fitDepth,
     leadFishes,
+    driftFishes,
     rigLeader,
     rigHook,
     fitPart,
@@ -120235,6 +121359,7 @@ function rce(e) {
     try {
       updateHuntTime(e, et);
       updateHerWater(e, et);
+      updateSeedfall(e, et);
     } catch (midnightError) {
       console.warn("[midnight]", midnightError);
     }
@@ -134570,6 +135695,8 @@ function Y0e(e) {
         (b.lureId = i.castVisualLure),
         (b.retrieving = !!i.retrieve || (r === "bite" && i.spinContact)),
         (b.lead = !!i.castLead),
+        // The Drift Float shows its own quill and sail.
+        (b.drift = !!i.castDrift),
         // A Live Minnow under the Cork Float swims, so the float wanders a little.
         (b.live = !i.castLead && i.castBait === "live_minnow"),
         (b.depth = Bt(i.depth, 0)),
@@ -135702,6 +136829,9 @@ function Y0e(e) {
     // Whether this cast fishes on the Sounding Lead, fixed at the release like the bait.
     i.castLead = xe() && !k() && p(() => N()?.leadFishes?.()) === !0;
     s.onLead = i.castLead;
+    // Whether it fishes on the Drift Float (Sporewood), fixed the same way: cast into the spore drift, it rides it.
+    i.castDrift = xe() && !k() && !i.castLead && p(() => N()?.driftFishes?.()) === !0;
+    i.driftRide = null;
     // The leader and hook this cast fishes, fixed at the release like the lead (null for the defaults).
     i.castLeader = castLeaderNow();
     i.castHook = castHookNow();
@@ -135984,6 +137114,7 @@ function Y0e(e) {
         });
     } else g("fishing:land", { position: c.bob.clone() });
     (i.depth = ye(R, I)), (s.depth = i.depth);
+    startDriftRide(R, I);
     // On the Sounding Lead a word says how deep the bait lies. (The fourth word, for the deepest water in the
     // lake, is for a later step: the hunt hides it until her water is found.)
     if (i.castLead) {
@@ -136235,7 +137366,8 @@ function Y0e(e) {
           comeback: Q?.comeback ?? null,
           notes: qe(),
           water: Re(),
-          depth: i.castLead ? "lead" : null,
+          // The Sounding Lead, or the Drift Float while it rides the spore drift (castDepthNow).
+          depth: castDepthNow(),
           // The leader fitted at the release (null for the Plain Knot), on bait and lure casts alike.
           leader: i.castLeader ?? null,
           // Hob's Lamp, once it is the player's: kinds never caught bite more often.
@@ -136494,6 +137626,7 @@ function Y0e(e) {
       tn = Dt === "gloomtide",
       yn = le();
     (i.legendCast = !1), (i.taperRule = !1), (i.comeback = null);
+    i.biteDrift = castDepthNow() === "drift";
     let bn = We(),
       herRule = herRuleFor(bn),
       legendChance = herRule ? 0 : legendCastChance(bn, At, i.castLead);
@@ -136843,6 +137976,44 @@ function Y0e(e) {
     );
   }
   // The leader a cast released now fishes (bait or lure), or null for the Plain Knot or a water without leaders.
+  // The Depth part a bite rolled now fishes on: "lead" on the Sounding Lead, "drift" while the Drift Float rides the
+  // spore drift (its float in the drift's band: i.rollAt for a debug roll at the raft), else null.
+  function castDepthNow() {
+    if (i.castLead) return "lead";
+    let at = i.rollAt || c.bob;
+    return i.driftRide && inSporeDrift(i.driftRide.drift, at.x, at.z) ? "drift" : null;
+  }
+  // A cast on the Drift Float that lands in the spore drift starts to ride it (rideDrift).
+  function startDriftRide(x, z, quiet = !1) {
+    i.driftRide = null;
+    if (!i.castDrift) return;
+    let drift = sporeDriftOf(Bt(h()?.evening, 1), Yt());
+    drift && inSporeDrift(drift, x, z) && (i.driftRide = { drift, held: !1, travel: 0 });
+    i.driftRide && !quiet && g("fishing:drift", { x, z, eddy: drift.eddy.id });
+  }
+  // While the line waits, the Drift Float rides the drift towards its eddy at the drift's pace, paying out line, until
+  // it leaves the band, reaches the drift's end or the line's length (the rod's cast reach); then it holds there.
+  function rideDrift(dt) {
+    let ride = i.driftRide;
+    if (!ride || ride.held || !(dt > 0)) return;
+    let drift = ride.drift,
+      at = driftReach(drift, c.bob.x, c.bob.z);
+    if (at.d > drift.w / 2 || at.s >= drift.len - 0.05) {
+      ride.held = !0;
+      return;
+    }
+    let q = driftAt(drift, Math.min(drift.len, at.s + drift.pace * dt)),
+      nx = q.x - q.dz * at.side,
+      nz = q.z + q.dx * at.side,
+      raft = P(),
+      d = Math.hypot(nx - raft.x, nz - raft.z);
+    if (d > S("castMax", 16)) {
+      ride.held = !0;
+      return;
+    }
+    (c.bob.x = nx), (c.bob.z = nz), (i.castDist = Math.max(i.castDist, d));
+    ride.travel += drift.pace * dt;
+  }
   function castLeaderNow() {
     return (xe() && p(() => N()?.rigLeader?.())) || null;
   }
@@ -139309,6 +140480,8 @@ function Y0e(e) {
       (tn.castRig = {
         bait: typeof i.castBait == "string" ? i.castBait : null,
         lead: i.castLead === !0,
+        // Taken while the Drift Float rode the spore drift (the bite was rolled there).
+        drift: i.biteDrift === !0,
         hook: i.castHook ?? null,
         leader: i.castLeader ?? null,
       });
@@ -141799,6 +142972,7 @@ function Y0e(e) {
       return;
     }
     if ((i.retrieve && lq(R), r !== "waiting")) return;
+    i.driftRide && rideDrift(R);
     if (
       !i.bellWarned &&
       !i.find &&
@@ -142575,6 +143749,28 @@ function Y0e(e) {
               return y(Ke), !1;
             }
           },
+          // How far the fitted rod casts: the line's length the Drift Float rides out to.
+          fishReach: () => S("castMax", 16),
+          // Moves the Drift Float on along the drift by `dt` seconds of riding, as the waiting line does each frame
+          // (with the game's clock held, so no fish bites meanwhile).
+          fishRide: (dt = 0.1) => (r === "waiting" && i.driftRide ? (rideDrift(Bt(dt, 0.1)), !0) : !1),
+          // The Drift Float on this cast: whether it fishes, rides the spore drift (in its band now), holds, how far it
+          // has ridden and where the float is; null with no cast out.
+          fishDrift: () =>
+            r === "idle"
+              ? null
+              : {
+                  drift: !!i.castDrift,
+                  riding: castDepthNow() === "drift",
+                  held: !!i.driftRide?.held,
+                  travel: Math.round((i.driftRide?.travel ?? 0) * 100) / 100,
+                  eddy: i.driftRide?.drift?.eddy?.id ?? null,
+                  x: Math.round(c.bob.x * 100) / 100,
+                  z: Math.round(c.bob.z * 100) / 100,
+                  castDist: Math.round(i.castDist * 100) / 100,
+                  reach: S("castMax", 16),
+                  state: r,
+                },
           mossAnswers: () =>
             i.wc2
               ? i.wc2.answers.map((I) => ({
@@ -142830,12 +144026,17 @@ function Y0e(e) {
               Dt = i.forcePlace,
               tn = i.taperRule,
               castLead = i.castLead,
-              castLeader = i.castLeader;
+              castLeader = i.castLeader,
+              keepDrift = { castDrift: i.castDrift, driftRide: i.driftRide, rollAt: i.rollAt };
             try {
-              // Rolled as a cast released now would be: on the Sounding Lead if it fishes, on the fitted leader.
+              // Rolled as a cast released now would be: on the Sounding Lead if it fishes, on the fitted leader, and on
+              // the Drift Float riding the spore drift when the raft is in it.
               (i.castLead = !k() && p(() => N()?.leadFishes?.()) === !0), (i.forcePlace = Q || null);
               i.castLeader = castLeaderNow();
               let yn = P();
+              i.castDrift = !k() && !i.castLead && p(() => N()?.driftFishes?.()) === !0;
+              i.rollAt = { x: yn.x, z: yn.z };
+              startDriftRide(yn.x, yn.z, !0);
               if (((i.cast = Ht(yn.x, yn.z, ye(yn.x, yn.z), Pe, !1)), i.cast.mist))
                 return { place: null, mist: i.cast.mist, counts: {} };
               let bn = {};
@@ -142854,6 +144055,7 @@ function Y0e(e) {
                 mist: null,
                 counts: bn,
                 onLead: !!i.castLead,
+                onDrift: castDepthNow() === "drift",
                 ...(vn?.entries?.some((Qn) => Qn.from === "preroll")
                   ? { preroll: vn.entries.find((Qn) => Qn.from === "preroll").p }
                   : {}),
@@ -142868,6 +144070,7 @@ function Y0e(e) {
                 (i.taperRule = tn),
                 (i.castLead = castLead),
                 (i.castLeader = castLeader);
+              Object.assign(i, keepDrift);
             }
           },
           // The strike grade a fish of this kind gets on the hook a cast released now fishes, as the strike
@@ -163121,7 +164324,7 @@ function Tfe(e, t, n = "mossmere") {
   let o = c4(t) ? t : {},
     a = c4(o.bait?.[n]) ? o.bait[n] : {},
     s = o.fitted?.bait ?? null;
-  return [e?.LOOP?.legendBait?.[n]?.id, ...Sb(e?.LOOP?.tins?.[n]), "cut_strip", "live_minnow"]
+  return [e?.LOOP?.legendBait?.[n]?.id, ...Sb(e?.LOOP?.tins?.[n]), "cut_strip", "live_minnow", "capseed"]
     .filter((l) => typeof l == "string")
     .filter((l, i, c) => c.indexOf(l) === i && (Math.max(0, Math.floor(Tb(a[l]))) > 0 || l === s))
     .map((l) => ({ id: l, count: Math.max(0, Math.floor(Tb(a[l]))), glyph: su[l] || "worm" }));
@@ -166207,9 +167410,13 @@ function cV(e, { run: t = null, metaLoop: n = null, line: o = null } = {}) {
           ? a.equippedBait
           : null,
     d = typeof a.lure == "string" ? a.lure : null,
-    f = [e?.LOOP?.legendBait?.[l]?.id, ...Ed(e?.LOOP?.tins?.[l]), "cut_strip", "live_minnow"].filter(
-      (p, w, y) => typeof p == "string" && y.indexOf(p) === w,
-    );
+    f = [
+      e?.LOOP?.legendBait?.[l]?.id,
+      ...Ed(e?.LOOP?.tins?.[l]),
+      "cut_strip",
+      "live_minnow",
+      "capseed",
+    ].filter((p, w, y) => typeof p == "string" && y.indexOf(p) === w);
   c && !f.includes(c) && f.push(c);
   let u = f
     .filter((p) => am(i[p]) > 0 || p === c)
@@ -166359,9 +167566,13 @@ function khe(e, { metaLoop: t = null, run: n = null, line: o = null, canChange: 
       log: z === x ? [w(m.item?.[z])].filter(Boolean) : [],
     }));
   b.push({ kind: "lure", head: r.lure, items: A });
-  let S = [e?.LOOP?.legendBait?.[c]?.id, ...Ed(e?.LOOP?.tins?.[c]), "cut_strip", "live_minnow"].filter(
-    (z, Z, D) => typeof z == "string" && D.indexOf(z) === Z,
-  );
+  let S = [
+    e?.LOOP?.legendBait?.[c]?.id,
+    ...Ed(e?.LOOP?.tins?.[c]),
+    "cut_strip",
+    "live_minnow",
+    "capseed",
+  ].filter((z, Z, D) => typeof z == "string" && D.indexOf(z) === Z);
   M && !S.includes(M) && S.push(M);
   let P = S.filter((z) => am(L[z]) > 0 || z === M).map((z) => ({
       kind: "bait",
@@ -166370,8 +167581,8 @@ function khe(e, { metaLoop: t = null, run: n = null, line: o = null, canChange: 
       name: f4(e, z),
       count: am(L[z]),
       on: z === M,
-      // The Live Minnow is drawn in the plain line style (dV), like the bare hook.
-      ...(z === "live_minnow" ? { plain: z } : { art: hV(e, "bait", z) }),
+      // The Live Minnow and the Capseed are drawn in the plain line style (dV), like the bare hook.
+      ...(z === "live_minnow" || z === "capseed" ? { plain: z } : { art: hV(e, "bait", z) }),
       log: z === M ? [w(m.item?.[z])].filter(Boolean) : [],
     })),
     B = M == null && x == null;
@@ -166396,12 +167607,19 @@ function khe(e, { metaLoop: t = null, run: n = null, line: o = null, canChange: 
           ? { lines: [e?.TEXT_LOOP?.bunch?.good, e?.TEXT_LOOP?.bunch?.cost].filter(Boolean) }
           : {}),
     });
-  // The Depth part, once a second option (the Sounding Lead) is owned, in a water that fishes by depth. With a
-  // lure on, the row says lures swim at their own depth instead of offering a choice.
+  // The Depth part, once a second option (the Sounding Lead, or Sporewood's Drift Float) is owned, in a water that
+  // fishes by depth or has a spore drift. With a lure on, the row says lures swim at their own depth instead of
+  // offering a choice.
   let depthText = i0(e?.TEXT_LOOP?.depth) ? e.TEXT_LOOP.depth : {},
-    depthParts = Ed(s.parts).filter((z) => e?.LOOP?.rig?.parts?.[z]?.slot === "depth");
-  if (bs[c]?.depth && depthParts.length > 1) {
-    let fittedDepth = s.fitted?.depth === "lead" ? "lead" : "float",
+    depthParts = Ed(s.parts).filter(
+      (z) => e?.LOOP?.rig?.parts?.[z]?.slot === "depth" && depthPartWorks(z, c),
+    );
+  if ((bs[c]?.depth || bs[c]?.drift) && depthParts.length > 1) {
+    let fittedDepth =
+        (s.fitted?.depth === "lead" || s.fitted?.depth === "drift") &&
+        depthPartOwned(s.fitted.depth, depthParts)
+          ? s.fitted.depth
+          : "float",
       fittedPart = depthParts.find((z) => e.LOOP.rig.parts[z].fit === fittedDepth);
     b.push({
       kind: "depth",
@@ -166569,8 +167787,15 @@ function rigPicture(e, opts = {}, shelf = []) {
   // The Depth part, the Leader and the Hook: as the rows offer them (a second option owned, in a water that has
   // the part), each option with its own lines. The Depth and the Hook are not offered under a lure. The cork is
   // drawn either way.
-  let depthWater = !!bs[water]?.depth,
-    depthFit = s.fitted?.depth === "lead" && Ed(s.parts).includes("sounding_lead") ? "lead" : "float";
+  let depthWater = !!bs[water]?.depth || !!bs[water]?.drift,
+    depthFit =
+      (s.fitted?.depth === "lead" || s.fitted?.depth === "drift") &&
+      depthPartOwned(
+        s.fitted.depth,
+        Ed(s.parts).filter((z) => depthPartWorks(z, water)),
+      )
+        ? s.fitted.depth
+        : "float";
   for (let slot of ["depth", "leader", "hook"]) {
     let row = rows[slot];
     if (!row || row.note) continue;
@@ -166726,11 +167951,25 @@ function rigSliceSvg(draw = {}) {
   anchors.reel = [reel[0] - 9, reel[1]];
   let line = (d) => out.push(`<path class="gw-rig-line" d="${d}"/>`),
     lead = draw.depth === "lead",
-    float = draw.depth === "float";
+    quill = draw.depth === "drift",
+    float = draw.depth === "float" || quill;
   // The end tackle: where the leader, hook and bait sit, upright under the cork or a lure, lying on the bed past
   // the lead.
   let end;
-  if (float) {
+  if (quill) {
+    // The Drift Float: a long quill through the surface with a little moss sail near its top.
+    let x = tip[0];
+    line(`M${x} ${tip[1]} V${surface - 26}`);
+    out.push(
+      `<path class="gw-rig-cork" d="M${x} ${surface - 26} C${x + 3} ${surface - 26} ${x + 3.5} ${surface - 18} ${x + 3.5} ${surface - 8} L${x + 2} ${surface + 16} C${x + 1} ${surface + 19} ${x - 1} ${surface + 19} ${x - 2} ${surface + 16} L${x - 3.5} ${surface - 8} C${x - 3.5} ${surface - 18} ${x - 3} ${surface - 26} ${x} ${surface - 26}Z"/>`,
+      `<path class="gw-rig-ink" d="M${x - 3} ${surface - 14} H${x + 3}" stroke-width="1.4"/>`,
+      `<path class="gw-rig-moss" d="M${x - 3} ${surface - 22} L${x - 17} ${surface - 16} C${x - 12} ${surface - 12} ${x - 9} ${surface - 9} ${x - 3} ${surface - 8}Z"/>`,
+      `<path class="gw-rig-ink" d="M${x} ${surface + 18} V${surface + 22}" stroke-width="1.6"/>`,
+    );
+    anchors.line = [x, 60];
+    anchors.depth = [x - 18, surface - 12];
+    end = { x, y: 252, from: surface + 22, upright: !0 };
+  } else if (float) {
     let x = tip[0];
     line(`M${x} ${tip[1]} V100`);
     out.push(
@@ -166858,9 +168097,11 @@ function rigLeaderPath(id, d, x, y, lying, len) {
     ky = lying ? y : y + len / 2;
   return `<path class="gw-rig-line" d="${d}"/><ellipse class="gw-rig-knot" cx="${Zt(kx)}" cy="${Zt(ky)}" rx="${lying ? 4 : 3}" ry="${lying ? 3 : 4}"/>`;
 }
-// The bait on the hook at (x, y): a minnow, a strip of meat, a ball of moss, a bunch of worms, or a worm.
+// The bait on the hook at (x, y): a seed pod, a minnow, a strip of meat, a ball of moss, a bunch of worms, or a worm.
 function rigBaitSvg(id, x, y) {
   let worm = (dx, dy) => `<path class="gw-rig-worm" d="M${x - 10 + dx} ${y + dy} c3 -5 6 5 9 0 s6 5 9 0"/>`;
+  if (id === "capseed")
+    return `<path class="gw-rig-cork" d="M${x} ${y - 7} C${x + 5} ${y - 7} ${x + 7} ${y - 2} ${x + 7} ${y + 2} C${x + 7} ${y + 6} ${x + 4} ${y + 9} ${x} ${y + 9} C${x - 4} ${y + 9} ${x - 7} ${y + 6} ${x - 7} ${y + 2} C${x - 7} ${y - 2} ${x - 5} ${y - 7} ${x} ${y - 7}Z"/><path class="gw-rig-ink" d="M${x - 6} ${y - 2} C${x - 2} ${y - 5} ${x + 2} ${y - 5} ${x + 6} ${y - 2}" stroke-width="1"/>`;
   return id === "live_minnow"
     ? `<path class="gw-rig-fish" d="M${x - 11} ${y} C${x - 5} ${y - 6} ${x + 5} ${y - 6} ${x + 9} ${y} C${x + 5} ${y + 6} ${x - 5} ${y + 6} ${x - 11} ${y}Z M${x + 9} ${y} L${x + 15} ${y - 5} V${y + 5}Z"/><circle class="gw-rig-knob" cx="${x - 6}" cy="${y - 1}" r="1"/>`
     : id === "cut_strip"
@@ -166959,6 +168200,14 @@ var The = `<svg class="gw-tk-tin-svg" viewBox="0 0 108 56" aria-hidden="true" fo
       '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M66 6V62C66 72 58 77 51 71L47 65" stroke-width="3.2"/><path d="M56 78C68 62 98 58 126 68L150 56V100L126 88C98 98 68 94 56 78Z" stroke-width="5"/><circle cx="73" cy="74" r="3.4" stroke-width="2.6"/><path d="M96 66C100 72 100 84 96 90" stroke-width="2.4" stroke-opacity=".6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     minnow_tin:
       '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M84 48C84 32 116 32 116 48" stroke-width="3.2"/><path d="M44 48H156V62H44Z" stroke-width="4"/><path d="M50 62H150V116C150 123 146 128 139 128H61C54 128 50 123 50 116Z" stroke-width="5"/><path d="M76 96C86 84 106 82 120 90L134 81V111L120 102C106 110 86 108 76 96Z" stroke-width="3.2"/><circle cx="68" cy="55" r="1.8" stroke-width="2"/><circle cx="100" cy="55" r="1.8" stroke-width="2"/><circle cx="132" cy="55" r="1.8" stroke-width="2"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    // Sporewood's Drift Float (a long quill with a little moss sail), the Seed Pouch (a drawstring pouch) and the
+    // Capseed (a seed pod with its cap ridge), in the same style.
+    drift_float:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V22" stroke-width="2.4"/><path d="M100 22C104 22 105 32 105 46L103 112C102 118 98 118 97 112L95 46C95 32 96 22 100 22Z" stroke-width="4"/><path d="M95 70H105" stroke-width="3" stroke-opacity=".6"/><path d="M104 30L132 40C124 46 118 52 104 55" stroke-width="3.2"/><path d="M112 38C116 42 117 46 115 50" stroke-width="1.8" stroke-opacity=".6"/><path d="M100 118V126C100 133 94 135 89 131" stroke-width="3.2"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    seed_pouch:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M72 62C58 82 60 126 100 128C140 126 142 82 128 62Z" stroke-width="5"/><path d="M70 58H130" stroke-width="4"/><path d="M86 56C80 38 98 36 94 52M114 56C120 38 102 36 106 52" stroke-width="3"/><path d="M100 80C110 80 115 90 115 98C115 108 108 114 100 114C92 114 85 108 85 98C85 90 90 80 100 80Z" stroke-width="3.2"/><path d="M88 92C96 86 104 86 112 92" stroke-width="2.4" stroke-opacity=".6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
+    capseed:
+      '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 34C122 34 132 58 132 80C132 106 116 122 100 122C84 122 68 106 68 80C68 58 78 34 100 34Z" stroke-width="5"/><path d="M72 62C88 50 112 50 128 62" stroke-width="3.6"/><path d="M100 34V24C100 18 106 16 110 20" stroke-width="3"/><path d="M92 76C96 90 96 102 90 112" stroke-width="2.4" stroke-opacity=".6"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     bare: '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M112 14V88C112 112 98 124 82 124C66 124 56 112 56 98V90L70 104" stroke-width="5"/><path d="M106 14H118" stroke-width="4"/><circle cx="112" cy="10" r="5" stroke-width="3.4"/><path d="M70 104L62 108" stroke-width="3.4"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
     none: '<svg class="cat-eng gw-tk-plain" viewBox="0 0 200 150" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M100 4V44" stroke-width="3"/><path d="M100 44C90 44 85 51 85 60V100C85 110 91 117 100 117C109 117 115 110 115 100V74" stroke-width="5"/><path d="M115 74C109 72 104 76 104 81" stroke-width="3.6" stroke-opacity=".7"/><path d="M60 138H140" stroke-width="1.6" stroke-opacity=".45"/></g></svg>',
   },
@@ -173535,16 +174784,19 @@ function WV(e) {
               line: liveText.gift?.[qt.tally?.giftSay] || liveText.gift?.plain,
               fit: "",
             }
-          : arrivalText.lines?.[arrivalKey]
-            ? { name: arrivalText.names?.[arrivalKey], line: arrivalText.lines[arrivalKey], fit: "" }
-            : {
-                name: giftText.names?.[gift],
-                line: giftText.gift,
-                // It says where to fit it. (An older save's last tally may name the rig its gift went on.)
-                fit: qt.tally?.giftRig
-                  ? Ab(f().rig?.saved?.onRig || "", { n: qt.tally.giftRig })
-                  : giftText.fit,
-              };
+          : gift === "seed_pouch"
+            ? { name: f().seedPouch?.name, line: f().seedPouch?.gift, fit: "" }
+            : arrivalText.lines?.[arrivalKey]
+              ? { name: arrivalText.names?.[arrivalKey], line: arrivalText.lines[arrivalKey], fit: "" }
+              : {
+                  name: giftText.names?.[gift],
+                  // Each Depth part's own gift line (the Drift Float's), else the Sounding Lead's.
+                  line: giftText.gifts?.[gift] || giftText.gift,
+                  // It says where to fit it. (An older save's last tally may name the rig its gift went on.)
+                  fit: qt.tally?.giftRig
+                    ? Ab(f().rig?.saved?.onRig || "", { n: qt.tally.giftRig })
+                    : giftText.fit,
+                };
     // The hunt's moment at this tally (the tale, or Murk's word about Hob), shown like the gift. At the tally
     // after she is landed his line about her comes first, before Hob's Lamp; at any other it follows the gift.
     // Its words are its lake's hunt's (the relic's hunt at the landing's tally).
@@ -173563,6 +174815,11 @@ function WV(e) {
         Tt.querySelector(".gw-tally")?.appendChild(g);
     }
     huntEl && !huntBeat.landed && Tt.querySelector(".gw-tally")?.appendChild(huntEl);
+    // Capseeds left in the Seed Pouch spoiled at this tally (lastTrip.spoiled): the card says so.
+    if (qt.tally?.spoiled > 0 && f().seedPouch?.spoiled) {
+      let spoiledEl = n("p", `gw-tally-gift-fit gw-tally-spoiled${Le.empty ? " gw-in" : ""}`);
+      (spoiledEl.textContent = f().seedPouch.spoiled), Tt.querySelector(".gw-tally")?.appendChild(spoiledEl);
+    }
     // What Murk's box says at this tally: the gift's and the hunt's lines, each its own page, in the order the
     // card lists them (the gift, where to fit it, the tale, his words; after the landing, his line, then the
     // lamp). The card keeps them written as they are.
@@ -184987,6 +186244,8 @@ var ij = () => (Array.isArray(X0?.skip?.keys) ? X0.skip.keys : ["Escape", "Enter
   yp = null,
   bp = null,
   xp = null,
+  // Sporewood's spore drift on the water (sporeDriftFx), made when first needed.
+  driftFx = null,
   li = ms
     ? nI({
         ctx: $t,
@@ -185893,6 +187152,13 @@ function Mj(e) {
         xp && xp.update(l ? n : 0, { show: i });
     } catch (c) {
       (xp = !1), _a("update(ambient)", c);
+    }
+  if (ms && driftFx !== !1)
+    try {
+      driftFx || ((driftFx = sporeDriftFx($t) || !1), driftFx && ($t.debug.drift = driftFx.state)),
+        driftFx && driftFx.update(l ? n : 0, { show: i });
+    } catch (c) {
+      (driftFx = !1), _a("update(drift)", c);
     }
   if (gs) {
     if ($t.firstEvening)

@@ -186,6 +186,24 @@ Eight questions were put as yes or no; the designer said yes to all ("Sounds goo
   hanging over the Gill Harp's neck (`gwHarpStrings`), moss on the stones in Sporewood's tones, a spore-gold mist at the
   Mother's Cup, and shore beds of spore reeds, moss tussocks and small mushrooms on medium and best. Mossmere's code
   paths are unchanged. On low, draw calls are the same and triangles rise by about 0.2%.
+- **The drift, the Drift Float, the seedfall and the Seed Pouch, as built** (step 3 of the plan's order of work, its
+  tackle parts and signs apart). The spore drift runs from the Mother's Cup to one of four eddies (east, south-west,
+  north-west, the neck's far side), a new one each evening by the seeded evening roll, never the evening before's; it
+  is drawn at every quality, glowing softly at night, with a slow swirl on the evening's eddy only. It succeeds the wind
+  lane: by day and at dusk its band is the lane's bite area, with the lane's share. The Drift Float is Murk's gift at
+  Sporewood's first tally with a sale (an older save that sold there gets it at its next tally); cast into the drift it
+  rides it at 0.3 m a second until it leaves the band, reaches the drift's end or the line's length, and while it rides,
+  fish tagged "drift" bite twice as often and "still" fish half as often, on every bite path. The Seed Pouch comes at
+  the tally after it. The seedfall is Sporewood's time clue, from evening 2, once an evening: ten sighs 2.2 s apart from
+  1 s into dusk, and her time three minutes from the first sigh.
+  - Gaps filled during the build: dusk lasts 20 s in play, so the ten sighs fill it and her time runs on about two
+    minutes and forty seconds into the night (it cannot end at nightfall). The Cap's breath of spores falls round the raft
+    wherever it is during the sighs, so the seedfall is seen from anywhere on the lake (the Cap itself is above the
+    fishing camera's frame from far off). Fourteen pods fall into the Cup, ride the drift at 0.6 m a second and circle in
+    the eddy until her time ends. Sporewood's entry in the hunt tables has its time clue only and no legend, so it has no
+    hunt and its legend still bites only on her Glowcap Bulb.
+  - The fishing camera sits south of the raft whatever way it faces, so on an evening whose drift runs east to west
+    (to the north-west eddy or the neck) the band crosses the frame, and its eddy shows only once the raft is near it.
 
 ## Murk's Tackle tab made plain, 24 November 2026
 
@@ -223,7 +241,7 @@ Step 3b of the Sporewood plan: its rig grows from 3 parts to 8, as Mossmere's di
 - **Brass Trace** (leader, 230): +4 Grip on toothy fish (both puffers, the mackerel, the Mildew Angler) and rough ones (both catfish, both eels, the Velvet Ray, the Nightbloom Carp). Shy fish (Hushcap Koi, Falsesmile Barb, Netcloud Fry, Sleepspore Jelly) bite 0.7 times as often.
 - **Mossthread Snood** (leader, 230): the same shy fish bite 1.4 times as often, and toothy fish lose 4 Grip. On the Plain Knot they never shy, so the snood raises bites to be worth its price.
 - **Burl Hook** (hook, 150), on bait only: a self-setter's struck strike or hard take is clean; a quick nibbler's clean strike is struck. Its shelf line says only what it does: nothing crushes a hook until Sporewood's hunt is built.
-- **They arrive one a tally**, on tallies with no gift, in the order Burl Hook, Brass Trace, Mossthread Snood. The trace comes sooner after the first toothy fish, the hook after a self-setter runs off a struck hook. A comment names the hunt beats that will bring them later (Burr's almanac, the first cracked pod).
+- **They arrive one a tally**, on tallies with no gift, in the order Burl Hook, Brass Trace, Mossthread Snood. A quiet tally waits until Murk has given the Drift Float and the Seed Pouch, so with the drift merged they come from Sporewood's third tally. The trace comes sooner after the first toothy fish, the hook after a self-setter runs off a struck hook. A comment names the hunt beats that will bring them later (Burr's almanac, the first cracked pod).
 - **Practice orders:** the Burl Hook names the Cindertail Catfish or the Threadling Eel; the snood the Falsesmile Barb or the Hushcap Koi.
 - **Signs on the water:** Sporewood has its own (rises, swirls, ruffles, spray, strikes, bubble trails, tiny rings, silt clouds, knocks at the stems), each weighted by its makers' share of the bites at that spot and hour. Ten kinds can be sighted. As in Mossmere, signs carry no words.
 - **Mossmere is unchanged:** its 34 related checks give the same results, and a seeded run of its signs matches.

@@ -869,6 +869,259 @@ const withTin = (save) => {
 
 const liveInRun = (session) => session.eval(() => window.__gw.state.run?.bait?.live_minnow ?? 0);
 
+// ---- Sporewood's spore drift, Drift Float, seedfall and Seed Pouch (sporewood-plan.md, order of work step 3) ----
+
+const DRIFT_FLOAT = "drift_float";
+const SEED_POUCH = "seed_pouch";
+const DRIFT_GIFT_LINE = "That pale ribbon of spores is a current. Cast this float into it and let it ride.";
+const POUCH_GIFT_LINE =
+  "At dusk the Mother Cap drops its seed pods. Sail through them, and this pouch holds three.";
+const DRIFT_GOOD =
+  "Cast it into the spore drift and it rides along. Fish that feed in the drift bite more often.";
+const DRIFT_COST = "Fish that like still water bite less often while it rides.";
+const SEEDFALL_FIRST = "The Mother Cap sighs, and its seed pods fall. Watch where the drift carries them.";
+const SEEDFALL_LINE = "The Mother Cap sighs. Its seed pods fall like snow.";
+const SEEDFALL_STILL = "The last pods sink, and the drift goes quiet.";
+const CAPSEED_FIRST = "You scoop up a seed pod. It is a Capseed now, and it fits on your hook.";
+const CAPSEED_SPOILED = "Your Capseeds went soft. They only keep for one evening.";
+const CAPSEED_GOOD = "Seed eaters and crushers, such as puffers and rays, take it.";
+const CAPSEED_COST = "You gather it at the seedfall, and it spoils at the tally.";
+// The Drift Float's tags, and the fish the Capseed's column names (any grade above 0).
+const DRIFT_FISH = ["netcloud_fry", "falsesmile_barb", "lostsea_mackerel", "sleepspore_jelly"];
+const STILL_FISH = ["hushcap_koi", "downcast_catfish", "mildew_angler"];
+const CAPSEED_FISH = [
+  "sporebelly_puffer",
+  "velvet_ray",
+  "hushcap_koi",
+  "nightbloom_carp",
+  "falsesmile_barb",
+  "festival_puffer",
+  "cindertail_catfish",
+  "capshell_crayfish",
+  "netcloud_fry",
+];
+// The seedfall's clock: the first sigh 1 s into dusk, ten 2.2 s apart, her time 180 s; dusk lasts 20 s.
+const SEEDFALL = { at: 1, strokes: 10, gap: 2.2, herTime: 180, dusk: 20 };
+
+const readFixture = (name) => JSON.parse(readFileSync(join(FIXTURES_DIR, `${name}.json`), "utf8"));
+
+// Gives a Sporewood save Murk's two gifts (as its tallies would) and, with fit, fits the Drift Float.
+const withDriftFloat =
+  (fit = true) =>
+  (save) => {
+    const loop = save.meta.loop;
+    loop.parts = [
+      ...new Set([...(Array.isArray(loop.parts) ? loop.parts : ["cork_float"]), DRIFT_FLOAT, SEED_POUCH]),
+    ];
+    loop.fitted = { ...loop.fitted, depth: fit ? "drift" : "float" };
+  };
+
+// A point `k` of the way along tonight's drift (0 to 1).
+const driftPoint = (session, k) =>
+  session.eval((k) => {
+    const g = window.__gw,
+      d = g.data.sporeDriftOf(g.state.run.evening, "sporewood"),
+      p = d.pts[Math.round(k * (d.pts.length - 1))];
+    return { x: p[0], z: p[1] };
+  }, k);
+
+// One Spore Cake bait roll at the raft through the game's own odds (fishPoolRoll), on the Cork Float and on the Drift
+// Float.
+const rollDrift = (session, opts) =>
+  session.eval((o) => {
+    const loop = window.__gw.progression.loop,
+      d = window.__gw.debug;
+    o.light && d.setPhase(o.light);
+    const roll = (depth) => (loop.fitDepth(depth), d.fishPoolRoll(1, { bait: "spore_cake", ...o.roll }));
+    const float = roll("float"),
+      drift = roll("drift");
+    loop.fitDepth("float");
+    return { float, drift };
+  }, opts);
+
+// Brings a cast in, if one is out, and waits for the line to be home (the fishing state idle).
+async function lineIn(session) {
+  await session.eval(() => {
+    const g = window.__gw;
+    g.debug.fishPlayTo?.(0.995);
+    g.fishing.reelInQuiet?.();
+  });
+  for (let i = 0; i < 40; i++) {
+    if (await session.eval(() => window.__gw.debug.fishDrift() === null)) return;
+    if (await session.eval(() => window.__gw.ui.isBlocking?.() === true)) await session.closeGuides(1500);
+    await session.pause(500);
+  }
+  throw new Error(
+    `the line did not come in: ${JSON.stringify(await session.eval(() => window.__gw.debug.fishDrift()))}`,
+  );
+}
+// Casts the fitted rig onto tonight's drift: at `k` of its length, or `fromEnd` metres short of its end, `aside` metres
+// to its side. The raft stands `back` metres off the target, across the drift; with back null it stands on the
+// drift's line upstream, at the line's length less 0.4 m. Returns the target, the raft, the eddy and the reach.
+const castOnDrift = (session, { k = null, fromEnd = null, back = null, aside = 0 }) =>
+  session.eval(
+    ([k, fromEnd, back, aside]) => {
+      const g = window.__gw,
+        D = g.data,
+        d = D.sporeDriftOf(g.state.run.evening, "sporewood"),
+        s = fromEnd != null ? d.len - fromEnd : k * d.len,
+        p = D.driftAt(d, s),
+        [nx, nz] = [-p.dz, p.dx],
+        target = { x: p.x + nx * aside, z: p.z + nz * aside },
+        reach = g.debug.fishReach(),
+        raft =
+          back == null
+            ? { x: target.x - p.dx * (reach - 0.4), z: target.z - p.dz * (reach - 0.4) }
+            : { x: target.x + nx * back, z: target.z + nz * back };
+      g.player.teleport(raft, Math.atan2(-(target.x - raft.x), -(target.z - raft.z)));
+      const ok = g.debug.castAt(target.x, target.z, 0.6);
+      return { ok, target, raft, eddy: d.eddy, reach };
+    },
+    [k, fromEnd, back, aside],
+  );
+
+// Casts onto the drift (castOnDrift) and rides the float (rideFloat), casting again, up to three times, when the
+// line does not wait (a fish can take at once).
+async function castAndRide(session, cast, until, n) {
+  let c = null,
+    ride = null;
+  for (let tries = 0; tries < 3; tries++) {
+    tries && (await lineIn(session));
+    c = await castOnDrift(session, cast);
+    ride = await rideFloat(session, until, n);
+    if (c.ok && ride.first?.state === "waiting" && ride.last?.state === "waiting") break;
+  }
+  return { cast: c, ...ride };
+}
+// Waits for the cast to land and the line to wait, then holds the game's clock (no fish bites meanwhile) and rides
+// the float on `step` seconds at a time, until `until(float)` or `n` steps: the float as it landed and as it is last.
+async function rideFloat(session, until, n, step = 0.25) {
+  let first = null;
+  for (let i = 0; i < 60 && !first; i++) {
+    if (await session.eval(() => window.__gw.ui.isBlocking?.() === true)) await session.closeGuides(1500);
+    const f = await session.eval(() => window.__gw.debug.fishDrift());
+    if (f?.state === "waiting") {
+      await session.eval(() => (window.__gw.time.timeScale = 0));
+      first = await session.eval(() => window.__gw.debug.fishDrift());
+    } else await session.pause(250);
+  }
+  let last = first;
+  for (let i = 0; first && i < n && !until(last); i++)
+    last = await session.eval((dt) => (window.__gw.debug.fishRide(dt), window.__gw.debug.fishDrift()), step);
+  await session.eval(() => (window.__gw.time.timeScale = 1));
+  return { first, last };
+}
+
+// Puts the trip at `t` seconds into dusk (with `evening`, a new evening: the run's evening flags cleared), lets the
+// game run two frames, and returns the run's seedfall flags and the drift's drawing.
+const atDusk = (session, t, { evening = null } = {}) =>
+  session.eval(
+    async ([t, evening]) => {
+      const g = window.__gw;
+      const run = g.state.run;
+      if (evening != null) {
+        run.evening = evening;
+        delete run.midnight;
+      }
+      if (run.phase !== "dusk") g.debug.setPhase("dusk");
+      run.phaseTime = t;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      return {
+        midnight: run.midnight ? JSON.parse(JSON.stringify(run.midnight)) : null,
+        drift: g.debug.drift?.() ?? null,
+      };
+    },
+    [t, evening],
+  );
+
+// Puts the trip `tau` seconds after the seedfall's first sigh on `evening` (a new evening when it changes; `empty`
+// empties the pouch) and the raft on seed pod `i` (or `off` metres across the drift from it), lets two frames pass
+// and returns the Capseeds in the pouch, the pods taken and the nearest pod still out.
+const gatherAt = (session, i, { evening, tau, off = 0, empty = false }) =>
+  session.eval(
+    async ([i, evening, tau, off, empty, sf]) => {
+      const g = window.__gw,
+        D = g.data,
+        run = g.state.run;
+      if (run.evening !== evening) {
+        run.evening = evening;
+        delete run.midnight;
+      }
+      empty && (run.bait.capseed = 0);
+      const clock = sf.at + tau;
+      if (clock < sf.dusk) {
+        if (run.phase !== "dusk") g.debug.setPhase("dusk");
+        run.phaseTime = clock;
+      } else {
+        if (run.phase !== "gloomtide") g.debug.setPhase("gloomtide");
+        run.phaseTime = clock - sf.dusk;
+      }
+      const set = D.seedfallPods("sporewood", run.evening),
+        at = D.seedfallPodAt(set, i, tau),
+        out = (c, taken) =>
+          Math.min(
+            ...set.pods.map((_, k) => {
+              const p = D.seedfallPodAt(set, k, tau);
+              return taken.includes(k) || !(p.state === "float" || p.state === "eddy")
+                ? 1 / 0
+                : Math.hypot(p.x - c.x, p.z - c.z);
+            }),
+          );
+      // With `off`, the spot that far from the pod that lies farthest from every pod.
+      let spot = { x: at.x, z: at.z };
+      if (off) {
+        let best = -1;
+        for (let a = 0; a < 16; a++) {
+          const c = {
+              x: at.x + Math.cos((a * Math.PI) / 8) * off,
+              z: at.z + Math.sin((a * Math.PI) / 8) * off,
+            },
+            n = out(c, run.midnight?.podsTaken ?? []);
+          n > best && ((best = n), (spot = c));
+        }
+      }
+      g.player.teleport(spot, 0);
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const taken = run.midnight?.podsTaken ?? [],
+        nearest = out(spot, taken);
+      return {
+        capseed: run.bait.capseed ?? 0,
+        taken: [...taken],
+        state: at.state,
+        nearest: +nearest.toFixed(2),
+      };
+    },
+    [i, evening, tau, off, empty, SEEDFALL],
+  );
+
+// Goes home and returns the whole tally card's text once it has counted, then closes it.
+async function tallyCardText(session) {
+  const homeBy = Date.now() + 60_000;
+  while (!(await session.eval(() => window.__gw.game.goHome()))) {
+    if (Date.now() > homeBy)
+      throw new Error(`the game will not go home; ${JSON.stringify(await session.state())}`);
+    await session.closeGuides(3000);
+    await session.pause(1000);
+  }
+  const soldVisible = () =>
+    [...document.querySelectorAll("button")].some(
+      (b) => b.textContent.trim() === "Sold" && b.getBoundingClientRect().width > 0,
+    );
+  await session.waitFor("Murk's tally", 90_000, soldVisible);
+  await session.clickButton(/^Sold$/);
+  await session.pause(2500);
+  const text = await session.eval(() =>
+    (document.querySelector(".gw-tally")?.textContent ?? "").replace(/\s+/g, " ").trim(),
+  );
+  const end = Date.now() + 60_000;
+  while (Date.now() < end && (await session.eval(soldVisible))) {
+    await session.clickButton(/^Sold$/);
+    await session.pause(1500);
+  }
+  await session.closeGuides();
+  return text;
+}
+
 // Lands a fish (z sets its size) and waits for its catch card. Returns the card's "Into the tin" text or null,
 // the fish's size class and the creel's length, and leaves the card open.
 async function catchCard(session, speciesId, z) {
@@ -2882,7 +3135,7 @@ const SCENARIOS = [
   },
 
   {
-    name: "live minnow: Sporewood has no tin, no button and no gift",
+    name: "live minnow: Sporewood has no tin and no button; its tally's gift is its own Drift Float, never the tin",
     fixture: "sporewood-crossed",
     debug: true,
     editSave: withLead(false),
@@ -2896,12 +3149,712 @@ const SCENARIOS = [
       await session.catchFish("netcloud_fry");
       const gift = await tallyAndGift(session);
       const after = await leadRecord(session);
-      // Murk's tally there may shelve one of Sporewood's own Leader and Hook parts (its tackle arrivals), never a tin.
+      // Murk's first tally there gives the Drift Float (Sporewood's tackle arrivals wait for his gifts), never a tin.
       check(
-        (gift === null || gift.text.includes("Burl Hook")) && !after.parts.includes(TIN),
+        gift?.text.includes("Drift Float") && after.gift === DRIFT_FLOAT && !after.parts.includes(TIN),
         `Sporewood's tally: ${JSON.stringify({ gift, after })}`,
       );
-      return "no tin, no gift";
+      return "no tin; the Drift Float";
+    },
+  },
+  {
+    name: "spore drift: it runs from the Mother's Cup to the evening's eddy, a new eddy each evening by the seeded roll and the same every time; its four eddies are in free water and far apart; by day and at dusk it is the lane",
+    fixture: "sporewood-crossed",
+    debug: true,
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      const r = await session.eval(() => {
+        const g = window.__gw,
+          D = g.data,
+          rule = D.sporeDriftOf(1, "sporewood"),
+          seq = [],
+          again = [];
+        for (let e = 1; e <= 24; e++) {
+          const d = D.sporeDriftOf(e, "sporewood");
+          seq.push({
+            eddy: d.eddy.id,
+            x: d.eddy.x,
+            z: d.eddy.z,
+            start: d.pts[0],
+            end: d.pts[d.pts.length - 1],
+          });
+          again.push(D.sporeDriftOf(e, "sporewood").eddy.id);
+        }
+        const eddies = {};
+        for (const s of seq) eddies[s.eddy] = { x: s.x, z: s.z };
+        // Each eddy: no place, no mist, water a raft sails (not land, not the shallows' edge).
+        const where = {};
+        for (const [id, at] of Object.entries(eddies)) {
+          g.player.teleport({ x: at.x, z: at.z }, 0);
+          const roll = g.debug.fishPoolRoll(1, { bait: "spore_cake" });
+          where[id] = {
+            place: roll?.place ?? null,
+            mist: roll?.mist ?? null,
+            shore: +g.world.getFromShore(at.x, at.z).toFixed(1),
+          };
+        }
+        // The lane: points down tonight's drift by day (in open water it is the lane; near stones or the shallows
+        // those win, as they did over the wind lane), then the first lane point at dusk and at night.
+        const run = g.state.run,
+          d = D.sporeDriftOf(run.evening, "sporewood"),
+          area = (p, light) => {
+            g.player.teleport({ x: p[0], z: p[1] }, 0);
+            g.debug.setPhase(light);
+            return g.debug.fishPoolRoll(1, { bait: "spore_cake" })?.area ?? null;
+          },
+          byDay = [0.35, 0.5, 0.65, 0.8].map((k) => d.pts[Math.round(k * (d.pts.length - 1))]),
+          days = byDay.map((p) => area(p, "calm")),
+          at = byDay[days.indexOf("lane")],
+          lane = at
+            ? { calm: "lane", dusk: area(at, "dusk"), gloomtide: area(at, "gloomtide") }
+            : { calm: days.join("/") };
+        g.debug.setPhase("calm");
+        return { seq, again, eddies, where, lane, from: rule.pts[0] };
+      });
+      const ids = r.seq.map((s) => s.eddy);
+      check(sameJson(ids, r.again), `the drift is not the same every time: ${ids} / ${r.again}`);
+      check(
+        ids.every((id, k) => k === 0 || id !== ids[k - 1]),
+        `the eddy did not move from one evening to the next: ${ids}`,
+      );
+      check(Object.keys(r.eddies).length === 4, `the eddies seen in 24 evenings: ${Object.keys(r.eddies)}`);
+      for (const s of r.seq)
+        check(
+          sameJson(s.start, r.from) && Math.hypot(s.end[0] - s.x, s.end[1] - s.z) < 0.05,
+          `a drift does not run from the Cup to its eddy: ${JSON.stringify(s)}`,
+        );
+      check(Math.hypot(r.from[0] - 48, r.from[1] - 6) < 6, `the drift does not leave the Cup: ${r.from}`);
+      const list = Object.entries(r.eddies);
+      for (let i = 0; i < list.length; i++)
+        for (let j = i + 1; j < list.length; j++) {
+          const d = Math.hypot(list[i][1].x - list[j][1].x, list[i][1].z - list[j][1].z);
+          check(d >= 25, `${list[i][0]} and ${list[j][0]} are ${d.toFixed(1)} m apart`);
+        }
+      for (const [id, w] of Object.entries(r.where))
+        check(
+          !w.place && !w.mist && w.shore > 4,
+          `the ${id} eddy is not in free water: ${JSON.stringify(w)}`,
+        );
+      check(
+        r.lane.calm === "lane" && r.lane.dusk === "lane" && r.lane.gloomtide !== "lane",
+        `the drift's bite area: ${JSON.stringify(r.lane)}`,
+      );
+      return `eddies ${ids.slice(0, 8).join(", ")}...; ${list.map(([id, at]) => `${id} (${at.x}, ${at.z})`).join(", ")}`;
+    },
+  },
+
+  {
+    name: "spore drift: drawn on the lowest setting by day, at dusk and at night, the swirl on the evening's eddy only, and nothing of it in Mossmere",
+    fixture: "sporewood-crossed",
+    debug: true,
+    async run(session, { browser, page }) {
+      await session.sail({ water: "sporewood" });
+      const r = await session.eval(async () => {
+        const g = window.__gw,
+          out = {};
+        g.render.setQuality("low");
+        for (const light of ["calm", "dusk", "gloomtide"]) {
+          g.debug.setPhase(light);
+          await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+          const scene = g.render.scene,
+            band = scene.getObjectByName("sporeDrift"),
+            swirl = scene.getObjectByName("sporeEddy");
+          out[light] = {
+            ...g.debug.drift(),
+            band: !!band?.visible,
+            swirl: !!swirl?.visible,
+            alpha: +(band?.material?.uniforms?.uAlpha?.value ?? 0).toFixed(2),
+            night: +(band?.material?.uniforms?.uNight?.value ?? 0).toFixed(2),
+          };
+        }
+        out.eddy = g.data.sporeDriftOf(g.state.run.evening, "sporewood").eddy;
+        return out;
+      });
+      for (const light of ["calm", "dusk", "gloomtide"]) {
+        const h = r[light];
+        check(h.on && h.band && h.swirl && h.motes > 0 && h.calls >= 3, `${light}: ${JSON.stringify(h)}`);
+        check(
+          Math.hypot(h.swirlAt.x - r.eddy.x, h.swirlAt.z - r.eddy.z) < 0.05,
+          `${light}: the swirl is not on the evening's eddy: ${JSON.stringify([h.swirlAt, r.eddy])}`,
+        );
+      }
+      check(r.gloomtide.night === 1 && r.calm.night === 0, `the band's night glow: ${JSON.stringify(r)}`);
+      // Mossmere: none of it.
+      const moss = await GameSession.open(browser, {
+        page,
+        save: JSON.stringify(readFixture("mid-mossmere")),
+        debug: true,
+        viewport: VIEWPORT,
+      });
+      try {
+        await moss.boot();
+        await moss.sail();
+        const m = await moss.eval(() => ({
+          ...(window.__gw.debug.drift?.() ?? {}),
+          band: !!window.__gw.render.scene.getObjectByName("sporeDrift")?.visible,
+        }));
+        check(!m.on && !m.band && !m.calls, `the drift in Mossmere: ${JSON.stringify(m)}`);
+        await moss.collectGameErrors();
+        check(!moss.errors.length, `errors in Mossmere: ${moss.errors.join("; ")}`);
+      } finally {
+        await moss.close();
+      }
+      return `low: ${r.calm.calls} draw calls for the drift, ${r.calm.motes} spores; night glow ${r.gloomtide.night}`;
+    },
+  },
+
+  {
+    name: "Drift Float: Murk gives it at Sporewood's first tally with a sale, once, with his line, and the Seed Pouch at the next tally, never with it; an old save that sold there gets the float at its next tally",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 900_000,
+    async run(session, { fixture, page, browser }) {
+      check(fixture.meta.loop.lastTrip.zone === "sporewood", "the fixture never sold in Sporewood");
+      // The old save sold in Sporewood before the float existed: it comes at the next tally, with nothing sold.
+      await session.sail({ water: "sporewood" });
+      const first = await tallyAndGift(session);
+      const atFloat = await leadRecord(session);
+      check(
+        first?.shown && first.text.includes(DRIFT_GIFT_LINE) && first.text.includes("Drift Float"),
+        `the float's tally: ${JSON.stringify(first)}`,
+      );
+      check(
+        atFloat.gift === DRIFT_FLOAT && !atFloat.parts.includes(SEED_POUCH) && atFloat.depth === "float",
+        `after the float's tally: ${JSON.stringify(atFloat)}`,
+      );
+      await session.sail({ water: "sporewood" });
+      const second = await tallyAndGift(session);
+      const atPouch = await leadRecord(session);
+      check(
+        second?.text.includes(POUCH_GIFT_LINE) && second.text.includes("Seed Pouch"),
+        `the pouch's tally: ${JSON.stringify(second)}`,
+      );
+      check(
+        atPouch.gift === SEED_POUCH &&
+          atPouch.parts.filter((id) => id === DRIFT_FLOAT).length === 1 &&
+          atPouch.parts.filter((id) => id === SEED_POUCH).length === 1,
+        `after the pouch's tally: ${JSON.stringify(atPouch)}`,
+      );
+      // Reloaded: neither again.
+      const saved = await session.saved();
+      const again = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await again.boot();
+        await again.sail({ water: "sporewood" });
+        await again.catchFish("netcloud_fry");
+        const third = await tallyAndGift(again);
+        const record = await leadRecord(again);
+        check(
+          !/Drift Float|Seed Pouch/.test(third?.text ?? "") &&
+            record.parts.filter((id) => id === DRIFT_FLOAT || id === SEED_POUCH).length === 2,
+          `a third tally: ${JSON.stringify({ third, record })}`,
+        );
+        await again.collectGameErrors();
+        check(!again.errors.length, `errors after reloading: ${again.errors.join("; ")}`);
+      } finally {
+        await again.close();
+      }
+      return `"${first.text.slice(0, 50)}...", then "${second.text.slice(0, 40)}..."`;
+    },
+  },
+
+  {
+    name: "Drift Float: in a Sporewood never sold in, it waits for the first tally with a sale; Mossmere's gifts are as before",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 720_000,
+    // Sporewood as a lake reached but never sold in: no evening there, none of its fish in the Journal.
+    editSave(save) {
+      const loop = save.meta.loop;
+      loop.eveningsAt = { ...loop.eveningsAt, sporewood: 0 };
+      for (const id of ["netcloud_fry", "falsesmile_barb"]) delete save.meta.journal[id];
+      loop.lastTrip = { ...loop.lastTrip, zone: "mossmere" };
+    },
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      const sold = await session.eval(() => window.__gw.progression.loop.state().sold);
+      check(!sold.includes("sporewood"), `the save counts as sold in Sporewood: ${sold}`);
+      const empty = await tallyAndGift(session);
+      const before = await leadRecord(session);
+      check(
+        empty === null && !before.parts.includes(DRIFT_FLOAT),
+        `the float came at a tally with no sale: ${JSON.stringify({ empty, before })}`,
+      );
+      await session.sail({ water: "sporewood" });
+      await session.catchFish("falsesmile_barb");
+      const gift = await tallyAndGift(session);
+      const after = await leadRecord(session);
+      check(
+        gift?.text.includes(DRIFT_GIFT_LINE) &&
+          after.parts.includes(DRIFT_FLOAT) &&
+          !after.parts.includes(LEAD),
+        `no float at the first sale: ${JSON.stringify({ gift, after })}`,
+      );
+      const moss = await session.eval(() => {
+        const D = window.__gw.data,
+          L = (parts) => ({ parts, sold: ["mossmere"] });
+        return {
+          mossmere: D.lakeGiftAtTally(L(["cork_float"]), "mossmere", true),
+          first: D.lakeGiftAtTally(L(["cork_float"]), "sporewood", true),
+          none: D.lakeGiftAtTally(L(["cork_float"]), "sporewood", false),
+          next: D.lakeGiftAtTally(L(["cork_float", "drift_float"]), "sporewood", false),
+          done: D.lakeGiftAtTally(L(["cork_float", "drift_float", "seed_pouch"]), "sporewood", true),
+        };
+      });
+      check(
+        sameJson(moss, { mossmere: null, first: DRIFT_FLOAT, none: null, next: SEED_POUCH, done: null }),
+        `the gifts' rule: ${JSON.stringify(moss)}`,
+      );
+      return "nothing at an empty tally, the float at the first sale";
+    },
+  },
+
+  {
+    name: "Drift Float: riding the drift doubles drift fish and halves still fish in the pool and in sign and sight takes; out of the drift, under a lure or on the Cork Float nothing changes",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withDriftFloat(false),
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      const table = await session.eval(
+        ([drift, still]) => {
+          const D = window.__gw.data,
+            ids = [
+              ...drift,
+              ...still,
+              "capshell_crayfish",
+              "harpstring_eel",
+              "festival_puffer",
+              "drifting_grove",
+            ];
+          return Object.fromEntries(ids.map((id) => [id, D.depthBiteMult(id, "drift", "sporewood")]));
+        },
+        [DRIFT_FISH, STILL_FISH],
+      );
+      for (const [id, m] of Object.entries(table)) {
+        const want = DRIFT_FISH.includes(id) ? 2 : STILL_FISH.includes(id) ? 0.5 : 1;
+        check(m === want, `${id} rides at ${m}, expected ${want}`);
+      }
+      const at = await driftPoint(session, 0.5);
+      await session.eval((p) => window.__gw.player.teleport({ x: p.x, z: p.z }, 0), at);
+      // 1. Pool rows, by day: each kind against an untagged fish (the Capshell Crayfish).
+      const day = await rollDrift(session, { light: "calm", roll: {} });
+      check(!day.float.onDrift && day.drift.onDrift, `the float did not ride: ${JSON.stringify(day)}`);
+      const f = day.float.shares,
+        d = day.drift.shares,
+        base = d.capshell_crayfish / f.capshell_crayfish,
+        kinds = Object.keys(f).filter((id) => f[id] > 0);
+      for (const id of kinds) {
+        const want = DRIFT_FISH.includes(id) ? 2 : STILL_FISH.includes(id) ? 0.5 : 1;
+        check(
+          near(d[id] / f[id] / base, want, 1e-6),
+          `${id}: ${(d[id] / f[id] / base).toFixed(4)}, expected ${want}`,
+        );
+      }
+      check(
+        kinds.some((id) => DRIFT_FISH.includes(id)) && kinds.some((id) => STILL_FISH.includes(id)),
+        `no mix of kinds here: ${kinds}`,
+      );
+      // 2. Sign and sight takes: a prerolled fry takes more surely, a still catfish less.
+      const fry = await rollDrift(session, {
+        light: "calm",
+        roll: { preroll: { speciesId: "netcloud_fry", base: 0.2 } },
+      });
+      const cat = await rollDrift(session, {
+        light: "calm",
+        roll: { preroll: { speciesId: "downcast_catfish", base: 0.45 } },
+      });
+      check(
+        near(fry.drift.preroll, Math.min(0.9, 2 * fry.float.preroll), 1e-9) &&
+          fry.drift.preroll > fry.float.preroll,
+        `fry take ${fry.float.preroll} -> ${fry.drift.preroll}`,
+      );
+      check(
+        near(cat.drift.preroll, cat.float.preroll / 2, 1e-9),
+        `catfish take ${cat.float.preroll} -> ${cat.drift.preroll}`,
+      );
+      // 3. Out of the drift: the same odds on both.
+      const out = await session.eval(([x, z]) => window.__gw.player.teleport({ x, z }, 0), [52, -14]);
+      void out;
+      const away = await rollDrift(session, { light: "calm", roll: {} });
+      check(
+        !away.drift.onDrift && sameJson(away.drift.shares, away.float.shares),
+        `out of the drift the odds moved: ${JSON.stringify(away)}`,
+      );
+      // 4. Under a lure the Drift Float does not fish.
+      const lure = await session.eval(() => {
+        const loop = window.__gw.progression.loop;
+        loop.fitDepth("drift");
+        loop.state().lures.includes("seedpod_twirl") || loop.state().lures.push("seedpod_twirl");
+        loop.changeHook({ lure: "seedpod_twirl" });
+        const fishes = loop.driftFishes();
+        loop.changeHook({ lure: null, bait: "spore_cake" });
+        loop.fitDepth("float");
+        return fishes;
+      });
+      check(lure === false, "the Drift Float fished under a lure");
+      return `drift x2, still x0.5 across ${kinds.length} kinds; takes ${fry.float.preroll} -> ${fry.drift.preroll}, ${cat.float.preroll} -> ${cat.drift.preroll}`;
+    },
+  },
+
+  {
+    name: "Drift Float: cast into the drift it rides towards the eddy, paying out line, and holds at the line's length and at the drift's end; cast beside it, it stays put",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withDriftFloat(true),
+    timeoutMs: 480_000,
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      await session.eval(() => window.__gw.progression.loop.changeHook({ bait: "spore_cake" }));
+      // 1. A cast at the line's length less 0.4 m, the raft upstream on the drift: it rides, then holds at its length.
+      const { cast: reach, ...long } = await castAndRide(session, { k: 0.8, back: null }, (f) => f.held, 40);
+      check(reach.ok, `the cast at the line's length was refused: ${JSON.stringify(reach)}`);
+      check(
+        long.first?.riding && long.last?.held && long.last.travel > 0.2 && long.last.travel < 1.2,
+        `at the line's length: ${JSON.stringify({ reach, long })}`,
+      );
+      check(
+        Math.abs(Math.hypot(long.last.x - reach.raft.x, long.last.z - reach.raft.z) - long.last.reach) < 0.25,
+        `it did not hold at the line's length: ${JSON.stringify({ reach, last: long.last })}`,
+      );
+      // 2. A cast 0.5 m short of the eddy: it rides to the drift's end and holds there.
+      await lineIn(session);
+      const { cast: end, ...ends } = await castAndRide(session, { fromEnd: 0.5, back: 8 }, (f) => f.held, 40);
+      check(end.ok, `the cast near the end was refused: ${JSON.stringify(end)}`);
+      check(
+        ends.last?.held && Math.hypot(ends.last.x - end.eddy.x, ends.last.z - end.eddy.z) < 2.2,
+        `at the drift's end: ${JSON.stringify({ end, ends })}`,
+      );
+      // 3. Cast 8 m beside the drift: a plain float, it does not move.
+      await lineIn(session);
+      const { cast: side, ...stays } = await castAndRide(
+        session,
+        { k: 0.5, back: 8, aside: 8 },
+        () => !1,
+        12,
+      );
+      check(side.ok, `the cast beside the drift was refused: ${JSON.stringify(side)}`);
+      check(
+        !stays.first?.riding &&
+          Math.hypot(stays.last.x - side.target.x, stays.last.z - side.target.z) < 0.05 &&
+          !(stays.last.travel > 0),
+        `beside the drift: ${JSON.stringify({ side, stays })}`,
+      );
+      return `held after ${long.last.travel} m at its ${long.last.reach} m line; held at the end after ${ends.last.travel} m`;
+    },
+  },
+
+  {
+    name: "seedfall: from evening 2, once an evening, ten sighs 2.2 s apart from 1 s into dusk with the first seedfall's line once and the plain line after; her time is three minutes from the first sigh; never in Mossmere, and the legend's bulb rule stands",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 480_000,
+    async run(session, { browser, page }) {
+      await session.sail({ water: "sporewood" });
+      await listenForToasts(session);
+      const none = await atDusk(session, 6, { evening: 1 });
+      check(!none.midnight?.struck, `a seedfall on evening 1: ${JSON.stringify(none.midnight)}`);
+      await atDusk(session, SEEDFALL.at - 0.5, { evening: 2 });
+      const struck = [];
+      for (let k = 0; k < SEEDFALL.strokes; k++) {
+        const now = await atDusk(session, SEEDFALL.at + k * SEEDFALL.gap + 0.05);
+        struck.push(now.midnight?.struck ?? 0);
+      }
+      check(sameJson(struck, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), `sighs counted at each due time: ${struck}`);
+      let toasts = await toastsSeen(session);
+      check(
+        toasts.filter((t) => t === SEEDFALL_FIRST).length === 1 && !toasts.includes(SEEDFALL_LINE),
+        `the first seedfall's line: ${JSON.stringify(toasts)}`,
+      );
+      // Once an evening: back before the sighs and through them again, nothing more.
+      await atDusk(session, SEEDFALL.at + 0.05);
+      const again = await atDusk(session, SEEDFALL.at + 4);
+      toasts = await toastsSeen(session);
+      check(
+        again.midnight.struck === SEEDFALL.strokes && toasts.filter((t) => t === SEEDFALL_FIRST).length === 1,
+        `the seedfall came again: ${JSON.stringify({ again, toasts })}`,
+      );
+      // Her time: from the first sigh for three minutes, through dusk into the night (dusk is 20 s long).
+      const open = await session.eval(
+        async ([sf]) => {
+          const g = window.__gw,
+            D = g.data,
+            run = g.state.run,
+            at = (phase, t) => {
+              run.phase = phase;
+              run.phaseTime = t;
+              return { clock: D.huntClock(run, D.LOOP.hunts.sporewood.time), open: D.herTimeOpen(run) };
+            },
+            out = {
+              before: at("dusk", sf.at - 0.2),
+              first: at("dusk", sf.at + 0.1),
+              dark: at("gloomtide", 5),
+              last: at("gloomtide", sf.at + sf.herTime - sf.dusk - 0.2),
+              after: at("gloomtide", sf.at + sf.herTime - sf.dusk + 0.3),
+            };
+          g.debug.setPhase("gloomtide");
+          run.phaseTime = sf.at + sf.herTime - sf.dusk + 1;
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          return out;
+        },
+        [SEEDFALL],
+      );
+      check(
+        !open.before.open && open.first.open && open.dark.open && open.last.open && !open.after.open,
+        `her time: ${JSON.stringify(open)}`,
+      );
+      check(
+        near(open.dark.clock, SEEDFALL.dusk + 5, 1e-9),
+        `the clock runs on into the night: ${JSON.stringify(open)}`,
+      );
+      toasts = await toastsSeen(session);
+      check(toasts.includes(SEEDFALL_STILL), `the end of her time has no line: ${JSON.stringify(toasts)}`);
+      // The next evening's seedfall has the plain line.
+      await atDusk(session, SEEDFALL.at - 0.5, { evening: 3 });
+      await atDusk(session, SEEDFALL.at + 0.05);
+      toasts = await toastsSeen(session);
+      check(toasts.includes(SEEDFALL_LINE), `the later seedfall's line: ${JSON.stringify(toasts)}`);
+      // The legend still takes only her Glowcap Bulb, in or out of her time.
+      const legend = await session.eval(() => {
+        const d = window.__gw.debug;
+        return {
+          bulb: d.fishLegendRoll({ place: "mothers_cup", bait: "glowcap_bulb", rolls: 0 })?.chance ?? null,
+          cake: d.fishLegendRoll({ place: "mothers_cup", bait: "spore_cake", rolls: 0 })?.chance ?? null,
+        };
+      });
+      check(legend.bulb > 0 && legend.cake === 0, `the legend's bait rule: ${JSON.stringify(legend)}`);
+      // Mossmere: no seedfall at dusk.
+      const moss = await GameSession.open(browser, {
+        page,
+        save: JSON.stringify(readFixture("mid-mossmere")),
+        debug: true,
+        viewport: VIEWPORT,
+      });
+      try {
+        await moss.boot();
+        await moss.sail();
+        const m = await atDusk(moss, SEEDFALL.at + 3, { evening: 4 });
+        check(!m.midnight?.struck && !m.drift?.pods, `a seedfall in Mossmere: ${JSON.stringify(m)}`);
+        await moss.collectGameErrors();
+        check(!moss.errors.length, `errors in Mossmere: ${moss.errors.join("; ")}`);
+      } finally {
+        await moss.close();
+      }
+      return `none on evening 1; ten sighs on evening 2, her time ${open.first.clock.toFixed(1)} to ${open.last.clock.toFixed(1)} s`;
+    },
+  },
+
+  {
+    name: "Seed Pouch: in the seedfall and her time the raft gathers each pod within 3 m as a Capseed, up to three, with the first one's line; without the pouch pods just drift",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withDriftFloat(false),
+    timeoutMs: 480_000,
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      await listenForToasts(session);
+      // Without the pouch: a pod floats by and nothing is gathered.
+      await session.eval(() => {
+        const L = window.__gw.progression.loop.state();
+        L.parts = L.parts.filter((id) => id !== "seed_pouch");
+      });
+      const plain = await gatherAt(session, 0, { evening: 4, tau: 45 });
+      check(
+        plain.capseed === 0 && !plain.taken.length,
+        `gathered without the pouch: ${JSON.stringify(plain)}`,
+      );
+      // The pouch given away from the pods, before the next evening's seedfall.
+      await session.eval(() => {
+        const g = window.__gw;
+        g.player.teleport({ x: 42, z: 20 }, 0);
+        g.debug.setPhase("calm");
+        g.progression.loop.state().parts.push("seed_pouch");
+      });
+      // Pods from sighs far apart (the 1st, 6th and 10th), so each is gathered alone; then a fourth with a full pouch.
+      const got = [];
+      for (const [k, i] of [0, 7, 13, 3].entries())
+        got.push(await gatherAt(session, i, { evening: 5, tau: 45 + k, empty: k === 0 }));
+      // Every pod in reach is gathered, one Capseed each, until the pouch holds three; then none.
+      check(
+        got[0].capseed >= 1 &&
+          got.every((g, k) => g.capseed === g.taken.length && (k === 0 || g.capseed >= got[k - 1].capseed)) &&
+          got[got.length - 1].capseed === 3,
+        `gathered: ${JSON.stringify(got)}`,
+      );
+      // Pods more than 3 m off are left alone (a fresh evening, room in the pouch).
+      const far = await gatherAt(session, 13, { evening: 6, tau: 45, off: 6, empty: true });
+      check(far.nearest > 3 && far.capseed === 0, `a pod over 3 m off was gathered: ${JSON.stringify(far)}`);
+      // After her time, pods sink and are not gathered.
+      const late = await gatherAt(session, 1, { evening: 7, tau: SEEDFALL.herTime + 1, empty: true });
+      check(late.capseed === 0, `a pod gathered after her time: ${JSON.stringify(late)}`);
+      const toasts = await toastsSeen(session);
+      check(
+        toasts.filter((t) => t === CAPSEED_FIRST).length === 1,
+        `the first Capseed's line: ${JSON.stringify(toasts)}`,
+      );
+      return `pods gathered ${got.map((g) => g.capseed).join(", ")}`;
+    },
+  },
+
+  {
+    name: "Seed Pouch: a Capseed fits, who bites follows its column, the bait chip counts it, and Capseeds spoil at the tally with a line",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave: withDriftFloat(false),
+    timeoutMs: 600_000,
+    async run(session) {
+      await session.sail({ water: "sporewood" });
+      const r = await session.eval(() => {
+        const g = window.__gw,
+          loop = g.progression.loop,
+          d = g.debug;
+        g.state.run.bait.capseed = 2;
+        const fit = loop.changeHook({ bait: "capseed" });
+        d.setPhase("calm");
+        const cake = d.fishPoolRoll(1, { bait: "spore_cake" }).shares,
+          seed = d.fishPoolRoll(1, { bait: "capseed" }).shares;
+        return { fit, cake, seed, takers: g.data.CATCH_V3?.items?.capseed?.species ?? [] };
+      });
+      check(r.fit?.ok === true && r.fit.count === 2, `a Capseed did not fit: ${JSON.stringify(r.fit)}`);
+      check(
+        r.takers.includes("sporebelly_puffer") &&
+          r.takers.includes("velvet_ray") &&
+          !r.takers.includes("lostsea_mackerel"),
+        `the Capseed's takers: ${r.takers}`,
+      );
+      const seen = Object.keys(r.seed).filter((id) => r.seed[id] > 0);
+      check(
+        seen.length > 0 && seen.every((id) => CAPSEED_FISH.includes(id)),
+        `bites on a Capseed: ${JSON.stringify(r.seed)}`,
+      );
+      check(
+        Object.keys(r.cake).some((id) => r.cake[id] > 0 && !CAPSEED_FISH.includes(id)),
+        `every Spore Cake fish takes a Capseed here, so the test proves nothing: ${JSON.stringify(r.cake)}`,
+      );
+      const tray = await rigTray(session, "bait");
+      await closeTackle(session);
+      check(
+        tray?.chips.some((c) => c.key === "capseed" && c.on) &&
+          /Capseed/.test(tray.text.capseed) &&
+          /2/.test(tray.text.capseed),
+        `the bait tray: ${JSON.stringify(tray)}`,
+      );
+      check(sameJson(tray.lines, [CAPSEED_GOOD, CAPSEED_COST]), `the Capseed's lines: ${tray.lines}`);
+      // The tally: they spoil, with a line, and the hook goes back to a bait in stock.
+      await session.eval(() => window.__gw.player.teleport({ x: 42, z: 20 }, 0));
+      const card = await tallyCardText(session);
+      const after = await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        return {
+          capseed: s.bait?.sporewood?.capseed ?? 0,
+          fitted: s.fitted?.bait ?? null,
+          spoiled: s.lastTrip?.spoiled ?? 0,
+        };
+      });
+      check(card.includes(CAPSEED_SPOILED), `the tally card: ${card}`);
+      check(
+        after.capseed === 0 && after.spoiled === 2 && after.fitted === "spore_cake",
+        `after the tally: ${JSON.stringify(after)}`,
+      );
+      return `${seen.length} kinds bite a Capseed here; spoiled ${after.spoiled}`;
+    },
+  },
+  {
+    name: "rig picture in Sporewood: with the Drift Float its Depth part offers the Cork Float and the Drift Float with their lines and draws the quill and its sail; a Capseed is drawn on the hook",
+    fixture: "sporewood-crossed",
+    debug: true,
+    editSave(save) {
+      withDriftFloat(true)(save);
+      save.meta.loop.bait.sporewood = { ...save.meta.loop.bait.sporewood, capseed: 2 };
+      save.meta.loop.fitted = { ...save.meta.loop.fitted, bait: "capseed", lure: null };
+    },
+    async run(session) {
+      await session.toHome();
+      const row = await depthRow(session);
+      await closeTackle(session);
+      check(
+        sameJson(row?.chips, [
+          { key: "cork_float", on: false },
+          { key: DRIFT_FLOAT, on: true },
+        ]),
+        `the Depth row: ${JSON.stringify(row)}`,
+      );
+      check(sameJson(row.lines, [DRIFT_GOOD, DRIFT_COST]), `the Drift Float's lines: ${row.lines}`);
+      const r = await rigScreen(session);
+      const quill = await session.eval(() => ({
+        sail: !!document.querySelector(".gw-rig .gw-rig-moss"),
+        depth: document.querySelector(".gw-rig")?.dataset.depth ?? null,
+      }));
+      await closeTackle(session);
+      check(
+        sameJson(
+          r.nodes.map((n) => n.part),
+          ["rod", "reel", "line", "depth", "bait"],
+        ) &&
+          r.nodes[3].key === DRIFT_FLOAT &&
+          r.nodes[4].key === "capseed" &&
+          r.drawn.cork &&
+          !r.drawn.lead &&
+          quill.sail,
+        `the picture: ${JSON.stringify({ r, quill })}`,
+      );
+      return `${r.nodes.map((n) => `${n.part}:${n.name}`).join(", ")}`;
+    },
+  },
+
+  {
+    name: "Sporewood saves: an old save loads with the Cork Float and its sales read from what it holds; the Drift Float fitted and the pouch survive a save and reload",
+    fixture: "sporewood-crossed",
+    debug: true,
+    async run(session, { fixture, page, browser }) {
+      await session.toHome();
+      const old = await session.eval(() => {
+        const s = window.__gw.progression.loop.state();
+        return { sold: s.sold, depth: s.fitted.depth, parts: s.parts, bait: s.bait.sporewood };
+      });
+      check(
+        sameJson(old.sold, ["mossmere", "sporewood"]) &&
+          old.depth === "float" &&
+          !old.parts.includes(DRIFT_FLOAT) &&
+          sameJson(old.bait, fixture.meta.loop.bait.sporewood),
+        `the old save: ${JSON.stringify(old)}`,
+      );
+      await session.eval(() => {
+        const L = window.__gw.progression.loop;
+        L.state().parts.push("drift_float", "seed_pouch");
+        L.fitDepth("drift");
+      });
+      await session.sail({ water: "sporewood" });
+      const saved = await session.saved();
+      const again = await GameSession.open(browser, { page, save: saved, debug: true, viewport: VIEWPORT });
+      try {
+        await again.boot();
+        // Saved on the water, so Continue goes back out on it.
+        await again.sail({ water: "sporewood" });
+        const back = await again.eval(() => {
+          const s = window.__gw.progression.loop.state();
+          return {
+            depth: s.fitted.depth,
+            parts: s.parts,
+            sold: s.sold,
+            rigs: s.rigs.map((r) => r.depth),
+            fishes: window.__gw.progression.loop.driftFishes(),
+          };
+        });
+        check(
+          back.depth === "drift" &&
+            back.fishes === true &&
+            back.parts.includes(DRIFT_FLOAT) &&
+            back.parts.includes(SEED_POUCH) &&
+            back.rigs.includes("drift"),
+          `after a reload: ${JSON.stringify(back)}`,
+        );
+        await again.collectGameErrors();
+        check(!again.errors.length, `errors after reloading: ${again.errors.join("; ")}`);
+      } finally {
+        await again.close();
+      }
+      return `old save sold in ${old.sold.join(" and ")}; the Drift Float stays fitted`;
     },
   },
   {
@@ -5672,7 +6625,7 @@ const SCENARIOS = [
   },
 
   {
-    name: "tackle arrival in Sporewood: one piece a tally, the Burl Hook, the Brass Trace and the Mossthread Snood on quiet tallies in that order; a toothy fish brings the trace sooner and a catfish that ran the hook; never Mossmere's parts",
+    name: "tackle arrival in Sporewood: one piece a tally, the Burl Hook, the Brass Trace and the Mossthread Snood on quiet tallies in that order once Murk's two gifts are given; a toothy fish brings the trace sooner and a catfish that ran the hook; never Mossmere's parts",
     fixture: "sporewood-crossed",
     debug: true,
     timeoutMs: 420_000,
@@ -5682,14 +6635,17 @@ const SCENARIOS = [
         const g = window.__gw.data,
           arrive = g.rigArrivalAtTally,
           beat = g.noteArrivalBeat,
-          loop = (parts = []) => ({
-            parts: ["cork_float", "plain_knot", "mere_hook", ...parts],
+          // Murk's two gifts there (the Drift Float, the Seed Pouch) given: quiet tallies wait for them.
+          loop = (parts = [], gifts = ["drift_float", "seed_pouch"]) => ({
+            parts: ["cork_float", "plain_knot", "mere_hook", ...gifts, ...parts],
             arrivals: { seq: 0, beats: {}, shelved: [] },
             hunt: {},
           }),
           tallies = (l, n, water = "sporewood") => Array.from({ length: n }, () => arrive(l, water));
         const out = {};
-        let l = loop();
+        let l = loop([], ["drift_float"]);
+        out.waits = tallies(l, 2);
+        l = loop();
         out.quiet = tallies(l, 4);
         out.shelf = [...l.arrivals.shelved];
         // A toothy fish first: the trace, then the hook and the snood.
@@ -5719,6 +6675,7 @@ const SCENARIOS = [
       });
       const key = (a) => (a ? `${a.gift}:${a.giftSay}` : null);
       const seq = (list) => JSON.stringify(list.map(key));
+      check(seq(r.waits) === "[null,null]", `before the Seed Pouch: ${seq(r.waits)}`);
       check(
         seq(r.quiet) === '["burl_hook:quiet","brass_trace:quiet","mossthread_snood:quiet",null]' &&
           sameJson(r.shelf, ["burl_hook", "brass_trace", "mossthread_snood"]),
@@ -5759,15 +6716,17 @@ const SCENARIOS = [
         beats.brass_trace > 0 && beats.burl_hook > beats.brass_trace && !beats.mossthread_snood,
         `the beats on the water: ${JSON.stringify(beats)}`,
       );
-      return "quiet: hook, trace, snood; a beat first goes first; Mossmere's and Sporewood's beats stay in their own lake";
+      return "quiet tallies wait for the gifts, then hook, trace, snood; a beat first goes first; Mossmere's and Sporewood's beats stay in their own lake";
     },
   },
 
   {
-    name: "tackle arrival at a Sporewood tally: the Brass Trace after a puffer with Murk's line, the Burl Hook on the next quiet tally, then the Mossthread Snood; on the shelf at 230, 150 and 230, and kept after a reload",
+    name: "tackle arrival at a Sporewood tally: with Murk's two gifts given, the Brass Trace after a puffer with Murk's line, the Burl Hook on the next quiet tally, then the Mossthread Snood; on the shelf at 230, 150 and 230, and kept after a reload",
     fixture: "sporewood-crossed",
     debug: true,
     timeoutMs: 900_000,
+    // The Drift Float and the Seed Pouch already given, so no tally here is a gift's.
+    editSave: withSporeParts([DRIFT_FLOAT, SEED_POUCH]),
     async run(session, { page, browser }) {
       await session.sail(SLOW_SAIL);
       await session.catchFish("sporebelly_puffer");
@@ -8992,33 +9951,75 @@ const SCENARIOS = [
   },
 
   {
-    name: "practice orders: Sporewood's board is unchanged by Mossmere's parts, every one owned and ready (its own parts' orders are checked with its tackle)",
+    name: "practice orders: in Sporewood Mossmere's parts post none, and Murk's two gifts there post theirs, a drift fish caught in the spore drift and a fish taken on a Capseed, each filled only the stated way",
     fixture: "sporewood-crossed",
     async run(session) {
       await session.boot();
       await practiceKit(session);
-      const r = await session.eval((ALL) => {
-        const P = window.__practice,
-          board = (parts) => {
-            const seeded = P.rng(4242),
-              seq = [];
-            for (let k = 0; k < 200; k++) {
-              const l = P.loop({ board: 2, parts });
-              P.refill(l, seeded, "sporewood");
-              seq.push(l.orders.map((o) => `${o.speciesId}:${o.kind}:${o.water ?? ""}`).join("|"));
-            }
-            return seq;
-          },
-          none = board([]),
-          all = board(ALL);
-        return {
-          same: JSON.stringify(none) === JSON.stringify(all),
-          rig: all.join("|").includes(":rig:"),
-          filled: all.filter(Boolean).length,
-        };
-      }, PRACTICE_PARTS);
-      check(r.same && !r.rig && r.filled === 200, `Sporewood's board: ${JSON.stringify(r)}`);
-      return "the same seeded orders with and without the parts, none a practice order";
+      const r = await session.eval(
+        ([ALL, OWN]) => {
+          const P = window.__practice,
+            D = P.D,
+            board = (parts) => {
+              const seeded = P.rng(4242),
+                seq = [];
+              for (let k = 0; k < 200; k++) {
+                const l = P.loop({ board: 2, parts });
+                P.refill(l, seeded, "sporewood");
+                seq.push(...l.orders);
+              }
+              return seq;
+            },
+            none = board([]).map((o) => `${o.speciesId}:${o.kind}`),
+            moss = board(ALL).map((o) => `${o.speciesId}:${o.kind}`),
+            own = board(OWN).filter((o) => o.kind === "rig"),
+            byPart = {};
+          for (const o of own) (byPart[o.part] ||= new Set()).add(`${o.speciesId}|${JSON.stringify(o.rig)}`);
+          const text = own.slice(0, 40).map((o) => D.orderBoardText(D, o));
+          return {
+            same: JSON.stringify(none) === JSON.stringify(moss),
+            mossRig: moss.some((o) => o.endsWith(":rig")),
+            parts: Object.fromEntries(Object.entries(byPart).map(([k, v]) => [k, [...v]])),
+            text: [...new Set(text)],
+            match: {
+              drift: D.castRigMatches({ depth: "drift" }, { drift: true, lead: false, bait: "spore_cake" }),
+              float: D.castRigMatches({ depth: "drift" }, { drift: false, lead: false, bait: "spore_cake" }),
+              lead: D.castRigMatches({ depth: "drift" }, { drift: false, lead: true, bait: "spore_cake" }),
+              seed: D.castRigMatches({ bait: "capseed" }, { drift: false, bait: "capseed" }),
+              cake: D.castRigMatches({ bait: "capseed" }, { drift: true, bait: "spore_cake" }),
+              bottom: D.castRigMatches({ depth: "bottom" }, { drift: true, lead: false }),
+            },
+          };
+        },
+        [PRACTICE_PARTS, [DRIFT_FLOAT, SEED_POUCH]],
+      );
+      check(r.same && !r.mossRig, `Mossmere's parts moved Sporewood's board: ${JSON.stringify(r)}`);
+      const want = {
+        drift_float: ["netcloud_fry", "falsesmile_barb", "lostsea_mackerel"],
+        seed_pouch: ["sporebelly_puffer", "falsesmile_barb", "velvet_ray"],
+      };
+      for (const [part, fish] of Object.entries(want)) {
+        const seen = r.parts[part] || [];
+        check(seen.length > 0, `no ${part} order in 200 refills: ${JSON.stringify(r.parts)}`);
+        for (const entry of seen) {
+          const [id, rig] = entry.split("|");
+          check(fish.includes(id), `${part} named ${id}`);
+          check(
+            rig === (part === DRIFT_FLOAT ? '{"depth":"drift"}' : '{"bait":"capseed"}'),
+            `${part}'s order asks ${rig}`,
+          );
+        }
+      }
+      check(
+        r.text.some((t) => /^An? .+, caught in the spore drift\.$/.test(t)) &&
+          r.text.some((t) => /^An? .+, taken on a Capseed\.$/.test(t)),
+        `the board's words: ${JSON.stringify(r.text)}`,
+      );
+      check(
+        sameJson(r.match, { drift: true, float: false, lead: false, seed: true, cake: false, bottom: false }),
+        `which catches fill them: ${JSON.stringify(r.match)}`,
+      );
+      return r.text.slice(0, 2).join(" / ");
     },
   },
 
