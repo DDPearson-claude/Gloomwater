@@ -10696,6 +10696,200 @@ const SCENARIOS = [
     },
   },
   {
+    name: "controller alone in Murk's Tackle tab, at 1280 x 800 ratio 2 and at 844 x 390: A opens a part's tray, the d-pad keeps to it and stops on its last option with the A ring beside it, B closes it back to its part and the page does not turn, left from Rig 1 stays on the picture, A buys in a tray, and a part's kind is at least 13 px",
+    fixture: "mid-mossmere",
+    debug: true,
+    open: { viewport: { width: 1280, height: 800 }, scale: 2, init: [GAMEPAD_INIT] },
+    timeoutMs: 600_000,
+    async run(session) {
+      // The CPU-drawn 3D picture is skipped, as in "controller alone"; the book and the controller run as they do.
+      await session.eval(() => (window.__gw.render.render = () => {}));
+      await session.toHome();
+      await session.closeGuides(4000);
+      await session.eval(() => window.__padConnect());
+      const HOST = RIG_HOST.shop;
+      // What a controller player sees of the book: its top screen, the pages showing and the chapter lit, the open
+      // tray, the focus (a part, a rig tab, or which of the tray's options) and the A ring's box beside it.
+      const look = () =>
+        session.eval((sel) => {
+          const open = [...document.querySelectorAll(".gw-modal-layer > .gw-modal")].filter(
+            (m) => !m.classList.contains("gw-out") && !m.dataset.held,
+          );
+          const host = document.querySelector(sel),
+            f = document.querySelector(".gw-padfocus"),
+            ring = [...document.querySelectorAll(".gw-padg.gw-on")].find((c) => c.textContent === "A"),
+            opts = [...(host?.querySelectorAll(".gw-rig-tray button.gw-rig-opt") ?? [])],
+            box = (el) => {
+              const r = el?.getBoundingClientRect();
+              return r ? { l: r.left, t: r.top, r: r.right, b: r.bottom } : null;
+            };
+          return {
+            top: open.at(-1)?.dataset.modal ?? null,
+            pages: [...document.querySelectorAll(".gw-mb-page")]
+              .filter((p) => p.getBoundingClientRect().width > 0)
+              .map((p) => p.dataset.page)
+              .join(","),
+            chapter: document.querySelector(".gw-book-tab[aria-selected=true]")?.textContent.trim() ?? null,
+            tray: host?.querySelector(".gw-rig-tray")?.dataset.part ?? null,
+            focus: f
+              ? (f.getAttribute("aria-label") || f.textContent).trim().replace(/\s+/g, " ").slice(0, 40)
+              : null,
+            node: f?.classList.contains("gw-rig-node") ? f.dataset.part : null,
+            inTray: !!f?.closest(".gw-rig-tray"),
+            opt: f ? opts.indexOf(f) : -1,
+            opts: opts.length,
+            fbox: box(f),
+            ring: box(ring),
+          };
+        }, HOST);
+      let v;
+      const press = async (button) => {
+        await padPress(session, button);
+        await session.pause(350);
+        return (v = await look());
+      };
+      // Presses `button` until `ok` holds, at most `limit` times.
+      const pressTo = async (ok, button, what, limit = 10) => {
+        const path = [(v = await look()).focus];
+        for (let i = 0; i < limit && !ok(v); i++) path.push((await press(button)).focus);
+        check(
+          ok(v),
+          `the d-pad (${button}) did not reach ${what}: ${path.join(" > ")}; ${JSON.stringify(v)}`,
+        );
+      };
+      const ringBeside = (x) =>
+        !!x.ring &&
+        !!x.fbox &&
+        x.ring.r <= x.fbox.l + 1 &&
+        x.ring.l >= 0 &&
+        (x.ring.t + x.ring.b) / 2 > x.fbox.t &&
+        (x.ring.t + x.ring.b) / 2 < x.fbox.b;
+      const results = [];
+      for (const size of [
+        { width: 1280, height: 800 },
+        { width: 844, height: 390 },
+      ]) {
+        const at = `${size.width} x ${size.height}`;
+        await session.page.setViewportSize(size);
+        await session.pause(800);
+        await session.eval(() => window.__gw.ui.loop.openShelf({ tab: "tackle" }));
+        await session.waitFor("Murk's Tackle tab", 15_000, (sel) => !!document.querySelector(sel), HOST);
+        await session.pause(1500);
+        // Nothing he sells for the tackle is in the purse's reach, so no tray opens by itself: the d-pad goes to
+        // the bait's part (the longest tray, its lures) and A opens it at his goods.
+        await pressTo((x) => x.node === "bait", "DOWN", `the bait's part (${at})`);
+        const spread = { pages: v.pages, chapter: v.chapter };
+        check(
+          v.top === "shelf" && !v.tray && /^\d/.test(v.pages),
+          `Murk's book at ${at}: ${JSON.stringify(v)}`,
+        );
+        await press("A");
+        await session.pause(600);
+        check(
+          ((v = await look()), v.tray === "bait" && v.inTray && v.opts >= 4),
+          `A on the bait's part at ${at}: ${JSON.stringify(v)}`,
+        );
+        // Down to the last option, and down once more stays there, with the A ring beside it.
+        await pressTo((x) => x.opt === x.opts - 1, "DOWN", `the tray's last option (${at})`, 20);
+        await press("DOWN");
+        await session.pause(400);
+        v = await look();
+        check(
+          v.tray === "bait" && v.opt === v.opts - 1 && ringBeside(v),
+          `the tray's last option at ${at}: ${JSON.stringify(v)}`,
+        );
+        const last = { n: v.opts, gap: Math.round(v.fbox.l - v.ring.r) };
+        // Left and right keep to the tray and do not turn the page.
+        for (const b of ["LEFT", "RIGHT"]) {
+          await press(b);
+          check(
+            v.tray === "bait" && v.opt === v.opts - 1 && v.pages === spread.pages,
+            `${b} in the bait's tray at ${at}: ${JSON.stringify(v)}`,
+          );
+        }
+        // B closes the tray back to its part; the book stays open on the same pages.
+        await press("B");
+        await session.pause(500);
+        v = await look();
+        check(
+          v.top === "shelf" &&
+            !v.tray &&
+            v.node === "bait" &&
+            v.pages === spread.pages &&
+            v.chapter === spread.chapter,
+          `B in the bait's tray at ${at}: ${JSON.stringify(v)} (the book showed ${JSON.stringify(spread)})`,
+        );
+        // Left from Rig 1 stays on it; right steps to Rig 2.
+        await pressTo((x) => /^Rig 1\b/.test(x.focus ?? ""), "UP", `Rig 1 (${at})`);
+        await press("LEFT");
+        check(
+          /^Rig 1\b/.test(v.focus ?? "") && v.pages === spread.pages,
+          `left from Rig 1 at ${at}: ${JSON.stringify(v)}`,
+        );
+        await press("RIGHT");
+        check(/^Rig 2\b/.test(v.focus ?? ""), `right from Rig 1 at ${at}: ${JSON.stringify(v)}`);
+        results.push(`${at}: the bait's tray ends on option ${last.n}, the A ring ${last.gap} px left of it`);
+        if (size.width === 844) {
+          // A chooses in a tray: the rod's tray, its next rod bought with A. With nothing more for the rod on his
+          // shelf, the part shows its kind, at least 13 px and clear of the drawing.
+          await pressTo((x) => x.node === "rod", "DOWN", `the rod's part (${at})`);
+          await press("A");
+          await session.pause(600);
+          await pressTo(
+            (x) => x.inTray && x.opt === x.opts - 1,
+            "DOWN",
+            `the rod's tray's last option (${at})`,
+          );
+          const rod = await session.eval(
+            (sel) => document.querySelector(`${sel} .gw-padfocus`)?.dataset.buy ?? null,
+            HOST,
+          );
+          check(rod?.startsWith("rod:"), `the rod's tray ends on ${rod}`);
+          await session.eval(() => window.__gw.debug.loop.giveClams(500));
+          const had = await session.eval(() => window.__gw.progression.loop.state().clams);
+          await press("A");
+          await session.pause(1200);
+          const bought = await session.eval(
+            (id) =>
+              window.__gw.progression.loop
+                .shelf()
+                .tabs.find((t) => t.id === "tackle")
+                .items.some((c) => c.id === id && c.bought === true),
+            rod,
+          );
+          const paid = had - (await session.eval(() => window.__gw.progression.loop.state().clams));
+          check(bought && paid > 0, `A on ${rod}: bought ${bought}, paid ${paid}`);
+          await press("B");
+          await session.pause(500);
+          const kind = await session.eval((sel) => {
+            const b = document.querySelector(`${sel} .gw-rig-node[data-part="rod"]`),
+              k = b?.querySelector(".gw-rig-kind"),
+              r = k?.getBoundingClientRect();
+            if (!r) return null;
+            const drawn = new Set();
+            for (let x = r.left + 0.5; x < r.right; x += 2)
+              for (let y = r.top + 0.5; y < r.bottom; y += 2)
+                for (const el of document.elementsFromPoint(x, y))
+                  if (el instanceof SVGElement && el.closest(".gw-rig") && el.tagName !== "svg") {
+                    const c = el.getAttribute("class") || el.tagName;
+                    /gw-rig-(band|bed|hit)/.test(c) || drawn.add(c);
+                  }
+            return { text: k.textContent, px: parseFloat(getComputedStyle(k).fontSize), drawn: [...drawn] };
+          }, HOST);
+          check(
+            kind && kind.text === "Rod" && kind.px >= 13 && !kind.drawn.length,
+            `the rod's kind at ${at}: ${JSON.stringify(kind)}`,
+          );
+          results.push(`the rod bought by A for ${paid}; its kind ${kind.px} px`);
+        }
+        await press("B");
+        await session.pause(800);
+        check((v = await look()).top === "jetty", `B on the picture at ${at} left ${v.top} open`);
+      }
+      return results.join("; ");
+    },
+  },
+  {
     name: "real time at 144 Hz: on a 144 Hz screen the dusk, a strike window, a fight, its landing and the raft's sailing speed take the same real time as at 60 Hz",
     fixture: "mid-mossmere",
     debug: true,

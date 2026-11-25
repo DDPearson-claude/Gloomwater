@@ -64686,7 +64686,24 @@ function x9(
       M(J === iy ? "ArrowLeft" : "ArrowRight", Ne);
       return;
     }
+    // A part of a screen may steer the d-pad itself (the rig picture and its trays on Murk's Tackle tab and the
+    // Sheet's Tackle page): the focus is sent a "gw-padmove" event first. A handler that takes the move (or keeps
+    // the focus where it is) cancels it; one that lets it go on may name controls it must not land on (detail.skip).
+    let skip = null;
+    if (Ne?.isConnected && pe.contains(Ne) && typeof a.CustomEvent == "function") {
+      let detail = { dir: J === b9 ? "up" : J === Pk ? "down" : J === iy ? "left" : "right", skip: null };
+      if (!Ne.dispatchEvent(new a.CustomEvent("gw-padmove", { bubbles: !0, cancelable: !0, detail }))) {
+        let now = s.activeElement;
+        now && now !== Ne && pe.contains(now) && B(now) && Z(now, !1);
+        return;
+      }
+      skip = detail.skip;
+    }
     let Xe = j(pe);
+    if (skip) {
+      let ok = Xe.els.map((el) => el === Ne || !el.matches(skip));
+      Xe = { els: Xe.els.filter((_el, k) => ok[k]), rects: Xe.rects.filter((_r, k) => ok[k]) };
+    }
     if (!Xe.els.length) return;
     let lt = Ne ? Xe.els.indexOf(Ne) : -1;
     if (lt < 0) {
@@ -167254,6 +167271,8 @@ div.gw-rig-shop { cursor: default; opacity: .8; }
   --ink-line: rgba(38, 29, 44, .3); --ink-ghost: rgba(38, 29, 44, .1); --glow: rgba(168, 96, 22, .3); --glow-soft: rgba(168, 96, 22, .22);
   --ink-shadow: 0 0 0 transparent; --veil-rgb: 238, 228, 210; color: var(--ink); }
 .gw-rig-paper .gw-rig-tray { padding: 4px 2px; background: var(--cat-paper, rgb(238, 228, 210)); }
+/* an option's drawing starts 6px in (as on a narrow page), so a controller's A ring fits beside the option, on the page */
+.gw-rig-paper .gw-rig-opt { padding-left: 6px; }
 .gw-rig-paper .gw-rig-bed { fill: rgba(38, 29, 44, .14); }
 .gw-rig-paper .gw-rig-band--0 { fill: rgba(70, 96, 140, .07); }
 .gw-rig-paper .gw-rig-band--1 { fill: rgba(70, 96, 140, .13); }
@@ -167912,23 +167931,69 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
     } catch {}
     return tray;
   }
+  // What the arrow keys and the d-pad move through on a page that embeds the rig picture, a row at a time: in an
+  // open tray its Back, then each option; else the rig tabs, then each part.
+  function rigRows(root, trayEl) {
+    return (
+      trayEl
+        ? [
+            [...trayEl.querySelectorAll(".gw-rig-back")],
+            ...[...trayEl.querySelectorAll("button.gw-rig-opt")].map((b) => [b]),
+          ]
+        : [
+            [...root.querySelectorAll(".gw-rig-tab")],
+            ...[...root.querySelectorAll(".gw-rig-node")].map((b) => [b]),
+          ]
+    ).filter((r) => r.length);
+  }
+  // The control in a row nearest across to `from`, and a control focused and brought into view.
+  function rigNearest(row, from) {
+    let r = from.getBoundingClientRect(),
+      mid = r.left + r.width / 2;
+    return row.reduce((best, b) => {
+      let br = b.getBoundingClientRect(),
+        d = Math.abs(br.left + br.width / 2 - mid);
+      return !best || d < best.d ? { b, d } : best;
+    }, null)?.b;
+  }
+  function rigFocus(to) {
+    try {
+      to.focus({ preventScroll: !0 }), to.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } catch {}
+    l("ui_hover", { volume: 0.3 });
+  }
+  // The d-pad or the left stick on a page that embeds the rig picture, sent by the controller as a "gw-padmove" at
+  // the focus. In an open tray up and down move between Back and its options and stop at either end, and left and
+  // right do nothing: the tray is left by Back, or B. On the picture left and right step through Rig 1 to 3 and then
+  // the parts and stop at either end; up and down move as the arrow keys do, and past the top or the bottom the move
+  // goes on as usual but never onto a page-turn arrow (only the bumpers turn the page). Returns true when taken here.
+  function rigPad(root, dir, detail = {}) {
+    let now = typeof document < "u" ? document.activeElement : null;
+    if (!root?.isConnected || !now || !root.contains(now)) return !1;
+    let trayEl = root.querySelector(".gw-rig-tray"),
+      rows = rigRows(root, trayEl),
+      at = rows.findIndex((r) => r.includes(now)),
+      to = null;
+    if (at < 0) return (detail.skip = ".gw-mb-turn"), !1;
+    if (dir === "left" || dir === "right") {
+      if (trayEl) return !0;
+      let seq = rows.flat();
+      to = seq[seq.indexOf(now) + (dir === "right" ? 1 : -1)] || null;
+    } else {
+      let next = at + (dir === "down" ? 1 : -1);
+      if (next < 0 || next >= rows.length) return trayEl ? !0 : ((detail.skip = ".gw-mb-turn"), !1);
+      to = rigNearest(rows[next], now);
+    }
+    to && to !== now && rigFocus(to);
+    return !0;
+  }
   // A key on a page that embeds the rig picture (Murk's Tackle tab): up and down move between the rig tabs and the
   // parts, or, in an open tray, between Back and its options, each brought into view. Returns true when handled.
   function rigKey(root, code) {
     let dir = { ArrowUp: -1, KeyW: -1, ArrowDown: 1, KeyS: 1 }[code];
     if (!dir || !root?.isConnected) return !1;
     let trayEl = root.querySelector(".gw-rig-tray"),
-      rows = (
-        trayEl
-          ? [
-              [...trayEl.querySelectorAll(".gw-rig-back")],
-              ...[...trayEl.querySelectorAll("button.gw-rig-opt")].map((b) => [b]),
-            ]
-          : [
-              [...root.querySelectorAll(".gw-rig-tab")],
-              ...[...root.querySelectorAll(".gw-rig-node")].map((b) => [b]),
-            ]
-      ).filter((r) => r.length);
+      rows = rigRows(root, trayEl);
     if (!rows.length) return !1;
     let now = document.activeElement,
       at = rows.findIndex((r) => r.includes(now)),
@@ -167948,22 +168013,9 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
         : root.querySelector(".gw-rig-node") || rows[0][0];
     else {
       let next = Math.max(0, Math.min(rows.length - 1, at + dir));
-      if (next !== at) {
-        let r = now.getBoundingClientRect(),
-          mid = r.left + r.width / 2;
-        to = rows[next].reduce((best, b) => {
-          let br = b.getBoundingClientRect(),
-            d = Math.abs(br.left + br.width / 2 - mid);
-          return !best || d < best.d ? { b, d } : best;
-        }, null)?.b;
-      }
+      next !== at && (to = rigNearest(rows[next], now));
     }
-    if (to && to !== now) {
-      try {
-        to.focus({ preventScroll: !0 }), to.scrollIntoView({ block: "nearest", inline: "nearest" });
-      } catch {}
-      l("ui_hover", { volume: 0.3 });
-    }
+    to && to !== now && rigFocus(to);
     return !0;
   }
   // The three saved rigs as tabs over the picture (mossmere-gear.md B6 "Saved rigs"): each its number, its name, its
@@ -168382,6 +168434,10 @@ function pV({ K: e, L: t, D: n, report: o = () => {} }) {
       `gw-rig-host gw-rig-paper${model.busy ? " gw-ts-busy" : ""}${spec.marks && !learned() ? " gw-rig-learn" : ""}`,
     );
     (root.dataset.loop = "rig-host"), (root.dataset.host = String(spec.id || ""));
+    // The controller's d-pad moves through the picture and its tray as rigPad says.
+    root.addEventListener("gw-padmove", (ev) => {
+      rigPad(root, ev.detail?.dir, ev.detail || {}) && ev.preventDefault();
+    });
     // The open tray covers the picture. The bait's tray is the lure's once a lure is on, and back.
     let bait = (p) => p === "bait" || p === "lure",
       open = st.tray
@@ -169140,7 +169196,7 @@ var Cb = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' widt
 .gw-mb-page--rig .gw-rig-host { container-type: inline-size; }
 @container (max-width: 300px) {
   .gw-rig-node { width: auto; max-width: 52%; min-height: 40px; }
-  .gw-rig-node .gw-rig-kind { font-size: 12px; }
+  .gw-rig-node .gw-rig-kind { font-size: 13px; }
   .gw-rig-node .gw-rig-name { font-size: 15px; white-space: nowrap; }
   .gw-rig-node.gw-rig-forsale { max-width: 60%; }
   .gw-rig-node .gw-rig-sale { margin-bottom: 1px; padding: 0 6px 1px; font-size: 13px; }
@@ -173767,12 +173823,14 @@ function WV(e) {
     e.openModal("shelf", Ht, {
       state: ht,
       cls: "gw-m-center gw-m-shelf gw-m-book",
-      // An open tray on the Tackle chapter's rig picture closes first, as on the tackle screen.
+      // An open tray on the Tackle chapter's rig picture closes first, as on the tackle screen: by its own Back, so
+      // the focus goes back to its part on the picture (Escape, or B on a controller).
       onEscape: () => {
-        let qt = e.entry("shelf");
-        qt?.state?.rig?.tray && qt.el?.querySelector?.(".gw-mb-page--rig .gw-rig-tray")
-          ? ((qt.state.rig.tray = null), qt.render())
-          : wt("shelf");
+        let qt = e.entry("shelf"),
+          back = qt?.state?.rig?.tray
+            ? qt.el?.querySelector?.(".gw-mb-page--rig .gw-rig-tray .gw-rig-back")
+            : null;
+        back ? back.click() : wt("shelf");
       },
       onKey: (qt) => {
         if (T.onKey(qt) === !0) return !0;
@@ -179298,13 +179356,14 @@ function YV(e) {
         (we.big = null), K.render();
         return;
       }
-      // An open tray on the Sheet's rig picture closes first, as on the tackle screen.
-      if (
-        we.tab === "sheet" &&
-        we.rig?.tray &&
-        K.el?.querySelector?.(".gw-sh-sec--tackle:not([hidden]) .gw-rig-tray")
-      ) {
-        (we.rig.tray = null), K.render();
+      // An open tray on the Sheet's rig picture closes first, as on the tackle screen: by its own Back, so the
+      // focus goes back to its part on the picture.
+      let back =
+        we.tab === "sheet" && we.rig?.tray
+          ? K.el?.querySelector?.(".gw-sh-sec--tackle:not([hidden]) .gw-rig-tray .gw-rig-back")
+          : null;
+      if (back) {
+        back.click();
         return;
       }
       if (we.view === "species") {
