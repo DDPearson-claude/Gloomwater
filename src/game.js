@@ -30573,6 +30573,14 @@ Ic(vg, {
   seedfallPodAt: () => seedfallPodAt,
   huntClock: () => huntClock,
   herTimeOpen: () => herTimeOpen,
+  // Sporewood's hunt, for the scenario tests: her water on an evening, the cutscene due now, the trip's lake evening.
+  herWaterAt: () => herWaterAt,
+  huntSceneDueOf: () => huntSceneDueOf,
+  huntLakeEvening: () => huntLakeEvening,
+  chartEddiesOf: () => chartEddiesOf,
+  crackedPodHere: () => crackedPodHere,
+  legendBaitChance: () => legendBaitChance,
+  legendGrowthLandings: () => legendGrowthLandings,
   lakeGiftAtTally: () => lakeGiftAtTally,
   castRigMatches: () => castRigMatches,
   // Where the local kinds bite (wo.localKinds), for the scenario tests.
@@ -31086,10 +31094,9 @@ var O5 = {
     },
     {
       id: "drifting_grove",
-      name: "The Drifting Grove",
-      journal: "A whole meadow rides on her back. It blooms where no one sees.",
-      haunt:
-        "Crown: the Mother's Cup, the floor of the Grove Well. Sign: the pool's glimmer; the float stops as if set down.",
+      name: "Meadowback Pacu",
+      journal: "She's a pacu, the oldest fish in Sporewood. Moss and little caps grow on her back.",
+      haunt: "She feeds where the spore drift ends, just after the Mother Cap sighs.",
       play: "Leaper. Authored: take, clamp to the bottom, blooming dive, leap, run, blooming dive, lift. Never better than a coin flip.",
       sizeModel: { L50: 300, sigma: 0.02, fullyGrown: 345 },
       hours: "day, dusk",
@@ -31100,7 +31107,7 @@ var O5 = {
       family: "legend",
       bodyPlan: "disc",
       water: ["Sporewood Pools"],
-      favours: "Her bait only: Glowcap Bulb.",
+      favours: "Her bait only: Capseed.",
     },
     {
       id: "harpstring_eel",
@@ -32998,15 +33005,26 @@ var isLegendSpecies = (id) => Sr(Ms).some((sp) => sp?.id === id && sp.rarity ===
 // never caught bites unmetBite times as often; never a legend.
 function lampBiteMult(species, lamp) {
   if (!lamp || !species?.id || species.rarity === "legendary" || isLegendSpecies(species.id)) return 1;
-  return lamp.met?.(species.id) ? 1 : ka(lamp.unmetBite, 1);
+  return (
+    (lamp.met?.(species.id) ? 1 : ka(lamp.unmetBite, 1)) * (species.giant === !0 ? ka(lamp.giantBite, 1) : 1)
+  );
 }
 // The lamp for bite rolls from a save's meta: null unless such a relic is the save's, else which kinds are met.
 function lampOf(meta) {
-  let relic = Sr(meta?.loop?.relics).find((id) => ka(wo.relics?.[id]?.stat?.unmetBite, 0) > 0);
-  return relic
+  let relic = Sr(meta?.loop?.relics).find((id) => ka(wo.relics?.[id]?.stat?.unmetBite, 0) > 0),
+    // A relic that makes giants bite (Burr's Seed, stat.giantBite) counts only in a lake after its own (wo.waters'
+    // order), which no lake is yet: the barge's water is where the bites are rolled.
+    here = wo.waters?.[meta?.loop?.barge?.water]?.order,
+    seed = Sr(meta?.loop?.relics).find(
+      (id) =>
+        ka(wo.relics?.[id]?.stat?.giantBite, 0) > 0 &&
+        Number(here) > Number(wo.waters?.[wo.relics[id].from]?.order ?? 1 / 0),
+    );
+  return relic || seed
     ? {
         met: (id) => Number(meta?.journal?.[id]?.caught) > 0,
-        unmetBite: ka(wo.relics[relic].stat.unmetBite, 1),
+        unmetBite: relic ? ka(wo.relics[relic].stat.unmetBite, 1) : 1,
+        ...(seed ? { giantBite: ka(wo.relics[seed].stat.giantBite, 1) } : {}),
       }
     : null;
 }
@@ -33019,8 +33037,7 @@ function localKindAt(baseId, at) {
     her = huntOf(water)?.find;
   if (
     her &&
-    (at?.place === her.place ||
-      at?.castPlace === her.place ||
+    ((!!her.place && (at?.place === her.place || at?.castPlace === her.place)) ||
       Math.hypot(ka(at?.x, NaN) - her.x, ka(at?.z, NaN) - her.z) <= her.theft)
   )
     return null;
@@ -34279,7 +34296,7 @@ var Y5 = {
       },
       unlock: {
         shells: 420,
-        requires: [{ type: "legendary", id: "drifting_grove", label: "Land the Drifting Grove" }],
+        requires: [{ type: "legendary", id: "drifting_grove" }],
       },
       drain: { oil: 1.4, satiety: 1.3 },
       gloom: 1.27,
@@ -34883,18 +34900,17 @@ var Ms = [
     },
     {
       id: "drifting_grove",
-      name: "The Drifting Grove",
+      name: "Meadowback Pacu",
       zone: "sporewood",
       rarity: "legendary",
       tier: 4,
-      epithet: "The Meadow That Swims",
       weight: [20, 45],
       value: 320,
       food: 70,
       oil: 70,
       time: "calm",
       depth: [0.8, 1],
-      bait: "glowcap_bulb",
+      bait: "capseed",
       behavior: "leaper",
       difficulty: Ta(4, "leaper", !0),
       boss: {
@@ -34916,8 +34932,8 @@ var Ms = [
         eyes: "glow",
         scale: 2.3,
       },
-      hint: "When the pools are quiet, something vast grazes in the deep. It hungers for Glowcap Bulbs.",
-      lore: "A whole meadow rides on her back. When she dives, it blooms beneath the water, where no one sees.",
+      hint: "She feeds where the spore drift ends, just after the Mother Cap sighs.",
+      lore: "She's a pacu, the oldest fish in Sporewood. Moss and little caps grow on her back, and she cracks seeds with teeth like a person's.",
     },
     {
       id: "prism_minnow",
@@ -44487,7 +44503,7 @@ var pP = {
       // Per-legend landing cap; a legend not listed here uses cap.legend.
       cap: { belled_matriarch: 0.75 },
       // The weakest line Hold that can land the legend; on a weaker line she is always lost.
-      minLineHold: { belled_matriarch: 5 },
+      minLineHold: { belled_matriarch: 5, drifting_grove: 7 },
       woundPerEscape: 6,
       woundCap: 18,
       woundScope: { expedition: "meta.legendWounds", run: "meta.legendWounds", descent: "run.legendWounds" },
@@ -48421,11 +48437,12 @@ bs.sporewood.lossParts = { toothy: "brass_trace", rough: "brass_trace", self: "b
 // quiet tally, the first still waiting in this order, so with no beats the Burl Hook, the Brass Trace and the
 // Mossthread Snood come on three tallies in a row. A quiet tally waits for Murk's two gifts here, the Drift Float
 // and then the Seed Pouch (a part the game does not have yet is not waited for).
-//   burl_hook: one of `runs` lost after it ran before the hook was set. The hunt's beat for it, when the hunt is
-//     built, is the first cracked pod seen (as Mossmere's first ring of scrapes: the hunt's beats.ring).
+//   burl_hook: one of `runs` lost after it ran before the hook was set, or the first cracked pod seen (the hunt's
+//     beats.person, as Mossmere's first ring of scrapes is its beats.ring), or a quiet tally.
 //   brass_trace: the first toothy fish landed or lost (`fish`), as Pike Wire's first pike. Alone.
-//   mossthread_snood: a quiet tally for now. The hunt's beat for the leaders, when it is built, is Burr's almanac
-//     (as Hob's map is Mossmere's: the hunt's beats.map); give it an arrival of both leaders then, with `alone`.
+//   mossthread_snood: comes with the Brass Trace in sporewood_leaders, whose beat is Burr's almanac (the hunt's
+//     beats.map, as Hob's map is Mossmere's), with `alone` when one of the two is on the shelf already. Neither
+//     leader comes on a quiet tally (Sporewood's hunt, as Mossmere's leaders wait for Hob's map).
 wo.arrivals.sporewood ??= {};
 wo.arrivals.sporewood.order ??= [];
 Object.assign(wo.arrivals.sporewood, {
@@ -48447,9 +48464,8 @@ Object.assign(wo.arrivals.sporewood, {
   brass_trace: {
     parts: ["brass_trace"],
     fish: ["sporebelly_puffer", "lostsea_mackerel", "mildew_angler"],
-    quiet: !0,
   },
-  mossthread_snood: { parts: ["mossthread_snood"], quiet: !0 },
+  mossthread_snood: { parts: ["mossthread_snood"] },
 });
 wo.arrivals.sporewood.order.push("burl_hook", "brass_trace", "mossthread_snood");
 // ---- The Razorpane Piranha in Sporewood's tables (the Drowned Greenhouse's own fish; its record is in Nf) ----------
@@ -49795,8 +49811,8 @@ Object.assign(wo.places, {
     water: "sporewood",
     kind: "crown",
     price: 2200,
-    card: "drifting_grove",
-    legend: "drifting_grove",
+    // (Sporewood's hunt: she feeds at the evening's eddy, not here, and stays hidden, so the Cup's card is its catfish)
+    card: "downcast_catfish",
     out: [
       [36.59, 32.5],
       [42.4, 30.8],
@@ -49936,7 +49952,9 @@ wo.keptAs.razorpane_piranha = { place: "drowned_greenhouse" };
 // Records kept in the data but dropped from a lake's play. The Sporebelly Puffer, Plumgill Perch and Hushcap Koi
 // were here until they joined Sporewood's list.
 wo.leftOut = { sporewood: [] };
-wo.legendBait.sporewood = { id: "glowcap_bulb", price: 250 };
+// Sporewood's legend has no bait of her own on Murk's shelf any more, as Mossmere's has none: her hunt's rig is a
+// Capseed, gathered free at the seedfall (wo.hunts.sporewood.rig). The Glowcap Bulb stays only in older saves' stock,
+// and nothing takes it.
 {
   let e = (n, o) => ({
       id: Gc[n][o].id,
@@ -49964,7 +49982,8 @@ wo.legendBait.sporewood = { id: "glowcap_bulb", price: 250 };
         { id: "stalkwood", hold: 3, cast: 2, hookWindow: 1.04, price: 175 },
         { id: "amberheart", hold: 6, cast: 4, hookWindow: 1.08, price: 1400 },
       ],
-      line: [t("line"), { id: "rootthread", hold: 3, price: 175 }, { id: "mothsilk", hold: 7, price: 1400 }],
+      // The Mothsilk is the hunt's line: about four times Mossmere's Waxed Silk (600), so 2,400 on the shelf.
+      line: [t("line"), { id: "rootthread", hold: 3, price: 175 }, { id: "mothsilk", hold: 7, price: 1200 }],
       reel: [t("reel"), { id: "capwheel", hold: 3, price: 175 }, { id: "burlwheel", hold: 6, price: 1400 }],
       hold: {
         ladder: [
@@ -50640,12 +50659,47 @@ Object.assign(wo.rig.parts, {
   drift_float: { slot: "depth", fit: "drift", gift: "firstSale", water: "sporewood" },
   seed_pouch: { slot: "pouch", gift: "afterDrift", water: "sporewood" },
 });
-// Sporewood's time clue, the seedfall (sporewood-plan.md beat 3): from evening 2, once an evening, at dusk. The Mother
-// Cap glows and sighs ten times, 2.2 seconds apart, the first 1 second into dusk. Dusk lasts 20 seconds, so the last
-// sigh comes as night falls; her time runs three minutes from the first sigh, as Mossmere's, well into the night.
-// Only the time clue is supplied: with no legend Sporewood has no hunt yet (huntOf), so every other hunt piece stays
-// off there, and its legend bites as she always has. The Cap's glow is drawn from the same clock (sporeDriftFx).
+// Sporewood's hunt (sporewood-plan.md, its fourteen beats; docs/design/hunt-per-lake.md): the wandering island, the
+// Meadowback Pacu, Mossmere's loop in Sporewood's own story. Where it differs from Mossmere's entry:
+// - lakeEvenings: its thresholds (taleEvening, character.lampEvening, time.fromEvening, and Burr's lamp) count the
+//   evenings spent in Sporewood (huntLakeEvening), so a player who sails in on their twentieth evening still has
+//   the gifts on Sporewood's evenings 1 and 2, the seedfall and the tale on its evening 2 and Burr from then on.
+// - character: Burr at the Drowned Greenhouse (`place`), who talks only in `phases` (his lamp is lit at dusk and
+//   after dark), within `reach` metres of its door.
+// - part: his part of the lake is no patch on a map but the water within `eddy` metres of the evening's eddy.
+// - find: her water is the evening's eddy (`eddy`, herWaterAt), not a fixed place. The first time the raft comes
+//   within `rise` metres of it in her time, once Burr's almanac is drawn, the island rises (no theft). Moss rafts
+//   (`rafts`) take the boils' place: every boilEvery seconds one sets off `from` metres out and drifts in to her eddy
+//   at `pace` metres a second, with a word when the raft is within boilSeen. She takes a cast within `take` metres
+//   of her eddy.
+// - scenes: two cutscenes, each played once: the island rising, as her water is found (on "find"), and the crunch,
+//   at the first seedfall after that night (on "next", `after` seconds after the first sigh). `length` is a plain
+//   title card's, played when HUNT_SCENES has no director of that kind.
+// - rig: `depth` and `bait` name the one rig that brings her (a Capseed under the Drift Float), where Mossmere's
+//   bait is graded in her bait table on the lead.
+// - marks: each line-up fish leaves its own mark (`own`, on its catch card), and the cracked pods carry hers
+//   ("person"): in her time, a cast within `pod.near` metres of her eddy brings one up at `pod.chance`.
+// - opens: nothing yet. Her landing would open Glasswater, which does not exist, and the ending says so.
 wo.hunts.sporewood = {
+  legend: "drifting_grove",
+  hidden: !0,
+  lakeEvenings: !0,
+  taleEvening: 2,
+  character: {
+    place: "drowned_greenhouse",
+    lampEvening: 2,
+    phases: ["dusk", "gloomtide"],
+    reach: 7.5,
+    leave: 11,
+    // His line about what came back waits for the crushed hook (Hob's for the worn leader).
+    worn: "hook",
+  },
+  part: { eddy: 25 },
+  // The seedfall (sporewood-plan.md beat 3): from Sporewood's evening 2, once an evening, at dusk. The Mother Cap
+  // glows and sighs ten times, 2.2 seconds apart, the first 1 second into dusk. Dusk lasts 20 seconds, so the last
+  // sigh comes as night falls; her time runs three minutes from the first sigh, as Mossmere's, well into the night.
+  // Her tries a night as Mossmere's: casts at her eddy, in her time, on a rig that could bring her. The Cap's glow is
+  // drawn from the same clock (sporeDriftFx).
   time: {
     fromEvening: 2,
     phase: "dusk",
@@ -50653,11 +50707,84 @@ wo.hunts.sporewood = {
     strokes: 10,
     strokeGap: 2.2,
     herTime: 180,
+    tries: 3,
     sound: "seedfall_sigh",
     pitch: 1,
     volume: 0.8,
     late: 1.5,
   },
+  find: {
+    eddy: !0,
+    rise: 10,
+    take: 6,
+    rafts: { from: [12, 18], pace: 0.55, sink: 3 },
+    boilEvery: [20, 30],
+    boilSeen: 25,
+    nudgedEvery: [10, 15],
+    nudgedSeen: 40,
+    boilClose: 5,
+  },
+  scenes: [
+    { kind: "island", on: "find", length: 4.5 },
+    { kind: "crunch", on: "next", after: 6, length: 4 },
+  ],
+  // The parts that hold her: the Mere Hook is crushed early in the fight, the Plain Knot (or the soft snood) is
+  // bitten through about halfway, and a weak line goes at the end. Her first take waits until the Burl Hook and the
+  // Brass Trace are both on Murk's shelf or owned.
+  rig: {
+    order: ["hook", "leader", "line"],
+    right: { hook: "burl_hook", leader: "brass_trace" },
+    at: { hook: 0.15, leader: 0.5 },
+    cause: { hook: "spat", leader: "snapped", line: "snapped" },
+    takeNeeds: ["burl_hook", "brass_trace"],
+    depth: "drift",
+    bait: "capseed",
+  },
+  // The line-up (sketch 3): five fish that could crack a seed pod, in the order they are drawn.
+  lineup: ["festival_puffer", "sporebelly_puffer", "velvet_ray", "razorpane_piranha", "cindertail_catfish"],
+  // The marks (PAD_MARKS draws them): the puffers' beak, the ray's plates, the piranha's razor teeth and the
+  // catfish's pads, each on its own catch card once Burr's almanac is drawn; and her teeth like a person's, on the
+  // cracked pods.
+  marks: {
+    order: ["beak", "plates", "razor", "pads", "person"],
+    own: {
+      festival_puffer: "beak",
+      sporebelly_puffer: "beak",
+      velvet_ray: "plates",
+      razorpane_piranha: "razor",
+      cindertail_catfish: "pads",
+    },
+    pod: { mark: "person", near: 16, chance: 0.3 },
+    // The fish whose catch matches a mark in the strip (none matches hers until she is landed).
+    leftBy: {
+      beak: ["festival_puffer", "sporebelly_puffer"],
+      plates: "velvet_ray",
+      razor: "razorpane_piranha",
+      pads: "cindertail_catfish",
+    },
+    art: "sporewood",
+  },
+  // Burr's almanac is the leaders' beat; the first cracked pod is the Burl Hook's (wo.arrivals.sporewood).
+  beats: { map: "sporewood_leaders", person: "burl_hook" },
+  // The notepad: its five sketches (PAD_ART.sporewood draws them), keyed as Mossmere's: map "Where the spores
+  // gather" (Burr's almanac), taken "The island rises", lineup, swirl "The refusal", back "What came back".
+  pad: {
+    art: "sporewood",
+    places: [
+      { key: "map", n: 1, page: "where" },
+      { key: "taken", n: 2, page: "where" },
+      { key: "lineup", n: 3, page: "suspects" },
+      { key: "swirl", n: 4, page: "gear" },
+      { key: "back", n: 5, page: "gear" },
+    ],
+    // Sketch 4 for an older save that had landed her before the hunt: as Spore Cake under the float would have
+    // drawn it.
+    oldSwirl: { kind: "left", bait: "spore_cake" },
+  },
+  // Sporewood earns about four times what Mossmere does, whose bounty is 900.
+  bounty: 3000,
+  relic: "burrs_seed",
+  opens: null,
 };
 // The seedfall's pods (seedfallPods), by lake: `pods` fall like snow from under the Mother Cap (`cap`: its middle, the
 // height of its gills and its reach) onto the Cup's water (`land`), `fall` metres a second, swaying `sway` metres.
@@ -50691,6 +50818,280 @@ Ca.hunts.sporewood = {
     still: "The last pods sink, and the drift goes quiet.",
   },
 };
+// Sporewood's hunt words (sporewood-plan.md; voice.md): the tale and Murk's lines, Burr's, the island and the moss
+// rafts on the water, the cracked pods and the marks, the refusals, the notepad and the ending. Until she is landed
+// she is "the wandering island", and the narrator says "it".
+Object.assign(Ca.hunts.sporewood, {
+  tale: "Burr kept the seeds of the old gardens. He planted his best on a mossy islet in the pools. By morning, the islet had gone.",
+  murk: {
+    tale: "It still turns up, never in the same place twice. They call it the wandering island. Burr lives at the old glasshouses. Go and ask him.",
+    findHob: "Burr's lamp is lit at the old glasshouses after dusk. Sail close and say hello.",
+    mapPassed: "Burr left this page of his almanac for you. It shows where the spores gather.",
+    // Nudges while her water is not found: not near the evening's eddy in her time, after one evening and after
+    // two; near it but no find, after one evening. Then his word once it is found.
+    midnight: "Be where the spores gather when the Mother Cap sighs.",
+    sail: "Follow the drift out from the Mother's Cup at dusk, and wait where it ends.",
+    boils: "Watch for drifting moss after the sigh, and follow it in.",
+    found: "A meadow on its back? Burr's almanac marks four eddies. I've put them on your chart.",
+    spot: "Fish where the drift ends after the sigh, and watch your rig.",
+    lineup: "Something cracks pods out there. Five fish here could do it. Catch them and see.",
+  },
+  drawn: "You draw it in your notepad.",
+  // The marks: each line-up fish's own, on its catch card (`own`), and hers, on the cracked pods (`pod`).
+  marks: {
+    own: {
+      beak: "Look at its beak. It snaps a pod in two, with no teeth marks.",
+      plates: "Look at its mouth. Flat plates grind a pod to crumbs.",
+      razor: "Look at its teeth. They slice a pod like broken glass.",
+      pads: "Look at its mouth. Soft pads, and no teeth at all.",
+    },
+    pod: "Your hook brings up a seed pod, cracked clean through.",
+    person: "The marks on it look like a person's teeth.",
+  },
+  // Her water: the island rising, the moss rafts drifting in, and the eddies on the chart.
+  water: {
+    rise: "Something huge rises by the eddy. A little meadow grows on its back.",
+    boil: "A clump of moss and caps drifts past, {where}.",
+    where: { ahead: "ahead of you", behind: "behind you", left: "to your left", right: "to your right" },
+    boilClose: "A clump of moss and caps drifts right past you.",
+  },
+  // The cutscenes' lines, said as each ends, and the title of each on a plain title card.
+  scenes: {
+    island: { title: "The island rises", after: "It sinks again, slow and easy, meadow and all." },
+    crunch: {
+      title: "The seedfall",
+      after: "Crack, crack. Something is cracking the pods. This is when it feeds.",
+    },
+  },
+  hob: {
+    tag: "Burr",
+    // His first talk, four boxes. The last two go with his almanac, so a player Murk gave the page to hears two.
+    first: [
+      "Evening. I'm Burr. I kept the seeds for the old gardens, a long time ago.",
+      "I planted my best seeds on a little islet of moss out there. By morning it had gone, seeds and all.",
+      "I've seen it since, here and there. Never in the same place twice.",
+      "Here, a page of my almanac. It always turns up where the spores gather, at the seedfall.",
+    ],
+    // One a night after that, in order. His later lines wait for sketches 2, 4 and 5.
+    nights: {
+      seasons: "Each dusk the Mother Cap sighs and lets her pods fall. The drift takes them somewhere new.",
+      seeds: "My seeds were good ones. Whatever has them is fed well, I should think.",
+      // Only once sketch 2 is drawn.
+      taken: "A meadow on its back? Then my seeds took root after all. Well, well.",
+      // Only once sketch 4 is drawn.
+      swirl: "Fussy, is it? It always did like the Mother Cap's seeds best.",
+      // Only once a crushed hook is drawn in sketch 5.
+      worn: "Crushed flat? I've seen pods cracked like that. Clean through.",
+    },
+    greeting: "Evening. Mind the glass, it's sharp after dark.",
+    next: "Next",
+    ok: "Got it",
+    after: {
+      landed: "One seed, from her own back. Plant it, and see what grows.",
+    },
+  },
+  pad: {
+    tab: "Notepad",
+    intro:
+      "This is your notepad. Each time you find a clue, you draw it here. Look at the pictures to work out what you're hunting, and where.",
+    pages: { where: "Where", suspects: "Suspects", gear: "Gear" },
+    titles: {
+      map: "Where the spores gather",
+      taken: "The island rises",
+      lineup: "The line-up",
+      swirl: "The refusal",
+      back: "What came back",
+    },
+    blank: "Not found yet",
+    nextHead: "What to try next",
+    next: {
+      hob: "Burr's lamp is lit at the old glasshouses after dusk. Sail close to talk to him.",
+      midnight: "Be where the spores gather when the Mother Cap sighs.",
+      boils: "After the sigh, follow the drifting moss to where it gathers.",
+      spot: "Fish where the drift ends after the sigh, and watch your rig.",
+      swirl: "Look again at the refusal in your notepad.",
+      sells: "Your notepad shows what broke. Murk sells what holds.",
+      fix: "Fix what broke, then fish where the drift ends after the sigh.",
+    },
+    // Sketch 1, Burr's almanac page, and its second line; the four eddies once she has risen.
+    map: "Burr's almanac says it turns up where the spores gather, at the seedfall.",
+    end: "The drift ends in a new place each evening.",
+    eddies: "Burr's almanac marks four eddies. The drift picks one each evening.",
+    // Sketch 2.
+    taken: "It rose by the eddy, with a meadow on its back. Then it sank.",
+    // Sketch 1's labels, as the art reads them.
+    labels: { cup: "Mother's Cup", eddies: "eddies", greenhouse: "Burr", home: "home" },
+    art: {
+      map: "A page of Burr's almanac: the pools, the Mother's Cup and the drift of spores",
+      end: "The drift drawn to an eddy, with an arrow",
+      taken: "A meadow rising on a huge back by the eddy, and the four eddies marked",
+      swirl: "Your rig, and something big turning away below it",
+      hook: "A hook crushed flat",
+      leader: "A knot bitten clean through",
+      line: "A rod tip with the line snapped just below it",
+      held: "Your hook, your leader and your line drawn whole",
+    },
+    // Sketch 4, The refusal: "left", a bait she won't take ({bait}); "float", a Capseed under a still float;
+    // "lure".
+    swirl: {
+      left: "It nosed {bait} and turned away. It wants a seed pod, riding the drift.",
+      float: "It nosed the Capseed and turned away. It wants it riding the drift.",
+      lure: "It turned away from the lure. It wants a seed pod, riding the drift.",
+      bunch: "It nosed {bait} and turned away. It wants a seed pod, riding the drift.",
+    },
+    // Sketch 5, What came back.
+    back: {
+      hook: "The hook came back crushed flat. A plain hook can't take that bite.",
+      leader: "The knot came back bitten clean through.",
+      line: "The line snapped by the rod, so it is too heavy for this line.",
+      held: "Your hook, your leader and your line all held.",
+      mine: "mine",
+      hobs: "Burr's",
+    },
+    heldTitle: "What held",
+    // Sketch 3, the line-up, and the marks strip.
+    lineup: {
+      head: "These five fish could crack a seed pod.",
+      frame: "It isn't any of these, so far.",
+      none: "It's none of them. Nobody here has ever caught it.",
+      landed: "It was her all along.",
+      fish: {
+        festival_puffer: {
+          name: "Festival Puffer",
+          why: "Its beak snaps a pod in two. It leaves no teeth marks.",
+        },
+        sporebelly_puffer: {
+          name: "Sporebelly Puffer",
+          why: "It has a beak too. A beak leaves no teeth marks.",
+        },
+        velvet_ray: {
+          name: "Velvet Ray",
+          why: "Its flat plates grind a pod to crumbs. They leave no teeth marks.",
+        },
+        razorpane_piranha: {
+          name: "Razorpane Piranha",
+          why: "Its teeth are as sharp as glass. They slice a pod, they don't crack it.",
+        },
+        cindertail_catfish: {
+          name: "Cindertail Catfish",
+          why: "It has soft pads and no teeth. It can't crack a pod.",
+        },
+      },
+      marks: {
+        beak: { open: "A beak snaps a pod in two.", match: "A puffer's beak snaps a pod in two." },
+        plates: {
+          open: "Flat plates grind a pod to crumbs.",
+          match: "A ray's flat plates grind a pod to crumbs.",
+        },
+        razor: { open: "Sharp teeth slice a pod.", match: "A piranha's sharp teeth slice a pod." },
+        pads: {
+          open: "Soft pads can't crack a pod at all.",
+          match: "A catfish's soft pads can't crack a pod at all.",
+        },
+        person: {
+          open: "Something cracks pods with teeth like a person's.",
+          landed: "She cracks pods with teeth like a person's.",
+        },
+      },
+      labels: { beak: "beak", plates: "plates", razor: "teeth", pads: "pads", person: "teeth" },
+      art: {
+        frame: "An empty frame with a question mark",
+        out: "crossed out",
+        beak: "A seed pod snapped in two by a beak",
+        plates: "A seed pod ground to crumbs",
+        razor: "A seed pod sliced through",
+        pads: "A soft mouth with no teeth",
+        person: "A seed pod cracked clean through, with marks like a person's teeth",
+      },
+    },
+    close: "Got it",
+    lake: "Sporewood Pools",
+    solved: "You solved it. It was never an islet. It was her.",
+  },
+  // The seal she would put on the chart her landing opens, before she is landed.
+  seal: "Land the wandering island.",
+});
+Object.assign(Ca.hunts.sporewood.time, {
+  // The lines the art's two scenes say as each ends (HUNT_SCENE_RULES' `line`), the same as a plain title card's.
+  islandRose: Ca.hunts.sporewood.scenes.island.after,
+  crunched: Ca.hunts.sporewood.scenes.crunch.after,
+  // The Journal's lines once she is landed, and the Odds sheet's.
+  bites: "She feeds where the spore drift ends, just after the Mother Cap sighs.",
+  feeds: "feeds where the spore drift ends, just after the Mother Cap sighs",
+  odds: "The {name} bites only in the few minutes after the Mother Cap sighs.",
+});
+// Her refusals at her eddy: something huge noses the bait and turns, and a line once a night for each part.
+Ca.hunts.sporewood.refusal = {
+  lure: "Something huge rises under the lure, noses it, and turns away.",
+  floatLive: "Something huge noses the Capseed under the still float, and turns away.",
+  float: "Something huge noses {bait} under the still float, and turns away.",
+  bait: "Something huge noses {your}, and turns away.",
+  bunch: "Something huge noses {your}, and turns away.",
+  wire: "Something huge noses {bait}, and turns away.",
+  lesson: "Something noses {bait}, and turns away. It remembers the {part}.",
+  parts: { hook: "hook", leader: "knot", line: "line" },
+  drawn: "Something huge noses your bait and turns away. You draw what you saw.",
+  baits: {
+    capseed: { the: "the Capseed", your: "your Capseed", them: "it" },
+    spore_cake: { the: "the Spore Cake", your: "your Spore Cake", them: "it" },
+  },
+};
+// The end of the hunt: the measuring card, the release, Murk's lines at the tally, Burr's Seed, and the next water.
+Ca.hunts.sporewood.ending = {
+  measured: [
+    "So that's the wandering island. She's a Meadowback Pacu, the oldest fish in Sporewood.",
+    "Moss and little caps grow on her back. Her teeth look like a person's.",
+  ],
+  release: "You let her go. She sinks back down, slow and easy, meadow and all.",
+  bounty: "Bounty",
+  murk: {
+    landed: "You landed the wandering island. Sit down, I'll count it twice.",
+    lamp: "Burr came by. He took one seed from her back as she went, and left it here for you.",
+    // After the keepsake: the water her landing would open does not exist yet.
+    next: "The next water is Glasswater. Nobody has charted it yet, so this is as far as the barge goes.",
+  },
+  lamp: {
+    name: "Burr's Seed",
+    line: "It grows into a little meadow on your raft. In every lake after this one, giant fish bite more often. It goes with you to every lake.",
+  },
+};
+// The Burl Hook's shelf line, now that she crushes a plain hook.
+Ca.shelf.burl_hook = "This thick hook won't crush, and it sets itself in fish that grab and run.";
+// Her losses (Mossmere's thief's, in her own words): the hook crushed, the knot bitten through, the line snapped.
+Ca.legendAway.drifting_grove = {
+  hook: "That one got away! Your hook comes back crushed flat. You draw it in your notepad.",
+  leader: "That one got away! Your knot comes back bitten through. You draw it in your notepad.",
+  line: "That one got away! Your line snaps by the rod. You draw it in your notepad.",
+  fight: "It shook free right under the raft. Everything held.",
+  weaker: "It will be a little weaker next time.",
+  after: {
+    hook: "That one got away! Your hook comes back crushed flat.",
+    leader: "That one got away! Your knot comes back bitten through.",
+    line: "That one got away! Your line snaps by the rod.",
+  },
+};
+// Burr's Seed (wo.relics): in every lake after the one whose monster gave it (wo.waters order), a giant bites
+// `giantBite` times as often; never a legend. Mounted on the raft as Hob's Lamp is (makeMeadowOnRaft).
+wo.relics.burrs_seed = { stat: { giantBite: 1.5 }, mount: "raft_meadow", from: "sporewood" };
+// Burr's almanac brings both leaders (the hunt's beats.map), as Hob's map brings Mossmere's; when one is already on
+// the shelf, Murk names the other alone. The first cracked pod brings the Burl Hook (beats.person), with his hunt line.
+wo.arrivals.sporewood.sporewood_leaders = { parts: ["brass_trace", "mossthread_snood"] };
+wo.arrivals.sporewood.order.push("sporewood_leaders");
+wo.arrivals.sporewood.alone = { brass_trace: "traceOnly", mossthread_snood: "snoodOnly" };
+// Murk's arrival lines for them; `hunt` names the line a hunt beat brings for an arrival (hookHunt is Mossmere's).
+Object.assign(Ca.arrivals.names, {
+  sporewood_leaders: "Brass Trace and Mossthread Snood",
+  traceOnly: "Brass Trace",
+  snoodOnly: "Mossthread Snood",
+  burlHunt: "Burl Hook",
+});
+Object.assign(Ca.arrivals.lines, {
+  sporewood_leaders: "Burr showed you his almanac? Seed eaters bite hard. Leaders are on the shelf now.",
+  traceOnly: "Burr showed you his almanac? Seed eaters bite hard. The Brass Trace is on the shelf now.",
+  snoodOnly: "Burr showed you his almanac? The Mossthread Snood is on the shelf now.",
+  burlHunt: "A pod cracked clean through? That bite would crush a hook. The Burl Hook won't crush.",
+});
+Ca.arrivals.hunt = { turnback_hook: "hookHunt", burl_hook: "burlHunt" };
 // The Drift Float's names and lines (the Depth part's, as the lead's), and Murk's line when he gives it.
 Object.assign(Ca.depth.names, { drift_float: "Drift Float" });
 Object.assign(Ca.depth.good, {
@@ -78243,7 +78644,7 @@ function greenhouseLampLit(game) {
     !!place?.lamp &&
     game?.flow === "playing" &&
     run?.zone === place.water &&
-    Math.trunc(Number(run.evening) || 0) >= (place.lamp.fromEvening ?? 2) &&
+    huntLakeEvening(run, huntTimeOf(place.water)) >= (place.lamp.fromEvening ?? 2) &&
     (run.phase === "dusk" || run.phase === "gloomtide")
   );
 }
@@ -84259,7 +84660,10 @@ $1`,
       (O.flora = $.stats());
   }
   // (Sporewood's Drowned Greenhouse) its glass and Burr's lamp at its door (gwGreenhouseLamp), lit in It() below.
-  let gwGhLamp = null;
+  let gwGhLamp = null,
+    // Burr himself (makeBurr, the art's, looked up when his lamp is first lit), at the spot kept for him.
+    gwBurr = null,
+    gwBurrTried = !1;
   if (ve?.greenhouse)
     try {
       gwGhLamp = gwGreenhouseLamp(ve.greenhouse, {
@@ -84944,6 +85348,47 @@ $1`,
     // himself (the plan's next step) stands at ve.greenhouse.burr, the clear spot beside it: his code goes here, as
     // Hob's on his rock does below.
     gwGhLamp && gwGhLamp.update(greenhouseLampLit(e), K?.night ?? 1);
+    // Burr stands at his spot beside the lamp (the arena's greenhouse.burr: x, y, z, yaw), only while it is lit and no
+    // cutscene plays: the art's makeBurr({ low }), made the first time, updated with the raft and the night.
+    if (ve?.greenhouse?.burr) {
+      let burrLit = greenhouseLampLit(e) && !e.cinematic;
+      if (burrLit && !gwBurr && !gwBurrTried && typeof makeBurr == "function") {
+        gwBurrTried = !0;
+        try {
+          let made = makeBurr({ low: g }),
+            group = made?.isObject3D
+              ? made
+              : made?.root?.isObject3D
+                ? made.root
+                : made?.group?.isObject3D
+                  ? made.group
+                  : null;
+          if (group) {
+            let at = ve.greenhouse.burr,
+              face = wo.places?.drowned_greenhouse?.greenhouse || {};
+            group.position.set(at.x, at.y, at.z);
+            group.rotation.y = Number.isFinite(at.yaw)
+              ? at.yaw
+              : Math.atan2(Number(face.fx) || 0, Number.isFinite(face.fz) ? face.fz : 1);
+            group.name || (group.name = "Burr");
+            E.add(group);
+            group.traverse((obj) => {
+              obj.geometry && v(obj.geometry), obj.material && b(obj.material);
+            });
+            gwBurr = { group, update: typeof made?.update == "function" ? made.update.bind(made) : null };
+          }
+        } catch (err) {
+          console.warn("[world] Burr", err);
+        }
+      }
+      gwBurr &&
+        ((gwBurr.group.visible = burrLit),
+        burrLit &&
+          gwBurr.update?.(Math.min(0.1, Math.max(0, H)), {
+            raft: e.player?.position ?? null,
+            night: K?.night ?? 1,
+          }));
+    }
     if (rockAngler) {
       rockAngler.root.visible = e.flow === "playing" && !e.cinematic;
       if (rockAngler.lamp && rockAngler.root.visible) {
@@ -104335,6 +104780,48 @@ function hH(e, { raft: t = null, wick: n = null } = {}) {
     }
     // Hob's Lamp (wo.relics.hobs_lamp, mount "raft_bow"): once it is yours it stands lit at the front of the
     // raft, the end away from the stern post, in every lake.
+    // Burr's Seed (wo.relics.burrs_seed, mount "raft_meadow"): once it is yours its little meadow grows on the raft
+    // (makeMeadowOnRaft({ low }), the art's, looked up then), at the art's mount (HUNT_ART_MOUNT.meadow: the stern's
+    // corner across from the brazier), in every lake; updated with the night as the lamp is.
+    if (
+      relicHeld(d, "burrs_seed") &&
+      !a.meadow &&
+      !a.meadowTried &&
+      l &&
+      typeof makeMeadowOnRaft == "function"
+    ) {
+      a.meadowTried = !0;
+      try {
+        let made = makeMeadowOnRaft({ low: e.render?.getQuality?.() === "low" }),
+          group = made?.isObject3D
+            ? made
+            : made?.group?.isObject3D
+              ? made.group
+              : made?.root?.isObject3D
+                ? made.root
+                : null,
+          mount = typeof HUNT_ART_MOUNT == "object" && HUNT_ART_MOUNT ? HUNT_ART_MOUNT : null,
+          at = Array.isArray(mount?.meadow) ? mount.meadow : [0.4, 0.24, 0.8];
+        group &&
+          ((group.name = "relic:burrsSeed"),
+          group.position.set(at[0], at[1], at[2]),
+          group.scale.setScalar(Number(mount?.meadowScale) || 1),
+          l.add(group),
+          (a.meadow = {
+            group,
+            update: typeof made?.update == "function" ? made.update.bind(made) : null,
+            dispose: typeof made?.dispose == "function" ? made.dispose.bind(made) : null,
+          }),
+          a.meadow.update?.(0, { night: 0 }));
+      } catch (err) {
+        console.warn("[raft] Burr's Seed", err);
+      }
+    }
+    !relicHeld(d, "burrs_seed") &&
+      a.meadow &&
+      (a.meadow.dispose ? a.meadow.dispose() : a.meadow.group.removeFromParent?.(),
+      (a.meadow = null),
+      (a.meadowTried = !1));
     if (relicHeld(d, "hobs_lamp") && !a.lamp && l) {
       let lamp = makeHobLamp();
       (lamp.group.name = "relic:hobsLamp"),
@@ -104375,6 +104862,9 @@ function hH(e, { raft: t = null, wick: n = null } = {}) {
       a.vane && (a.vane.vane.rotation.y = Math.sin(s * 0.21) * 0.9 + Math.sin(s * 0.07) * 0.6),
         a.tassel && (a.tassel.rotation.z = Math.sin(s * 2.1) * 0.12),
         a.lamp && a.lamp.update(Math.min(0.1, Math.max(0, Number(d) || 0)), !0);
+      a.meadow?.update?.(Math.min(0.1, Math.max(0, Number(d) || 0)), {
+        night: e.state?.run?.phase === "gloomtide" ? 1 : e.state?.run?.phase === "dusk" ? 0.5 : 0,
+      });
     },
     debug: () => ({ vane: !!a.vane, tassel: !!a.tassel, lamp: !!a.lamp }),
   };
@@ -112414,6 +112904,9 @@ var Mle = (e, t) => ({
     return a ? a.p : null;
   };
 // ---- The hunts' lookups (wo.hunts and Ca.hunts, by the water's id) -----------------------------------------------
+// The art's pieces for Sporewood's hunt, defined beside its other drawings and models (hunt-per-lake.md, "What the
+// art supplies"). Each is looked up with typeof when it is needed, so a build without one plays on without it.
+/* global PAD_MARKS, makeBurr, makeMossRaft, makeCrackedPod, makeMeadowOnRaft */
 // A lake's hunt rules, or null for a lake with no hunt. Plain checks, so it works before the shared helpers exist.
 // An entry with no legend yet supplies only the pieces it names (Sporewood: its time clue, read by huntTimeOf) and
 // is not a hunt: every other hunt check there says no.
@@ -112454,6 +112947,35 @@ function huntWaterOfPlace(placeId) {
 function huntWaterOfRelic(relicId) {
   return (relicId && huntWaters().find((water) => huntOf(water).relic === relicId)) || null;
 }
+// Her water on an evening: a hunt whose find names the eddy (find.eddy: Sporewood's) has it at that evening's spore
+// drift eddy (sporeDriftOf); any other at its find's fixed centre. { x, z } (and the eddy's id), or null.
+function herWaterAt(water, evening) {
+  let find = huntOf(water)?.find;
+  if (!find) return null;
+  if (find.eddy) {
+    let drift = sporeDriftOf(evening, water);
+    return drift ? { x: drift.eddy.x, z: drift.eddy.z, id: drift.eddy.id } : null;
+  }
+  return Number.isFinite(find.x) && Number.isFinite(find.z) ? { x: find.x, z: find.z } : null;
+}
+// Her water tonight, on a trip in a lake with a hunt.
+function herWaterTonight(run) {
+  return run && run.outing === "trip" ? herWaterAt(run.zone, run.evening) : null;
+}
+// The evening a hunt's thresholds read (taleEvening, character.lampEvening, time.fromEvening): the trip's evening,
+// or, for a hunt that counts its own lake's evenings (lakeEvenings: Sporewood's), the trip's evening in that lake
+// (run.lakeEvening, set as the trip sets out; an older trip without it reads its evening).
+function huntLakeEvening(run, hunt = huntTimeOf(run?.zone)) {
+  let lake = Number(run?.lakeEvening);
+  return hunt?.lakeEvenings && Number.isFinite(lake)
+    ? Math.trunc(lake)
+    : Math.trunc(Number(run?.evening) || 0);
+}
+// The marks a lake's hunt knows (marks.order), Mossmere's three when it names none.
+function huntMarkKeys(water) {
+  let order = Sr(huntOf(water)?.marks?.order);
+  return order.length ? order : CATCH_MARKS;
+}
 // ---- Her time (the time clue: Mossmere's midnight bell; mossmere-hunt-2.md, section 1 and B2) -------------------
 // The time clue strikes `time.at` seconds into its phase's own clock (the night's, or `time.phase`'s: Sporewood's
 // seedfall comes at dusk), and her time runs `time.herTime` seconds from its first stroke: the legend takes only
@@ -112461,7 +112983,7 @@ function huntWaterOfRelic(relicId) {
 // on a trip from the evening its time clue first comes (the evenings Mossmere's bell strikes), or null.
 function huntEvening(run) {
   let hunt = run && run.outing === "trip" ? huntTimeOf(run.zone) : null;
-  return hunt && Math.trunc(Number(run.evening) || 0) >= hunt.time.fromEvening ? hunt : null;
+  return hunt && huntLakeEvening(run, hunt) >= hunt.time.fromEvening ? hunt : null;
 }
 function midnightFlags(run) {
   let m = run.midnight;
@@ -112713,7 +113235,7 @@ function huntWaterFound(loop, water) {
   return (
     !!hunt &&
     (huntRecordOf(loop, water)?.found === !0 ||
-      (Array.isArray(loop?.maps?.places) && loop.maps.places.includes(hunt.find.place)))
+      (!!hunt.find?.place && Array.isArray(loop?.maps?.places) && loop.maps.places.includes(hunt.find.place)))
   );
 }
 // A place nothing may mark yet: an unmarked place (her water) while its hunt has not found it.
@@ -112737,7 +113259,11 @@ function herWaterCorkAt(loop, water) {
 }
 // The character's part of the lake (the shaded patch on his map, in lake units: the hunt's `part`), made once.
 const huntPartPts = new WeakMap();
-function inHuntPart(hunt, x, z) {
+function inHuntPart(hunt, x, z, run = null) {
+  if (hunt?.part?.eddy > 0) {
+    let at = run ? herWaterAt(run.zone, run.evening) : null;
+    return !!at && Math.hypot(x - at.x, z - at.z) <= hunt.part.eddy;
+  }
   let pts = huntPartPts.get(hunt);
   pts || huntPartPts.set(hunt, (pts = Array.isArray(hunt?.part) ? padBlobPts(...hunt.part) : []));
   let inside = !1;
@@ -112775,7 +113301,9 @@ function bearingWord(game, raft, x, z) {
 }
 // Called every frame from the phase clock with the run, after the time clue. In her time, once the character's
 // map is drawn: notes being in his part (for the nudges), and raises a boil over her water every boilEvery
-// seconds (20 to 30 s on Mossmere), with a word when the raft is near enough to see it.
+// seconds (20 to 30 s on Mossmere), with a word when the raft is near enough to see it. A hunt with moss rafts
+// (find.rafts: Sporewood's) sets one drifting in to her water instead: it starts find.rafts.from metres out (on the
+// raft's side when the raft is near) and the word is for where it starts.
 function updateHerWater(game, run) {
   if (!herTimeOpen(run) || !huntOf(run.zone)?.find) return;
   let water = run.zone,
@@ -112786,26 +113314,36 @@ function updateHerWater(game, run) {
   // No boils once she is landed: her time is over (section 3, "After the landing").
   if (!record || !(record.sketches?.map > 0) || record.landed > 0) return;
   let m = midnightFlags(run),
-    t = nightClock(run),
+    t = huntClock(run, hunt.time),
     pos = game.player?.position,
     raft = pos && Number.isFinite(pos.x) && Number.isFinite(pos.z) ? pos : null,
-    evening = Math.max(1, Math.trunc(Number(run.evening) || 0));
-  raft && !record.partAt && inHuntPart(hunt, raft.x, raft.z) && (record.partAt = evening);
+    evening = Math.max(1, Math.trunc(Number(run.evening) || 0)),
+    at = herWaterAt(water, run.evening);
+  if (!at) return;
+  raft && !record.partAt && inHuntPart(hunt, raft.x, raft.z, run) && (record.partAt = evening);
   let nudged = !huntWaterFound(loop, water) && herBoilsNudged(record, run),
     [lo, hi] = nudged ? find.nudgedEvery : find.boilEvery,
     gap = () => lo + Math.random() * (hi - lo);
   if (!(Number(m.boilAt) > 0)) m.boilAt = t + gap();
   if (t < m.boilAt) return;
   m.boilAt = t + gap();
-  let a = Math.random() * Math.PI * 2,
-    r = find.boilSpread * Math.sqrt(Math.random()),
-    x = find.x + Math.cos(a) * r,
-    z = find.z + Math.sin(a) * r;
+  let rafts = find.rafts,
+    near = !!rafts && !!raft && Math.hypot(raft.x - at.x, raft.z - at.z) < 45,
+    a = near
+      ? Math.atan2(raft.z - at.z, raft.x - at.x) + (Math.random() - 0.5) * 2.4
+      : Math.random() * Math.PI * 2,
+    r = rafts
+      ? rafts.from[0] + Math.random() * (rafts.from[1] - rafts.from[0])
+      : find.boilSpread * Math.sqrt(Math.random()),
+    x = at.x + Math.cos(a) * r,
+    z = at.z + Math.sin(a) * r;
   try {
-    game.water?.addRipple?.(x, z, 1.2);
-    game.water?.addRipple?.(x + 0.6, z - 0.3, 1.2);
-    game.water?.addRipple?.(x - 0.4, z + 0.5, 1.2);
-    game.water?.splash?.(x, z, { size: 1.1, count: 18 });
+    if (rafts) spawnMossRaft(game, run, { x, z, tx: at.x, tz: at.z, pace: rafts.pace, sink: rafts.sink });
+    else
+      game.water?.addRipple?.(x, z, 1.2),
+        game.water?.addRipple?.(x + 0.6, z - 0.3, 1.2),
+        game.water?.addRipple?.(x - 0.4, z + 0.5, 1.2),
+        game.water?.splash?.(x, z, { size: 1.1, count: 18 });
   } catch {}
   let words = huntWords(water).water || {},
     dist = raft ? Math.hypot(x - raft.x, z - raft.z) : 1 / 0,
@@ -112814,6 +113352,7 @@ function updateHerWater(game, run) {
     word = dist < find.boilClose ? "close" : bearingWord(game, raft, x, z);
   m.boils = (m.boils | 0) + 1;
   m.lastBoil = { x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, t, word };
+  rafts && (m.lastBoil.raft = { tx: at.x, tz: at.z });
   word &&
     game.bus?.emit?.("toast", {
       text:
@@ -112822,11 +113361,180 @@ function updateHerWater(game, run) {
     });
   game.bus?.emit?.("hunt:boil", { ...m.lastBoil });
 }
+// Called every frame from the phase clock with the run, after her water: in a hunt whose water is the evening's
+// eddy (find.eddy: Sporewood's), once the character's map is drawn and in her time, the first time the raft comes
+// within find.rise metres of her water she surfaces there and it is found (findHerWater, by "rise"), with its
+// "hunt:found" event; the island cutscene follows (huntSceneDueOf).
+function updateHerFind(game, run) {
+  let hunt = huntOf(run?.zone);
+  if (!hunt?.find?.eddy || !herTimeOpen(run)) return;
+  let loop = game.state?.meta?.loop,
+    record = huntRecordOf(loop, run.zone);
+  if (!record || !(record.sketches?.map > 0) || record.found === !0 || record.landed > 0) return;
+  let at = herWaterAt(run.zone, run.evening),
+    raft = game.player?.position;
+  if (!at || !Number.isFinite(raft?.x) || Math.hypot(raft.x - at.x, raft.z - at.z) > hunt.find.rise) return;
+  if (!findHerWater(loop, run, { x: at.x, z: at.z, by: "rise" })) return;
+  try {
+    game.water?.addRipple?.(at.x, at.z, 1.6);
+    game.water?.splash?.(at.x, at.z, { size: 1.5, count: 24 });
+  } catch {}
+  try {
+    game.game?.save?.();
+  } catch {}
+  game.bus?.emit?.("hunt:found", { rise: !0, x: at.x, z: at.z });
+}
+// A cracked pod brought up by a cast near her water in her time (the hunt's marks.pod: Sporewood's): counted, and
+// the first is the mark seen (her teeth, "person"), which draws into the line-up's strip and is the beat of the
+// arrival the hunt's beats name for it (the Burl Hook). Returns { first, pods } or null.
+function huntCrackedPod(loop, run) {
+  let hunt = huntOf(run?.zone),
+    record = huntRecordOf(loop, run?.zone);
+  if (!hunt?.marks?.pod || !record) return null;
+  let evening = Math.max(1, Math.trunc(Number(run.evening) || 0));
+  record.pods = ha(record.pods) + 1;
+  return { first: noteMarkSeen(loop, record, hunt.marks.pod.mark, evening, run.zone), pods: record.pods };
+}
+// Whether a cast at (x, z) could bring up a cracked pod: in her time, once the character's map is drawn and before
+// she is landed, within marks.pod.near metres of her water tonight.
+function crackedPodHere(loop, run, x, z) {
+  let pod = huntOf(run?.zone)?.marks?.pod,
+    record = huntRecordOf(loop, run?.zone),
+    at = pod ? herWaterTonight(run) : null;
+  return (
+    !!at &&
+    !!record &&
+    record.sketches?.map > 0 &&
+    !(record.landed > 0) &&
+    herTimeOpen(run) &&
+    Math.hypot(x - at.x, z - at.z) <= pod.near
+  );
+}
+// ---- The hunt's props on the water: Sporewood's moss rafts and the cracked pod brought up on the line. Their
+// models are the art's (makeMossRaft, makeCrackedPod), looked up when one is needed: { group, update(dt, k) } or an
+// object to place. Without them nothing is drawn and the hunt plays on. Each prop is placed every frame on its path
+// at the water's surface; k is its size (1 down to 0 as it sinks). Models are pooled by kind and never disposed.
+const huntProps = { live: [], pool: {}, run: null };
+function huntPropModel(kind, low = !1) {
+  let pool = huntProps.pool[kind] || (huntProps.pool[kind] = []),
+    free = pool.find((p) => !p.busy);
+  if (free) return free;
+  let make =
+    kind === "raft"
+      ? typeof makeMossRaft == "function"
+        ? makeMossRaft
+        : null
+      : typeof makeCrackedPod == "function"
+        ? makeCrackedPod
+        : null;
+  if (!make) return null;
+  let made = null;
+  try {
+    made = make({ low });
+  } catch {
+    return null;
+  }
+  let group = made?.isObject3D
+    ? made
+    : made?.group?.isObject3D
+      ? made.group
+      : made?.root?.isObject3D
+        ? made.root
+        : null;
+  if (!group) return null;
+  let prop = { group, update: typeof made?.update == "function" ? made.update.bind(made) : null, busy: !1 };
+  pool.push(prop);
+  return prop;
+}
+function addHuntProp(game, kind, path) {
+  let scene = game?.render && !game.render.isStub ? game.render.scene : null;
+  if (!scene?.add || huntProps.live.length > 12) return !1;
+  let prop = huntPropModel(kind, game.render?.getQuality?.() === "low");
+  if (!prop) return !1;
+  prop.busy = !0;
+  prop.group.parent !== scene && scene.add(prop.group);
+  prop.group.visible = !0;
+  huntProps.run = game.state?.run ?? null;
+  huntProps.live.push({ prop, path, t: 0, kind });
+  return !0;
+}
+// A moss raft from (x, z) to her water (tx, tz) at `pace` metres a second, bobbing and turning slowly; it sinks over
+// `sink` seconds once there, or as her time ends.
+function spawnMossRaft(game, run, { x, z, tx, tz, pace = 0.55, sink = 3 }) {
+  let len = Math.hypot(tx - x, tz - z) || 1,
+    trip = len / Math.max(0.05, pace),
+    spin = Math.random() * Math.PI * 2;
+  return addHuntProp(game, "raft", (t) => {
+    let f = Math.min(1, t / trip),
+      e = f * f * (3 - 2 * f) * 0.15 + f * 0.85,
+      over = !herTimeOpen(run) || t > trip,
+      gone = Math.max(0, (t - trip) / sink),
+      k = over ? Math.max(0, 1 - gone) : 1;
+    return {
+      x: x + (tx - x) * e,
+      z: z + (tz - z) * e,
+      y: 0.02 * Math.sin(t * 1.7) - 0.15 * (1 - k),
+      yaw: spin + t * 0.12,
+      k,
+      done: over && (t > trip ? gone >= 1 : k <= 0),
+    };
+  });
+}
+// The cracked pod on the line: from the float, up and in to the raft's side over the reel in, held there a moment,
+// then gone.
+function showCrackedPod(game, from, to) {
+  return addHuntProp(game, "pod", (t) => {
+    let f = Math.min(1, t / 0.7);
+    return {
+      x: from.x + (to.x - from.x) * f * 0.85,
+      z: from.z + (to.z - from.z) * f * 0.85,
+      y: 0.1 + Math.sin(f * Math.PI * 0.5) * 0.7,
+      yaw: t * 0.8,
+      k: t > 2.6 ? Math.max(0, 1 - (t - 2.6) / 0.4) : 1,
+      done: t > 3,
+    };
+  });
+}
+function hideHuntProps() {
+  for (let item of huntProps.live) (item.prop.busy = !1), (item.prop.group.visible = !1);
+  huntProps.live.length = 0;
+}
+// Called every frame from the phase clock: moves the props along their paths. A new trip puts them all away.
+function updateHuntProps(game, dt) {
+  if (!huntProps.live.length) return;
+  if (game.flow !== "playing" || game.state?.run !== huntProps.run) return void hideHuntProps();
+  let step = Math.max(0, Math.min(0.25, Number(dt) || 0));
+  for (let i = huntProps.live.length - 1; i >= 0; i--) {
+    let item = huntProps.live[i],
+      p = null;
+    try {
+      item.t += step;
+      p = item.path(item.t);
+      let surface = game.water?.getHeight?.(p.x, p.z),
+        g = item.prop.group,
+        height = (Number.isFinite(surface) ? surface : 0) + p.y,
+        phase = game.state?.run?.phase;
+      g.position.set(p.x, height, p.z);
+      g.rotation.y = p.yaw || 0;
+      g.scale.setScalar(Math.max(0.001, p.k));
+      // The art's update bobs it at `height` (its y), and lights a raft's glow after dark.
+      item.prop.update?.(step, {
+        height,
+        night: phase === "gloomtide" ? 1 : phase === "dusk" ? 0.5 : 0,
+        k: p.k,
+      });
+    } catch {
+      p = { done: !0 };
+    }
+    p?.done && ((item.prop.busy = !1), (item.prop.group.visible = !1), huntProps.live.splice(i, 1));
+  }
+}
 // The theft (B3): in her time, once the character's map is drawn and while her water is not found, once a night,
 // a fish hooked within `theft` metres of her centre is taken. The caller checks that it is an ordinary fish on
 // bait.
 function thiefTakes(game, run, x, z) {
-  if (!herTimeOpen(run) || !huntOf(run.zone)?.find || !Number.isFinite(x) || !Number.isFinite(z)) return !1;
+  if (!herTimeOpen(run) || !(huntOf(run.zone)?.find?.theft > 0) || !Number.isFinite(x) || !Number.isFinite(z))
+    return !1;
   let water = run.zone,
     find = huntOf(water).find,
     loop = game.state?.meta?.loop,
@@ -112842,7 +113550,11 @@ function thiefTakes(game, run, x, z) {
 // The theft found her water (in `water`, the run's): sketch 2 is drawn and her place becomes the player's, as
 // owning its chart made it (maps.places, places.revealed), so it lifts and is fished as a found place. Returns true
 // the once.
-function findHerWater(loop, run, { x = NaN, z = NaN, onLead = !1, water = run?.zone ?? null } = {}) {
+function findHerWater(
+  loop,
+  run,
+  { x = NaN, z = NaN, onLead = !1, water = run?.zone ?? null, by = "theft" } = {},
+) {
   let hunt = huntOf(water),
     record = huntRecordOf(loop, water);
   if (!record || record.found === !0) return !1;
@@ -112853,17 +113565,20 @@ function findHerWater(loop, run, { x = NaN, z = NaN, onLead = !1, water = run?.z
   run && huntEvening(run) && (midnightFlags(run).thiefTook = !0);
   (record.found = !0),
     (record.foundEvening = evening),
-    (record.foundBy = "theft"),
-    (record.takenOn = onLead ? "lead" : "float");
+    (record.foundBy = by),
+    (record.takenOn = by === "theft" ? (onLead ? "lead" : "float") : "");
   Number.isFinite(x) &&
     Number.isFinite(z) &&
     (record.foundAt = { x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100 });
   drawHuntSketch(record, "taken", evening);
-  (loop.places && typeof loop.places == "object" && !Array.isArray(loop.places)) ||
-    (loop.places = { revealed: [] });
-  Array.isArray(loop.places.revealed) || (loop.places.revealed = []);
-  loop.places.revealed.includes(hunt.find.place) || loop.places.revealed.push(hunt.find.place);
-  h7(loop, hunt.find.place);
+  // A water with a place (Mossmere's Bell Pool) becomes the player's, as owning its chart made it.
+  if (hunt.find.place) {
+    (loop.places && typeof loop.places == "object" && !Array.isArray(loop.places)) ||
+      (loop.places = { revealed: [] });
+    Array.isArray(loop.places.revealed) || (loop.places.revealed = []);
+    loop.places.revealed.includes(hunt.find.place) || loop.places.revealed.push(hunt.find.place);
+    h7(loop, hunt.find.place);
+  }
   // The theft is also a tackle arrival's beat (the hunt's beats.theft, wo.arrivals: Mossmere's Turnback Hook),
   // with Murk's own line for it at the tally.
   let beat = hunt.beats?.theft;
@@ -112876,8 +113591,9 @@ function findHerWater(loop, run, { x = NaN, z = NaN, onLead = !1, water = run?.z
 // An older save that owns her place counts as found (B4): sketches 1 and 2 are drawn (to draw in when the
 // notepad next opens), sketch 2 with the words "You found this spot yourself."
 function foundByChart(loop, water) {
-  let record = huntRecordOf(loop, water);
-  if (!record || record.found === !0 || !loop.maps?.places?.includes?.(huntOf(water).find.place)) return !1;
+  let record = huntRecordOf(loop, water),
+    place = huntOf(water)?.find?.place;
+  if (!record || record.found === !0 || !place || !loop.maps?.places?.includes?.(place)) return !1;
   let evening = Math.max(1, Math.trunc(Number(loop.evenings) || 0));
   (record.found = !0), (record.foundEvening = evening), (record.foundBy = "chart"), (record.murkFound = !0);
   record.sketches.map || drawHuntSketch(record, "map", evening);
@@ -113059,16 +113775,19 @@ function settleOldLanding(loop, meta, water) {
   record.mapBy || (record.mapBy = "murk");
   if (record.found !== !0) {
     (record.found = !0), (record.foundEvening = evening), (record.foundBy = "save");
-    Ln(loop.places) || (loop.places = { revealed: [] });
-    Array.isArray(loop.places.revealed) || (loop.places.revealed = []);
-    loop.places.revealed.includes(hunt.find.place) || loop.places.revealed.push(hunt.find.place);
-    h7(loop, hunt.find.place);
+    if (hunt.find?.place) {
+      Ln(loop.places) || (loop.places = { revealed: [] });
+      Array.isArray(loop.places.revealed) || (loop.places.revealed = []);
+      loop.places.revealed.includes(hunt.find.place) || loop.places.revealed.push(hunt.find.place);
+      h7(loop, hunt.find.place);
+    }
   }
   // Sketch 4 as the default rig would have drawn it (pad.oldSwirl: on Mossmere, worms under the float).
   let swirl = hunt.pad?.oldSwirl || {};
   record.swirlKind ||
     ((record.swirlKind = swirl.kind || "left"), (record.swirlRig = { bait: swirl.bait || "", lead: !1 }));
   (record.murkNudged = !0), (record.murkFound = !0), (record.birdCutsceneSeen = !0);
+  Ln(record.scenesSeen) && Sr(hunt.scenes).forEach((scene) => (record.scenesSeen[scene.kind] = evening));
   (record.padUnseen = []), (record.padDue = !1);
   (record.landed = evening), (record.landedBy = "save"), (record.bountyPaid = !0);
   hunt.relic && grantRelic(loop, hunt.relic);
@@ -113078,7 +113797,7 @@ function settleOldLanding(loop, meta, water) {
 // The character's rod (Hob's) comes up on the first cast in her water after she is landed (section 5), once.
 function herRodDue(loop, water) {
   let record = huntRecordOf(loop, water);
-  return !!record && record.landed > 0 && !(record.rodFound > 0);
+  return !!record && !!huntOf(water)?.find?.place && record.landed > 0 && !(record.rodFound > 0);
 }
 // An older save's line lesson (set before the notepad) carries over: taught, and drawn into sketch 5.
 function carryHerLineLesson(loop, water) {
@@ -113104,58 +113823,258 @@ function herBaitWords(baitId, water) {
 function thiefLanded(game, hunt) {
   return Number(game?.state?.meta?.journal?.[hunt?.legend]?.caught) > 0;
 }
-// True while the hunt's cutscene (Mossmere's bird at midnight) is waiting to play tonight: in her time, after the
-// first stroke, on a night after the one her water was found, not yet seen, and never for a save that has not
-// found her water.
-function huntSceneDue(game, run) {
-  if (!herTimeOpen(run) || !huntOf(run.zone)) return !1;
-  let hunt = huntOf(run.zone),
-    t = nightClock(run),
-    record = huntRecordOf(game?.state?.meta?.loop, run.zone);
-  return (
-    !!record &&
-    !!hunt.scene &&
-    t >= hunt.time.at + hunt.scene.after &&
-    record.found === !0 &&
-    record.birdCutsceneSeen !== !0 &&
-    Math.trunc(Number(run.evening) || 0) > Math.trunc(Number(record.foundEvening) || 0) &&
-    !thiefLanded(game, hunt)
-  );
+// A hunt's cutscenes: its `scenes` (Sporewood's: the island rising, played as her water is found, on "find"; the
+// crunch, at the first time clue after that night, on "next"), or Mossmere's one `scene` (the bird at midnight, on
+// "next"; its seen flag is the record's birdCutsceneSeen, and its director tests and marks that itself, as it
+// always has). A scene in `scenes` is seen once it starts (record.scenesSeen[kind], its evening).
+function huntScenesOf(hunt) {
+  if (Array.isArray(hunt?.scenes))
+    return hunt.scenes.filter((scene) => scene && typeof scene.kind == "string");
+  return hunt?.scene ? [{ ...hunt.scene, on: "next", legacy: !0 }] : [];
 }
-// At the first stroke, on the nights after the cutscene was seen: a splash and a ripple at her centre.
+function huntSceneSeen(record, scene) {
+  return scene.legacy ? record?.birdCutsceneSeen === !0 : ha(record?.scenesSeen?.[scene.kind]) > 0;
+}
+// The hunt's cutscene waiting to play now on this trip, or null. Only once her water is found and never once she
+// has been landed. A scene "on find": on the evening of the find, until it is seen. A scene "on next" (Mossmere's
+// bird at midnight): in her time, `after` seconds from the time clue's first stroke, on an evening after the find.
+function huntSceneDueOf(game, run) {
+  let hunt = huntOf(run?.zone),
+    record = hunt ? huntRecordOf(game?.state?.meta?.loop, run.zone) : null;
+  if (!record || record.found !== !0 || run.outing !== "trip" || thiefLanded(game, hunt)) return null;
+  let evening = Math.trunc(Number(run.evening) || 0),
+    foundOn = Math.trunc(Number(record.foundEvening) || 0);
+  for (let scene of huntScenesOf(hunt)) {
+    if (huntSceneSeen(record, scene)) continue;
+    if (scene.on === "find") {
+      if (evening === foundOn) return scene;
+      continue;
+    }
+    if (!herTimeOpen(run) || !(evening > foundOn)) continue;
+    let t = huntClock(run, hunt.time);
+    if (t != null && t >= hunt.time.at + (Number(scene.after) || 0)) return scene;
+  }
+  return null;
+}
+// True while a hunt's cutscene is waiting to play now (huntSceneDueOf).
+function huntSceneDue(game, run) {
+  return !!huntSceneDueOf(game, run);
+}
+// At the first stroke, on the nights after the hunt's "next" cutscene was seen (Mossmere's bird, Sporewood's
+// crunch): a splash and a ripple at her water tonight.
 function markHerTimeStart(game, m, run) {
   let water = run?.zone,
-    find = huntOf(water)?.find,
-    record = huntRecordOf(game.state?.meta?.loop, water);
-  if (!record || record.found !== !0 || record.birdCutsceneSeen !== !0 || m.herMarked || record.landed > 0)
+    record = huntRecordOf(game.state?.meta?.loop, water),
+    later = huntScenesOf(huntOf(water)).filter((scene) => scene.on !== "find");
+  if (
+    !record ||
+    record.found !== !0 ||
+    !later.length ||
+    !later.every((scene) => huntSceneSeen(record, scene)) ||
+    m.herMarked ||
+    record.landed > 0
+  )
     return;
+  let at = herWaterAt(water, run.evening);
+  if (!at) return;
   m.herMarked = !0;
   try {
-    game.water?.splash?.(find.x, find.z, { size: 1.3, count: 22 });
-    game.water?.addRipple?.(find.x, find.z, 1.4);
-    game.water?.addRipple?.(find.x + 0.5, find.z - 0.4, 1.2, 0.35);
+    game.water?.splash?.(at.x, at.z, { size: 1.3, count: 22 });
+    game.water?.addRipple?.(at.x, at.z, 1.4);
+    game.water?.addRipple?.(at.x + 0.5, at.z - 0.4, 1.2, 0.35);
   } catch {}
-  game.bus?.emit?.("hunt:herTimeMark", { x: find.x, z: find.z });
+  game.bus?.emit?.("hunt:herTimeMark", { x: at.x, z: at.z });
 }
 // The directors a hunt's scene.kind names. A new lake's own cutscene adds its director here.
 const HUNT_SCENES = { bird: birdSceneDirector };
-// Plays the cutscene of the run's water's hunt, by its scene.kind: one director for each kind, made when first
-// needed. The flow module owns one, updates it every frame, and skips it on a press.
+// Plays the run's water's hunt cutscene that is due (huntSceneDueOf), by its kind: one director for each kind in
+// HUNT_SCENES, made when first needed and looked up then. The flow module owns one, updates it every frame, and
+// skips it on a press. Mossmere's bird plays as it always has. A scene of a hunt's `scenes` (Sporewood's island and
+// crunch) is made with (game, { report, cue }) and begun with begin(cue), where cue (also opts.cue()) is { kind,
+// water, evening, rule (its entry in scenes), x, z (her water tonight), raft: { x, z }, title, after }. When there
+// is no such director, it throws, or its begin() says no, a plain title card plays in its place
+// (titleSceneDirector). A scene is seen once it starts; when it ends (its state() is null and the game's cinematic
+// is off), its `after` line shows. A scene still running after its watch time is stopped.
 function huntSceneDirector(game, opts = {}) {
   let made = {},
-    current = null;
-  const of = (kind) =>
-    made[kind] || (HUNT_SCENES[kind] ? (made[kind] = HUNT_SCENES[kind](game, opts)) : null);
+    current = null,
+    playing = null,
+    cue = null,
+    plain = null;
+  const report = typeof opts.report == "function" ? opts.report : () => {},
+    call = (director, what, ...args) => {
+      try {
+        return director?.[what]?.(...args);
+      } catch (err) {
+        return report(`huntScene.${what}`, err), void 0;
+      }
+    },
+    of = (kind) => {
+      if (made[kind]) return made[kind];
+      let make = HUNT_SCENES[kind];
+      if (typeof make != "function") return null;
+      try {
+        let director = make(game, { ...opts, cue: () => cue });
+        return director && typeof director.begin == "function" ? (made[kind] = director) : null;
+      } catch (err) {
+        return report(`huntScene.${kind}`, err), null;
+      }
+    },
+    // A scene of `scenes` has ended: its line, and the end event.
+    ended = (skipped = !1) => {
+      let done = playing;
+      if (!done) return;
+      (playing = null), (current = null);
+      // The art's scenes say their own line at their end (Ca.hunts[water].time[rule.line]); a plain card's is said here.
+      done.plain && done.words.after && game.bus?.emit?.("toast", { text: done.words.after, kind: "lore" });
+      game.bus?.emit?.("hunt:scene", { kind: done.scene.kind, phase: "end", skipped, plain: done.plain });
+    },
+    over = () => call(current, "state") == null && game.cinematic !== !0;
   return {
     begin() {
-      let kind = huntOf(game.state?.run?.zone)?.scene?.kind,
-        director = kind ? of(kind) : null;
-      return director ? (director.begin() ? ((current = director), !0) : !1) : !1;
+      let run = game.state?.run,
+        scene = huntSceneDueOf(game, run);
+      if (!scene || playing) return !1;
+      // Mossmere's bird at midnight: its own director tests and marks it, as before.
+      if (scene.legacy) {
+        let director = of(scene.kind);
+        return director ? (director.begin() ? ((current = director), !0) : !1) : !1;
+      }
+      if (game.flow !== "playing" || game.cinematic === !0) return !1;
+      let water = run.zone,
+        record = huntRecordOf(game.state?.meta?.loop, water),
+        evening = Math.max(1, Math.trunc(Number(run.evening) || 0)),
+        at = herWaterAt(water, run.evening) || { x: 0, z: 0 },
+        raft = game.player?.position,
+        words = huntWords(water).scenes?.[scene.kind] || {};
+      cue = {
+        kind: scene.kind,
+        water,
+        evening,
+        rule: scene,
+        x: at.x,
+        z: at.z,
+        raft: Number.isFinite(raft?.x) ? { x: raft.x, z: raft.z } : null,
+        title: words.title || "",
+        after: words.after || "",
+      };
+      let director = of(scene.kind),
+        ok = !!director && call(director, "begin", cue) === !0;
+      if (!ok) {
+        plain || (plain = titleSceneDirector(game, { report }));
+        director = plain;
+        ok = plain.begin(cue);
+      }
+      if (!ok) return !1;
+      // Seen from the moment it starts, so it never plays again, even if it is skipped or cut short.
+      Ln(record.scenesSeen) || (record.scenesSeen = {});
+      record.scenesSeen[scene.kind] = evening;
+      try {
+        game.game?.save?.();
+      } catch {}
+      current = director;
+      playing = {
+        scene,
+        words,
+        plain: director === plain,
+        t: 0,
+        watch: Math.max(12, 3 * (Number(scene.length) || 4)),
+      };
+      game.bus?.emit?.("hunt:scene", {
+        kind: scene.kind,
+        phase: "start",
+        plain: playing.plain,
+        x: at.x,
+        z: at.z,
+      });
+      return !0;
     },
-    update: (dt) => current?.update(dt),
-    skip: () => current?.skip() ?? !1,
-    stop: () => current?.stop(),
-    state: () => current?.state() ?? null,
+    update(dt) {
+      if (!current) return;
+      call(current, "update", dt);
+      if (!playing) return;
+      playing.t += Math.max(0, Math.min(0.25, Number(dt) || 0));
+      if (playing.t > playing.watch && !over()) {
+        call(current, "stop");
+        game.cinematic = !1;
+      }
+      over() && ended(!1);
+    },
+    skip() {
+      if (!current) return !1;
+      let skipped = call(current, "skip") ?? !1;
+      playing && over() && ended(!0);
+      return skipped;
+    },
+    stop() {
+      call(current, "stop");
+      playing && ((playing = null), (current = null));
+    },
+    state: () =>
+      current
+        ? (call(current, "state") ?? (playing ? { kind: playing.scene.kind, t: playing.t } : null))
+        : null,
+  };
+}
+// The plain title card a hunt's cutscene plays when its director is missing: the camera holds on her water, the
+// scene's title shows (the place lift's title, through "hunt:title"), and rings and a splash break the water there.
+// One press skips it; the evening's clock stands while it plays.
+function titleSceneDirector(game, { report = () => {} } = {}) {
+  let scene = null;
+  const safe = (what, fn) => {
+      try {
+        return fn();
+      } catch (err) {
+        report(`titleScene.${what}`, err);
+      }
+    },
+    emit = (name, payload) => safe("emit", () => game.bus?.emit?.(name, payload)),
+    put = (skipped) => {
+      let was = scene;
+      scene = null;
+      skipped && safe("frame", () => game.render?.frameLandmark?.(null, { back: 0.6 }));
+      emit("hunt:title", { phase: "end" });
+      game.cinematic = !1;
+      return !!was;
+    };
+  function begin(cue) {
+    if (scene || !cue || game.flow !== "playing" || game.cinematic === !0) return !1;
+    let len = Math.max(2, Number(cue.rule?.length) || 4);
+    scene = { t: 0, len, x: cue.x, z: cue.z, kind: cue.kind, rings: 0 };
+    game.cinematic = !0;
+    safe("frame", () =>
+      game.render?.frameLandmark?.(
+        { x: cue.x, y: 0, z: cue.z, r: 2.5, dist: 11, elev: 18 },
+        { dur: len - 0.6, back: 0.6 },
+      ),
+    );
+    cue.title && emit("hunt:title", { phase: "title", name: cue.title, dur: len - 1 });
+    return !0;
+  }
+  function update(dt) {
+    if (!scene) return;
+    if (game.flow !== "playing" || !game.state?.run) return void put(!0);
+    if (game.paused || !(dt > 0)) return;
+    scene.t += Math.min(dt, 0.25);
+    if (scene.rings < 3 && scene.t >= 0.5 + 0.7 * scene.rings) {
+      let k = scene.rings++,
+        big = scene.kind === "island";
+      safe("water", () => {
+        game.water?.addRipple?.(scene.x + 0.4 * k, scene.z - 0.3 * k, big ? 1.4 : 0.8);
+        game.water?.splash?.(scene.x, scene.z, { size: big ? 1.3 : 0.45, count: big ? 18 : 10 });
+      });
+    }
+    scene.t >= scene.len && put(!1);
+  }
+  return {
+    begin,
+    update,
+    skip: () => (scene ? put(!0) : !1),
+    stop: () => void (scene && put(!0)),
+    state: () =>
+      scene
+        ? { t: Math.round(scene.t * 100) / 100, x: scene.x, z: scene.z, kind: scene.kind, plain: !0 }
+        : null,
   };
 }
 // Plays the bird at midnight (scene kind "bird"): its rules are the hunt's scene, her centre its find.
@@ -113736,6 +114655,13 @@ function legendBaitChance(
   { bait = null, lure = null, onLead = false, water = null, baitRecord = null } = {},
 ) {
   if (!species?.id || !bait || bait === "bare") return 0;
+  // A hunt whose rig names her one bait and depth part (Sporewood's: a Capseed on the Drift Float; `onLead` is then
+  // whether the cast fishes on that part) takes only that, at the top grade's chance (1 in 3), never under a lure.
+  const herRig = huntOf(huntWaterOf(species.id))?.rig;
+  if (herRig?.bait) {
+    const rule = wo.legendGradeBite || {};
+    return !lure && onLead && bait === herRig.bait ? ka(rule.chance, 0) * ka(Sr(rule.mult)[3], 0) : 0;
+  }
   const row = z7(species.id, water);
   if (row && Object.values(row).some((grade) => grade != null)) {
     if (lure || !onLead) return 0;
@@ -114265,7 +115191,7 @@ function hF(
       ? legendBaitChance(W3(t, _t), {
           bait: p,
           lure: g,
-          onLead: sheetDepth === "lead",
+          onLead: huntOf(d)?.rig?.depth === "drift" ? driftFloatFishes(c, d, g) : sheetDepth === "lead",
           water: d,
           baitRecord: V3(t, p),
         })
@@ -114982,12 +115908,16 @@ function freshHuntRecord(water) {
     // The line-up (sketch 3, B4): the evening each of its five fish was crossed out, by fish id; and the evening
     // each bite mark was first seen (0 until then), which adds it to the strip at the foot of the page.
     crossed: {},
-    marks: { cuts: 0, holes: 0, ring: 0 },
+    marks: Object.fromEntries(huntMarkKeys(water).map((mark) => [mark, 0])),
     // The line-up fish that carried the ring of scrapes when they were crossed out (only the Kissmark can).
     ringed: [],
     // The bird at midnight (B4): the once-only cutscene has played (or was skipped). From the next night a
     // splash marks the start of her time instead.
     birdCutsceneSeen: false,
+    // A hunt with several cutscenes (its `scenes`: Sporewood's island and crunch): the evening each was seen.
+    ...(Array.isArray(hunt?.scenes) ? { scenesSeen: {} } : {}),
+    // Sporewood: the cracked pods brought up (huntCrackedPod).
+    ...(hunt?.marks?.pod ? { pods: 0 } : {}),
     // The end (B4): the evening she was first landed (0 until then), and how ("catch", or "save" for an older
     // save that had already sold or landed her); the bounty and Hob's Lamp paid at a tally; the evenings Hob's
     // rod was found in her water and given back to him (0 until then).
@@ -115062,6 +115992,7 @@ function catchMarkFor(
     !(huntRecordOf(loop, run?.zone)?.sketches?.map > 0)
   )
     return null;
+  if (rule.own) return huntLanded(loop, run.zone) ? null : (rule.own[speciesId] ?? null);
   let find = huntOf(run.zone).find;
   if (
     herTimeOpen(run) &&
@@ -115079,10 +116010,12 @@ function catchMarkFor(
 // beat (wo.arrivals: the Turnback Hook), in a water with hooks while its parts are not on the shelf yet. Returns
 // whether it was new.
 function noteMarkSeen(loop, record, mark, evening, water, { unseen = !0 } = {}) {
-  if (!CATCH_MARKS.includes(mark) || ha(record.marks[mark]) > 0) return !1;
+  if (!huntMarkKeys(water).includes(mark) || ha(record.marks[mark]) > 0) return !1;
   record.marks[mark] = Math.max(1, ha(evening));
   unseen && !record.padUnseen.includes(`mark:${mark}`) && record.padUnseen.push(`mark:${mark}`);
-  let beat = mark === "ring" ? huntOf(water)?.beats?.ring : null;
+  let beat =
+    (mark === "ring" || mark === huntOf(water)?.marks?.pod?.mark ? huntOf(water)?.beats?.[mark] : null) ??
+    null;
   beat &&
     bs[water]?.hookSet &&
     !Sr(wo.arrivals?.[water]?.[beat]?.parts).every((id) => Sr(loop?.arrivals?.shelved).includes(id)) &&
@@ -115143,7 +116076,7 @@ function huntTallyBeat(loop, trip, rule = huntOf(trip?.zone), { quiet = !1, jour
     lineupDue = record.taleAt > 0 && record.sketches.map > 0 && !(record.sketches.lineup > 0);
   if (quiet) record.padUnseen.length && (record.padDue = !0);
   else if (!record.taleAt) {
-    if (evening < rule.taleEvening) return null;
+    if ((rule.lakeEvenings ? huntLakeEvening(trip, rule) : evening) < rule.taleEvening) return null;
     (record.taleAt = evening), (beat.tale = !0);
   } else if (!record.sketches.map) {
     let missed = evening - record.taleAt;
@@ -115362,10 +116295,16 @@ function rigArrivalAtTally(loop, water, rule = typeof water == "string" ? wo.arr
   let parts = waiting(gift);
   arrivals.shelved.push(...parts);
   gift !== parts[0] && parts.length === 1 && rule.alone?.[parts[0]] && (giftSay = rule.alone[parts[0]]);
-  // Brought by the theft that found her water, or after the ring of scrapes has been seen: Murk's hunt line.
-  (gift === hunt?.beats?.theft || gift === hunt?.beats?.ring) &&
+  // Brought by the theft that found her water, or after the ring of scrapes has been seen: Murk's hunt line. In
+  // Sporewood, after the first cracked pod (the hunt's marks.pod and its beat).
+  let podMark = hunt?.marks?.pod?.mark;
+  (gift === hunt?.beats?.theft ||
+    gift === hunt?.beats?.ring ||
+    (!!podMark && gift === hunt?.beats?.[podMark])) &&
     giftSay === "beat" &&
-    (record?.hookByTheft === !0 || ha(record?.marks?.ring) > 0) &&
+    (record?.hookByTheft === !0 ||
+      ha(record?.marks?.ring) > 0 ||
+      (!!podMark && ha(record?.marks?.[podMark]) > 0)) &&
     (giftSay = "hunt");
   return { gift, giftSay };
 }
@@ -116695,6 +117634,8 @@ function CF(e) {
         bites: {},
         mercy: {},
         evening: Math.max(0, ha(Ee.evenings)) + 1,
+        // The trip's evening in its own lake (huntLakeEvening).
+        lakeEvening: Math.max(0, ha(Ee.eveningsAt?.[K])) + 1,
         comeback: null,
       };
     try {
@@ -117231,8 +118172,13 @@ function CF(e) {
   // from his lamp's evening (character.lampEvening: evening 2), and talks when you pass.
   function hobHere() {
     let ze = a(),
-      hunt = r(ze) ? huntOf(ze.zone) : null;
-    return !!hunt && ha(ze.evening) >= ha(hunt.character?.lampEvening, 2);
+      hunt = r(ze) ? huntOf(ze.zone) : null,
+      phases = hunt?.character?.phases;
+    return (
+      !!hunt &&
+      huntLakeEvening(ze, hunt) >= ha(hunt.character?.lampEvening, 2) &&
+      (!Array.isArray(phases) || phases.includes(ze.phase))
+    );
   }
   // His lamp burns at his side while he is there, until it is yours (the hunt's relic, Hob's Lamp, given when she
   // is landed): then it hangs on your raft instead.
@@ -117248,6 +118194,14 @@ function CF(e) {
     return (
       (record.rodFound = Math.max(1, ha(ze.evening))), c(), d("hunt:rod", { evening: record.rodFound }), !0
     );
+  }
+  // A cracked pod brought up on the line (huntCrackedPod): counted and noted, with its lines on the water.
+  function noteCrackedPod() {
+    let ze = a(),
+      H = p();
+    if (!r(ze) || !H) return null;
+    let pod = huntCrackedPod(H, ze);
+    return pod && (c(), d("hunt:pod", { ...pod })), pod;
   }
   // Hob speaks when the raft comes near his lit lamp. The first time: his first talk, and he draws his map
   // (sketch 1) unless Murk has passed it on already. After that, one new line a night, then his greeting once
@@ -117293,9 +118247,9 @@ function CF(e) {
       // for an older save that found the spot by its chart, so, as with Murk's word, he never says it there.)
       // His lines after sketches 4 and 5 wait for them: the swirl drawn, and your worn end drawn (a leader loss).
       let waits = {
-          taken: () => record.sketches.taken > 0 && record.foundBy === "theft",
+          taken: () => record.sketches.taken > 0 && (record.foundBy === "theft" || record.foundBy === "rise"),
           swirl: () => record.sketches.swirl > 0,
-          worn: () => record.back.includes("leader"),
+          worn: () => record.back.includes(huntOf(water)?.character?.worn || "leader"),
         },
         line = Object.keys(n().TEXT_LOOP?.hunts?.[water]?.hob?.nights || {}).find(
           (k) => !record.hobLines.includes(k) && (!waits[k] || waits[k]()),
@@ -117363,7 +118317,18 @@ function CF(e) {
       // Sketch 3: the line-up fish crossed out and the bite marks seen (ids only).
       crossed: Sr(huntOf(water)?.lineup).filter((id) => ha(record.crossed?.[id]) > 0),
       ringed: Sr(record.ringed).filter((id) => typeof id == "string"),
-      marks: CATCH_MARKS.filter((k) => ha(record.marks?.[k]) > 0),
+      marks: huntMarkKeys(water).filter((k) => ha(record.marks?.[k]) > 0),
+      // A hunt whose water is the evening's eddy (Sporewood's): the four eddies, marked once she has risen (and on
+      // the chart), where she rose (foundAt), and the depth part her rig wants.
+      ...(huntOf(water)?.find?.eddy
+        ? {
+            eddies: Sr(bs[water]?.geometry?.drift?.eddies).map((e) => ({ id: e.id, x: e.x, z: e.z })),
+            eddiesMarked: huntWaterFound(p(), water),
+            foundAt: record.foundAt && (record.foundAt.x || record.foundAt.z) ? { ...record.foundAt } : null,
+            depth: huntOf(water)?.rig?.depth ?? null,
+            pods: ha(record.pods),
+          }
+        : {}),
     };
   }
   // The notepad opened by itself and was closed: what it drew in has been seen.
@@ -118113,6 +119078,7 @@ function CF(e) {
     hobHere,
     hobTalk,
     noteRodFound,
+    noteCrackedPod,
     notepad,
     notepadShown,
   };
@@ -124479,7 +125445,9 @@ function rce(e) {
     try {
       updateHuntTime(e, et);
       updateHerWater(e, et);
+      updateHerFind(e, et);
       updateSeedfall(e, et);
+      updateHuntProps(e, Ie);
     } catch (midnightError) {
       console.warn("[midnight]", midnightError);
     }
@@ -140311,6 +141279,19 @@ function Y0e(e) {
         herAnswer?.part && herAnswer.part !== "gate"
           ? { answer: herAnswer, at: i.clock + 1.6 + Math.random() * 1.4 }
           : null;
+      // A cracked pod (the hunt's marks.pod: Sporewood's): a cast near her water in her time that she does not
+      // answer sometimes brings one up a moment after it lands; the line comes back in with it and no fish bites.
+      i.podDue = null;
+      let pod = huntOf(h()?.zone)?.marks?.pod;
+      !!pod &&
+        xe() &&
+        !i.tutorial &&
+        !i.rodDue &&
+        !herAnswer &&
+        !i.cast?.mist &&
+        p(() => crackedPodHere(e.state?.meta?.loop, h(), c.bob.x, c.bob.z)) === !0 &&
+        lt() < ka(pod.chance, 0) &&
+        (i.podDue = { at: i.clock + 1.2 });
     }
     (i.retrieve = null),
       Nr() && k() && !i.castBait
@@ -140594,6 +141575,23 @@ function Y0e(e) {
       (xe() ? $(bn) : Math.hypot(c.bob.x - bn.x, c.bob.z - bn.z) <= bn.r)
     );
   }
+  // Whether the cast just released is in her water: her place (Mossmere's Bell Pool), or for a hunt whose water is
+  // the evening's eddy (Sporewood's) the float within find.take metres of it tonight.
+  function herCastHere(bn) {
+    let find = huntOf(Yt())?.find;
+    if (!find?.eddy) return $(bn);
+    let at = herWaterTonight(h()),
+      x = Number.isFinite(i.cast?.x) ? i.cast.x : c.bob.x,
+      z = Number.isFinite(i.cast?.z) ? i.cast.z : c.bob.z;
+    return !!at && !i.cast?.mist && Math.hypot(x - at.x, z - at.z) <= ka(find.take, 6);
+  }
+  // Whether a cast released now fishes on her rig's depth part: the Drift Float for a hunt whose rig names it
+  // (Sporewood's), else the Sounding Lead.
+  function herDepthNow() {
+    return huntOf(Yt())?.rig?.depth === "drift"
+      ? !k() && p(() => N()?.driftFishes?.()) === !0
+      : !k() && p(() => N()?.leadFishes?.()) === !0;
+  }
   // A hunt's legend (Mossmere's thief) answers a cast herself in her hunt's lake (answerHerCast); every other
   // legend rolls in zt().
   function herRuleFor(bn) {
@@ -140615,12 +141613,21 @@ function Y0e(e) {
       record = huntRecordOf(loop, water);
     if (!herRuleFor(bn) || !record || i.tutorial || i.find || !huntWaterFound(loop, water)) return null;
     // (No 20 s rebite wait for her: one hook-up a night closes her time; mossmere-hunt.md A2, "Rebite".)
-    if (!herTimeOpen(run) || !$(bn)) return null;
+    if (!herTimeOpen(run) || !herCastHere(bn)) return null;
     let bait = i.castBait || null,
       lure = i.castVisualLure || k() || null;
     if (!bait && !lure) return null;
-    let onLead = !lure && !!i.castLead,
-      grade = bait && !lure ? Number(Rl(bn.species.id, { bait, water: Yt() })) || 0 : 0,
+    // On her rig's depth part (the Sounding Lead, or Sporewood's Drift Float); her bait graded in her water's table,
+    // or, for a rig that names one bait (Sporewood's Capseed), that bait alone at the top grade.
+    let onLead = !lure && (rig.depth === "drift" ? !!i.castDrift : !!i.castLead),
+      grade =
+        bait && !lure
+          ? rig.bait
+            ? bait === rig.bait
+              ? 3
+              : 0
+            : Number(Rl(bn.species.id, { bait, water: Yt() })) || 0
+          : 0,
       leader = i.castLeader ?? null,
       lineWeak =
         p(
@@ -140671,7 +141678,7 @@ function Y0e(e) {
           .replace("{part}", words.parts?.[taught] || taught || ""),
       text =
         part === "depth"
-          ? fill(bait === "live_minnow" ? words.floatLive : words.float)
+          ? fill(bait === (rig.bait || "live_minnow") ? words.floatLive : words.float)
           : part === "gate"
             ? ""
             : fill(words[part]),
@@ -140681,7 +141688,7 @@ function Y0e(e) {
         part === "lure"
           ? "lure"
           : part === "depth"
-            ? bait === "live_minnow"
+            ? bait === (rig.bait || "live_minnow")
               ? "float"
               : "left"
             : part === "bait"
@@ -140735,6 +141742,16 @@ function Y0e(e) {
     if (rod && i.clock >= rod.at) {
       i.rodDue = null;
       r === "waiting" && p(() => N()?.noteRodFound?.()) === !0 && pR();
+    }
+    let pod = i.podDue;
+    if (pod && i.clock >= pod.at) {
+      i.podDue = null;
+      if (r === "waiting" && p(() => N()?.noteCrackedPod?.())) {
+        let from = { x: c.bob.x, z: c.bob.z },
+          to = { x: c.raft.x, z: c.raft.z };
+        pR();
+        p(() => showCrackedPod(e, from, to));
+      }
     }
     let due = i.herRefusalDue;
     if (!due || i.clock < due.at) return;
@@ -143595,7 +144612,7 @@ function Y0e(e) {
           z: c.bob.z,
         }),
       );
-      CATCH_MARKS.includes(mark) && (tn.mark = mark);
+      huntMarkKeys(Yt()).includes(mark) && (tn.mark = mark);
     }
     // How it was taken, kept on the catch record: a practice order on Murk's board counts only a fish taken the
     // stated way (castRigMatches). The cast's bait, whether it fished on the Sounding Lead, and its hook and
@@ -144535,7 +145552,11 @@ function Y0e(e) {
       );
     }
     let Pe = We();
-    if (!Pe || (xe() && !de(Pe))) {
+    if (
+      !Pe ||
+      (xe() && !de(Pe)) ||
+      (xe() && !!huntOf(h()?.zone)?.find?.eddy && Pe.species?.id === huntOf(h()?.zone)?.legend)
+    ) {
       o.setLegendPool(!1), o.clearSlot(rz), (u.active = !1), (gi.legendPool = null);
       return;
     }
@@ -147029,6 +148050,8 @@ function Y0e(e) {
             place: i.cast?.place?.id || null,
             // Hob's rod snagged on this cast, waiting to come up (its time on the fishing clock), or null.
             rodDue: i.rodDue ? { ...i.rodDue, clock: i.clock } : null,
+            // A cracked pod due to come up on this cast (Sporewood's hunt), on the fishing clock, or null.
+            podDue: i.podDue ? { ...i.podDue, clock: i.clock } : null,
             giant: !!i.cast?.giant,
             pressureKey: i.cast?.pressureKey || null,
             letPass: i.letPass ? { ...i.letPass } : null,
@@ -147135,7 +148158,7 @@ function Y0e(e) {
           legendBite: ({ bait: Pe = null, n: I = 0 } = {}) => {
             let bn = We();
             if (!bn) return null;
-            let onLead = xe() && !k() && p(() => N()?.leadFishes?.()) === !0,
+            let onLead = xe() && herDepthNow(),
               chance = legendCastChance(bn, Pe, onLead),
               hits = 0;
             for (let roll = 0; roll < Math.max(0, I | 0); roll++) rollLegendBite(chance, lt) && hits++;
@@ -147227,7 +148250,7 @@ function Y0e(e) {
               let yn = P();
               i.cast = Ht(yn.x, yn.z, ye(yn.x, yn.z), Pe, !1);
               let bn = We(),
-                onLead = !k() && p(() => N()?.leadFishes?.()) === !0,
+                onLead = herDepthNow(),
                 chance = legendCastChance(bn, Pe, onLead),
                 may = chance > 0 && legendMayTake(bn, Pe, j()),
                 takes = 0;
@@ -147248,6 +148271,8 @@ function Y0e(e) {
             place: Q = huntOf(h()?.zone)?.find?.place ?? null,
             bait: Pe = null,
             u: U = null,
+            // Where the cast lands (Sporewood's eddy moves), when given; else where the rod aims now.
+            at: castAt = null,
           } = {}) => {
             if (!xe()) return null;
             let keep = {
@@ -147255,6 +148280,7 @@ function Y0e(e) {
               forcePlace: i.forcePlace,
               castBait: i.castBait,
               castLead: i.castLead,
+              castDrift: i.castDrift,
               castLeader: i.castLeader,
               castHook: i.castHook,
               castLoadout: i.castLoadout,
@@ -147263,11 +148289,12 @@ function Y0e(e) {
             };
             try {
               i.forcePlace = Q || null;
-              let yn = P();
+              let yn = castAt && Number.isFinite(castAt.x) && Number.isFinite(castAt.z) ? castAt : P();
               i.cast = Ht(yn.x, yn.z, ye(yn.x, yn.z), Pe, !1);
               i.castBait = Pe;
               i.castVisualLure = k();
               i.castLead = !k() && p(() => N()?.leadFishes?.()) === !0;
+              i.castDrift = !k() && !i.castLead && p(() => N()?.driftFishes?.()) === !0;
               i.castLeader = castLeaderNow();
               i.castHook = castHookNow();
               i.castLoadout = nn();
@@ -165584,6 +166611,7 @@ function cfe(e, t, n, o, a) {
     !!n?.paper?.image,
     !!o.paperImage,
     o.barge || null,
+    o.eddies ? JSON.stringify(o.eddies) : null,
   ]);
 }
 function PU(e, t, n, o, a, s, r, l, i) {
@@ -166393,6 +167421,35 @@ function hfe(e, t, n, o) {
       e.fill(),
       e.restore();
   }
+  // Burr's four eddies, from his almanac, once the wandering island has risen (the chart's eddies, by lake): a small
+  // pencil whorl at each. Drawing only.
+  for (let ed of Array.isArray(o?.eddies?.[n.id]) ? o.eddies[n.id] : []) {
+    let [px, py] = s(ed[0], ed[1]),
+      rr = Math.max(3.5, 3.4 * a);
+    e.save(),
+      (e.strokeStyle = "rgba(58, 50, 66, .62)"),
+      (e.lineCap = "round"),
+      (e.lineWidth = 0.9),
+      e.beginPath();
+    for (let q = 0; q <= 36; q++) {
+      let ang = (q / 36) * Math.PI * 3.2,
+        rq = rr * (0.18 + 0.82 * (q / 36));
+      q
+        ? e.lineTo(px + Math.cos(ang) * rq, py + Math.sin(ang) * rq * 0.86)
+        : e.moveTo(px + Math.cos(ang) * rq, py);
+    }
+    e.stroke(), e.restore();
+  }
+}
+// The chart's eddies (Burr's almanac): for each lake whose hunt's water is the evening's eddy and has been found,
+// its eddies' centres from the spore drift.
+function chartEddiesOf(loop) {
+  let out = {};
+  for (let water of huntWaters())
+    huntOf(water).find?.eddy &&
+      huntWaterFound(loop, water) &&
+      (out[water] = Sr(bs[water]?.geometry?.drift?.eddies).map((ed) => [ed.x, ed.z]));
+  return out;
 }
 function pfe(e, t, n, o, a, s, r, l) {
   let [i, c] = n.at,
@@ -167208,6 +168265,7 @@ function ZU(e) {
             reduced: !!A.reduced,
             water: Object.fromEntries(ne.sheets.map((oe) => [oe.waterId, v(oe.waterId)])),
             barge: Te?.barge?.water || null,
+            eddies: chartEddiesOf(Te),
             sites: Object.assign({}, ...ne.sheets.map((oe) => YU(o(), oe.waterId))),
             ink: { sheet: G, places: Ve },
             fmtWeight: (oe) => (typeof o()?.fmtWeight == "function" ? o().fmtWeight(oe) : ""),
@@ -167921,9 +168979,11 @@ const CATCH_MARK_CSS = `
 `;
 function catchCardMark(art, fish, game, text, own = null) {
   if (!art || !fish || typeof document > "u") return;
-  let words = text?.marks || {},
-    mark = CATCH_MARKS.includes(fish.mark) ? fish.mark : null,
-    line = mark ? words[mark] : null;
+  let zone = game?.state?.run?.zone,
+    ownMarks = !!huntOf(zone)?.marks?.own,
+    words = text?.marks || {},
+    mark = (ownMarks ? huntMarkKeys(zone) : CATCH_MARKS).includes(fish.mark) ? fish.mark : null,
+    line = mark ? (ownMarks ? words.own?.[mark] : words[mark]) : null;
   if (!line) {
     let meta = game?.state?.meta,
       water = game?.state?.run?.zone,
@@ -167943,12 +169003,29 @@ function catchCardMark(art, fish, game, text, own = null) {
     let style = document.createElement("style");
     (style.id = "gw-cc-mark-css"), (style.textContent = CATCH_MARK_CSS), document.head.appendChild(style);
   }
-  mark && (art.classList.add("gw-cc-marked"), art.insertAdjacentHTML("beforeend", catchMarkSvg(mark)));
+  mark &&
+    !ownMarks &&
+    (art.classList.add("gw-cc-marked"), art.insertAdjacentHTML("beforeend", catchMarkSvg(mark)));
   let p = document.createElement("p");
   (p.className = "gw-cc-markline"),
     (p.dataset.mark = mark || (ownLine ? "own" : "leaves")),
     (p.textContent = line),
     art.after(p);
+  // A line-up fish's own mark (PAD_MARKS[mark].card, the art's: its own <svg>, an inset on a seed pod) on the card's
+  // picture, when there is a drawing.
+  let markArt = mark && ownMarks ? padMarkArt(mark) : "";
+  markArt && (art.classList.add("gw-cc-marked"), art.insertAdjacentHTML("beforeend", markArt));
+}
+// A mark's catch-card drawing from the art's PAD_MARKS: its `card` (an <svg> string), or the entry itself when it is a
+// string or a function of the mark giving one; "" when there is none.
+function padMarkArt(mark) {
+  let art = typeof PAD_MARKS == "undefined" || !PAD_MARKS ? null : PAD_MARKS[mark];
+  try {
+    art = typeof art == "function" ? art(mark) : art?.card !== void 0 ? art.card : art;
+  } catch {
+    art = null;
+  }
+  return typeof art == "string" ? art : "";
 }
 function QU({
   ctx: e,
@@ -176918,6 +177995,48 @@ function padPanels(key, text, at, view = {}, fresh = []) {
 }
 // Each notepad's drawings, by the hunt's pad.art: (key, text, at, view, fresh) gives a drawn sketch's panels.
 const PAD_ART = { mossmere: padPanels };
+// A drawn sketch's panels from its notepad's drawings (PAD_ART, looked up by the caller), or, when they are
+// missing, give nothing or fail, the sketch's own words alone (padPlainPanels), so a drawn sketch is never blank.
+function padDrawnPanels(draw, key, text, at, view, fresh) {
+  let html = null;
+  try {
+    html = typeof draw == "function" ? draw(key, text, at, view, fresh) : null;
+  } catch {
+    html = null;
+  }
+  return html || padPlainPanels(key, text, view);
+}
+// A sketch's words with no drawing: what each place says, in the notepad's hand.
+function padPlainPanels(key, text, view = {}) {
+  let cap = (words) => (words ? `<p class="gw-pad-cap">${padEsc(words)}</p>` : ""),
+    named = (line) =>
+      String(line || "").replace("{bait}", herBaitWords(view.swirlRig?.bait || "", view.water).the),
+    lines = [];
+  if (key === "map") lines.push(text.map, text.end, view.eddiesMarked ? text.eddies : null);
+  else if (key === "taken") lines.push(view.foundBy === "chart" ? text.takenSelf : text.taken);
+  else if (key === "swirl") lines.push(named(text.swirl?.[view.swirlKind] || text.swirl?.left));
+  else if (key === "back")
+    lines.push(...(view.back?.length ? view.back.map((part) => text.back?.[part]) : [text.back?.held]));
+  else if (key === "lineup") {
+    let lu = text.lineup || {},
+      crossed = Sr(view.crossed),
+      fish = Sr(huntOf(view.water)?.lineup);
+    lines.push(lu.head);
+    for (let id of fish)
+      lines.push(
+        crossed.includes(id)
+          ? `${lu.fish?.[id]?.name || id}: ${lu.fish?.[id]?.why || ""}`
+          : lu.fish?.[id]?.name,
+      );
+    lines.push(view.landed ? lu.landed || lu.none : crossed.length >= fish.length ? lu.none : lu.frame);
+    for (let mark of Sr(view.marks))
+      lines.push(
+        (view.landed && lu.marks?.[mark]?.landed) || lu.marks?.[mark]?.match || lu.marks?.[mark]?.open,
+      );
+  }
+  let body = lines.filter(Boolean).map(cap).join("");
+  return body ? `<div class="gw-pad-pnl gw-pad-plain">${body}</div>` : null;
+}
 function padCoils(n = 12) {
   let s = `<svg viewBox="0 0 ${n * 30} 30" preserveAspectRatio="none" aria-hidden="true">`;
   for (let i = 0; i < n; i++) {
@@ -176941,7 +178060,7 @@ function notepadElement(h, text, view, { page = null, animate = [], intro = !1, 
     fig = (place) => {
       let drawn = view.sketches?.[place.key] > 0,
         panels = drawn
-          ? draw(place.key, text, animate.includes(place.key) ? 0.6 : null, view, animate)
+          ? padDrawnPanels(draw, place.key, text, animate.includes(place.key) ? 0.6 : null, view, animate)
           : null;
       // Sketch 5 drawn with nothing broken is titled "What held".
       let title = place.key === "back" && drawn && !view.back?.length ? text.heldTitle : titles[place.key];
@@ -178128,6 +179247,11 @@ function huntView(K) {
   try {
     t.bus?.on?.("hunt:found", (found = {}) => {
       let words = text(here()).water || {};
+      // The island rose (Sporewood's find): what was seen and the sketch line; its cutscene follows, with no lift.
+      if (found.rise) {
+        say(words.rise), say(text(here()).drawn);
+        return;
+      }
       say(found.onLead ? words.takenLead : words.takenFloat);
       found.onLead || say(words.spareFloat);
       say(text(here()).drawn);
@@ -178138,6 +179262,12 @@ function huntView(K) {
       let words = noted.crossed ? text(here()).pad?.lineup?.fish?.[noted.crossed] : null;
       words && say(noted.ringed ? words.why : (words.whyPlain ?? words.why));
       say(text(here()).drawn);
+    });
+    // A cracked pod brought up on the line (Sporewood's): what it is, its marks, and the sketch line the first time.
+    t.bus?.on?.("hunt:pod", (pod = {}) => {
+      let words = text(here()).marks || {};
+      say(words.pod), say(words.person);
+      pod.first && say(text(here()).drawn);
     });
     // The character's rod (Hob's) brought up from her hole after the landing: what it is, and where it goes.
     t.bus?.on?.("hunt:rod", () => {
@@ -178156,10 +179286,16 @@ function huntView(K) {
     let style = document.createElement("style");
     (style.id = "gw-notepad-css"), (style.textContent = NOTEPAD_CSS), document.head.appendChild(style);
   }
-  // The character's island in a lake's arena (character.island: Mossbell Isle), or null.
+  // Where the character waits in a lake: his island in its arena (character.island: Mossbell Isle), or the door
+  // of his place (character.place: Burr's Drowned Greenhouse); null for none.
   let isle = (water) => {
-      let name = huntOf(water)?.character?.island,
+      let rule = huntOf(water)?.character,
+        name = rule?.island,
         zone = D().ZONE_BY_ID?.[water] || (D().ZONES || []).find((z) => z?.id === water);
+      if (rule?.place) {
+        let at = wo.places?.[rule.place]?.greenhouse;
+        return at && Number.isFinite(at.x) ? { x: at.x, z: at.z } : null;
+      }
       return (name && (zone?.arena?.islands || []).find((i) => i?.name === name)) || null;
     },
     // Hob waits until nothing is on screen and the line is in, so he never cuts into a bite or a card.
@@ -178247,6 +179383,8 @@ function huntView(K) {
           call("hobHere") === !0 &&
           ((state.armed = !1), (talk = call("hobTalk")), talk && openHob(talk, run.zone));
     } else t.flow !== "playing" && (state.armed = !0);
+    // Off the water the hunt's props (the moss rafts, a cracked pod) are put away.
+    t.flow !== "playing" && hideHuntProps();
     // Her water's lift, when nothing holds the screen. Off the water it waits for the next trip's own lifts.
     if (state.liftDue)
       if (t.flow !== "playing") state.liftDue = !1;
@@ -179028,11 +180166,19 @@ function WV(e) {
       // of scrapes has been seen.
       arrivalText = f().arrivals || {},
       gutOnly = gift === "leaders" && qt.tally?.giftSay === "gutOnly",
+      // The part a lake's arrival brought alone (wo.arrivals[lake].alone), by Murk's word for it.
+      aloneOf = Object.entries(wo.arrivals?.[qt.tally?.zone]?.alone || {}).find(
+        ([, say]) => say === qt.tally?.giftSay,
+      ),
       arrivalKey = gutOnly
         ? "gutOnly"
         : gift === "turnback_hook" && qt.tally?.giftSay === "hunt"
           ? "hookHunt"
-          : gift,
+          : aloneOf
+            ? aloneOf[1]
+            : qt.tally?.giftSay === "hunt" && arrivalText.hunt?.[gift]
+              ? arrivalText.hunt[gift]
+              : gift,
       // A hunt's relic (Hob's Lamp) at the tally after she is landed, in that hunt's words.
       relicWater = huntWaterOfRelic(gift),
       endingText = f().hunts?.[relicWater]?.ending || {},
@@ -179068,7 +180214,7 @@ function WV(e) {
     huntBeat?.landed && Tt.querySelector(".gw-tally")?.appendChild(huntEl);
     if (gift && giftShown.line) {
       let g = n("div", `gw-tally-gift${Le.empty ? " gw-in" : ""}`),
-        art = RELIC_ART[gift] ?? (dV[gutOnly ? "chafe_gut" : gift] || "");
+        art = RELIC_ART[gift] ?? (dV[gutOnly ? "chafe_gut" : aloneOf ? aloneOf[0] : gift] || "");
       g.innerHTML = `<span class="gw-tally-gift-art" aria-hidden="true">${art}</span><b class="gw-tally-gift-name"></b><p class="gw-murk-line gw-in"></p>${giftShown.fit ? '<p class="gw-tally-gift-fit"></p>' : ""}`;
       (g.querySelector(".gw-tally-gift-name").textContent = giftShown.name || ""),
         (g.querySelector(".gw-murk-line").textContent = giftShown.line),
@@ -179076,6 +180222,15 @@ function WV(e) {
         Tt.querySelector(".gw-tally")?.appendChild(g);
     }
     huntEl && !huntBeat.landed && Tt.querySelector(".gw-tally")?.appendChild(huntEl);
+    // At the ending's tally, after the keepsake: Murk's word that the next water is not charted yet (ending.murk.next).
+    if (huntBeat?.landed && relicWater && endingText.murk?.next) {
+      let nextEl = n("div", `gw-tally-hunt${Le.empty ? " gw-in" : ""}`),
+        line = n("p", "gw-murk-line gw-in");
+      (nextEl.dataset.loop = "tallynext"),
+        (line.textContent = endingText.murk.next),
+        nextEl.appendChild(line);
+      Tt.querySelector(".gw-tally")?.appendChild(nextEl);
+    }
     // Capseeds left in the Seed Pouch spoiled at this tally (lastTrip.spoiled): the card says so.
     if (qt.tally?.spoiled > 0 && f().seedPouch?.spoiled) {
       let spoiledEl = n("p", `gw-tally-gift-fit gw-tally-spoiled${Le.empty ? " gw-in" : ""}`);
@@ -179952,6 +181107,10 @@ function WV(e) {
     en("place:lift", (_t) => {
       let Pt = Zhe(_t, o());
       _t.phase === "title" && Pt.show ? W(Pt) : (_t.phase === "end" || _t.phase === "start") && C();
+    }),
+    // A hunt cutscene's plain title card (titleSceneDirector), shown as a place's title is.
+    en("hunt:title", (_t) => {
+      _t?.phase === "title" && _t.name ? W({ name: _t.name, dur: Yo(_t.dur, 3) }) : C();
     }),
     en("fishing:hook", (_t) => {
       h() && _t?.legendary === !0 && ee();

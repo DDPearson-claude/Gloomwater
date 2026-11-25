@@ -383,6 +383,96 @@ names those call. Their interfaces are in `hunt-per-lake.md`, "Sporewood's piece
   raft is over 40 m from him. The Sporewood field guide draws her new model and a new portrait of it, side on, as the
   other Sporewood fish; its name and line for her, and when it shows her, were left to the hunt's rules and words.
 
+## Sporewood's hunt, its rules, words and flow, built 25 November 2026
+
+Step 5a of the Sporewood plan: the hunt for the wandering island, the Meadowback Pacu, by the plan's fourteen beats.
+Its rules are `wo.hunts.sporewood`, its words `Ca.hunts.sporewood`; `hunt-per-lake.md` lists what each piece is and
+what the art (step 5b, built apart and merged) is passed. Its drawings, Burr's figure, the moss rafts, the pod, the
+scenes and the meadow on the raft are the art's, looked up when needed; were one missing, a plain title card would
+stand in for a scene and the notepad's words for a drawing.
+
+- **How it plays, beat by beat.** Murk's Drift Float and Seed Pouch at Sporewood's first two tallies with sales (built
+  before). The seedfall from Sporewood's evening 2. The tale at the tally of its evening 2, both lines Murk's in his
+  box, and the notepad opens. Burr's lamp at the Greenhouse is lit from evening 2 at dusk and after dark; within
+  7.5 m of its door, while it is lit, he talks once (four boxes) and draws his almanac page, sketch 1, "Where the
+  spores gather"; then one line a night and his greeting. Missed, Murk says where he is after one evening and passes
+  the page on after two. At the next tally Murk names the five crushers, sketch 3. Each suspect's catch card shows
+  its own mark (the puffers' beak, the ray's plates, the piranha's razor teeth, the catfish's pads) with a line, and
+  its first catch crosses it out with its reason. In her time a cast near the evening's eddy sometimes brings up a
+  pod cracked clean through, "like a person's teeth"; the first goes into the marks strip and brings the Burl Hook.
+  Moss rafts drift in to her eddy in her time, with a direction word, as Mossmere's boils. The first time the raft is
+  within 10 m of the evening's eddy in her time, the island rises (sketch 2) and Burr's four eddies go on the chart.
+  At the next seedfall the crunch plays, once, and on later nights a splash marks her eddy at the first sigh. She
+  noses any bait but a Capseed, a Capseed under a still float and any lure, and turns (sketch 4, "The refusal"). She
+  takes a Capseed under the Drift Float within 6 m of her eddy in her time at 1 in 3, once the Burl Hook and the
+  Brass Trace are shelved or owned, three tries a night. The Mere Hook is crushed early, the Plain Knot (or the
+  snood) bitten through halfway, a line under the Mothsilk snaps at the end, each named, taught, notched and drawn
+  (sketch 5). Landed, the measuring card names her, she is let go, and at the tally Murk's line comes first, then
+  Burr's Seed (Burr took it from her back), then "The next water is Glasswater. Nobody has charted it yet, so this
+  is as far as the barge goes." The 3,000 bounty goes into Sporewood's purse, no chart is laid, and each landing
+  makes her next fight 2 harder, as Mossmere's.
+- **Gaps filled during the build:**
+  - Sporewood counts its own evenings for the hunt (`lakeEvenings`): the tale, Burr's lamp and the seedfall come from
+    the evenings spent there, so a player who sails in on evening 20 still has the plan's pacing. The seedfall was
+    built "from evening 2" by the game's evenings; it now comes from Sporewood's evening 2.
+  - The tale is in Murk's box under his name, as Mossmere's ruling has it (the brief's "under Burr's name" was read as
+    the tale being about Burr's islet).
+  - Burr talks only while his lamp is lit (dusk and night). His part of the lake, for the nudges, is the water within
+    25 m of the evening's eddy.
+  - Her water: the island rises within 10 m of the eddy, she takes within 6 m, cracked pods come within 16 m at 3
+    casts in 10 (only on a cast she does not answer, so before she has risen, or 6 to 16 m out after), moss rafts
+    every 20 to 30 s from 12 to 18 m out at 0.55 m a second. The island plays as soon as the screen is free; the crunch
+    6 s after the first sigh of the next seedfall.
+  - The suspects' marks show from Burr's almanac until she is landed, as Mossmere's marks wait for Hob's map.
+  - Her refusals: "left" (any bait but a Capseed), "float" (a Capseed under a still float) and "lure"; sketch 4 always
+    ends "It wants a seed pod, riding the drift." No leader makes her refuse (Mossmere's wire has no match here).
+  - The losses' looks: the hook "spat", the knot and the line "snapped". The Mothsilk's hold (7) is her line rule; her
+    landing cap stays the old 0.5, a coin flip.
+  - The leaders come with Burr's almanac (both, or the one not yet shelved, with Murk's own line), never on a quiet
+    tally; the Brass Trace still comes sooner after a toothy fish. The Burl Hook still comes on a quiet tally, or
+    after the first pod with Murk's hunt line. Its shelf line now says it won't crush.
+  - The Mothsilk is 2,400 on the shelf (it was 2,800): about four times Mossmere's Waxed Silk, as the plan prices the
+    hunt's parts.
+  - The Glowcap Bulb leaves Murk's shelf (nothing takes it now; an older save keeps its stock). The Mother's Cup is no
+    longer her place: its card is the Downcast Catfish, and the pool's glimmer never marks her there.
+  - Her records, the roster's copy and the field guide name her the Meadowback Pacu, with plain lore; the old epithet
+    "The Meadow That Swims" goes, and Glasswater's old seal label no longer names her.
+  - Burr's Seed: in any lake after Sporewood a giant bites 1.5 times as often, never a legend; no such lake exists yet,
+    so today it changes no bite. It grows at the raft's front corner across from Hob's Lamp.
+  - An older save that had sold the Drifting Grove loads with her hunt landed and Burr's Seed, as Mossmere's does.
+- **Words:** 17 new lines of Murk's, 11 of Burr's, about 77 others (the island, the moss rafts, the pods and marks,
+  refusals, losses, the notepad, the ending, her lore), and about 60 labels, all in the voice guide's style. No line
+  names her kind before the landing.
+- **Timed play-through by script** (`tools/playthrough.mjs --lake sporewood`), from `sporewood-crossed` made into a
+  first arrival (no Sporewood evening played, 137 clams, the starter kit). Its player fishes the Lullaby by day on
+  Spore Cake, keeps a hold of 3 at the game's own sizes and buys only the hunt's parts; it lands fish with the debug
+  calls (only kinds the game's own roll gives there) and never hands out clams or parts. 24 of Sporewood's evenings
+  were played, with no game errors; it did not reach the landing.
+  - **Measured, by Sporewood's evenings:** the Drift Float 1; the Seed Pouch, the tale and the notepad, Burr's
+    almanac and the island rising 2; the leaders on the shelf, the line-up, the crunch, the refusal and the Brass
+    Trace bought 3; the first cracked pod and the Burl Hook shelved and bought 4; the first hook-up 5, lost to the
+    line (sketch 5); the Rootthread bought 8. From then she only turns away ("It remembers the line"), and at
+    evening 24 it had 1,083 clams towards the Mothsilk.
+  - **Tallies** averaged 73 clams an evening (12 to 195), less than half the plan's 178 for the starter kit, which
+    the earnings study measured with a hold of 4 and its own spots.
+  - **Projected, not measured:** the Mothsilk about evening 42 and the landing a few evenings later (three tries a
+    night at 1 in 3, and her landing chance a coin flip at best). That is far later than the plan's 7 to 12 for a
+    keen player; a player who buys a creel or fills orders earns more, which was not measured.
+  - **The opening went faster than designed:** the script knows where to go, so Burr, the island and the crunch came
+    on evenings 2 and 3 (planned 3, then 4 or 5). Not checked by this run: the art's own scenes (it ran before the art
+    was merged, so the plain title cards played), and the real length of an evening.
+- **Mossmere is unchanged:** the 52 scenarios named by Mossmere's hunt words (hunt, midnight, her water, the bird at
+  midnight, her tries, her refusals, her first take, her losses, her right rig, line-up, bite marks, ending, Hob's,
+  legend-sold, the thief), one at a time: 51 of 52 before; the one failure, "tackle arrival: one piece a tally", had a
+  stale Sporewood case from before Murk's gifts there were waited for, now fixed. After, on the build merged with the
+  art: 52 of 52. Three of them read Sporewood's legend and now expect her hunt: her bait (a Capseed under the Drift
+  Float, never the old Glowcap Bulb), her line rule on Twine, and that stale case.
+- **Scenarios:** thirteen new, "Sporewood hunt, ...", one or more a beat, pass one at a time on the merged build.
+  Sporewood's other checks (the seedfall, the Seed Pouch, the Drift Float, the drift, the Greenhouse, its fish and
+  tackle) were run once: 43 of the first 45 passed, and the two that failed set the game's evening to 1 to test
+  Sporewood's evening 1, which now reads the lake's own evening; their helpers set both. The other 31 were not run
+  after the last change.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.

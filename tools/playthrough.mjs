@@ -6,7 +6,8 @@
 // How it plays (the shortcuts are listed in the summary too):
 // - Screens are worked as a player works them: the driver's sail, the tally's Sold button, Murk's and Hob's
 //   speech boxes, the notepad's close button, the catch card's Keep, Let go and Into the tin.
-// - Fish are landed with the debug hook instantCatch, at an ordinary size (z 0), and only kinds the game's own
+// - Fish are landed with the debug hook instantCatch, at an ordinary size (z 0; in Sporewood at the game's own size
+//   roll), and only kinds the game's own
 //   bite roll (fishPoolRoll) gives for the place, light, bait and depth fitted. Each evening keeps fish up to an
 //   earnings budget (decisions.md: a keen player earns about 45 clams an evening, about 80 once on Braided Gut).
 // - The raft is moved by teleport (to Hob's rock, to Hob's part, to a boil, to the marked spot).
@@ -16,6 +17,18 @@
 // - Shelf buys use the shelf's own call (loop.buy) and fitting uses the tackle screen's calls (fitDepth, fit).
 //
 // Usage: node tools/playthrough.mjs [--out run.json] [--evenings 40] [--page Gloomwater-Mossmere.html]
+//   [--lake sporewood --from save.txt]
+//
+// With --lake sporewood it plays Sporewood's hunt (sporewood-plan.md) from a save whose barge is in Sporewood (by
+// default tools/fixtures/sporewood-crossed.json made into a first arrival: no Sporewood evening played yet), evening
+// after evening until the wandering island is landed and her ending tally is done. Its player: fishes by day in
+// the Lullaby (Sporewood's free place, where the earnings study's starter kit fished) to an earnings budget, landing
+// fish at the game's own size roll, fits Murk's Drift Float, sails to Burr's lamp at dusk until his almanac
+// is drawn, gathers three Capseeds in the seedfall (the raft put on floating pods), waits where the drift ends in
+// her time and follows the moss rafts in, casts there in her time (two ordinary casts, which may bring up a
+// cracked pod, then her own answer, fishHerCast, on Spore Cake until the refusal is drawn, then on a Capseed
+// under the Drift Float), and buys the Burl Hook, the Brass Trace, the Rootthread and the Mothsilk as the hunt
+// shows them. Its evenings in the summary are Sporewood's own.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -31,6 +44,7 @@ const MAX_EVENINGS = Number(option("--evenings", 40)) || 40;
 const PAGE = option("--page", DEFAULT_PAGE);
 const SAVES = option("--saves", null); // a folder: the save string after each evening, as e<N>.save
 const FROM = option("--from", null); // a save file to start from instead of New Game (for testing the tool)
+const LAKE = option("--lake", "mossmere");
 
 const LEGEND = "belled_matriarch";
 const MIDNIGHT_AT = 60;
@@ -159,8 +173,12 @@ async function hearHob(s, waitMs = 15000) {
 
 // Lands a fish with instantCatch and works its catch card: Into the tin when wanted and offered, else Keep while
 // the hold has room, else Let go. Returns what was done.
-async function landFish(s, id, { tin = false } = {}) {
-  const ok = await s.eval((id) => window.__gw.debug.instantCatch(id, { z: 0 }), id);
+async function landFish(s, id, { tin = false, rolled = false } = {}) {
+  // An ordinary size (z 0), or with `rolled` the game's own size roll for the cast.
+  const ok = await s.eval(
+    ([id, rolled]) => window.__gw.debug.instantCatch(id, rolled ? undefined : { z: 0 }),
+    [id, rolled],
+  );
   if (!ok) return { id, did: "refused" };
   for (const end = Date.now() + 30000; Date.now() < end; ) {
     await s.pause(400);
@@ -653,6 +671,7 @@ const MILESTONES = [
 // ---- main ---------------------------------------------------------------------------------------------------
 
 async function main() {
+  if (LAKE === "sporewood") return mainSporewood();
   const browser = await launchBrowser();
   const save = FROM ? readFileSync(FROM, "utf8") : null;
   const s = await GameSession.open(browser, {
@@ -732,6 +751,450 @@ async function main() {
     landedOn: milestones.landed ?? null,
     milestones,
     quietEvenings: quiet,
+    stopped,
+    minutes: (Date.now() - t0) / 60000,
+    errors: evenings.flatMap((e) => (e.errors || []).map((x) => `E${e.evening}: ${x}`)),
+  };
+  say("SUMMARY", JSON.stringify(summary, null, 1));
+  if (OUT) writeFileSync(OUT, JSON.stringify({ summary, evenings }, null, 1));
+}
+
+// ---- Sporewood's hunt (--lake sporewood) --------------------------------------------------------------------
+
+const SW_LEGEND = "drifting_grove";
+const SW_BUDGET = { plain: 178, root: 260 }; // clams an evening: the starter kit's measured earnings, more on Rootthread
+const BURR_NEAR = { x: 52, z: -25.5 };
+const SW_START = { x: 40, z: 22 };
+// Where the player fishes by day: the Lullaby, Sporewood's free place, as the earnings study's starter kit did.
+const SW_FISHING = { x: -51.5, z: -29 };
+
+const swState = (s) =>
+  s.eval(() => {
+    const g = window.__gw,
+      st = g.progression.loop.state();
+    return JSON.parse(
+      JSON.stringify({
+        clams: st.clams,
+        evenings: st.evenings,
+        lake: st.eveningsAt?.sporewood ?? 0,
+        tackle: st.tackle,
+        parts: st.parts,
+        fitted: st.fitted,
+        shelved: st.arrivals?.shelved ?? [],
+        hunt: st.hunt?.sporewood ?? null,
+        relics: st.relics ?? [],
+        bait: st.bait?.sporewood ?? {},
+        holdSlots: st.holdSlots,
+        next: g.progression.loop.notepad?.("sporewood")?.next ?? null,
+      }),
+    );
+  });
+
+// Records the hunt's own events too: moss rafts (hunt:boil), the find, its scenes and cracked pods.
+const listenSw = (s) =>
+  s.eval(() => {
+    const g = window.__gw;
+    if (g.bus.__ptSwListening) return;
+    g.bus.__ptSwListening = true;
+    window.__ptSw ||= { found: [], scene: [], pods: [] };
+    g.bus.on("hunt:found", (e) => window.__ptSw.found.push(JSON.parse(JSON.stringify(e))));
+    g.bus.on("hunt:scene", (e) => window.__ptSw.scene.push(`${e.kind}:${e.phase}`));
+    g.bus.on("hunt:pod", (e) => window.__ptSw.pods.push(JSON.parse(JSON.stringify(e))));
+  });
+
+// The clock put `tau` seconds after the seedfall's first sigh (1 s into dusk), with two frames run.
+const atSeedfall = (s, tau) =>
+  s.eval(async (tau) => {
+    const g = window.__gw,
+      run = g.state.run,
+      t = 1 + tau,
+      phase = t < 20 ? "dusk" : "gloomtide";
+    run.phase !== phase && g.debug.setPhase(phase);
+    run.phaseTime = t < 20 ? t : t - 20;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return run.midnight ? JSON.parse(JSON.stringify(run.midnight)) : null;
+  }, tau);
+
+const swEddy = (s) => s.eval(() => window.__gw.data.herWaterAt("sporewood", window.__gw.state.run.evening));
+
+const rollSwFish = (s, bait) =>
+  s.eval((bait) => {
+    const r = window.__gw.debug.fishPoolRoll(300, { bait });
+    const entries = Object.entries(r?.counts || {}).filter(
+      ([id]) => id !== "none" && id !== "drifting_grove",
+    );
+    const total = entries.reduce((n, [, c]) => n + c, 0);
+    if (!total) return null;
+    let u = Math.random() * total;
+    for (const [id, c] of entries) if ((u -= c) <= 0) return id;
+    return entries.at(-1)[0];
+  }, bait);
+
+// Sails the raft through the seedfall's floating pods until the pouch holds three Capseeds (the raft gathers a pod
+// within 3 m of it).
+async function gatherCapseeds(s, rec) {
+  for (let k = 0; k < 14; k++) {
+    const got = await s.eval(async (k) => {
+      const g = window.__gw,
+        D = g.data,
+        run = g.state.run,
+        set = D.seedfallPods("sporewood", run.evening),
+        tau = run.phase === "dusk" ? run.phaseTime - 1 : 19 + run.phaseTime,
+        at = set ? D.seedfallPodAt(set, k, tau) : null;
+      if (at && (at.state === "float" || at.state === "eddy")) g.player.teleport({ x: at.x, z: at.z }, 0);
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      return run.bait?.capseed ?? 0;
+    }, k);
+    await s.pause(250);
+    if (got >= 3) break;
+  }
+  rec.capseeds = await s.eval(() => window.__gw.state.run.bait?.capseed ?? 0);
+}
+
+// Two ordinary casts by her eddy, which may bring up a cracked pod; the line is brought in after each.
+async function castsByEddy(s, at, rec) {
+  for (let k = 0; k < 2; k++) {
+    const cast = await s.eval((a) => {
+      const g = window.__gw;
+      g.player.teleport({ x: a.x + 14, z: a.z + 1 }, Math.PI / 2);
+      return g.debug.castAt(a.x + 8, a.z, 0.6);
+    }, at);
+    if (!cast) rec.notes.push("a cast by the eddy was refused");
+    // A pod comes 1.2 s of the game's clock after the float lands (podDue): wait for it, or for none to be due.
+    await s
+      .waitFor(
+        "the cast by the eddy",
+        20000,
+        (n) => {
+          const f = window.__gw.debug.fishing();
+          return (
+            window.__ptSw.pods.length > n ||
+            (f?.state === "waiting" && !f.podDue) ||
+            (!!f && f.state !== "waiting" && f.state !== "casting")
+          );
+        },
+        await s.eval(() => window.__ptSw.pods.length),
+      )
+      .catch(() => {});
+    await s.eval(() => {
+      const g = window.__gw;
+      g.debug.fishPlayTo?.(0.995);
+      g.fishing.reelInQuiet?.();
+    });
+    await settle(s);
+  }
+  rec.pods = await s.eval(() => window.__ptSw.pods.length);
+}
+
+// Her answer at her eddy in her time: Spore Cake on the Drift Float until the refusal is drawn, then a Capseed, up
+// to three tries; a take is hooked and fought out.
+async function fishSwHer(s, at, rec, ctx) {
+  const st = await swState(s);
+  for (let k = 0; k < 6; k++) {
+    const capseeds = await s.eval(() => window.__gw.state.run.bait?.capseed ?? 0);
+    const bait = st.hunt?.sketches?.swirl && capseeds > 0 ? "capseed" : "spore_cake";
+    await s.eval((bait) => {
+      const loop = window.__gw.progression.loop;
+      loop.state().parts.includes("drift_float") && loop.fitDepth("drift");
+    }, bait);
+    const a = await s.eval(
+      ([b, at]) => window.__gw.debug.fishHerCast({ bait: b, u: Math.random(), at: { x: at.x + 2, z: at.z } }),
+      [bait, at],
+    );
+    if (!a) {
+      rec.her.push("closed");
+      break;
+    }
+    rec.her.push(`${bait}:${a.part || (a.take ? "take" : "none")}${a.said ? `: ${short(a.said, 7)}` : ""}`);
+    await settle(s);
+    if (a.take) {
+      const r = await hookAndPlay(s, SW_LEGEND);
+      rec.hook = {
+        p: r.p,
+        reason: r.escape?.legendLossReason ?? null,
+        line: r.line ?? null,
+        landed: r.landed === SW_LEGEND,
+      };
+      ctx.hookups++;
+      if (r.landed === SW_LEGEND) {
+        await press(s, /^\d?Let go\b/);
+        await s.pause(1500);
+      }
+      await settle(s);
+      break;
+    }
+    if (!a.open) break;
+    if (!a.tried && a.part && k >= 2) break;
+  }
+}
+
+async function playSporeEvening(s, n, ctx) {
+  const rec = {
+    evening: n,
+    notes: [],
+    landed: [],
+    murk: [],
+    hob: [],
+    toasts: [],
+    bought: [],
+    wanted: [],
+    gifts: [],
+    her: [],
+  };
+  const before = await swState(s);
+  rec.clamsAtStart = before.clams;
+  rec.sail = await s.sail({ wick: "Tallow", water: "sporewood", timeoutMs: 300000 });
+  await listen(s);
+  await listenSw(s);
+  await s.eval(() => {
+    for (const k of ["toasts", "boils", "escaped", "landed", "scene"]) window.__pt[k].length = 0;
+    for (const k of ["found", "scene", "pods"]) window.__ptSw[k].length = 0;
+  });
+  let st = await swState(s);
+  const h = () => st.hunt || {};
+  const lake = await s.eval(() => window.__gw.state.run.lakeEvening ?? null);
+  rec.lake = lake;
+  // 1. By day: fish the Lullaby to the budget, on Spore Cake (the Drift Float is a plain float there).
+  await teleport(s, SW_FISHING);
+  await s.pause(1500);
+  await s.closeGuides(3000);
+  const budget = st.tackle.line >= 1 ? SW_BUDGET.root : SW_BUDGET.plain;
+  rec.budget = budget;
+  const keepN = Math.max(1, Math.min(st.holdSlots || 3, Math.round(budget / Math.max(10, ctx.avgFish))));
+  await s.eval(() => window.__gw.progression.loop.fit?.("bait", "spore_cake"));
+  let kept = 0;
+  for (let casts = 0; casts < MAX_LANDED && kept < keepN; casts++) {
+    const id = await rollSwFish(s, "spore_cake");
+    if (!id) {
+      rec.notes.push("no bite roll for spore_cake");
+      break;
+    }
+    const got = await landFish(s, id, { rolled: true });
+    rec.landed.push(`${id}:${got.did}${got.mark ? "*" : ""}`);
+    if (got.did === "keep") kept++;
+  }
+  // 2. Dusk, from Sporewood's evening 2: Burr's lamp is lit; sail to him until his almanac is drawn.
+  if (lake >= 2 && !h().landed) {
+    await atSeedfall(s, -0.6);
+    await s.closeGuides(3000);
+    if (!h().sketches?.map) {
+      await teleport(s, BURR_NEAR);
+      const lines = await hearHob(s, 25000);
+      rec.hob.push(...lines);
+      await teleport(s, SW_START);
+      await s.pause(800);
+      st = await swState(s);
+    }
+    // 3. The seedfall: gather three Capseeds once the pouch is owned (after a cutscene that is due has played).
+    await atSeedfall(s, 0.2);
+    await atSeedfall(s, 2);
+    await s.closeGuides(3000);
+    await atSeedfall(s, 8);
+    await s.pause(1500);
+    await settle(s);
+    if (st.parts.includes("seed_pouch")) {
+      await atSeedfall(s, 40);
+      await gatherCapseeds(s, rec);
+    }
+    // 4. Her time, once the almanac is drawn: where the drift ends.
+    if (h().sketches?.map) {
+      rec.debugClock = true;
+      const at = await swEddy(s);
+      if (!h().found) {
+        // Where the spores gather: wait 20 m short of the eddy, then follow a moss raft in.
+        await teleport(s, { x: at.x + 20, z: at.z });
+        for (let tau = 44; tau < 170 && !(await s.eval(() => window.__ptSw.found.length)); tau += 4) {
+          await atSeedfall(s, tau);
+          const raft = await s.eval(() => window.__pt.boils.at(-1) ?? null);
+          if (raft?.word) {
+            rec.notes.push(`moss raft ${raft.word}`);
+            await teleport(s, { x: at.x + 6, z: at.z });
+            await s.pause(1500);
+          }
+        }
+        await settle(s);
+        st = await swState(s);
+        if (h().found) rec.notes.push("the island rose");
+      } else {
+        await atSeedfall(s, 60);
+        await castsByEddy(s, at, rec);
+        await settle(s);
+        await fishSwHer(s, at, rec, ctx);
+      }
+      rec.midnight = await atSeedfall(s, 181);
+      await s.pause(1200);
+      await settle(s);
+    }
+  }
+  rec.toasts.push(...(await takeToasts(s)));
+  rec.scenes = await s.eval(() => window.__ptSw.scene.slice());
+  // 5. Home, and the tally.
+  rec.clamsBeforeTally = (await swState(s)).clams;
+  const t = await tally(s);
+  rec.murk.push(...t.murk);
+  rec.tallyHunt = t.hunt;
+  rec.tallyGift = t.gift;
+  rec.trip = t.trip;
+  rec.pad = t.pad;
+  st = await swState(s);
+  rec.clamsAfterTally = st.clams;
+  if (t.trip?.gift) rec.gifts.push(t.trip.gift);
+  if (t.trip?.total && rec.landed.some((l) => /:keep\*?$/.test(l))) {
+    const keptN = rec.landed.filter((l) => /:keep\*?$/.test(l)).length;
+    const sale = t.trip.total - (t.trip.bounty || 0);
+    if (keptN && sale > 0) ctx.avgFish = 0.5 * ctx.avgFish + 0.5 * (sale / keptN);
+  }
+  // 6. At home: fit the Drift Float, buy what the hunt needs next, and fit the hunt's parts.
+  await shopSw(s, rec);
+  rec.after = await swState(s);
+  rec.notepad = await s.eval(() => {
+    const v = window.__gw.progression.loop.notepad?.("sporewood");
+    return v ? JSON.parse(JSON.stringify(v)) : null;
+  });
+  await s.collectGameErrors();
+  rec.errors = s.errors.splice(0);
+  return rec;
+}
+
+async function shopSw(s, rec) {
+  let st = await swState(s);
+  if (st.parts.includes("drift_float") && st.fitted.depth !== "drift") {
+    await s.eval(() => window.__gw.progression.loop.fitDepth("drift"));
+    rec.notes.push("fitted the Drift Float");
+  }
+  const cake = st.bait?.spore_cake ?? 0;
+  if (cake < 6) {
+    const r = await s.eval(() => window.__gw.progression.loop.buy("tin:spore_cake"));
+    if (r?.ok) rec.bought.push("Spore Cake");
+  }
+  const shelf = await shelfNow(s);
+  st = await swState(s);
+  const want = [];
+  const onShelf = (id) => shelf.find((i) => i.id === id && !i.bought);
+  for (const id of ["burl_hook", "brass_trace"])
+    if (onShelf(`part:${id}`) && !st.parts.includes(id)) want.push(`part:${id}`);
+  if (st.tackle.line < 1 && onShelf("line:1")) want.push("line:1");
+  if (st.tackle.line >= 1 && st.tackle.line < 2 && onShelf("line:2")) want.push("line:2");
+  for (const id of want) {
+    const item = shelf.find((i) => i.id === id);
+    st = await swState(s);
+    if (st.clams >= item.price) {
+      const r = await s.eval((id) => window.__gw.progression.loop.buy(id), id);
+      if (r?.ok) rec.bought.push(`${item.name} (${item.price})`);
+      else rec.notes.push(`buy ${id} refused: ${r?.msg ?? ""}`);
+    } else {
+      rec.wanted.push(`${item.name} (${item.price}, had ${st.clams})`);
+      break;
+    }
+  }
+  await s.eval(() => {
+    const loop = window.__gw.progression.loop,
+      p = loop.state().parts;
+    p.includes("burl_hook") && loop.fitPart("hook", "burl_hook");
+    p.includes("brass_trace") && loop.fitPart("leader", "brass_trace");
+  });
+  await s.closeGuides(3000);
+}
+
+const SW_MILESTONES = [
+  ["Drift Float given", (r) => r.after.parts.includes("drift_float")],
+  ["Seed Pouch given", (r) => r.after.parts.includes("seed_pouch")],
+  ["tale told, notepad opens", (r) => r.after.hunt?.taleAt > 0],
+  ["Burr's first talk and almanac (sketch 1)", (r) => r.after.hunt?.sketches?.map > 0],
+  ["leaders on the shelf", (r) => r.after.shelved.includes("mossthread_snood")],
+  ["line-up (sketch 3)", (r) => r.after.hunt?.sketches?.lineup > 0],
+  ["first cracked pod", (r) => r.after.hunt?.marks?.person > 0],
+  ["Burl Hook on the shelf", (r) => r.after.shelved.includes("burl_hook")],
+  ["the island rises (sketch 2)", (r) => r.after.hunt?.found === true],
+  ["the crunch", (r) => r.after.hunt?.scenesSeen?.crunch > 0],
+  ["refusal (sketch 4)", (r) => r.after.hunt?.sketches?.swirl > 0],
+  ["Burl Hook bought", (r) => r.after.parts.includes("burl_hook")],
+  ["Brass Trace bought", (r) => r.after.parts.includes("brass_trace")],
+  ["Rootthread bought", (r) => r.after.tackle.line >= 1],
+  ["Mothsilk bought", (r) => r.after.tackle.line >= 2],
+  ["first hook-up", (r) => !!r.hook],
+  ["what came back (sketch 5)", (r) => r.after.hunt?.sketches?.back > 0],
+  ["landed", (r) => r.hook?.landed === true || r.after.hunt?.landed > 0],
+  ["ending tally (bounty, Burr's Seed)", (r) => r.after.relics.includes("burrs_seed")],
+];
+
+async function mainSporewood() {
+  const browser = await launchBrowser();
+  let save = FROM ? readFileSync(FROM, "utf8") : null;
+  if (!save) {
+    // sporewood-crossed made into a first arrival: the barge in Sporewood, no evening played there yet.
+    const fixture = JSON.parse(
+      readFileSync(
+        join(new URL("..", import.meta.url).pathname, "tools/fixtures/sporewood-crossed.json"),
+        "utf8",
+      ),
+    );
+    const loop = fixture.meta.loop;
+    loop.eveningsAt = { ...loop.eveningsAt, sporewood: 0 };
+    loop.evenings = loop.eveningsAt.mossmere || 0;
+    save = JSON.stringify(fixture);
+  }
+  const s = await GameSession.open(browser, {
+    page: PAGE,
+    save,
+    debug: true,
+    viewport: { width: 480, height: 270 },
+  });
+  const evenings = [];
+  const ctx = { avgFish: 40, hookups: 0 };
+  const milestones = {};
+  let stopped = null;
+  try {
+    await s.boot();
+    say("booted");
+    for (let n = 1; n <= MAX_EVENINGS; n++) {
+      let rec;
+      try {
+        rec = await playSporeEvening(s, n, ctx);
+      } catch (err) {
+        stopped = `evening ${n}: ${err.message}`;
+        say("STOPPED", stopped);
+        await s.collectGameErrors();
+        evenings.push({ evening: n, crashed: err.message, errors: s.errors.splice(0) });
+        break;
+      }
+      for (const [name, test] of SW_MILESTONES)
+        if (!(name in milestones) && test(rec)) milestones[name] = rec.lake ?? n;
+      evenings.push(rec);
+      const sk = rec.after.hunt?.sketches || {};
+      const pad = Object.entries(sk)
+        .filter(([, v]) => v > 0)
+        .map(([k]) => k)
+        .join(",");
+      say(
+        `E${rec.lake ?? n}`,
+        `clams ${rec.clamsBeforeTally}->${rec.clamsAfterTally}`,
+        `fish ${rec.landed.join(" ")}`,
+        rec.murk.length ? `Murk: ${rec.murk.map((m) => `"${short(m, 6)}"`).join(" ")}` : "",
+        rec.hob.length ? `Burr: ${rec.hob.map((m) => `"${short(m, 6)}"`).join(" ")}` : "",
+        rec.gifts.length ? `gift ${rec.gifts}` : "",
+        rec.bought.length ? `bought ${rec.bought.join(", ")}` : "",
+        rec.wanted.length ? `wanted ${rec.wanted.join(", ")}` : "",
+        `pad [${pad}]`,
+        rec.capseeds != null ? `capseeds ${rec.capseeds}` : "",
+        rec.pods ? `pods ${rec.pods}` : "",
+        rec.scenes?.length ? `scenes ${rec.scenes.join(",")}` : "",
+        rec.her.length ? `her: ${rec.her.join(" / ")}` : "",
+        rec.hook ? `HOOK p=${rec.hook.p} ${rec.hook.landed ? "LANDED" : `lost: ${rec.hook.reason}`}` : "",
+        rec.notes.length ? `(${rec.notes.join("; ")})` : "",
+        rec.errors.length ? `ERRORS ${rec.errors.length}` : "",
+      );
+      if (OUT) writeFileSync(OUT, JSON.stringify({ evenings, milestones, stopped }, null, 1));
+      if (SAVES) writeFileSync(join(SAVES, `e${n}.save`), await s.saved());
+      if (rec.after.relics.includes("burrs_seed")) break;
+    }
+  } finally {
+    await browser.close();
+  }
+  const summary = {
+    evenings: evenings.length,
+    landedOn: milestones.landed ?? null,
+    milestones,
     stopped,
     minutes: (Date.now() - t0) / 60000,
     errors: evenings.flatMap((e) => (e.errors || []).map((x) => `E${e.evening}: ${x}`)),
