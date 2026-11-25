@@ -30518,6 +30518,8 @@ Ic(vg, {
   favourNotches: () => wte,
   findShares: () => nte,
   fishClams: () => $ee,
+  // (the Drowned Greenhouse) whether Burr's lamp at its door is lit now, for a game: (game) => true or false
+  greenhouseLampLit: () => greenhouseLampLit,
   fishValueV3: () => bte,
   fishWeight: () => Eu,
   fishXpFor: () => pee,
@@ -42225,6 +42227,50 @@ var Nf = [
       src: "walk",
       spots: { veilwater: 5 },
     }),
+    // ---- The Drowned Greenhouse's own fish (sporewood-plan.md, order of work step 4): a place fish, kept for its one
+    // place as the Sleepspore Jelly is for the Lullaby (wo.kept, wo.keptAs). Razor teeth make it one of the five
+    // suspects of Sporewood's hunt; its bite marks are the hunt's to add. A real red-bellied piranha: a deep, short
+    // body, grey-olive above and red below, an underslung jaw of triangular teeth. It bites at dusk and at night.
+    {
+      id: "razorpane_piranha",
+      name: "Razorpane Piranha",
+      zone: "sporewood",
+      rarity: "rare",
+      tier: 3,
+      value: 62,
+      food: 18,
+      oil: 20,
+      time: "dusk",
+      depth: [0.25, 0.9],
+      bait: null,
+      behavior: "thrasher",
+      difficulty: Ta(3, "thrasher"),
+      // A piranha is a small fish: it never grows past a prize, whatever the rig (and the Greenhouse, an old place, lets
+      // other fish grow to elders).
+      maxClass: "prize",
+      size: Ga(40, 0.11, "carp"),
+      family: "predator",
+      prefers: "hush",
+      phase: 1,
+      src: "v1",
+      // The Journal's drawing, in the coat of its portrait (merePortraits): a deep bream-shaped body, olive-grey
+      // above, a red belly, dark fins and a jaw of teeth.
+      model: {
+        shape: "bream",
+        body: 0x55594a,
+        belly: 0xc8492e,
+        fin: 0x3a3a34,
+        glow: null,
+        pattern: "scales",
+        eyes: "normal",
+        scale: 0.62,
+        depth: 1.05,
+        jaw: "razor_teeth",
+        tail: "scythe",
+      },
+      hint: "It bites only at dusk and at night, and only in the Drowned Greenhouse. Cut Strip and the Ember Minnow suit it best.",
+      lore: "A deep, short piranha, grey above and red below. Its teeth are as sharp as broken glass.",
+    },
     {
       id: "the_remembered_sun",
       name: "The Remembered Sun",
@@ -48399,6 +48445,22 @@ Object.assign(wo.arrivals.sporewood, {
   mossthread_snood: { parts: ["mossthread_snood"], quiet: !0 },
 });
 wo.arrivals.sporewood.order.push("burl_hook", "brass_trace", "mossthread_snood");
+// ---- The Razorpane Piranha in Sporewood's tables (the Drowned Greenhouse's own fish; its record is in Nf) ----------
+// Its hook-table row, in the columns of TS (bare, Spore Cake, Amber Larvae, Cut Strip, Spore Moth, Ember Minnow, Root
+// Jig, Spore-Lamp Fly, Seedpod Twirl), then the Capseed: a meat eater takes cut fish and a warm wobbling minnow best,
+// a flashing fly well, seeds, larvae and a jig a little (red-bellied piranhas eat seeds too), and never a moth on the
+// top, the puffers' little twirl or a bare hook. A place fish of the still Greenhouse, so it is "still" on the Drift
+// Float (it never meets the drift there). Razor teeth: "toothy" on both leaders (the Brass Trace holds it, the
+// Mossthread Snood is cut), and it nips and lets go, a "quick" nibbler on the Burl Hook. The first one landed or lost
+// is a toothy fish's beat for the Brass Trace.
+bs.sporewood.hook.table.razorpane_piranha = {
+  ...ZQ("razorpane_piranha", [0, 1, 1, 3, 0, 3, 1, 2, 0]),
+  capseed: 1,
+};
+bs.sporewood.drift.razorpane_piranha = "still";
+bs.sporewood.leader.razorpane_piranha = { brass_trace: "toothy", mossthread_snood: "toothy" };
+bs.sporewood.hookSet.razorpane_piranha = "quick";
+wo.arrivals.sporewood.brass_trace.fish.push("razorpane_piranha");
 // Practice orders for the Burl Hook and the Mossthread Snood (wo.orders.practice), as Mossmere's Turnback Hook
 // and Chafe Gut: a fish the part truly helps. The catfish grabs and runs, so the Burl Hook hooks it clean; the
 // barb and the koi are shy, so they bite more often on the snood. Each fish takes bait.
@@ -49736,6 +49798,51 @@ Object.assign(wo.places, {
     ],
   },
 });
+// ---- The Drowned Greenhouse, Sporewood's fifth place and Burr's home (sporewood-plan.md "Places", order of work
+// step 4). Hidden until found: never sold (no price, secret), so it has no name on the chart, no Odds row and nothing
+// in the Journal, and its mist stands over it; sailing into its water finds it (foundBy "sail": the game's update
+// and loop.findPlace), with the place's title and the mist lifting, as Mossmere's finds. Found, it is owned as a
+// bought place is, so the chart, the Odds sheet and the Journal's lake page show it. Its own mix (`only`, as
+// Mossmere's Veilback Brook): its own fish, the Razorpane Piranha, and a few that suit glass, shade and still
+// water. `frame`: the lift camera's view of it. `reach`: how far past its water's edge the raft finds it.
+wo.places.drowned_greenhouse = {
+  water: "sporewood",
+  kind: "old",
+  price: 0,
+  secret: !0,
+  foundBy: "sail",
+  reach: 0.5,
+  card: "razorpane_piranha",
+  only: !0,
+  own: ["razorpane_piranha"],
+  draws: {
+    capshell_crayfish: 2.5,
+    threadling_eel: 0.8,
+    downcast_catfish: 0.8,
+    hushcap_koi: 1.5,
+    mildew_angler: 2,
+  },
+  // Its glasshouses (gwGreenhouse): the door on the bank of the south-east bay's shallows, facing north into the water.
+  greenhouse: { x: 52, z: -31.3, fx: 0, fz: 1 },
+  // Burr's lamp at the door: lit from evening 2, at dusk and after dark (greenhouseLampLit).
+  lamp: { fromEvening: 2 },
+  frame: { at: [52, 1.2, -29.4], side: [-0.45, 0.89], elev: 16, dist: 15 },
+  out: [
+    [36.59, 32.5],
+    [42.4, 30.8],
+    [44, 18],
+    [40, 4],
+    [43, -8],
+    [50, -17],
+    [52, -25.6],
+  ],
+};
+// Its words: the place's line (shown once it is found, on the chart and on the Journal's lake page) and Murk's line
+// at the tally the first time he buys its piranha (in his speech box, as his other firsts).
+Ca.maps.drowned_greenhouse = "Rows of old glasshouses lie half sunk here, with moss in the broken panes.";
+Ca.murk.firstSold = {
+  razorpane_piranha: "Greenhouse piranha. Teeth like glass. Brass holds them, thread won't.",
+};
 var _P = Object.freeze({
   places: Object.freeze(
     [
@@ -49783,6 +49890,20 @@ var _P = Object.freeze({
         landmark: { x: 59, y: 18, z: 12 },
         look: "a deep well under the Mother Cap",
       },
+      // The Drowned Greenhouse (wo.places.drowned_greenhouse): its water is the flooded aisle between the
+      // glasshouse rows, open to the raft; the rows, the lamp at its door and Burr's spot are its scenery (gwGreenhouse).
+      {
+        id: "drowned_greenhouse",
+        name: "The Drowned Greenhouse",
+        access: "raft",
+        stand: null,
+        secret: !0,
+        x: 52,
+        z: -26.7,
+        water: { kind: "disc", x: 52, z: -26.7, r: 3, depth: [0.28, 0.4] },
+        landmark: { x: 52, y: 1.6, z: -31.3 },
+        look: "rows of old glasshouses half sunk in the shallows",
+      },
     ].map((e) => Object.freeze(e)),
   ),
 });
@@ -49802,6 +49923,9 @@ wo.species.sporewood = [
 ];
 wo.kept.push("capshell_crayfish", "mildew_angler", "sleepspore_jelly");
 wo.keptAs = { sleepspore_jelly: { place: "lullaby", bait: "amber_larvae" } };
+// The Drowned Greenhouse's own fish (its record is in Nf): kept for that one place, as the Jelly is for the Lullaby.
+wo.kept.push("razorpane_piranha");
+wo.keptAs.razorpane_piranha = { place: "drowned_greenhouse" };
 // Records kept in the data but dropped from a lake's play. The Sporebelly Puffer, Plumgill Perch and Hushcap Koi
 // were here until they joined Sporewood's list.
 wo.leftOut = { sporewood: [] };
@@ -51169,6 +51293,8 @@ registerLakeFight("lostsea_mackerel", "runner", 1.1, 1.08, 1, 0.04, 1.35, 1.35);
 registerLakeFight("sleepspore_jelly", "pulse", 0.89, 0.74, -1, 0, 0.42, 0.72);
 // Sporewood's Seedfall Silver Dollar (wo.seedfallGuest): a small, quick dart and a turn on its side.
 registerLakeFight("seedfall_silver_dollar", "dart", 0.8, 0.72, -1.5, 0.02, 0.6, 1.3);
+// The Drowned Greenhouse's Razorpane Piranha: short, hard rushes and quick shakes of the head, never a long run.
+registerLakeFight("razorpane_piranha", "rush", 0.96, 1.02, 0.5, 0.04, 1.05, 1.4);
 // The local kinds, Mossmere's and Sporewood's, fight as their base fish do (wo.localKinds).
 for (const [id, kind] of Object.entries(wo.localKinds.kinds))
   lakeFightProfiles.set(id, lakeFightProfiles.get(kind.of));
@@ -52944,8 +53070,32 @@ function nI(e) {
   function he() {
     (v.lift = null), (t.cinematic = !1);
   }
+  // A hidden place found by sailing into it (wo.places[id].foundBy "sail": Sporewood's Drowned Greenhouse): once the
+  // raft is in its water (or within its `reach` of the edge) on a trip, with no fish on and nothing else lifting, the
+  // loop marks it found and its mist lifts with its title, as Mossmere's finds do. Checked four times a second.
+  function sailFinds(dt) {
+    if ((v.findT = (v.findT || 0) + Math.min(Math.max(0, dt || 0), 0.25)) < 0.25) return;
+    v.findT = 0;
+    if (t.flow !== "playing" || t.state.run?.outing !== "trip" || v.lift || t.cinematic || t.paused) return;
+    let pos = S(),
+      zone = t.state.run?.zone;
+    if (!pos || typeof zone != "string" || p(() => t.fishing?.isHooked?.(), !1) === !0) return;
+    let loop = y(),
+      owned = p(() => loop?.state?.()?.maps?.places, null);
+    if (!loop || !Array.isArray(owned)) return;
+    for (let id of p(() => n.loopPlaceIds?.(zone), null) || []) {
+      let rule = m.places?.[id];
+      if (rule?.foundBy !== "sail" || owned.includes(id)) continue;
+      let area = z(id)?.area;
+      if (area?.kind !== "disc" || Math.hypot(pos.x - area.x, pos.z - area.z) > area.r + $l(rule.reach, 0))
+        continue;
+      p(() => loop.findPlace?.(id), !1) === !0 && Se([id]);
+      return;
+    }
+  }
   function X(Ze) {
     birdScene.update(Ze);
+    sailFinds(Ze);
     let xe = v.lift?.cur;
     if (xe) {
       if (t.flow !== "playing" || !t.state.run) {
@@ -75824,7 +75974,14 @@ function $ae(e) {
   function yt(vt, bt, Kt) {
     if (((mt.length = 0), Array.isArray(vt)))
       for (let Fe of vt) {
-        if (!Fe || (V && (Fe.kind === "hull" || Fe.kind === "murk")) || Fe.kind === "debris") continue;
+        // (the Drowned Greenhouse's glasshouses keep the raft out but draw no foam or shallows: kind "greenhouse")
+        if (
+          !Fe ||
+          (V && (Fe.kind === "hull" || Fe.kind === "murk")) ||
+          Fe.kind === "debris" ||
+          Fe.kind === "greenhouse"
+        )
+          continue;
         let pt = Number(Fe.x ?? Fe.position?.x),
           ot = Number(Fe.z ?? Fe.position?.z),
           an = Number(Fe.r ?? Fe.radius);
@@ -77468,6 +77625,634 @@ function gwHarpStrings(list, from, cap, rng, low, onWay) {
     });
   }
 }
+// ---- Sporewood's Drowned Greenhouse: its scenery and the raft's obstacles (sporewood-plan.md, order of work step 4) -
+// The place's layout from its `greenhouse` (wo.places.drowned_greenhouse, which loopPlace carries): its door on the
+// bank at x, z and the way into the water, fx, fz. Distances are metres: `s` across the aisle, `f` from the door out
+// into the water, y up from the water. A main glasshouse stands along the bank behind the door; two rows of glasshouses
+// run out from it into the shallows, sinking as they go, with the flooded aisle between them, which is the place's
+// water. The lamp stands on the stone step at the door, with Burr's spot beside it (left clear: Burr is the next step).
+function gwGreenhouseLayout(b) {
+  if (!b || !Number.isFinite(b.x) || !Number.isFinite(b.z)) return null;
+  let k = Math.hypot(b.fx, b.fz) || 1,
+    fx = (Number(b.fx) || 0) / k,
+    fz = (Number(b.fz) || 1) / k,
+    sx = -fz,
+    sz = fx;
+  return {
+    fx,
+    fz,
+    sx,
+    sz,
+    at: (s, f) => ({ x: b.x + sx * s + fx * f, z: b.z + sz * s + fz * f }),
+    house: { s0: -5.6, s1: 5.6, f0: -3.4, f1: 0, eave: 1.85, ridge: 3.05, bay: 1.4 },
+    rows: [
+      { s: -4.25, w: 3.3, wall: 1.0, top: 2.55, f1: 9.2, sink: 1.45, tilt: 0.12, bay: 1.3, broken: 0.42 },
+      { s: 4.25, w: 3.3, wall: 1.0, top: 2.55, f1: 8.4, sink: 1.75, tilt: -0.16, bay: 1.3, broken: 0.55 },
+    ],
+    landing: { s0: -2.3, s1: 2.3, f0: -0.4, f1: 1.15, y: 0.26 },
+    door: { w: 1.15, h: 2.05 },
+    lamp: { s: -1.75, f: 0.85, h: 2.4 },
+    // Burr's spot, left clear beside the lamp: his code goes in gwGreenhouseLamp's update (the arena's It()).
+    burr: { s: -0.9, f: 0.6 },
+  };
+}
+// The raft cannot sail through the glass: circles down each row, and the stone step at the door.
+function gwGreenhouseObstacles(b) {
+  let L = gwGreenhouseLayout(b),
+    out = [];
+  if (!L) return out;
+  for (let row of L.rows)
+    for (let f = 0.8; f < row.f1 - 0.1; f += 1.35) {
+      let p = L.at(row.s, f);
+      out.push({ x: p.x, z: p.z, r: row.w / 2 + 0.15, kind: "greenhouse" });
+    }
+  for (let s of [-1.6, 0, 1.6]) {
+    let p = L.at(s, 0.5);
+    out.push({ x: p.x, z: p.z, r: 0.85, kind: "greenhouse" });
+  }
+  return out;
+}
+// The Greenhouse's scenery, built into the arena's own batches so it adds no draw call of its own but its glass and
+// its lamp: iron frames (wood batch, painted rust and moss), stone footings, the step and terracotta pots (stone
+// batch), benches and seedling trays (wood batch), a few small glowing caps (the cap helper), moss cushions, ferns, small
+// caps and hanging strands (the flora's extras), and the panes as one geometry for the arena's glass material. Low
+// quality: fewer panes and no small caps in the extras. Returns the glass, the lantern's glass, the lamp's place and
+// the footprint the rest of the scenery keeps clear of.
+// A bar for low: a box's two broad faces only (x long, y thin, z broad: the faces at +y and -y), a third of the
+// triangles; from the fishing camera its thin sides do not show.
+function gwStrip(x, y, z) {
+  let a = x / 2,
+    b = y / 2,
+    c = z / 2,
+    g = new lo();
+  g.setAttribute(
+    "position",
+    new eo([-a, b, -c, a, b, -c, a, b, c, -a, b, c, -a, -b, -c, a, -b, -c, a, -b, c, -a, -b, c], 3),
+  );
+  g.setAttribute(
+    "normal",
+    new eo([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0], 3),
+  );
+  g.setIndex([0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7]);
+  return g;
+}
+// Low draws fewer panes, pots and caps, no moss cushions, ferns or hanging strands, and its bars as two faces, not
+// boxes; medium sits between (no strands, fewer caps and ferns, a few more panes gone), so neither setting slows the
+// frame at the Greenhouse by more than a twentieth.
+function gwGreenhouse(
+  place,
+  { org, bars = org, rock, glow, extra, P, kit, capC, low, medium = !1, rng, inWater },
+) {
+  let L = gwGreenhouseLayout(place?.greenhouse);
+  if (!L) return null;
+  // (on low and medium the arena draws these with a plain lit material, which shows colours fuller and darks darker:
+  // the iron a little lighter and the terracotta duller there)
+  let plain = low || medium,
+    iron = Xo(plain ? 0x3a3836 : 0x2b2a2c),
+    rust = Xo(0x6e4128),
+    mossC = Xo(0x56692f),
+    mossD = Xo(0x34452a),
+    wood = kit.wood || Xo(0x3b2a1e),
+    clay = Xo(plain ? 0x76503c : 0x9a5536),
+    clayD = Xo(plain ? 0x523629 : 0x6a3a26),
+    soil = Xo(0x2a2018),
+    stone = Jn(kit.rock, kit.rockHi, 0.45),
+    W = (s, f, y) => {
+      let p = L.at(s, f);
+      return fi(p.x, y, p.z);
+    },
+    // a box's yaw that lays its length along s (across) or along f (out into the water)
+    yawS = Math.atan2(-L.sz, L.sx),
+    yawF = Math.atan2(-L.fz, L.fx),
+    ground = (s, f) => {
+      let p = L.at(s, f);
+      return P(p.x, p.z);
+    },
+    // iron, its rust and the moss on its upper faces
+    ironFn = (x, y, z, nx, ny) => {
+      let n = Math.sin(x * 3.1 + z * 2.3) * Math.sin(y * 4.7 + x * 1.3);
+      let c = Jn(iron, rust, Xd(0.35 + 0.5 * n));
+      return ny > 0.55 ? Jn(c, Jn(mossD, mossC, Xd(0.5 + n)), 0.65) : y < 0.35 ? Jn(c, mossD, 0.5) : c;
+    },
+    // an iron bar from a to b: a flat strip, its broad face turned across `wide` (a round bar's faces all meet the eye at
+    // a slant, so the rim light paled them); with no `wide`, broad face up
+    F3 = fi(L.fx, 0, L.fz),
+    bar = (a, b, r = 0.035, wide = null) => {
+      let x = b.clone().sub(a),
+        len = x.length();
+      if (len < 1e-4) return;
+      x.multiplyScalar(1 / len);
+      let zA = (wide || (Math.abs(x.y) > 0.9 ? F3 : fi(0, 1, 0))).clone(),
+        zz = zA.sub(x.clone().multiplyScalar(zA.dot(x))).normalize(),
+        yy = zz.clone().cross(x),
+        mtx = new Lo().makeBasis(x, yy, zz).setPosition(a.clone().add(b).multiplyScalar(0.5));
+      bars.push(
+        Gn(low ? gwStrip(len + r * 0.6, r * 1.1, r * 2.2) : new Eo(len + r * 0.6, r * 1.1, r * 2.2), {
+          matrix: mtx,
+          colorFn: ironFn,
+        }),
+      );
+    },
+    // an arched rib through pts: strips turned with the arch, broad across the row
+    arc = (pts, r = 0.04) => {
+      for (let j = 0; j + 1 < pts.length; j++) {
+        let d = pts[j + 1].clone().sub(pts[j]);
+        bar(pts[j], pts[j + 1], r, d.cross(F3).normalize());
+      }
+    },
+    glass = { pos: [], nor: [], col: [] },
+    tint = [0.4, 0.49, 0.47],
+    wash = [0.62, 0.66, 0.6],
+    // one pane, a quad a b c d (or a triangle when cracked), facing either way (the glass is drawn from both sides)
+    pane = (a, b, c, d, shade = 1, crack = 0) => {
+      let ux = b.x - a.x,
+        uy = b.y - a.y,
+        uz = b.z - a.z,
+        vx = d.x - a.x,
+        vy = d.y - a.y,
+        vz = d.z - a.z,
+        nx = uy * vz - uz * vy,
+        ny = uz * vx - ux * vz,
+        nz = ux * vy - uy * vx,
+        nl = Math.hypot(nx, ny, nz) || 1,
+        // now and then an old pane whitewashed against the sun
+        tc = rng() < 0.14 ? wash : tint,
+        tri = (p, q, r) => {
+          for (let v of [p, q, r])
+            glass.pos.push(v.x, v.y, v.z),
+              glass.nor.push(nx / nl, ny / nl, nz / nl),
+              glass.col.push(tc[0] * shade, tc[1] * shade, tc[2] * shade);
+        };
+      // a crack: a jagged corner gone, the break running across the pane
+      if (crack > 0) {
+        let m = a.clone().lerp(b, 0.25 + 0.5 * crack),
+          n = a.clone().lerp(d, 0.7 - 0.4 * crack);
+        tri(m, b, c), tri(m, c, d), tri(m, d, n);
+      } else tri(a, b, c), tri(a, c, d);
+    },
+    foot = [],
+    info = {};
+  // ---- the main house along the bank: footings, gable frames every bay, ridge and eaves, panes on walls and roof
+  {
+    let H = L.house,
+      n = Math.round((H.s1 - H.s0) / H.bay),
+      fm = (H.f0 + H.f1) / 2,
+      base = (s, f) => Math.max(0.12, ground(s, f)) + 0.32;
+    for (let [s0, s1, f0, f1] of [
+      [H.s0, H.s1, H.f0, H.f0],
+      [H.s0, H.s0, H.f0, H.f1],
+      [H.s1, H.s1, H.f0, H.f1],
+      [H.s0, -L.door.w / 2, H.f1, H.f1],
+      [L.door.w / 2, H.s1, H.f1, H.f1],
+    ]) {
+      let a = L.at(s0, f0),
+        b = L.at(s1, f1),
+        len = Math.hypot(b.x - a.x, b.z - a.z),
+        g = Math.max(ground(s0, f0), ground(s1, f1), 0.1);
+      rock.push(
+        Gn(new Eo(len + 0.3, 0.36 + g, 0.3), {
+          matrix: co(
+            (a.x + b.x) / 2,
+            (g + 0.36) / 2 - 0.12,
+            (a.z + b.z) / 2,
+            0,
+            Math.atan2(-(b.z - a.z), b.x - a.x),
+            0,
+          ),
+          colorFn: (x, y) => Jn(stone, mossD, Xd(0.5 - y)),
+        }),
+      );
+    }
+    for (let i = 0; i <= n; i++) {
+      let s = H.s0 + ((H.s1 - H.s0) * i) / n,
+        yb = base(s, fm),
+        back = W(s, H.f0, yb),
+        front = W(s, H.f1, yb),
+        backE = W(s, H.f0, yb + H.eave),
+        frontE = W(s, H.f1, yb + H.eave),
+        ridge = W(s, fm, yb + H.ridge);
+      bar(back, backE, 0.04), bar(backE, ridge, 0.035), bar(frontE, ridge, 0.035);
+      Math.abs(s) > L.door.w / 2 + 0.1 && bar(front, frontE, 0.04);
+      if (i < n) {
+        let s2 = H.s0 + ((H.s1 - H.s0) * (i + 1)) / n,
+          yb2 = base(s2, fm),
+          pieces = [
+            [W(s, H.f0, yb), W(s2, H.f0, yb2), W(s2, H.f0, yb2 + H.eave), W(s, H.f0, yb + H.eave)],
+            [
+              W(s, H.f0, yb + H.eave),
+              W(s2, H.f0, yb2 + H.eave),
+              W(s2, fm, yb2 + H.ridge),
+              W(s, fm, yb + H.ridge),
+            ],
+            [
+              W(s, H.f1, yb + H.eave),
+              W(s2, H.f1, yb2 + H.eave),
+              W(s2, fm, yb2 + H.ridge),
+              W(s, fm, yb + H.ridge),
+            ],
+          ];
+        // the front wall, but for the door
+        let mid = (s + s2) / 2;
+        Math.abs(mid) > L.door.w / 2 + 0.3 &&
+          pieces.push([W(s, H.f1, yb), W(s2, H.f1, yb2), W(s2, H.f1, yb2 + H.eave), W(s, H.f1, yb + H.eave)]);
+        for (let [j, q] of pieces.entries()) {
+          if (low && j === 0) continue;
+          let r = rng();
+          r < 0.22 || pane(q[0], q[1], q[2], q[3], 0.85 + 0.3 * rng(), r < 0.45 ? rng() : 0);
+          // a glazing bar down the middle of each wall pane
+          j !== 1 && j !== 2 && bar(q[0].clone().lerp(q[1], 0.5), q[3].clone().lerp(q[2], 0.5), 0.018);
+        }
+      }
+    }
+    let yA = base(H.s0, fm),
+      yB = base(H.s1, fm);
+    bar(W(H.s0, fm, yA + H.ridge), W(H.s1, fm, yB + H.ridge), 0.04);
+    bar(W(H.s0, H.f0, yA + H.eave), W(H.s1, H.f0, yB + H.eave), 0.035);
+    bar(W(H.s0, H.f1, yA + H.eave), W(H.s1, H.f1, yB + H.eave), 0.035);
+    // the door: a wooden frame and one door left ajar
+    let yd = base(0, H.f1);
+    for (let s of [-L.door.w / 2, L.door.w / 2]) {
+      let a = L.at(s, H.f1);
+      org.push(
+        Gn(new Eo(0.12, L.door.h, 0.12), {
+          matrix: co(a.x, yd + L.door.h / 2 - 0.3, a.z, 0, yawS, 0),
+          color: Jn(wood, kit.rock, 0.2),
+        }),
+      );
+    }
+    let lin = L.at(0, H.f1);
+    org.push(
+      Gn(new Eo(L.door.w + 0.24, 0.14, 0.14), {
+        matrix: co(lin.x, yd + L.door.h - 0.3, lin.z, 0, yawS, 0),
+        color: wood,
+      }),
+    );
+    // hinged at the door's left post and swung open into the house
+    let hinge = L.at(-L.door.w / 2, H.f1),
+      open = yawS + 1.15,
+      lw = L.door.w * 0.92,
+      leaf = { x: hinge.x + Math.cos(open) * lw * 0.5, z: hinge.z - Math.sin(open) * lw * 0.5 };
+    org.push(
+      Gn(new Eo(lw, L.door.h - 0.45, 0.06), {
+        matrix: co(leaf.x, yd + (L.door.h - 0.45) / 2 - 0.25, leaf.z, 0, open, 0),
+        colorFn: (x, y) => Jn(Jn(wood, mossD, Xd(0.4 - (y - yd) * 0.4)), wood, 0.4),
+      }),
+    );
+    // inside: a bench along the back wall with trays and pots
+    let yb = base(0, H.f0 + 0.6) - 0.3,
+      bc = L.at(0, H.f0 + 0.55);
+    org.push(
+      Gn(new Eo(H.s1 - H.s0 - 1, 0.07, 0.55), {
+        matrix: co(bc.x, yb + 0.78, bc.z, 0, yawS, 0),
+        color: Jn(wood, soil, 0.3),
+      }),
+    );
+    for (let s = H.s0 + 0.9; s < H.s1 - 0.6; s += low || medium ? 1.4 : 0.7) {
+      let p = L.at(s, H.f0 + 0.55);
+      low || medium || rng() < 0.5
+        ? org.push(
+            Gn(new Eo(0.55, 0.08, 0.42), {
+              matrix: co(p.x, yb + 0.86, p.z, 0, yawS + rng.range(-0.15, 0.15), 0),
+              colorFn: (x, y) => (y > yb + 0.88 ? soil : Jn(wood, soil, 0.2)),
+            }),
+          )
+        : potAt(p.x, yb + 0.82, p.z, rng.range(0.13, 0.2));
+    }
+    foot.push(...[-3.6, 0, 3.6].map((s) => ({ ...L.at(s, fm), r: 2.4 })));
+  }
+  // a small cap growing through the glass: a pale stalk, a cap darker to its rim and its gills aglow (as the lake's caps)
+  function smallCap(p, size) {
+    let h = size * 0.85,
+      ch = size * 0.42;
+    org.push(
+      Gn(
+        ns(
+          [p, fi(p.x + 0.04, p.y + h * 0.5, p.z), fi(p.x + 0.07, p.y + h, p.z + 0.03)],
+          (t) => size * 0.09 * (1.3 - t * 0.5),
+          5,
+          4,
+        ),
+        {
+          color: Jn(capC.bone, kit.rock, 0.2),
+        },
+      ),
+    );
+    let top = fi(p.x + 0.07, p.y + h, p.z + 0.03);
+    org.push(
+      Gn(
+        Ar(
+          [
+            [0.01, 0],
+            [size * 0.5, -ch * 0.02],
+            [size * 0.92, -ch * 0.06],
+            [size, ch * 0.08],
+            [size * 0.85, ch * 0.5],
+            [size * 0.45, ch * 0.9],
+            [0, ch],
+          ],
+          9,
+        ),
+        {
+          matrix: co(top.x, top.y, top.z, rng.range(-0.15, 0.15), rng() * ao, rng.range(-0.15, 0.15)),
+          colorFn: (x, y) => Jn(capC.cap, capC.capHi, Xd((y - top.y) / ch) * 0.8),
+        },
+      ),
+    );
+    glow.push(
+      Gn(
+        Ar(
+          [
+            [size * 0.16, -ch * 0.05],
+            [size * 0.6, -ch * 0.085],
+            [size * 0.95, -ch * 0.03],
+          ],
+          9,
+        ),
+        {
+          matrix: co(top.x, top.y - 0.02, top.z),
+          color: ko(capC.gill, 1.5),
+        },
+      ),
+    );
+  }
+  // a terracotta pot (stone batch) with soil and, now and then, a fern or a small cap growing in it
+  function potAt(x, y, z, r, tilt = 0) {
+    rock.push(
+      Gn(
+        Ar(
+          [
+            [r * 0.62, 0],
+            [r, r * 1.25],
+            [r * 1.12, r * 1.3],
+            [r * 1.08, r * 1.45],
+            [r * 0.9, r * 1.42],
+          ],
+          8,
+        ),
+        {
+          matrix: co(x, y, z, tilt, rng() * ao, tilt * 0.5),
+          colorFn: (px, py) => Jn(clayD, clay, Xd((py - y) / (r * 1.4))),
+        },
+      ),
+    );
+    let k = rng();
+    tilt === 0 && !low && k < (medium ? 0.2 : 0.35)
+      ? extra.push({ k: "fernUp", x, y: y + r * 1.3, z, ry: rng() * ao, s: r * 2.2, sy: 1 })
+      : tilt === 0 &&
+        k < 0.6 &&
+        !low &&
+        extra.push({ k: "toadcap", x, y: y + r * 1.25, z, ry: rng() * ao, s: 0.45, sy: 0.6 });
+  }
+  // ---- the rows: arched ribs every bay, sinking and leaning as they run out into the water
+  for (let row of L.rows) {
+    let n = Math.max(2, Math.round(row.f1 / row.bay)),
+      half = row.w / 2,
+      wall = row.wall,
+      top = row.top,
+      seg = low ? 5 : 7,
+      sinkAt = (f) => -row.sink * Math.pow(Math.max(0, f) / row.f1, 1.6),
+      rollAt = (f) => row.tilt * (f / row.f1) * (f > row.f1 - row.bay * 1.5 ? 1.8 : 1),
+      // a point on the rib at f: u from 0 (inner foot) through the crown to 1 (outer foot)
+      rib = (f, u) => {
+        let side = row.s < 0 ? -1 : 1,
+          a = Math.PI * u,
+          sOff = -Math.cos(a) * half * side,
+          h = u <= 0 || u >= 1 ? 0 : wall + (top - wall) * Math.sin(a),
+          base = Math.max(sinkAt(f), f < 0.6 ? ground(row.s + sOff, f) * 0.6 : sinkAt(f)),
+          r = rollAt(f),
+          y = base + h * Math.cos(r),
+          s = row.s + sOff + h * Math.sin(r) * side;
+        return W(s, f, y);
+      },
+      ribPts = (f) => {
+        let a = rib(f, 0),
+          b = rib(f, 1),
+          pts = [a, fi(a.x, a.y + wall, a.z)];
+        for (let j = 1; j < seg; j++) pts.push(rib(f, j / seg));
+        return pts.push(fi(b.x, b.y + wall, b.z), b), pts;
+      };
+    let prev = null;
+    for (let i = 0; i <= n; i++) {
+      let f = (row.f1 * i) / n,
+        pts = ribPts(f);
+      // the last rib out in the water has broken at its crown and hangs from one side
+      i === n ? arc(pts.slice(0, Math.ceil(pts.length * 0.55))) : arc(pts);
+      if (prev) {
+        let far = f / row.f1;
+        for (let j = 0; j + 1 < pts.length; j++) {
+          let r = rng(),
+            wallPane = j === 0 || j === pts.length - 2,
+            gone = (low ? 0.15 : medium ? 0.08 : 0) + (wallPane ? 0.15 : 0) + row.broken * (0.3 + 0.9 * far);
+          r < gone ||
+            pane(prev[j], pts[j], pts[j + 1], prev[j + 1], 0.8 + 0.35 * rng(), r < gone + 0.25 ? rng() : 0);
+        }
+        // the eave and crown bars run from rib to rib
+        bar(prev[1], pts[1], 0.025), bar(prev[pts.length - 2], pts[pts.length - 2], 0.025);
+        bar(prev[Math.floor(pts.length / 2)], pts[Math.floor(pts.length / 2)], 0.03);
+      }
+      prev = pts;
+    }
+    // benches down both walls with trays and pots; the far end is under water
+    for (let side of [-1, 1]) {
+      let sb = row.s + side * (half - 0.4);
+      for (let f = 0.6; f < row.f1 * 0.62; f += low ? 1.5 : medium ? 1.1 : 0.75) {
+        let y = sinkAt(f) + 0.72;
+        if (y < 0.12) break;
+        let p = L.at(sb, f);
+        org.push(
+          Gn(new Eo(0.78, 0.06, 0.5), { matrix: co(p.x, y, p.z, 0, yawF, 0), color: Jn(wood, soil, 0.25) }),
+        );
+        low || rng() < (medium ? 0.75 : 0.55)
+          ? org.push(
+              Gn(new Eo(0.5, 0.08, 0.42), {
+                matrix: co(p.x, y + 0.07, p.z, 0, yawF + rng.range(-0.2, 0.2), 0),
+                colorFn: (x, yy) => (yy > y + 0.09 ? soil : Jn(wood, soil, 0.2)),
+              }),
+            )
+          : potAt(p.x, y + 0.03, p.z, rng.range(0.11, 0.17));
+        rng() < (medium ? 0.15 : 0.3) &&
+          !low &&
+          extra.push({ k: "fernUp", x: p.x, y: y + 0.1, z: p.z, ry: rng() * ao, s: 0.35, sy: 0.8 });
+      }
+    }
+    // moss cushions along the footing, strands hanging from the crown
+    for (let f = 0.4; f < (low ? 0 : row.f1 * 0.5); f += medium ? 2.2 : 1.3) {
+      let p = L.at(row.s + (rng() - 0.5) * row.w * 0.8, f);
+      extra.push({
+        k: "cushion",
+        x: p.x,
+        y: Math.max(sinkAt(f), 0) + 0.05,
+        z: p.z,
+        ry: rng() * ao,
+        s: rng.range(0.5, 0.8),
+        sy: rng.range(0.5, 0.75),
+      });
+    }
+    for (let i = 0; i < (low || medium ? 0 : 7); i++) {
+      let f = rng.range(0.5, row.f1 * 0.85),
+        c = rib(f, rng.range(0.3, 0.7));
+      extra.push({
+        k: "strand",
+        x: c.x,
+        y: c.y - 0.05,
+        z: c.z,
+        ry: rng() * ao,
+        s: rng.range(0.7, 1),
+        sy: rng.range(0.4, 0.9),
+      });
+    }
+    for (let f = 0.8; f < row.f1; f += 2.4) foot.push({ ...L.at(row.s, f), r: half + 0.6 });
+  }
+  // ---- the stone step at the door, and the lamp on its post
+  {
+    let G = L.landing,
+      mid = L.at((G.s0 + G.s1) / 2, (G.f0 + G.f1) / 2),
+      g = Math.max(0, ground(0, G.f0));
+    rock.push(
+      Gn(Gd(rng, { r: 1, h: 1, detail: 1, rough: 0.12, flare: 0.1, squash: 1 }), {
+        matrix: co(mid.x, G.y - 0.42 + g * 0.5, mid.z, 0, yawS, 0, [
+          (G.s1 - G.s0) / 2,
+          0.42,
+          (G.f1 - G.f0) / 2,
+        ]),
+        colorFn: (x, y) => Jn(stone, mossD, Xd((G.y - y) * 2.2)),
+      }),
+    );
+    let lp = L.at(L.lamp.s, L.lamp.f),
+      y0 = G.y - 0.05,
+      top = W(L.lamp.s, L.lamp.f, y0 + L.lamp.h),
+      arm = W(L.lamp.s, L.lamp.f + 0.5, y0 + L.lamp.h - 0.05),
+      hang = W(L.lamp.s, L.lamp.f + 0.5, y0 + L.lamp.h - 0.42);
+    bar(W(L.lamp.s, L.lamp.f, y0), top, 0.045),
+      bar(top, arm, 0.03),
+      bar(arm, W(L.lamp.s, L.lamp.f + 0.5, y0 + L.lamp.h - 0.2), 0.012);
+    org.push(Gn(new Xn(0.04, 0.12, 0.1, 6), { matrix: co(hang.x, hang.y + 0.21, hang.z), colorFn: ironFn }));
+    org.push(Gn(new Xn(0.1, 0.1, 0.03, 6), { matrix: co(hang.x, hang.y - 0.14, hang.z), colorFn: ironFn }));
+    for (let j = 0; j < 4; j++) {
+      let a = (j / 4) * ao + 0.4;
+      bar(
+        fi(hang.x + Math.cos(a) * 0.085, hang.y - 0.13, hang.z + Math.sin(a) * 0.085),
+        fi(hang.x + Math.cos(a) * 0.085, hang.y + 0.16, hang.z + Math.sin(a) * 0.085),
+        0.009,
+      );
+    }
+    info.lamp = { x: hang.x, y: hang.y, z: hang.z, post: { x: lp.x, z: lp.z } };
+    let bs = L.at(L.burr.s, L.burr.f);
+    info.burr = { x: +bs.x.toFixed(2), y: G.y, z: +bs.z.toFixed(2) };
+    foot.push({ ...mid, r: 2.4 });
+  }
+  // ---- small glowing caps on the roofs, and the flotsam: pots afloat, a tray, shards of glass on the water
+  {
+    let H = L.house,
+      spots = [
+        [-3.2, -1.2],
+        [2.6, -2.2],
+        [-4.25, 3.2],
+        [4.25, 1.9],
+        [-4.25, 6],
+      ].slice(0, low ? 1 : medium ? 3 : 5);
+    for (let [s, f] of spots) {
+      let yb = Math.max(0.12, ground(s, f)) + 0.32,
+        y = f < 0 ? yb + H.ridge - 0.25 : 2.4 - (f > 4 ? 0.45 : 0),
+        p = W(s, f, y - 0.4);
+      smallCap(p, rng.range(0.45, 0.7));
+    }
+    for (let [s, f, r] of [
+      [-1.4, 5.8, 0.16],
+      [1.7, 7.4, 0.14],
+      [0.4, 9.8, 0.18],
+    ]) {
+      let p = L.at(s, f);
+      !low && inWater(p.x, p.z) && potAt(p.x, -0.12, p.z, r, rng.range(0.5, 1.1));
+    }
+    let tp = L.at(-0.8, 8.6);
+    inWater(tp.x, tp.z) &&
+      org.push(
+        Gn(new Eo(0.45, 0.07, 0.55), {
+          matrix: co(tp.x, 0.02, tp.z, 0.06, rng() * ao, -0.04),
+          color: Jn(wood, soil, 0.3),
+        }),
+      );
+    for (let i = 0; i < (low ? 3 : 8); i++) {
+      let row = L.rows[i % 2],
+        f = rng.range(row.f1 * 0.5, row.f1 + 1),
+        s = row.s - Math.sign(row.s) * rng.range(1.5, 2.2),
+        c = W(s, f, 0.025),
+        a = rng() * ao,
+        e = rng.range(0.15, 0.3),
+        q = (t) => fi(c.x + Math.cos(a + t) * e, 0.025, c.z + Math.sin(a + t) * e);
+      pane(q(0), q(2.1), q(3.9), q(5.2), 0.7);
+    }
+  }
+  let geo = new lo();
+  geo.setAttribute("position", new eo(glass.pos, 3)),
+    geo.setAttribute("normal", new eo(glass.nor, 3)),
+    geo.setAttribute("color", new eo(glass.col, 3)),
+    geo.computeBoundingSphere();
+  return { glass: geo, lamp: info.lamp, burr: info.burr, foot, layout: L };
+}
+// Burr's lamp at the Drowned Greenhouse (wo.places.drowned_greenhouse.lamp): lit on the water of its lake from its
+// evening (2), from dusk on, and dark by day, at home and before then.
+function greenhouseLampLit(game) {
+  let place = wo.places?.drowned_greenhouse,
+    run = game?.state?.run;
+  return (
+    !!place?.lamp &&
+    game?.flow === "playing" &&
+    run?.zone === place.water &&
+    Math.trunc(Number(run.evening) || 0) >= (place.lamp.fromEvening ?? 2) &&
+    (run.phase === "dusk" || run.phase === "gloomtide")
+  );
+}
+// The Greenhouse's glass and its lamp at run time: the panes (one mesh, see-through, their rims and gloss catching the
+// light), the lantern's glass (dark until lit, warm when lit), the lamp's halo, seen from far across the water, and its
+// light (an anchor of the arena's two pooled lights, which lights the glass and the step when the raft is near).
+function gwGreenhouseLamp(gh, { group, halos, anchor, keep, rimC, low = !1 }) {
+  // the glass: lit, with a rim and a gloss that catch the light; on low an unlit tint, much cheaper to draw, dimmed
+  // by the hour in update() as light would
+  let glassMat = keep.mat(
+    low
+      ? new ua({ color: 0x8a8a8a, vertexColors: !0, transparent: !0, opacity: 0.3, side: ca, fog: !0 })
+      : sa({
+          color: 0xffffff,
+          vertexColors: !0,
+          transparent: !0,
+          opacity: 0.3,
+          rim: 0.85,
+          rimColor: rimC,
+          side: ca,
+          gloss: 0.85,
+          shine: 80,
+        }),
+  );
+  glassMat.depthWrite = !1;
+  let glass = new An(keep.geo(gh.glass), glassMat);
+  (glass.name = "greenhouseGlass"), (glass.renderOrder = 2), group.add(glass);
+  let at = gh.lamp,
+    lanternMat = keep.mat(Jl(0xffc36a, 1.7)),
+    litColor = lanternMat.color.clone(),
+    darkColor = new Vt(0x2c2620),
+    lantern = new An(keep.geo(new Xn(0.075, 0.075, 0.24, 6)), lanternMat);
+  lantern.position.set(at.x, at.y, at.z), (lantern.name = "greenhouseLamp"), group.add(lantern);
+  let halo = halos ? halos.add(at.x, at.y + 0.05, at.z, [0, 0, 0], 6, 3.1) : -1,
+    light = anchor(at.x, at.y - 0.1, at.z, 0xffb060, 0, 6),
+    shown = -1,
+    glassK = -1;
+  return {
+    glass,
+    lantern,
+    // `night` is the hour's night share (0 at dusk's start, 1 at night): the lamp is warmer and brighter after dark.
+    update(lit, night = 1) {
+      let gk = low ? 0.54 * (1 - 0.65 * Math.max(0, Math.min(1, night))) : -1;
+      Math.abs(gk - glassK) > 0.01 && ((glassK = gk), glassMat.color.setScalar(gk));
+      let k = lit ? 0.7 + 0.3 * Math.max(0, Math.min(1, night)) : 0;
+      if (Math.abs(k - shown) < 0.02) return;
+      (shown = k), lanternMat.color.copy(lit ? litColor : darkColor);
+      light && (light.intensity = 1.1 * k);
+      halo >= 0 && (halos.setColor(halo, 1.0 * k, 0.6 * k, 0.27 * k), halos.touchColors());
+    },
+  };
+}
 function eN({
   ctx: e,
   L: t,
@@ -77480,6 +78265,7 @@ function eN({
   halos: i,
   addAnchor: c,
   low: d = !1,
+  medium: dMid = !1,
   inkC: f,
 }) {
   let u = t.outline,
@@ -77511,6 +78297,31 @@ function eN({
       .map((ye) => ye.out),
     z = (ye, se, ne) =>
       j.some((he) => he.some((X, _) => _ + 1 < he.length && xie(ye, se, X, he[_ + 1]) < ne));
+  // (Sporewood's Drowned Greenhouse) its glasshouses, from their own seed so the rest of the plan is as it was; the cap
+  // trees and the flora keep clear of their footprint (the caps list). Its pieces go in their own lists (`parts`), which
+  // the arena makes into their own meshes; its glass and lamp are made by the arena too.
+  let gwGh = null;
+  for (let id of B?.loopPlaceIds?.("sporewood") || []) {
+    let place = B?.loopPlace?.(id);
+    if (!place?.greenhouse) continue;
+    let parts = { org: [], bars: [], rock: [], glow: [] };
+    gwGh = gwGreenhouse(place, {
+      org: parts.org,
+      bars: parts.bars,
+      rock: parts.rock,
+      glow: parts.glow,
+      extra: m,
+      P,
+      kit: r,
+      capC: { cap: O, capHi: T, gill: x, bone: M },
+      low: d,
+      medium: dMid,
+      rng: Dr(((t.artSeed | 0) ^ 435713) >>> 0),
+      inWater: (ye, se) => vi(u, ye, se) > 0.4,
+    });
+    gwGh &&
+      (g.push(...gwGh.foot), (gwGh.parts = parts), (y.greenhouse = { lamp: gwGh.lamp, burr: gwGh.burr }));
+  }
   function Z(
     ye,
     se,
@@ -78170,7 +78981,7 @@ function eN({
         .filter((ne) => vi(u, ne.x, ne.z) > 0.5);
     (Se = zk(se.flatMap((ne) => [ne, ne]))), (Se.mesh.name = "sporeHaze");
   }
-  return { extra: m, caps: g, lamps: p, cuts: w, falls: be, haze: Se, info: y };
+  return { extra: m, caps: g, lamps: p, cuts: w, falls: be, haze: Se, info: y, greenhouse: gwGh };
 }
 function bie(e, t) {
   let o = [],
@@ -81952,6 +82763,8 @@ $1`,
         halos: P,
         addAnchor: j,
         low: g,
+        // the arena is built for "low" or "high"; the Greenhouse also reads the setting itself, as medium draws it lighter
+        medium: g ? !1 : e?.state?.meta?.settings?.quality === "medium",
         inkC: je,
       });
     else if (l === "sporewood")
@@ -82180,6 +82993,24 @@ $1`,
   // (Sporewood's look pass: moss on its stones too, in its own greens)
   else if (l === "sporewood" && c) for (let H of se.rock) gwMossify(H, 0.8, GW_SPORE_MOSS);
   Re(se.rock, Z, Se, "rocks"), Re(se.org, D, c ? null : ye, "organics");
+  // (Sporewood's Drowned Greenhouse) its own meshes, so they are left out as one whenever they are out of view (its
+  // few glowing gills join the lake's). On low and medium its iron, wood and stone are one mesh in a plain lit material
+  // (the lake's own costs a tenth of the frame there), with no cast shadow; the best setting draws its stones as rock,
+  // with their ink outline.
+  let gwGhParts = ve?.greenhouse?.parts;
+  if (gwGhParts) {
+    let full = !g && e?.state?.meta?.settings?.quality !== "medium";
+    if (l === "sporewood" && c) for (let H of gwGhParts.rock) gwMossify(H, 0.8, GW_SPORE_MOSS);
+    full && Re(gwGhParts.rock, Z, Se, "greenhouseStone");
+    Re(
+      [...gwGhParts.bars, ...gwGhParts.org, ...(full ? [] : gwGhParts.rock)],
+      full ? D : b(new Qv({ vertexColors: !0, fog: !0 })),
+      null,
+      "greenhouseFrames",
+      full,
+    ),
+      se.glow.push(...gwGhParts.glow);
+  }
   let ge = ne
     ? b(
         Y(
@@ -82314,6 +83145,21 @@ $1`,
       ve?.haze && (v(ve.haze.geo), b(ve.haze.mat), E.add(ve.haze.mesh)),
       (O.flora = $.stats());
   }
+  // (Sporewood's Drowned Greenhouse) its glass and Burr's lamp at its door (gwGreenhouseLamp), lit in It() below.
+  let gwGhLamp = null;
+  if (ve?.greenhouse)
+    try {
+      gwGhLamp = gwGreenhouseLamp(ve.greenhouse, {
+        group: E,
+        halos: P,
+        anchor: j,
+        keep: { geo: v, mat: b },
+        rimC: z,
+        low: g,
+      });
+    } catch (H) {
+      console.error("[world] greenhouse failed", H), e.errors?.push?.(`world.greenhouse: ${H?.message || H}`);
+    }
   let de = [],
     Be = [],
     mt = new Lo(),
@@ -82981,6 +83827,10 @@ $1`,
   let et = new He(),
     kt = 720;
   function It(H, Ee, je, K) {
+    // (Sporewood's Drowned Greenhouse) Burr's lamp at its door: lit from evening 2, at dusk and after dark. Burr
+    // himself (the plan's next step) stands at ve.greenhouse.burr, the clear spot beside it: his code goes here, as
+    // Hob's on his rock does below.
+    gwGhLamp && gwGhLamp.update(greenhouseLampLit(e), K?.night ?? 1);
     if (rockAngler) {
       rockAngler.root.visible = e.flow === "playing" && !e.cinematic;
       if (rockAngler.lamp && rockAngler.root.visible) {
@@ -85586,6 +86436,17 @@ uniform float uK; uniform vec3 uGlowCol; varying float vGlowW;`,
   function Nt(ht) {
     let Ht = y.find((at) => at.id === ht);
     if (!Ht) return null;
+    // A place with its own view for the lift camera (the Drowned Greenhouse's `frame`).
+    if (Array.isArray(Ht.frame?.at) && Array.isArray(Ht.frame.side))
+      return {
+        x: Ht.frame.at[0],
+        y: Ht.frame.at[1],
+        z: Ht.frame.at[2],
+        r: Ht.area?.r ?? 4,
+        side: Ht.frame.side.slice(0, 2),
+        elev: Ht.frame.elev,
+        dist: Ht.frame.dist,
+      };
     let qt = sA(Ht.area),
       Le = iA(Ht.area, 0),
       it = Math.max(Le.x1 - Le.x0, Le.z1 - Le.z0) / 2,
@@ -86160,6 +87021,10 @@ function qie(e) {
       for (let ct of dt.circles) i.obstacles.push({ x: ct.x, z: ct.z, r: ct.r, kind: ct.kind });
     }
     for (let We of d9(e.data, re.id)) i.obstacles.push(We);
+    // (Sporewood's Drowned Greenhouse) the raft keeps out of its glasshouses and off the step at its door.
+    if (e.data?.LOOP_ENABLED === !0)
+      for (let We of e.data.loopPlaceIds?.(re.id) || [])
+        for (let at of gwGreenhouseObstacles(e.data.loopPlace?.(We)?.greenhouse)) i.obstacles.push(at);
     (y.radius = i.R), b.position.set(i.gate.x, 0, i.gate.z), (b.radius = i.gate.radius), (L = rt(re)), _e();
     let De = Object.assign({}, d3.palette, re.palette || {});
     for (let We of ["fog", "far", "light", "glow", "ambient", "ink", "water", "waterDeep", "foam", "accent"])
@@ -89077,6 +89942,21 @@ Ey.bream = function (t) {
         ),
       );
   }
+  // (the Drowned Greenhouse's Razorpane Piranha) razor teeth: small white cones round a dark gape, the lower row
+  // standing up past the lip.
+  if (t.jaw === "razor_teeth") {
+    let r = s.yc(0) - 0.004,
+      l = [];
+    for (let j = 0; j < 7; j++) {
+      let d = -0.024 + j * 0.008,
+        z = 0.5 + 0.004 - Math.abs(d) * 0.55;
+      l.push(Wn(new ii(0.0045, 0.017, 4), { p: [d, r - 0.004, z], r: [0, 0, 0] }));
+      j % 2 === 0 &&
+        l.push(Wn(new ii(0.0036, 0.012, 4), { p: [d + 0.004, r + 0.011, z - 0.002], r: [Math.PI, 0, 0] }));
+    }
+    a.extras.push(zn(Co(0.034, 0.014, 0.012, [0, r, 0.5 - 0.002], 10, 6), 787976)),
+      a.extras.push(zn(mo(l), 15788244));
+  }
   return (a.opts.noPhotophores = !0), a;
 };
 Ey.finlet = function (t) {
@@ -91402,6 +92282,19 @@ Object.assign(merePortraits, {
     mark: "hushcap",
     speed: 3.4,
   },
+  // The Drowned Greenhouse's Razorpane Piranha ("razorpane"): a deep, blunt body, dark olive-grey above with silver
+  // flecks, a red throat and belly in Sporewood's warm red, and an underslung jaw of white triangular teeth showing.
+  razorpane_piranha: {
+    form: "deepbarb",
+    w: 0.104,
+    h: 0.205,
+    coat: ["474a3c", "8c8a72", "c2472e", "3e3934", "a5503a", "231f1d"],
+    dorsal: [0.1, 0.2, 0.085],
+    tail: [0.17, 0.07],
+    eye: 0.024,
+    mark: "razorpane",
+    speed: 5.6,
+  },
 });
 // Mossmere's local kinds (wo.localKinds): each its base fish's shape in a coat of its own. "blotch" is a row of
 // dark blotches along the side, "stripe" a bright stripe along it, "mirror" bare skin with a few big pale scales
@@ -91822,6 +92715,16 @@ function buildMerePortrait(id) {
         ink,
         0.97 * smooth(nape, nape + 0.02, z) * (1 - smooth(0.46, 0.475, z)) * smooth(brim, brim + 0.035, k),
       );
+    }
+    if (mark === "razorpane") {
+      // The red of the belly runs up the throat and the lower flank, silver flecks sparkle above, and the mouth is a
+      // dark gape under the blunt snout.
+      c = mix(c, belly, 0.72 * (1 - smooth(-0.45, 0.05, k)) * smooth(-0.3, -0.12, z));
+      const fleck = (0.5 + 0.5 * sin(173 * z + 41 * k) * sin(97 * k - 61 * z)) ** 6;
+      c = mix(c, cream, 0.3 * fleck * smooth(-0.3, 0.4, k));
+      const gape =
+        smooth(0.392, 0.438, z) * (1 - smooth(0.025, 0.12, abs(k + 0.19))) * (1 - smooth(0.478, 0.497, z));
+      c = mix(c, dark, 0.9 * gape);
     }
     if (mark === "bell")
       c = mix(
@@ -92500,6 +93403,20 @@ function buildMerePortrait(id) {
             4,
           );
         }
+    }
+    if (mark === "razorpane") {
+      // Razor teeth: a row of white triangles along the lower jaw, standing up past the lip, and a smaller row above.
+      const tooth = (z, k0, w, len, dir) =>
+        detail.sheet(
+          3,
+          3,
+          (u, v) => flank(z + (u - 0.5) * w * (1 - v), k0 + dir * len * v, s, 0.0024 + 0.001 * sin(pi * u)),
+          (u, v) => mix(cream, edge, 0.18 * (1 - v)),
+          false,
+          s > 0,
+        );
+      for (let i = 0; i < 6; i++) tooth(0.4 + 0.016 * i, -0.26, 0.0135, 0.098, 1);
+      for (let i = 0; i < 5; i++) tooth(0.411 + 0.016 * i, -0.12, 0.011, 0.065, -1);
     }
     if (mark === "cinder" || mark === "silt") {
       barbels(s, mark === "cinder" ? 4 : 2, mark === "cinder" ? 0.225 : 0.2);
@@ -113302,8 +114219,16 @@ function $3(e, t, n) {
     // The thief gets no card, glyph or name on the lake page until she is landed.
     // The local kinds get no card of their own: they show under their base fish (`locals`, below).
     // A visitor (wo.seedfallGuest) shows in the guests row instead (Ole).
+    // A place found by sailing into it (the Drowned Greenhouse) shows nothing, its own fish included, until found.
     l = (t?.SPECIES || []).filter(
-      (L) => Ln(L) && L.zone === n && !L.cove && !L.variantOf && !L.visitor && !thiefHidden(e, L.id),
+      (L) =>
+        Ln(L) &&
+        L.zone === n &&
+        !L.cove &&
+        !L.variantOf &&
+        !L.visitor &&
+        !thiefHidden(e, L.id) &&
+        !(L.place && s[L.place]?.foundBy === "sail" && !r.has(L.place)),
     ),
     i = new Map(l.map((L) => [L.id, L])),
     // A caught base fish's local kinds (wo.localKinds), each caught or not, for its "Local kinds" strip.
@@ -113354,6 +114279,8 @@ function $3(e, t, n) {
         kind: E.kind,
         owned: r.has(L),
         name: r.has(L) ? (t?.loopPlace?.(L)?.name ?? t?.PLACE_BY_ID?.[L]?.name ?? null) : null,
+        // A place found by sailing into it has no map card to carry its line, so its group carries it.
+        ...(E.foundBy === "sail" && r.has(L) && t?.TEXT_LOOP?.maps?.[L] ? { line: t.TEXT_LOOP.maps[L] } : {}),
         entries: A,
       });
   }
@@ -114276,7 +115203,9 @@ function CF(e) {
           ? (Ee.firstChartBy?.[y()] ?? Ee.firstChart)
           : /^listComplete:[a-z_]+$/.test(ze)
             ? Ee.listComplete
-            : Ee[ze];
+            : /^firstSold:[a-z_]+$/.test(ze)
+              ? Ee.firstSold?.[ze.slice(10)]
+              : Ee[ze];
     return typeof K != "string" || !K ? null : ((H.said[ze] = !0), i(), K);
   }
   function rt(ze) {
@@ -114958,6 +115887,20 @@ function CF(e) {
       ? !1
       : (H.lifted.push(ze), c(), !0);
   }
+  // A hidden place found by sailing into it (wo.places[id].foundBy "sail": Sporewood's Drowned Greenhouse). It is
+  // revealed and owned as a bought place is, so it joins the chart, the Odds sheet and the Journal's lake page; the
+  // game lifts its mist with its title (beginLifts), and markLifted ends that. True when it was found now.
+  function findPlace(ze) {
+    let H = p(),
+      Ee = typeof ze == "string" ? f().places?.[ze] : null;
+    if (!H || !Ln(Ee) || Ee.foundBy !== "sail" || !Ln(H.maps) || !Array.isArray(H.maps.places)) return !1;
+    if (H.maps.places.includes(ze)) return !1;
+    (Ln(H.places) && !Array.isArray(H.places)) || (H.places = { revealed: [] });
+    Array.isArray(H.places.revealed) || (H.places.revealed = []);
+    H.places.revealed.includes(ze) || H.places.revealed.push(ze);
+    h7(H, ze);
+    return c(), d("loop:placeFound", { placeId: ze, water: Ee.water }), !0;
+  }
   let Nt = () => {
     let ze = p();
     return Array.isArray(ze?.lifted) ? ze.lifted.slice() : [];
@@ -115342,6 +116285,7 @@ function CF(e) {
     refundBait: ge,
     liftDue: rn,
     markLifted: cn,
+    findPlace,
     lifted: Nt,
     markGiant: Gt,
     takeGiantMark: sn,
@@ -153255,6 +154199,9 @@ var hG = `/* ui.css \u2014 GLOOMWATER interface, UI style v2 (CONTRACT \xA79, DE
 .gw-p-chart--drawn .gw-pc { padding-top: 26px; }   /* (the sheet clear of the \u2715) */
 .gw-p-chart--drawn .gw-pc > .gw-murk-line { margin: -16px auto 8px; text-align: center; }
 .gw-chart--drawn { align-items: stretch; gap: 8px; }
+/* (a place found by sailing into it, picked: its line under the map) */
+.gw-chart-pline { margin: 0 auto; max-width: 48ch; text-align: center; font: italic 400 16px/1.35 var(--f-body); color: var(--ink-dim); text-shadow: var(--ink-shadow); }
+.gw-chart-pline[hidden] { display: none; }
 .gw-chart-sheet { position: relative; width: 100%; height: clamp(250px, calc(100vh - 176px), 460px); }
 .gw-p-chart--drawn .gw-pf { display: flex; align-items: center; justify-content: center; gap: 34px; margin-top: 6px; }
 .gw-p-chart--drawn .gw-pf .gw-chart-hold { margin: 0; min-height: 34px; }
@@ -153654,6 +154601,8 @@ var hG = `/* ui.css \u2014 GLOOMWATER interface, UI style v2 (CONTRACT \xA79, DE
 .gw-loop-on .gw-cat-gh { display: flex; align-items: center; gap: 10px; padding: 6px 10px 0; color: var(--ink-dim); }
 .gw-loop-on .gw-cat-gh .gw-ico { width: 22px; height: 22px; filter: drop-shadow(0 1px 2px #000); }
 .gw-loop-on .gw-cat-gh b { font: 400 17px/1.2 var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); text-shadow: var(--ink-shadow); }
+/* (a place found by sailing into it: its line under its name) */
+.gw-loop-on .gw-cat-pline { margin: 2px 10px 0 42px; font: italic 400 15px/1.35 var(--f-body); color: var(--ink-dim); text-shadow: var(--ink-shadow); }
 .gw-loop-on .gw-cat-odds { display: block; margin: 10px auto 2px; font-size: 18px; min-height: 44px; }
 .gw-loop-on .gw-cat-species { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-bottom: 6px; }
 .gw-loop-on .gw-cat-species .gw-jr-detail::before { display: none; }
@@ -156249,6 +157198,29 @@ function sue(e, t, n, o, a, s, r) {
           e.fillRect(h - w / 2, m, w, t), e.strokeRect(h - w / 2, m, w, t);
         }
       (e.strokeStyle = Fs), (e.lineWidth = 1.6 * o), e.stroke(d);
+    } else if (!a && r.jaw === "razor_teeth") {
+      // (the Drowned Greenhouse's Razorpane Piranha) a dark gape with rows of white triangles, the lower row standing up.
+      let d = new Path2D();
+      d.moveTo(0.97 + 0.03, 0.06 - 0.03),
+        d.quadraticCurveTo(0.97 - 0.09, 0.06 - 0.02, 0.97 - 0.13, 0.065),
+        d.quadraticCurveTo(0.97 - 0.08, 0.06 + 0.03, 0.97 + 0.03, 0.06 + 0.045),
+        d.closePath(),
+        (e.fillStyle = "#120a0c"),
+        e.fill(d),
+        (e.fillStyle = "#efe6d2"),
+        (e.strokeStyle = Fs),
+        (e.lineWidth = 0.8 * o);
+      for (let f = 0; f < 4; f++)
+        for (let u of [-1, 1]) {
+          if (u < 0 && f === 3) continue;
+          let h = 0.975 - f * 0.03,
+            m = u > 0 ? 0.098 : 0.034,
+            tip = u > 0 ? 0.048 : 0.072,
+            tri = new Path2D();
+          tri.moveTo(h - 0.013, m), tri.lineTo(h + 0.013, m), tri.lineTo(h, tip), tri.closePath();
+          e.fill(tri), e.stroke(tri);
+        }
+      (e.strokeStyle = Fs), (e.lineWidth = 1.5 * o), e.stroke(d);
     }
     // The Gillstring Barb (wo.localKinds): long threads trail from the back of its fins, past its tail.
     if (!a && Number(r.threads) > 0) {
@@ -164401,6 +165373,15 @@ function ZU(e) {
       }
       (ne.pick = r.pick), Te && !a0(Te.chartPick) && (Te.chartPick = { ...r.pick });
     }
+    // (Sporewood's Drowned Greenhouse) a place found by sailing into it has no map card to carry its line: picked on
+    // the chart, its line shows under the map.
+    let pline = a("p", "gw-chart-pline"),
+      paintLine = () => {
+        let id = ne.pick?.place,
+          text = id && o()?.LOOP?.places?.[id]?.foundBy === "sail" ? o()?.TEXT_LOOP?.maps?.[id] : null;
+        (pline.textContent = text || ""), (pline.hidden = !text);
+      };
+    W.appendChild(pline), paintLine();
     let Ye = (lt) => {
         let Ze = l(),
           xe = C.getBoundingClientRect(),
@@ -164559,7 +165540,7 @@ function ZU(e) {
               try {
                 n.bus?.emit?.("chart:pick", { water: r.pick.water, place: r.pick.place });
               } catch {}
-              D?.(r.pick), Ye(l());
+              D?.(r.pick), Ye(l()), paintLine();
             } else
               N.kind === "buy"
                 ? be?.(N.place)
@@ -172646,6 +173627,7 @@ function m4(e, t) {
       kind: a.kind ?? "open",
       owned: a.owned === !0,
       name: a.owned === !0 ? (a.name ?? null) : null,
+      line: a.owned === !0 && typeof a.line == "string" && a.line ? a.line : null,
       cards: ri(a.entries).map((s) => n(s, !1)),
     })),
     guests: ri(e.guests).map((a) => ({ ...n(a, !1), guest: !0, note: a.note ?? null })),
@@ -172702,6 +173684,7 @@ function Xhe({
   // The lake's own lines (Murk's `at`) that this tally's sales bring, in order: Sporewood's first local kind and
   // each guest's first sale (wo.guestSold).
   sold = [],
+  soldLines: sl = [],
 } = {}) {
   let i = Oa(t) ? t : {};
   if ((s === !0 || ri(e).some((u) => u.find === "veil_notebook")) && !i.brook) return "brook";
@@ -172716,28 +173699,32 @@ function Xhe({
   if (c("home")) return c("home");
   let d = a === !0 ? (Oa(l) ? c("away") : i.firstAway ? null : "firstAway") : null;
   if (o) return d;
-  let f = ri(e);
+  let f = ri(e),
+    // The first of a kind Murk has his own line for (Ca.murk.firstSold: the Drowned Greenhouse's Razorpane Piranha).
+    soldFirst = f.map((u) => u?.speciesId).find((id) => !!id && ri(sl).includes(id) && !i[`firstSold:${id}`]);
   return f.some((u) => u.legend) && !i.legendFirst
     ? "legendFirst"
     : f.some((u) => u.giant) && !i.firstGiant
       ? "firstGiant"
       : f.some((u) => u.jackpot) && !i.firstJackpot
         ? "firstJackpot"
-        : i.firstSale
-          ? d ||
-            ri(sold).map(c).find(Boolean) ||
-            (f.some((u) => u.find && u.kind === "tackle") && !i.firstTackle
-              ? "firstTackle"
-              : f.some((u) => u.find && (u.kind === "part" || u.kind === "look")) && !i.firstPart
-                ? "firstPart"
-                : f.some((u) => u.find && u.kind === "treasure") && !i.firstTreasure
-                  ? "firstTreasure"
-                  : f.some(
-                        (u) => u.giant || u.legend || u.sizeClass === "trophy" || u.sizeClass === "elder",
-                      ) && !i.firstTrophy
-                    ? "firstTrophy"
-                    : null)
-          : "firstSale";
+        : soldFirst && i.firstSale
+          ? `firstSold:${soldFirst}`
+          : i.firstSale
+            ? d ||
+              ri(sold).map(c).find(Boolean) ||
+              (f.some((u) => u.find && u.kind === "tackle") && !i.firstTackle
+                ? "firstTackle"
+                : f.some((u) => u.find && (u.kind === "part" || u.kind === "look")) && !i.firstPart
+                  ? "firstPart"
+                  : f.some((u) => u.find && u.kind === "treasure") && !i.firstTreasure
+                    ? "firstTreasure"
+                    : f.some(
+                          (u) => u.giant || u.legend || u.sizeClass === "trophy" || u.sizeClass === "elder",
+                        ) && !i.firstTrophy
+                      ? "firstTrophy"
+                      : null)
+            : "firstSale";
 }
 function DV(e, t) {
   let n = tf(e).settings || {},
@@ -175624,7 +176611,18 @@ function WV(e) {
         ...(soldIds.some((id) => o()?.LOOP?.localKinds?.kinds?.[id]?.water === qt) ? ["local"] : []),
         ...soldIds.map((id) => o()?.LOOP?.guestSold?.[qt]?.[id]).filter(Boolean),
       ],
-      re = Xhe({ rows: _t, said: Ht, listDone: it, empty: Pt, away: Tt, brook: Ft, water: qt, at: Ct, sold }),
+      re = Xhe({
+        rows: _t,
+        said: Ht,
+        listDone: it,
+        empty: Pt,
+        away: Tt,
+        brook: Ft,
+        water: qt,
+        at: Ct,
+        sold,
+        soldLines: Object.keys(Oa(f().murk?.firstSold) ? f().murk.firstSold : {}),
+      }),
       De = re ? i("sayOnce", re) : null;
     return {
       line: De || null,
@@ -181561,6 +182559,10 @@ function YV(e) {
         `<i class="gw-cat-kind" aria-hidden="true">${m(`kind_${xt.kind}`)}</i>${xt.name ? "<b></b>" : ""}`,
       );
       xt.name && (zt.querySelector("b").textContent = xt.name), Mt.appendChild(zt);
+      if (xt.line) {
+        let line = n("p", "gw-cat-pline");
+        (line.textContent = xt.line), Mt.appendChild(line);
+      }
       let Ut = n("div", "gw-cat-grid");
       for (let on of xt.cards) Ut.appendChild(withLocalKinds(K, Ft(K, on), on));
       Mt.appendChild(Ut), Ce.appendChild(Mt);

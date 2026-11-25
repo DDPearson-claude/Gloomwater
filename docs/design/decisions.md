@@ -285,6 +285,55 @@ Drowned Greenhouse and the Razorpane Piranha are step 4a, built apart.
   swing with the giants; the template's 178, 490 and 1,257 came from more.)
 - **Mossmere is unchanged:** its local kinds and guest checks give the same results before and after.
 
+## The Drowned Greenhouse and the Razorpane Piranha, built 25 November 2026
+
+Step 4a of the Sporewood plan: the lake's fifth place, Burr's home, and its own fish.
+
+- **Where and what.** Rows of old glasshouses in the shallows of the south-east bay, against its south bank: a main
+  glasshouse along the bank with its door on a stone step, and two rows running about 9 m out into the water, sinking
+  and leaning as they go, with the flooded aisle between them as the place's water. Iron ribs, tinted panes (some
+  whitewashed, some cracked, more gone towards the far end), benches with seedling trays and pots, moss, ferns, hanging
+  strands and small glowing caps; pots, a tray and shards of glass afloat. It is 17 m or more from the four drift
+  eddies and well away from the barge, the dock and its buoy. The raft cannot sail through the glass. Low draws fewer
+  panes, pots and caps and no moss, ferns or strands; medium has no strands and fewer caps, ferns and pots. On both its
+  iron, wood and stone use a plain lit material (the lake's own cost a tenth of the frame there).
+- **The lamp** hangs from an iron post on the step, lit from evening 2 at dusk and after dark, with a halo seen across
+  the bay from the set-out spot. A clear spot beside it is left for Burr, and a comment in the arena's update marks
+  where his code goes.
+- **Hidden until found.** Secret and never sold: no name on the chart, no Odds row, nothing on the Journal's lake page
+  (its fish included), and its mist stands over the aisle. Sailing into the aisle finds it with Mossmere's lift: its
+  name as the title and the mist lifting. Then it is on the chart, the Odds sheet and the Journal, with its line under
+  its name (and on the chart when picked). Old saves load with it unfound.
+- **The Razorpane Piranha**: a place fish, as the Sleepspore Jelly is; rare, about 40 cm, never past a prize; 25 to about
+  340 clams, about 130 on average. Only at the Greenhouse, at dusk and at night, best on Cut Strip and the Ember Minnow
+  (by the game's roll there: 100% of the Ember Minnow's bites at dusk, 79% at night, 14% of Cut Strip's at dusk; none
+  by day or anywhere else). Toothy on both leaders (Brass Trace +4 Grip, Mossthread Snood -4), a quick nibbler on the
+  Burl Hook, "still" on the Drift Float. A suspect of the hunt: no bite marks yet.
+- **Its mix**, its own (as Mossmere's hidden places): the piranha, Capshell Crayfish 2.5, Threadling Eel 0.8, Downcast
+  Catfish 0.8, Hushcap Koi 1.5, Mildew Angler 2. Spore Cake by day: 70% crayfish, 26% eel, 4% catfish; at night much
+  the same with a few anglers, piranhas and koi. The Ember Minnow at night: 75% piranha, 25% angler.
+- **Earnings**, by a seeded probe that plays evenings inside the page with the game's own bites, hooks and landing
+  chances (the template study's method, 100 or more evenings a kit). Before: 176, 555 and 1,563 on the starter, middle
+  and top kits (181, 590 and 1,498 in a second run). A player who fishes the Greenhouse at dusk, when its lamp comes on
+  and the piranha starts, and his usual spots otherwise: 174, 551 and 1,365; hour by hour, against the same day hour,
+  0%, +4% and -1% (the top kit's day hour, with the Gill Harp's giant eels, is the noisy part). At dusk and all night
+  there: 172, 568 and 1,106 (the top kit gives up the Veilwater). All evening there: about 130 to 160, 380 to 410 and
+  900 to 950, as by day it has only crayfish, eels and a few catfish. Set to get there: the mix above (catfish and eel
+  down, crayfish up), the piranha's size and its prize cap.
+- **Words.** Title on finding it: "The Drowned Greenhouse". Its line: "Rows of old glasshouses lie half sunk here, with
+  moss in the broken panes." The piranha's Journal line: "It bites only at dusk and at night, and only in the Drowned
+  Greenhouse. Cut Strip and the Ember Minnow suit it best." Its catch line: "A deep, short piranha, grey above and red
+  below. Its teeth are as sharp as broken glass." Murk, at the tally where he first buys one: "Greenhouse piranha.
+  Teeth like glass. Brass holds them, thread won't."
+- **Speed** (`tools/scenery-shots.mjs --speed --lake sporewood`, 480x270, builds in turn on the same machine, no
+  graphics card; runs wander by about a twentieth). Low: set-out 81.6 and 84.6 ms a frame, the Greenhouse 75.1 and
+  73.8; 123 draw calls and 182,888 triangles against 127 and 186,875 at the set-out, 104 and 114,705 against 108 and
+  119,136 at the Greenhouse. Medium: set-out 188.0 and 185.6 ms, the Greenhouse 165.4 and 164.5; 231 and 551,555
+  against 237 and 555,490, and 188 and 370,885 against 194 and 372,616.
+- **Mossmere is unchanged:** its 21 checks of finds, places, the chart and the Odds pass before and after, with the same
+  results but for two timings measured in real time. Sporewood's 17 checks of the drift, the float, the seedfall, its
+  list, signs, orders and sheet pass as before.
+
 ## Still open
 
 - H14: the designer's unfinished playtest note, "The camera angle when unlocking the ...". The Bell Pool reveal reuses the existing mist-lift camera until this is answered.

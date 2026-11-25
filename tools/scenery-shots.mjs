@@ -11,7 +11,8 @@
 // --lake sporewood: Sporewood Pools' own views (SPOREWOOD_VIEWS) from tools/fixtures/sporewood-crossed.json, a save
 // with the barge at Sporewood, the Lullaby and the Gill Harp free and the Veilwater and the Mother's Cup still locked
 // under their mist. Among them: the spore drift by the hour, the seedfall from far and near, its pods in the evening's
-// eddy and the Drift Float riding the drift (its trip is evening 7, so the drift and the seedfall are that evening's).
+// eddy and the Drift Float riding the drift (its trip is evening 7, so the drift and the seedfall are that evening's),
+// and the Drowned Greenhouse: hidden under its mist, its lamp seen far off, its find, and found by the hour.
 // --rod is for Mossmere's rods only.
 //
 // --rod: the "found" save owns and fits that Mossmere rod (willow_switch, ashwood_rod, whalebone_rod, or the found
@@ -23,8 +24,8 @@
 //
 // Default: the game's best quality setting ("high") at 1280x720, device scale 1.
 // --speed: at 480x270 on low quality (or --quality), prints the average time of 60 frames at the set-out spot and in the
-// Lily Maze (with --lake sporewood: in the Lullaby) (wall-clock time between animation frames; builders use it to check
-// the low setting is no slower).
+// Lily Maze (with --lake sporewood: in the Lullaby and in the Drowned Greenhouse's aisle, found) (wall-clock time between
+// animation frames; builders use it to check the low setting is no slower).
 //
 // How each view is made the same every time:
 // - The page's clock is replaced before the game loads: every animation frame moves the game on by a fixed step,
@@ -160,6 +161,10 @@ const SPOREWOOD_PLACES = {
   // Cup is in the fishing camera's frame).
   lullabyCap: { at: { x: -44, z: -21 }, look: { x: 51, z: 8 } },
   cupNear: { at: { x: 44, z: 16 }, look: { x: 48, z: 6 } },
+  // The Drowned Greenhouse in the south-east bay's shallows (its door at 52, -31.3, the aisle running north): the raft in
+  // its flooded aisle facing the door and the lamp, and the raft out in the bay north of it, where it is first seen.
+  greenhouse: { at: { x: 52, z: -25.4 }, look: { x: 52, z: -31 } },
+  ghOutside: { at: { x: 51, z: -11 }, look: { x: 52, z: -31 } },
 };
 
 // The views, in the order they are taken. `session` names the save they need; `at` a place above or "setout" (the
@@ -259,6 +264,33 @@ const SPOREWOOD_VIEWS = [
     hour: "dusk",
     act: "driftCast",
     floatClose: { elev: 16, dist: 3.2, side: 0.6 },
+  },
+  // The Drowned Greenhouse: found and its mist lifted, from the fishing camera in its aisle by the hour (the save's
+  // evening is 7, so Burr's lamp is lit at dusk and at night); hidden under its mist from the bay with the lamp lit; the
+  // lamp seen far off from the set-out spot at dusk; the find, as the raft sails into it (the title shown with the
+  // game's own page, so `hud`); and close on the door, the lamp and the clear spot beside it for Burr.
+  ...["day", "dusk", "night"].map((hour) => ({
+    name: `greenhouse-${hour}`,
+    session: "ghfound",
+    at: "greenhouse",
+    hour,
+  })),
+  { name: "greenhouse-hidden-dusk", session: "crossed", at: "ghOutside", hour: "dusk" },
+  { name: "greenhouse-lamp-far-dusk", session: "crossed", at: "setout", hour: "dusk" },
+  {
+    name: "greenhouse-find-dusk",
+    session: "crossed",
+    at: "ghOutside",
+    hour: "dusk",
+    act: "findGreenhouse",
+    hud: true,
+  },
+  {
+    name: "greenhouse-door-night",
+    session: "ghfound",
+    at: "greenhouse",
+    hour: "night",
+    cam: { x: 52.6, y: 1.1, z: -30.9, side: [0.25, 0.97], elev: 22, dist: 6 },
   },
 ];
 const VIEWS = LAKE === "sporewood" ? SPOREWOOD_VIEWS : MOSSMERE_VIEWS;
@@ -383,7 +415,24 @@ function cupSave(quality) {
   return JSON.stringify(save);
 }
 
-const SAVES = { found: foundSave, locked: lockedSave, crossed: crossedSave, cup: cupSave };
+// Sporewood with the Drowned Greenhouse found and its mist lifted (as a sail into it leaves the save).
+function ghFoundSave(quality) {
+  const save = JSON.parse(crossedSave(quality)),
+    loop = save.meta.loop;
+  loop.places = loop.places || { revealed: [] };
+  loop.places.revealed = loop.places.revealed || [];
+  for (const list of [loop.maps.places, loop.places.revealed, (loop.lifted = loop.lifted || [])])
+    list.includes("drowned_greenhouse") || list.push("drowned_greenhouse");
+  return JSON.stringify(save);
+}
+
+const SAVES = {
+  found: foundSave,
+  locked: lockedSave,
+  crossed: crossedSave,
+  cup: cupSave,
+  ghfound: ghFoundSave,
+};
 
 // ---- steps on the page ---------------------------------------------------------------------------------------------
 
@@ -548,6 +597,14 @@ async function stage(s, view, setout) {
       },
       [place, view.floatClose || null],
     );
+  } else if (view.act === "findGreenhouse") {
+    // Sail into the Greenhouse's aisle: the game finds it (its update, four times a second) and lifts its mist.
+    await s.eval(() => {
+      const g = window.__gw,
+        a = g.data.loopPlace("drowned_greenhouse")?.area;
+      if (!a) throw new Error("no Drowned Greenhouse");
+      g.player.teleport({ x: a.x, z: a.z + 1 }, 0);
+    });
   } else if (view.act === "hook") {
     await s.eval(() => {
       const g = window.__gw;
@@ -567,17 +624,25 @@ async function stage(s, view, setout) {
 async function shoot(s, view, dir, setting = RAFTS[0]) {
   await setStep(s, 50);
   // A hooked fish's fight and the mist lift are moments: they settle for less time.
-  const settle = view.act === "hook" ? 30 : view.act === "liftMist" ? 70 : SETTLE_FRAMES;
+  const settle =
+    view.act === "hook"
+      ? 30
+      : view.act === "liftMist"
+        ? 70
+        : view.act === "findGreenhouse"
+          ? 72
+          : SETTLE_FRAMES;
   await frames(s, settle);
   await setStep(s, 1000 / 30);
   await s.page.setViewportSize({ width: SHOT_W, height: SHOT_H });
   await setQuality(s, QUALITY);
   await frames(s, SHOT_FRAMES);
-  await s.page.addStyleTag({
-    content:
-      "*{visibility:hidden!important} canvas[data-scenery-shot]{visibility:visible!important}" +
-      " html,body{background:#000!important}",
-  });
+  view.hud ||
+    (await s.page.addStyleTag({
+      content:
+        "*{visibility:hidden!important} canvas[data-scenery-shot]{visibility:visible!important}" +
+        " html,body{background:#000!important}",
+    }));
   await frames(s, 1);
   const file = join(dir, `${view.name}${suffix(setting)}.png`);
   await s.page.screenshot({ path: file, timeout: 300_000 });
@@ -644,7 +709,9 @@ async function speed() {
     const q = args.includes("--quality") ? QUALITY : "low";
     // The scenery is built for the quality the save names when the lake loads (low or not, and medium or high for
     // some pieces), so the save carries the measured quality: a change of setting alone does not rebuild it.
-    const { s, setout } = await openSession(browser, LAKE === "sporewood" ? crossedSave(q) : foundSave(q));
+    // (Sporewood: the Drowned Greenhouse found, so its glass and lamp are there with no mist over them; an older build
+    // simply has no such place)
+    const { s, setout } = await openSession(browser, LAKE === "sporewood" ? ghFoundSave(q) : foundSave(q));
     await setQuality(s, q);
     const measure = () =>
       s.eval(
@@ -667,6 +734,7 @@ async function speed() {
       LAKE === "sporewood"
         ? ["the Lullaby", { at: "lullaby", hour: "dusk" }]
         : ["Lily Maze", { at: "lily", hour: "dusk" }],
+      ...(LAKE === "sporewood" ? [["the Greenhouse", { at: "greenhouse", hour: "dusk" }]] : []),
     ]) {
       await stage(s, view, setout);
       await frames(s, 20);

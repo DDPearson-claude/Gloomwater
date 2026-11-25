@@ -1510,6 +1510,13 @@ const LOSS_RAN = "It ran before the hook was set. A Turnback Hook sets itself.";
 // ---- Sporewood's Leader and Hook parts (sporewood-plan.md "Tackle") ----------------------------------------
 const SPORE_PARTS = ["brass_trace", "mossthread_snood", "burl_hook"];
 // Sporewood's shy fish (wary or delicate on both leaders), its toothy ones, its rough ones.
+// The Drowned Greenhouse's words (src/game.js: Ca.maps.drowned_greenhouse, Ca.murk.firstSold, the piranha's record).
+const GREENHOUSE_LINE = "Rows of old glasshouses lie half sunk here, with moss in the broken panes.";
+const PIRANHA_HINT =
+  "It bites only at dusk and at night, and only in the Drowned Greenhouse. Cut Strip and the Ember Minnow suit it best.";
+const PIRANHA_LORE =
+  "A deep, short piranha, grey above and red below. Its teeth are as sharp as broken glass.";
+const MURK_PIRANHA = "Greenhouse piranha. Teeth like glass. Brass holds them, thread won't.";
 const SPORE_SHY = ["hushcap_koi", "falsesmile_barb", "netcloud_fry", "sleepspore_jelly"];
 const SPORE_TOOTHY = ["sporebelly_puffer", "lostsea_mackerel", "mildew_angler", "festival_puffer"];
 const SPORE_ROUGH = [
@@ -9380,6 +9387,306 @@ const SCENARIOS = [
     },
   },
 
+  {
+    name: "Drowned Greenhouse: an old save loads it unfound, with no name on the chart, no Odds row, nothing in the Journal and its mist standing; sailing into it finds it with its title and the mist lifting; then it is on the chart, the Odds sheet and the Journal's lake page with its line, and kept after a save and reload; its lamp is lit from evening 2 at dusk and after",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 900_000,
+    async run(session) {
+      const GH = "drowned_greenhouse";
+      // Where it shows at home: the chart's places, the Odds page's places, the Journal's lake page (its group and
+      // its fish's card).
+      const shown = async () => {
+        const chart = await chartPlaces(session);
+        const r = await session.eval((GH) => {
+          const loop = window.__gw.progression.loop;
+          return {
+            owned: loop.state().maps.places.includes(GH),
+            lifted: loop.lifted().includes(GH),
+            odds: loop.sheet({}).picks.choices.map((c) => c.id),
+          };
+        }, GH);
+        await session.eval(() => window.__gw.ui.openJournal({ zone: "sporewood" }));
+        await session.waitFor(
+          "the lake's page",
+          15_000,
+          () => !!document.querySelector(".gw-cat-list .gw-cat-card"),
+        );
+        const journal = await session.eval((GH) => {
+          const group = document.querySelector(`.gw-cat-group[data-place="${GH}"]`);
+          return {
+            group: !!group,
+            name: group?.querySelector(".gw-cat-gh b")?.textContent ?? null,
+            line: group?.querySelector(".gw-cat-pline")?.textContent ?? null,
+            piranha: !!document.querySelector('[data-species="razorpane_piranha"]'),
+            piranhaInGroup: !!group?.querySelector('[data-species="razorpane_piranha"]'),
+            words: /Drowned Greenhouse|Razorpane/.test(
+              document.querySelector(".gw-modal.gw-in")?.textContent ?? "",
+            ),
+          };
+        }, GH);
+        await backToJetty(session);
+        return { ...r, chart: chart.includes(GH), journal };
+      };
+      await session.toHome();
+      const before = await shown();
+      check(
+        !before.owned &&
+          !before.chart &&
+          !before.odds.includes(GH) &&
+          !before.journal.group &&
+          !before.journal.piranha &&
+          !before.journal.words,
+        `unfound, it shows: ${JSON.stringify(before)}`,
+      );
+      await session.sail(SLOW_SAIL);
+      await session.eval(() => {
+        window.__lifts = [];
+        window.__gw.bus.on("place:lift", (e) => window.__lifts.push(`${e.placeId}:${e.phase}:${e.name}`));
+      });
+      // Its lamp: lit on evening 2 and after, at dusk and at night; dark by day and on evening 1.
+      const lamp = await session.eval(() => {
+        const g = window.__gw,
+          run = g.state.run,
+          lantern = g.render.scene.getObjectByName("greenhouseLamp"),
+          lit = () => g.data.greenhouseLampLit(g),
+          out = { evening: run.evening };
+        g.debug.setPhase("calm");
+        out.day = lit();
+        g.debug.setPhase("dusk");
+        out.dusk = lit();
+        g.debug.setPhase("gloomtide");
+        out.night = lit();
+        const was = run.evening;
+        run.evening = 1;
+        out.first = lit();
+        run.evening = was;
+        g.debug.setPhase("calm");
+        out.lantern = !!lantern;
+        return out;
+      });
+      check(
+        lamp.evening >= 2 && !lamp.day && lamp.dusk && lamp.night && !lamp.first && lamp.lantern,
+        `the lamp: ${JSON.stringify(lamp)}`,
+      );
+      // Hidden on the water: its mist stands, a cast into it is lost in the mist, and the raft near it finds nothing.
+      const hidden = await session.eval((GH) => {
+        const g = window.__gw;
+        g.player.teleport({ x: 52, z: -16 }, 0);
+        return {
+          bank: g.world.places().banks.find((b) => b.id === GH),
+          water: g.fishing.waterAt({ x: 52, z: -26.7 }),
+        };
+      }, GH);
+      await session.pause(1500);
+      const near = await session.eval(
+        (GH) => window.__gw.progression.loop.state().maps.places.includes(GH),
+        GH,
+      );
+      check(
+        hidden.bank && !hidden.bank.lifted && hidden.bank.op > 0.5 && hidden.water?.mist === true && !near,
+        `hidden: ${JSON.stringify({ ...hidden, near })}`,
+      );
+      // Sailing into its water finds it: its title, then the mist lifts.
+      await session.eval(() => window.__gw.player.teleport({ x: 52, z: -25.6 }, 0));
+      await session.waitFor(
+        "the Greenhouse found and lifted",
+        120_000,
+        (GH) => window.__gw.progression.loop.lifted().includes(GH),
+        GH,
+      );
+      await session.pause(800);
+      const found = await session.eval((GH) => {
+        const g = window.__gw,
+          s = g.progression.loop.state();
+        return {
+          lifts: window.__lifts.slice(),
+          owned: s.maps.places.includes(GH),
+          revealed: s.places.revealed.includes(GH),
+          bank: g.world.places().banks.find((b) => b.id === GH),
+          water: g.fishing.waterAt({ x: 52, z: -26.7 }),
+        };
+      }, GH);
+      check(
+        found.lifts.includes(`${GH}:title:The Drowned Greenhouse`) &&
+          found.owned &&
+          found.revealed &&
+          found.bank?.lifted &&
+          found.water?.placeId === GH &&
+          !found.water.mist,
+        `found: ${JSON.stringify(found)}`,
+      );
+      await session.goHomeAndTally();
+      const after = await shown();
+      check(
+        after.owned &&
+          after.lifted &&
+          after.chart &&
+          after.odds.includes(GH) &&
+          after.journal.name === "The Drowned Greenhouse" &&
+          after.journal.line === GREENHOUSE_LINE &&
+          after.journal.piranhaInGroup,
+        `found, it shows: ${JSON.stringify(after)}`,
+      );
+      // Saved and reloaded: still found and lifted, and on the chart.
+      await reloadToHome(session);
+      const kept = await shown();
+      check(
+        kept.owned && kept.lifted && kept.chart && kept.odds.includes(GH),
+        `after a reload: ${JSON.stringify(kept)}`,
+      );
+      return `hidden (no chart, Odds or Journal; mist; lamp lit from evening 2 at dusk); found by sailing in with its title; on the chart, Odds and Journal with its line; kept after a reload`;
+    },
+  },
+  {
+    name: "Razorpane Piranha: it bites only in the Drowned Greenhouse, at dusk and at night, best on Cut Strip and the Ember Minnow; it is toothy on the Brass Trace and the Mossthread Snood and a quick nibbler on the Burl Hook; its catch card, its Journal page and its field guide entry show it, and Murk has a line at its first sale",
+    fixture: "sporewood-crossed",
+    debug: true,
+    timeoutMs: 600_000,
+    editSave(save) {
+      withSporeParts(["brass_trace", "mossthread_snood", "burl_hook"])(save);
+      const loop = save.meta.loop;
+      loop.lures = [...new Set([...loop.lures, "ember_minnow", "spore_moth"])];
+      loop.bait.sporewood = { ...loop.bait.sporewood, spore_cake: 20, cut_strip: 20 };
+      for (const list of [loop.maps.places, loop.lifted, loop.places.revealed])
+        list.includes("drowned_greenhouse") || list.push("drowned_greenhouse");
+    },
+    async run(session) {
+      const ID = "razorpane_piranha";
+      await session.toHome();
+      // Not caught yet, its Journal page gives its hint.
+      await session.eval((id) => window.__gw.ui.openJournal({ zone: "sporewood", sel: id }), ID);
+      await session.waitFor("its page", 10_000, () => !!document.querySelector(".gw-jr-where"));
+      const hint = await visibleText(session, ".gw-jr-where");
+      check(hint === PIRANHA_HINT, `its hint: "${hint}"`);
+      await backToJetty(session);
+      await session.sail(SLOW_SAIL);
+      // Its niche by the game's own roll: its share at the Greenhouse by hour and rig, never elsewhere.
+      const r = await session.eval((id) => {
+        const g = window.__gw,
+          d = g.debug,
+          loop = g.progression.loop,
+          share = (light, place, rig) => {
+            d.setPhase(light);
+            if (rig.bait) loop.fit("lure", null), loop.fit("bait", rig.bait);
+            else loop.fit("lure", rig.lure);
+            const roll = d.fishPoolRoll(1, { place, bait: rig.bait ?? null });
+            return roll.mist ? "mist" : +(roll.shares?.[id] ?? 0).toFixed(3);
+          },
+          ember = { lure: "ember_minnow" },
+          cut = { lure: null, bait: "cut_strip" },
+          cake = { lure: null, bait: "spore_cake" },
+          moth = { lure: "spore_moth" };
+        const out = {
+          duskEmber: share("dusk", "drowned_greenhouse", ember),
+          nightEmber: share("gloomtide", "drowned_greenhouse", ember),
+          duskCut: share("dusk", "drowned_greenhouse", cut),
+          nightCake: share("gloomtide", "drowned_greenhouse", cake),
+          dayEmber: share("calm", "drowned_greenhouse", ember),
+          dayCut: share("calm", "drowned_greenhouse", cut),
+          duskMoth: share("dusk", "drowned_greenhouse", moth),
+          lullaby: share("dusk", "lullaby", ember),
+          harp: share("gloomtide", "gill_harp", ember),
+          open: share("dusk", null, ember),
+        };
+        loop.fit("lure", null), loop.fit("bait", "spore_cake");
+        d.setPhase("dusk");
+        // Grip on landing (+4 on the Brass Trace, -4 on the Mossthread Snood) and the Burl Hook's strike.
+        const parts = (leader) =>
+          g.data.catchParts(
+            id,
+            "keeper",
+            { hold: { rod: 5, line: 5, reel: 5 } },
+            { strike: "clean", lake: "sporewood", leader },
+          );
+        out.trace = parts("brass_trace").hold - parts(null).hold;
+        out.snood = parts("mossthread_snood").hold - parts(null).hold;
+        loop.fitPart("hook", "burl_hook");
+        out.burl = d.fishHookSet({ grade: "clean", speciesId: id })?.grade;
+        loop.fitPart("hook", "mere_hook");
+        return out;
+      }, ID);
+      check(
+        r.duskEmber >= 0.6 &&
+          r.nightEmber >= 0.5 &&
+          r.duskCut >= 0.1 &&
+          r.dayEmber === 0 &&
+          r.dayCut === 0 &&
+          r.duskMoth === 0 &&
+          r.lullaby === 0 &&
+          r.harp === 0 &&
+          r.open === 0,
+        `its shares: ${JSON.stringify(r)}`,
+      );
+      check(r.trace === 4 && r.snood === -4 && r.burl === "struck", `its tags: ${JSON.stringify(r)}`);
+      // Landed: its card names it and draws its portrait.
+      await session.eval((id) => window.__gw.debug.instantCatch(id), ID);
+      await session.waitFor("its catch card", 30_000, () => !!document.querySelector(".gw-cc-keep"));
+      await session.pause(1200);
+      const card = await session.eval(() => ({
+        text: document.querySelector(".gw-modal.gw-in")?.textContent.replace(/\s+/g, " ") ?? "",
+        art: [...document.querySelectorAll(".gw-modal.gw-in canvas")].some((c) => c.width > 0),
+      }));
+      check(
+        card.text.includes("Razorpane Piranha") && card.art,
+        `its card: ${JSON.stringify(card).slice(0, 300)}`,
+      );
+      await session.clickButton(/^\d?Keep\b/);
+      await session.pause(600);
+      await session.closeGuides(4000);
+      // Murk at the tally: his line for the first one sold, in his box (every page his box shows is noted).
+      await session.eval(() => {
+        window.__murkSaid = [];
+        setInterval(() => {
+          const t = document.querySelector(
+            '.gw-modal.gw-in[data-modal="murktalk"] .gw-murk-text',
+          )?.textContent;
+          t && !window.__murkSaid.includes(t) && window.__murkSaid.push(t);
+        }, 100);
+      });
+      await session.goHomeAndTally();
+      for (
+        let i = 0;
+        i < 20 && !(await session.eval((t) => window.__murkSaid.includes(t), MURK_PIRANHA));
+        i++
+      ) {
+        await session.eval((b) => document.querySelector(b)?.click(), MURK_BOX_BUTTON);
+        await session.pause(700);
+      }
+      const said = await session.eval(() => ({
+        lines: window.__murkSaid.slice(),
+        flag: window.__gw.progression.loop.state().said?.["firstSold:razorpane_piranha"] === true,
+      }));
+      check(said.lines.includes(MURK_PIRANHA) && said.flag, `Murk said: ${JSON.stringify(said)}`);
+      await session.closeGuides(4000);
+      await backToJetty(session);
+      // Its Journal page now: its lore, and the line the game writes for a caught fish.
+      await session.eval((id) => window.__gw.ui.openJournal({ zone: "sporewood", sel: id }), ID);
+      await session.waitFor("its page", 10_000, () => !!document.querySelector(".gw-jr-where"));
+      const page = await visibleText(session, ".gw-modal.gw-in");
+      check(
+        page.includes("Razorpane Piranha") && page.includes(PIRANHA_LORE),
+        `its Journal page: ${page.slice(0, 400)}`,
+      );
+      await backToJetty(session);
+      // The field guide (the page the Journal opens): its entry, with its lore and portrait, and its 3D model.
+      const guide = await session.eval((id) => {
+        const html = JSON.parse(document.getElementById("gw-spore-guide-template").textContent);
+        const at = html.indexOf(`{"id": "${id}"`),
+          entry = at < 0 ? "" : html.slice(at, html.indexOf("}", at) + 1);
+        return {
+          entry: entry.slice(0, 200),
+          portrait: /"portrait": "data:image\/webp;base64,[A-Za-z0-9+/=]{2000,}"/.test(entry),
+          model: html.includes(`${id}:{form:'deepbarb'`),
+        };
+      }, ID);
+      check(
+        guide.entry.includes(PIRANHA_LORE) && guide.portrait && guide.model,
+        `its field guide entry: ${JSON.stringify(guide)}`,
+      );
+      return `at the Greenhouse ${Math.round(100 * r.duskEmber)}% on the Ember Minnow at dusk, ${Math.round(100 * r.nightEmber)}% at night, ${Math.round(100 * r.duskCut)}% on Cut Strip; never by day or elsewhere; Grip +4 / -4; Burl Hook ${r.burl}; card, Murk, Journal and field guide`;
+    },
+  },
   {
     name: "guide in Sporewood: the first-play card about worms and the spoon does not come up after a cast and a catch there, on a save whose guide is not finished",
     fixture: "sporewood-crossed",
